@@ -1,11 +1,11 @@
 #!/bin/bash
-# Run this script to initialize all database after a fresh docker compose up.
+# Run this script to initialize all databases after a fresh docker compose up.
 
 set -e  # Exit on first error
 set -o pipefail
 
 # Source the .env file to load the variables
-source ./.env
+source .env
 
 
 # Export PostgreSQL environment variables so they're available to npm/Node.js processes
@@ -48,23 +48,45 @@ curl -X PUT "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}" \
   -H "Authorization: Bearer ${QDRANT_API_KEY}" \
   -d '{
         "vectors": {
-          "size": 1536,
+          "size": 4096,
           "distance": "Cosine"
         }
       }'
 
+# Ensure MinIO environment variables are set
+if [[ -z "$AWS_ACCESS_KEY_ID" ]]; then
+    AWS_ACCESS_KEY_ID="minioadmin"
+    print_warning "AWS_ACCESS_KEY_ID not set, using default: $AWS_ACCESS_KEY_ID"
+fi
+
+if [[ -z "$AWS_SECRET_ACCESS_KEY" ]]; then
+    AWS_SECRET_ACCESS_KEY="minioadmin"
+    print_warning "AWS_SECRET_ACCESS_KEY not set, using default: $AWS_SECRET_ACCESS_KEY"
+fi
+
+# Create MinIO bucket using AWS CLI or curl
+if command -v aws &> /dev/null; then
+    # on AWS -- untested
+    # aws s3 mb s3://"${S3_BUCKET_NAME}" --endpoint-url http://localhost:9000 || print_warning "Failed to create MinIO bucket (might already exist)"
+
+    # on mac osx
+    # brew update
+    # brew install minio/mc
+    mc alias set minio http://localhost:9000 "${AWS_ACCESS_KEY_ID}" "${AWS_SECRET_ACCESS_KEY}"
+    mc mb --ignore-existing minio/${S3_BUCKET_NAME}
+else
+    print_warning "AWS CLI not found, skipping MinIO bucket creation"
+fi
+
+echo "MinIO bucket setup complete!"
+
 # Create Default Global Project
-curl -X POST "${RAILWAY_URL}/createProject" \
+curl -sS -X POST "${RAILWAY_URL}/createProject" \
   -H "Content-Type: application/json" \
   -d "{
         \"project_name\": \"$PROJECT_NAME\",
         \"project_description\": \"$PROJECT_DESC\",
         \"project_owner_email\": \"$PROJECT_EMAIL\",
         \"allow_logged_in_users\": true
-      }"
-
-# TODO: Keycloak Setup Reminder
-echo "Keycloak realm setup is done by mouting the keycloak-realm.json file in the container at startup. 
-echo "Make sure realm was loaded correctly if you are having issues with keycloak."
-
-echo "Initialization complete."
+      }" \
+  -w "\nHTTP_STATUS:%{http_code}\n"
