@@ -23,7 +23,7 @@ This will start:
 - PostgreSQL (port 5432)
 - Redis (port 6379)
 - Qdrant (port 6333)
-- MinIO (port 10000)
+- MinIO (port 9001)
 - RabbitMQ (port 5672)
 - Keycloak (port 8080)
 

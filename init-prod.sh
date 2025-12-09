@@ -62,81 +62,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🚀 Initializing UIUC.chat Development Environment"
+echo "🚀 Initializing UIUC.chat Production Environment"
 echo "=================================================="
-
-# Clean mode: Clear existing containers and volumes
-if [ "$CLEAN_MODE" = true ]; then
-    print_warning "CLEAN MODE: Clearing existing containers, volumes, and data..."
-    
-    # Stop and remove containers
-    print_status "Stopping and removing existing containers..."
-    docker-compose -f docker-compose.dev.yaml down -v 2>/dev/null || true
-    
-    # Remove any remaining containers
-    print_status "Removing any remaining containers..."
-    docker ps -aq --filter "name=redis|qdrant|minio|postgres-illinois-chat|postgres-keycloak|rabbitmq|keycloak|worker" | xargs -r docker rm -f 2>/dev/null || true
-    
-    # Remove volumes
-    print_status "Removing volumes..."
-    docker volume rm uiuc-chat-network_redis-data uiuc-chat-network_qdrant-data uiuc-chat-network_minio-data uiuc-chat-network_postgres-illinois-chat uiuc-chat-network_postgres-keycloak uiuc-chat-network_rabbitmq 2>/dev/null || true
-    
-    # Clear Qdrant data directory
-    print_status "Clearing Qdrant data..."
-    rm -rf qdrant_data/* 2>/dev/null || true
-    
-    # Frontend-specific cleanup removed (frontend is a submodule)
-    
-    print_success "Cleanup completed!"
-    echo ""
-fi
 
 # Check if .env file exists
 if [ ! -f .env ]; then
-    print_warning ".env file not found. Creating from template..."
-    if [ -f .env.template ]; then
-        cp .env.template .env
-        print_success "Created .env from template"
-    else
-        print_error ".env.template not found. Creating default .env file..."
-        cat > .env << 'EOF'
-# Database Configuration
-POSTGRES_USERNAME=postgres
-POSTGRES_PASSWORD=password
-POSTGRES_ENDPOINT=localhost
-POSTGRES_PORT=5432
-POSTGRES_DATABASE=postgres
-
-# Qdrant Configuration
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=your-strong-key-here
-
-# Redis Configuration
-INGEST_REDIS_PASSWORD=password
-
-# MinIO Configuration
-AWS_ACCESS_KEY_ID=minioadmin
-AWS_SECRET_ACCESS_KEY=minioadmin
-DOCKER_INTERNAL_MINIO_API_PORT=10000
-DOCKER_INTERNAL_MINIO_DASHBOARD_PORT=10001
-PUBLIC_MINIO_API_PORT=10000
-PUBLIC_MINIO_DASHBOARD_PORT=9001
-
-# RabbitMQ Configuration
-RABBITMQ_USER=guest
-RABBITMQ_PASS=guest
-
-# Keycloak Configuration
-KEYCLOAK_ADMIN_USERNAME=admin
-KEYCLOAK_ADMIN_PASSWORD=admin
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-
-# Other Configuration
-OPENAI_API_KEY=your-openai-api-key-here
-EOF
-        print_success "Created default .env file"
-    fi
+    print_warning ".env file not found. Please create based on .env.template, but replace with secure passwords."
+    exit 1
 fi
 
 # Validate .env file format
@@ -163,7 +95,7 @@ fi
 
 # Start Docker Compose services
 print_status "Starting Docker Compose services..."
-docker-compose -f docker-compose.dev.yaml up -d
+docker-compose -f docker-compose.yaml up -d
 
 print_success "Docker Compose services started!"
 
@@ -176,7 +108,7 @@ print_status "Checking if services started successfully..."
 
 # Wait for essential services to be healthy
 print_status "Waiting for PostgreSQL to be healthy..."
-if docker-compose -f docker-compose.dev.yaml ps postgres-illinois-chat | grep -q "healthy"; then
+if docker-compose -f docker-compose.yaml ps postgres-illinois-chat | grep -q "healthy"; then
     print_success "✓ PostgreSQL is healthy"
 else
     print_status "Waiting for PostgreSQL health check..."
@@ -185,7 +117,7 @@ else
         # Start a background process to kill the loop after 60 seconds
         sleep 60 && kill $$ 2>/dev/null &
         # Wait for the service to become healthy
-        until docker-compose -f docker-compose.dev.yaml ps postgres-illinois-chat | grep -q "healthy"; do 
+        until docker-compose -f docker-compose.yaml ps postgres-illinois-chat | grep -q "healthy"; do
             sleep 2
         done
     ) &
@@ -195,13 +127,13 @@ else
     else
         print_error "✗ PostgreSQL failed to become healthy"
         print_status "Checking Docker logs..."
-        docker-compose -f docker-compose.dev.yaml logs postgres-illinois-chat
+        docker-compose -f docker-compose.yaml logs postgres-illinois-chat
         exit 1
     fi
 fi
 
 print_status "Waiting for Qdrant to be healthy..."
-if docker-compose -f docker-compose.dev.yaml ps qdrant | grep -q "healthy"; then
+if docker-compose -f docker-compose.yaml ps qdrant | grep -q "healthy"; then
     print_success "✓ Qdrant is healthy"
 else
     print_status "Waiting for Qdrant health check..."
@@ -210,7 +142,7 @@ else
         # Start a background process to kill the loop after 60 seconds
         sleep 60 && kill $$ 2>/dev/null &
         # Wait for the service to become healthy
-        until docker-compose -f docker-compose.dev.yaml ps qdrant | grep -q "healthy"; do 
+        until docker-compose -f docker-compose.yaml ps qdrant | grep -q "healthy"; do
             sleep 2
         done
     ) &
@@ -220,7 +152,7 @@ else
     else
         print_error "✗ Qdrant failed to become healthy"
         print_status "Checking Docker logs..."
-        docker-compose -f docker-compose.dev.yaml logs qdrant
+        docker-compose -f docker-compose.yaml logs qdrant
         exit 1
     fi
 fi
@@ -389,7 +321,7 @@ else
         print_error "✗ Failed to create Qdrant collection after $attempts attempts"
         print_status "Last response: $last_response"
         print_status "Checking Qdrant logs..."
-        docker-compose -f docker-compose.dev.yaml logs qdrant
+        docker-compose -f docker-compose.yaml logs qdrant
         exit 1
     fi
 fi
@@ -429,8 +361,8 @@ echo "   - PostgreSQL (UIUC Chat): localhost:5432"
 echo "   - PostgreSQL (Keycloak): localhost:5433"
 echo "   - Redis: localhost:6379"
 echo "   - Qdrant: localhost:6333"
-echo "   - MinIO: localhost:10000"
-echo "   - MinIO Console: localhost:9001"
+echo "   - MinIO: localhost:9001"
+echo "   - MinIO Console: localhost:9002"
 echo "   - RabbitMQ: localhost:5672"
 echo "   - RabbitMQ Management: localhost:15672"
 echo "   - Keycloak: localhost:8080"
@@ -447,6 +379,6 @@ echo "   cd uiuc-chat-backend && source venv/bin/activate && flask --app ai_ta_b
 echo ""
 echo "🔍 To verify everything is working:"
 echo "   - Check containers: docker ps"
-echo "   - Check logs: docker-compose -f docker-compose.dev.yaml logs"
+echo "   - Check logs: docker-compose -f docker-compose.yaml logs"
 echo "   - Test Qdrant: curl http://localhost:6333/collections"
 echo "   - Test PostgreSQL: psql -h localhost -p 5432 -U postgres -d postgres"

@@ -24,9 +24,9 @@ Failure to obtain a commercial license for commercial use is a violation of the 
 sudo bash init.sh
 ```
 This will: 
-* Create a `.env` file. You can customize this later to change the default passwords.
-* Initialize all our databases (Redis, Minio, Qdrant, Postgres/Suapabse)
-* Start the backend service running on http://localhost:3012 To customize HTTP port used as the main entrypoint, set the `FLASK_PORT` variabel in your `.env`.
+* Create a `.env` file. You can customize this later to change the default passwords
+* Initialize all our databases (Redis, Minio, Qdrant, Postgres)
+* Start the backend service running on http://localhost:8000
 
 
 To start fresh, you can use: 
@@ -35,16 +35,15 @@ To start fresh, you can use:
 sudo bash init.sh --wipe_data
 ```
 
-### Configuring Postgres (Supabase)
+### Configuring Postgres
 
-It's strongly recommende to change your passwords away from the defaults. The Supabase .env file is separate from the rest of the code for seamless compatibility with Supabase's self hosted offering on github, and to maintain compatibility with their guides and general community information.
-The .env file is stored in the local path: `./supabase/docker/.env`
+It's strongly recommended to change your passwords away from the defaults.
 
 ### Configuring Database passwords
 
 Customize your env variables. The SQL database can be any of SQLite, Postgres, and Supabase. The object storage can be Minio or AWS S3. 
 
-### Take schema dump from Postgres (Supabase)
+### Take schema dump from Postgres
 ```bash
 PGPASSWORD=<password> pg_dump -h aws-0-us-east-1.pooler.supabase.com -U postgres.twzwfuydgnnjcaopyfdv -d postgres --schema-only > schema.sql
 ```
@@ -93,3 +92,11 @@ sudo bash init.sh --rebuild="uiuc-chat-frontend flask-app "
 ```
 
 If you're interested in contributing, check out our [official developer quickstart](https://docs.uiuc.chat/developers/developer-quickstart).
+
+# Docker
+
+To force build all required images (frontend, backend, worker) run:
+
+```bash
+docker compose build --no-cache
+```
