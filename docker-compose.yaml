@@ -2,8 +2,7 @@ services:
   redis:
     image: redis:7.2
     restart: unless-stopped
-    container_name: redis
-    command: redis-server --requirepass ${INGEST_REDIS_PASSWORD}
+    command: redis-server --requirepass your-strong-password-here
     ports:
        - 6379:6379
     networks:
@@ -11,81 +10,67 @@ services:
     volumes:
       - redis-data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s # Optional: Time to wait before starting health checks
 
   qdrant:
     image: qdrant/qdrant:v1.9.0
     restart: unless-stopped
-    container_name: qdrant
     # environment:
     #   - QDRANT_API_KEY=${QDRANT_API_KEY}
     ports:
       - 6333:6333
       - 6334:6334
-    expose:
-      - 6333
-      - 6334
-      - 6335
     volumes:
       - qdrant-data:/qdrant/storage
       - ./qdrant_config.yaml:/qdrant/config/production.yaml # Mount the config file directly as a volume
     networks:
       - uiuc-chat-network
     healthcheck:
-      test:
-        - CMD-SHELL
-        - bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/readyz || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s # Give Qdrant time to start before health checks begin
 
   minio:
     image: minio/minio:RELEASE.2024-06-13T22-53-53Z
     restart: unless-stopped
-    container_name: minio
     # Customize env vars in .env file
-    environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
-      MINIO_API_PORT: ${DOCKER_INTERNAL_MINIO_API_PORT}
-      MINIO_CONSOLE_PORT: ${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT}
-    command: server /data --console-address ":${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT}" --address ":${DOCKER_INTERNAL_MINIO_API_PORT}"
+    env_file:
+      - .env.prod
+    command: server /data --console-address ":9001" --address ":9000"
     ports:
-      - ${PUBLIC_MINIO_API_PORT}:${DOCKER_INTERNAL_MINIO_API_PORT} # API access
-      - ${PUBLIC_MINIO_DASHBOARD_PORT}:${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT} # Dashboard access
-    expose:
-      - ${PUBLIC_MINIO_API_PORT}
-      - ${PUBLIC_MINIO_DASHBOARD_PORT}
+      - "9000:9000" # MinIO API port
+      - "9001:9001" # MinIO Console port (note: Console deprecated Q4 2024)
     networks:
       - uiuc-chat-network
     volumes:
       - minio-data:/data
     healthcheck:
-      test:
-        - CMD-SHELL
-        - bash -c ':> /dev/tcp/127.0.0.1/${DOCKER_INTERNAL_MINIO_API_PORT}' || exit 1
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
-      timeout: 10s
+      timeout: 20s
       retries: 3
 
-  crawlee:
-    build: ./ic_crawlee
-    container_name: ic_crawlee
-    networks:
-      - uiuc-chat-network
-    volumes:
-      - ./data:/data
-    ports:
-      - "3345:3000"
-    env_file:
-      - .env
-    environment:
-      - INGEST_URL=http://flask-app:8001/ingest
-    depends_on:
-      - redis
+#  crawlee:
+#    build: ./ic_crawlee
+#    container_name: ic_crawlee
+#    networks:
+#      - uiuc-chat-network
+#    volumes:
+#      - ./data:/data
+#    ports:
+#      - "3345:3000"
+#    env_file:
+#      - .env
+#    environment:
+#      - INGEST_URL=http://flask-app:8001/ingest
+#    depends_on:
+#      - redis
 
   postgres-illinois-chat:
     image: postgres
@@ -94,12 +79,14 @@ services:
       - uiuc-chat-network
     volumes:
       - postgres-illinois-chat:/var/lib/postgres/data
+    env_file:
+      - .env.prod
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -115,10 +102,12 @@ services:
       - postgres-keycloak:/var/lib/postgres/data
     ports:
       - "5433:5432"
+    env_file:
+      - .env.prod
     environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -127,9 +116,8 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
+    env_file:
+      - .env.prod
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -144,16 +132,17 @@ services:
       - rabbitmq:/var/lib/rabbitmq
 
   keycloak:
-#    platform: linux/amd64  # M chip
+    platform: linux/amd64  # M chip
     image: quay.io/keycloak/keycloak:26.1
-    container_name: keycloak
     restart: unless-stopped
     env_file:
-      - .env
+      - .env.prod
     ports:
       - "8080:8080"
     networks:
       - uiuc-chat-network
+    depends_on:
+      - postgres-keycloak
     command:
       - start-dev
       - --http-enabled=true
@@ -161,26 +150,23 @@ services:
       - --hostname-strict=false
       - --db=postgres
       - --db-url=jdbc:postgresql://postgres-keycloak:5432/postgres
-      - --db-username=${POSTGRES_USER}
-      - --db-password=${POSTGRES_PASSWORD}
+      - --db-username=postgres
+      - --db-password=password
       - --import-realm
     environment:
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USERNAME}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - KC_METRICS_ENABLED=true
       - KC_HEALTH_ENABLED=true
     volumes:
       - ./keycloak-theme:/opt/keycloak/themes/keywind
       - ./keycloak/realms/realm-export.json:/opt/keycloak/data/import/realm-export.json
     healthcheck:
-      test:
-        - CMD-SHELL
-        - bash -c ':> /dev/tcp/127.0.0.1/8080' || exit 1
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 20s # Give Keycloak time to start up before checking
 
-  worker:
+  backend:
     platform: linux/arm64/v8
     build:
       context: ./uiuc-chat-backend
@@ -189,25 +175,108 @@ services:
     networks:
       - uiuc-chat-network
     ports:
-      - "8001:8001"
+      - "8000:8001"
     depends_on:
       - rabbitmq
       - postgres-illinois-chat
     environment:
       RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
-      POSTGRES_HOST: postgres-illinois-chat
+      POSTGRES_ENDPOINT: postgres-illinois-chat
       POSTGRES_PORT: 5432
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USERNAME: postgres
       QDRANT_URL: "http://qdrant:6333"
-      QDRANT_API_KEY: "your-strong-key-here"
-      QDRANT_COLLECTION_NAME: illinois_chat
+      QDRANT_COLLECTION_NAME: uiuc-chat
       MINIO_URL: http://minio:10000
       AWS_ACCESS_KEY_ID: "minioadmin"
       AWS_SECRET_ACCESS_KEY: "minioadmin"
       S3_BUCKET_NAME: uiuc-chat
+    env_file:
+      - .env.prod
+
+  frontend:
+    build:
+      context: ./uiuc-chat-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_KEYCLOAK_REALM: illinois_chat_realm
+        NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: illinois_chat
+        NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: True
+#        NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ""
+#        NEXT_PUBLIC_POSTHOG_KEY: ""
+#        NEXT_PUBLIC_POSTHOG_HOST: ""
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - uiuc-chat-network
+    env_file:
+      - .env.prod
+    environment:
+      # TODO: For some reason nextjs requires ENV variables to be defined in docker compose as they are not picked up
+      # TODO: from .env.prod specified above in env_file. Need to investigate this further.
+      # Server-side Keycloak URL (for container-to-container communication)
+      KEYCLOAK_URL: "http://keycloak:8080/"
+      # NEXT_PUBLIC_KEYCLOAK_URL is already set in .env.prod for browser-side code
+      # PostgreSQL connection settings (required for server-side database access)
+      POSTGRES_ENDPOINT: postgres-illinois-chat
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Keycloak PostgreSQL connection settings
+      KEYCLOAK_DB_ENDPOINT: postgres-keycloak
+      KEYCLOAK_DB_PORT: 5432
+      KEYCLOAK_DB_DATABASE: postgres
+      KEYCLOAK_DB_USERNAME: postgres
+      KEYCLOAK_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # MinIO configuration
+      LOCAL_MINIO: true
+      AWS_REGION: us-east-1
+      AWS_KEY: minioadmin
+      AWS_SECRET: minioadmin
+      S3_BUCKET_NAME: uiuc-chat
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      # Vyriad MinIO configuration
+      VYRIAD_MINIO_ENDPOINT: http://minio:9000
+      VYRIAD_MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      VYRIAD_MINIO_REGION: us-east-1
+      VYRIAD_MINIO_KEY: minioadmin
+      VYRIAD_MINIO_SECRET: minioadmin
+      # qdrant
+      QDRANT_API_KEY: your-strong-key-here
+      QDRANT_COLLECTION_NAME: uiuc-chat
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      - keycloak
+      - postgres-illinois-chat
+
+  worker:
+    build:
+      context: ./uiuc-chat-backend/ai_ta_backend/rabbitmq
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    networks:
+      - uiuc-chat-network
+    env_file:
+      - .env.prod
+    environment:
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672"
+      POSTGRES_HOST: postgres-illinois-chat
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      QDRANT_URL: "http://qdrant:6333"
+      QDRANT_COLLECTION_NAME: uiuc-chat
+      S3_BUCKET_NAME: uiuc-chat
+    depends_on:
+      - rabbitmq
+      - postgres-illinois-chat
+      - qdrant
+      - minio
 
 # declare the network resource
 # this will allow you to use service discovery and address a container by its name from within the network

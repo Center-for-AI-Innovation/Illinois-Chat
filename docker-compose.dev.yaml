@@ -44,15 +44,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
-      MINIO_API_PORT: ${DOCKER_INTERNAL_MINIO_API_PORT}
-      MINIO_CONSOLE_PORT: ${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT}
-    command: server /data --console-address ":${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT}" --address ":${DOCKER_INTERNAL_MINIO_API_PORT}"
+    command: server /data --console-address ":9001" --address ":9000"
     ports:
-      - ${PUBLIC_MINIO_API_PORT}:${DOCKER_INTERNAL_MINIO_API_PORT} # API access
-      - ${PUBLIC_MINIO_DASHBOARD_PORT}:${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT} # Dashboard access
-    expose:
-      - ${PUBLIC_MINIO_API_PORT}
-      - ${PUBLIC_MINIO_DASHBOARD_PORT}
+      - "9000:9000" # MinIO API port
+      - "9001:9001" # MinIO Console port (note: Console deprecated Q4 2024)
     networks:
       - uiuc-chat-network
     volumes:
@@ -139,7 +134,7 @@ services:
     platform: linux/amd64  # M chip
     image: quay.io/keycloak/keycloak:26.1
     env_file:
-      - .env
+      - .env.dev
     ports:
       - "8080:8080"
     networks:
