@@ -133,8 +133,6 @@ services:
   keycloak:
     platform: linux/amd64  # M chip
     image: quay.io/keycloak/keycloak:26.1
-    env_file:
-      - .env.dev
     ports:
       - "8080:8080"
     networks:

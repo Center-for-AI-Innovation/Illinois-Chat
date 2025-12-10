@@ -39,9 +39,9 @@ services:
   minio:
     image: minio/minio:RELEASE.2024-06-13T22-53-53Z
     restart: unless-stopped
-    # Customize env vars in .env file
-    env_file:
-      - .env.prod
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
     command: server /data --console-address ":9001" --address ":9000"
     ports:
       - "9000:9000" # MinIO API port
@@ -79,13 +79,11 @@ services:
       - uiuc-chat-network
     volumes:
       - postgres-illinois-chat:/var/lib/postgresql
-    env_file:
-      - .env.prod
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DATABASE: postgres
-      POSTGRES_USERNAME: postgres
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_USERNAME: ${POSTGRES_DATABASE:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -102,11 +100,9 @@ services:
       - postgres-keycloak:/var/lib/postgresql
 #    ports:
 #      - "5433:5432"
-    env_file:
-      - .env.prod
     environment:
-      POSTGRES_DATABASE: postgres
-      POSTGRES_USERNAME: postgres
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_USERNAME: ${POSTGRES_DATABASE:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -116,8 +112,9 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    env_file:
-      - .env.prod
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
 #    ports:
 #      - "5672:5672"
 #      - "15672:15672"
@@ -135,8 +132,6 @@ services:
     platform: linux/amd64  # M chip
     image: quay.io/keycloak/keycloak:26.1
     restart: unless-stopped
-    env_file:
-      - .env.prod
     ports:
       - "8080:8080"
     networks:
@@ -154,6 +149,8 @@ services:
       - --db-password=password
       - --import-realm
     environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - KC_METRICS_ENABLED=true
       - KC_HEALTH_ENABLED=true
     volumes:
@@ -166,34 +163,6 @@ services:
       retries: 5
       start_period: 20s # Give Keycloak time to start up before checking
 
-  backend:
-    platform: linux/arm64/v8
-    build:
-      context: ./uiuc-chat-backend
-      dockerfile: Self-Hosted-Dockerfile
-    restart: unless-stopped
-    networks:
-      - uiuc-chat-network
-#    ports:
-#      - "8000:8001"
-    depends_on:
-      - rabbitmq
-      - postgres-illinois-chat
-    environment:
-      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
-      POSTGRES_ENDPOINT: postgres-illinois-chat
-      POSTGRES_PORT: 5432
-      POSTGRES_DATABASE: postgres
-      POSTGRES_USERNAME: postgres
-      QDRANT_URL: "http://qdrant:6333"
-      QDRANT_COLLECTION_NAME: uiuc-chat
-      MINIO_URL: http://minio:10000
-      AWS_ACCESS_KEY_ID: "minioadmin"
-      AWS_SECRET_ACCESS_KEY: "minioadmin"
-      S3_BUCKET_NAME: uiuc-chat
-    env_file:
-      - .env.prod
-
   frontend:
     build:
       context: ./uiuc-chat-frontend
@@ -202,6 +171,9 @@ services:
         NEXT_PUBLIC_KEYCLOAK_REALM: illinois_chat_realm
         NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: illinois_chat
         NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: True
+        NEXT_PUBLIC_KEYCLOAK_URL: "http://keycloak.localhost/"
+        NEXT_PUBLIC_S3_ENDPOINT: "http://localhost:9000"
+        #NEXT_PUBLIC_SIGNING_KEY=""
 #        NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ""
 #        NEXT_PUBLIC_POSTHOG_KEY: ""
 #        NEXT_PUBLIC_POSTHOG_HOST: ""
@@ -210,11 +182,12 @@ services:
       - "3000:3000"
     networks:
       - uiuc-chat-network
-    env_file:
-      - .env.prod
     environment:
-      # TODO: For some reason nextjs requires ENV variables to be defined in docker compose as they are not picked up
-      # TODO: from .env.prod specified above in env_file. Need to investigate this further.
+      # backend
+      RAILWAY_URL: "http://backend:8001"
+      INGEST_URL: "http://backend:8001/ingest"
+      #redis
+      REDIS_URL: "redis://default:${INGEST_REDIS_PASSWORD}@redis:6379"
       # Server-side Keycloak URL (for container-to-container communication)
       KEYCLOAK_URL: "http://keycloak:8080/"
       # NEXT_PUBLIC_KEYCLOAK_URL is already set in .env.prod for browser-side code
@@ -245,12 +218,71 @@ services:
       VYRIAD_MINIO_KEY: minioadmin
       VYRIAD_MINIO_SECRET: minioadmin
       # qdrant
-      QDRANT_API_KEY: your-strong-key-here
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
       QDRANT_COLLECTION_NAME: uiuc-chat
       QDRANT_URL: http://qdrant:6333
+      # llms
+      OLLAMA_SERVER_URL: ${OLLAMA_SERVER_URL}
+      NCSA_HOSTED_VLM_BASE_URL: ${NCSA_HOSTED_VLM_BASE_URL}
+      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY}
     depends_on:
       - keycloak
       - postgres-illinois-chat
+
+  backend:
+    platform: linux/arm64/v8
+    build:
+      context: ./uiuc-chat-backend
+      dockerfile: Self-Hosted-Dockerfile
+    restart: unless-stopped
+    networks:
+      - uiuc-chat-network
+#    ports:
+#      - "8000:8001"
+    depends_on:
+      - rabbitmq
+      - postgres-illinois-chat
+    environment:
+      REDIS_URL: "redis://default:${INGEST_REDIS_PASSWORD}@redis:6379"
+      KV_REST_API_TOKEN: ${INGEST_REDIS_PASSWORD}
+      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
+      POSTGRES_ENDPOINT: postgres-illinois-chat
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # qdrant
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      QDRANT_COLLECTION_NAME: uiuc-chat
+      QDRANT_URL: http://qdrant:6333
+      # Not being used for self hosted. Need to avoid run time errors.
+      VYRIAD_QDRANT_URL: "http://localhost:6333"
+      VYRIAD_QDRANT_PORT: "6333"
+      VYRIAD_QDRANT_API_KEY: "your-strong-key-here"
+      # MinIO configuration
+      LOCAL_MINIO: true
+      AWS_REGION: us-east-1
+      AWS_KEY: minioadmin
+      AWS_SECRET: minioadmin
+      S3_BUCKET_NAME: uiuc-chat
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      # Vyriad MinIO configuration
+      VYRIAD_MINIO_ENDPOINT: http://minio:9000
+      VYRIAD_MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      VYRIAD_MINIO_REGION: us-east-1
+      VYRIAD_MINIO_KEY: minioadmin
+      VYRIAD_MINIO_SECRET: minioadmin
+      # llm
+      OLLAMA_SERVER_URL: ${OLLAMA_SERVER_URL}
+      NCSA_HOSTED_VLM_BASE_URL: ${NCSA_HOSTED_VLM_BASE_URL}
+      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY}
+      # other
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY:-not_a_key}
 
   worker:
     build:
@@ -261,17 +293,31 @@ services:
 #      - "8001:8001"
     networks:
       - uiuc-chat-network
-    env_file:
-      - .env.prod
     environment:
       RABBITMQ_URL: "amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672"
-      POSTGRES_HOST: postgres-illinois-chat
+      POSTGRES_ENDPOINT: postgres-illinois-chat
       POSTGRES_PORT: 5432
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      QDRANT_URL: "http://qdrant:6333"
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KEYCLOAK_DB_DATABASE: postgres
+      KEYCLOAK_DB_USERNAME: postgres
+      # qdrant
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
       QDRANT_COLLECTION_NAME: uiuc-chat
+      QDRANT_URL: http://qdrant:6333
+      # MinIO configuration
+      LOCAL_MINIO: true
+      AWS_REGION: us-east-1
+      MINIO_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
       S3_BUCKET_NAME: uiuc-chat
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      # llm
+      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY}
     depends_on:
       - rabbitmq
       - postgres-illinois-chat
