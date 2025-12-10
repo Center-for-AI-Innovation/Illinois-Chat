@@ -81,12 +81,13 @@ fi
 echo "MinIO bucket setup complete!"
 
 # Create Default Global Project
-curl -sS -X POST "${RAILWAY_URL}/createProject" \
-  -H "Content-Type: application/json" \
-  -d "{
-        \"project_name\": \"$PROJECT_NAME\",
-        \"project_description\": \"$PROJECT_DESC\",
-        \"project_owner_email\": \"$PROJECT_EMAIL\",
-        \"allow_logged_in_users\": true
-      }" \
-  -w "\nHTTP_STATUS:%{http_code}\n"
+# Backend port is currently not exposed for security reasons
+#curl -sS -X POST "${RAILWAY_URL}/createProject" \
+#  -H "Content-Type: application/json" \
+#  -d "{
+#        \"project_name\": \"$PROJECT_NAME\",
+#        \"project_description\": \"$PROJECT_DESC\",
+#        \"project_owner_email\": \"$PROJECT_EMAIL\",
+#        \"allow_logged_in_users\": true
+#      }" \
+#  -w "\nHTTP_STATUS:%{http_code}\n"
