@@ -2,9 +2,9 @@ services:
   redis:
     image: redis:7.2
     restart: unless-stopped
-    command: redis-server --requirepass your-strong-password-here
-    ports:
-       - 6379:6379
+    command: redis-server --requirepass ${INGEST_REDIS_PASSWORD}
+#    ports:
+#       - 6379:6379
     networks:
       - uiuc-chat-network
     volumes:
@@ -19,8 +19,8 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.9.0
     restart: unless-stopped
-    # environment:
-    #   - QDRANT_API_KEY=${QDRANT_API_KEY}
+    environment:
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
     ports:
       - 6333:6333
       - 6334:6334
@@ -78,7 +78,7 @@ services:
     networks:
       - uiuc-chat-network
     volumes:
-      - postgres-illinois-chat:/var/lib/postgres/data
+      - postgres-illinois-chat:/var/lib/postgresql
     env_file:
       - .env.prod
     ports:
@@ -99,9 +99,9 @@ services:
     networks:
       - uiuc-chat-network
     volumes:
-      - postgres-keycloak:/var/lib/postgres/data
-    ports:
-      - "5433:5432"
+      - postgres-keycloak:/var/lib/postgresql
+#    ports:
+#      - "5433:5432"
     env_file:
       - .env.prod
     environment:
@@ -118,9 +118,9 @@ services:
     image: rabbitmq:3-management-alpine
     env_file:
       - .env.prod
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+#    ports:
+#      - "5672:5672"
+#      - "15672:15672"
     healthcheck:
       test: [ "CMD", "nc", "-z", "localhost", "5672" ]
       interval: 3s
@@ -174,8 +174,8 @@ services:
     restart: unless-stopped
     networks:
       - uiuc-chat-network
-    ports:
-      - "8000:8001"
+#    ports:
+#      - "8000:8001"
     depends_on:
       - rabbitmq
       - postgres-illinois-chat
@@ -257,8 +257,8 @@ services:
       context: ./uiuc-chat-backend/ai_ta_backend/rabbitmq
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "8001:8001"
+#    ports:
+#      - "8001:8001"
     networks:
       - uiuc-chat-network
     env_file:
