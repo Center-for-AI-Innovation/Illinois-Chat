@@ -1,10 +1,31 @@
 services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=DEBUG" # Set log level to DEBUG
+      - "--accesslog=true" # Enable access logs
+    ports:
+      - "80:80"
+      - "8888:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  whoami:
+    image: traefik/whoami
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.docker.localhost`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
   redis:
     image: redis:7.2
     restart: unless-stopped
-    command: redis-server --requirepass your-strong-password-here
-    ports:
-       - 6379:6379
+    command: redis-server --requirepass ${INGEST_REDIS_PASSWORD}
+#    ports:
+#       - 6379:6379
     networks:
       - uiuc-chat-network
     volumes:
@@ -55,7 +76,18 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+    labels:
+      - "traefik.enable=true"
 
+      - "traefik.http.routers.minio.service=minio"
+      - "traefik.http.routers.minio.rule=Host(`minio.docker.localhost`)"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+      - "traefik.http.routers.minio.entrypoints=web"
+
+      - "traefik.http.routers.minioconsole.service=minioconsole"
+      - "traefik.http.routers.minioconsole.rule=Host(`minioconsole.docker.localhost`)"
+      - "traefik.http.services.minioconsole.loadbalancer.server.port=9001"
+      - "traefik.http.routers.minioconsole.entrypoints=web"
 #  crawlee:
 #    build: ./ic_crawlee
 #    container_name: ic_crawlee
@@ -100,8 +132,6 @@ services:
       - uiuc-chat-network
     volumes:
       - postgres-keycloak:/var/lib/postgres/data
-    ports:
-      - "5433:5432"
     env_file:
       - .env.prod
     environment:
@@ -118,9 +148,6 @@ services:
     image: rabbitmq:3-management-alpine
     env_file:
       - .env.prod
-    ports:
-      - "5672:5672"
-      - "15672:15672"
     healthcheck:
       test: [ "CMD", "nc", "-z", "localhost", "5672" ]
       interval: 3s
@@ -165,6 +192,12 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s # Give Keycloak time to start up before checking
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak.service=keycloak"
+      - "traefik.http.routers.keycloak.rule=Host(`keycloak.docker.localhost`)"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+      - "traefik.http.routers.keycloak.entrypoints=web"
 
   backend:
     platform: linux/arm64/v8
@@ -174,8 +207,6 @@ services:
     restart: unless-stopped
     networks:
       - uiuc-chat-network
-    ports:
-      - "8000:8001"
     depends_on:
       - rabbitmq
       - postgres-illinois-chat
@@ -257,8 +288,6 @@ services:
       context: ./uiuc-chat-backend/ai_ta_backend/rabbitmq
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "8001:8001"
     networks:
       - uiuc-chat-network
     env_file:
