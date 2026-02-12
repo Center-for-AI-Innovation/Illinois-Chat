@@ -61,6 +61,7 @@ services:
 #    depends_on:
 #      - redis
 
+  # pgvector Postgres. Run frontend: npm run db:push && npm run db:populate to create schema + embeddings table.
   postgres-illinois-chat:
     image: pgvector/pgvector:pg15
     container_name: postgres-illinois-chat
@@ -69,7 +70,6 @@ services:
       - uiuc-chat-network
     volumes:
       - postgres-illinois-chat:/var/lib/postgresql/data
-      - ./init-scripts/init-vector.sql:/docker-entrypoint-initdb.d/init-vector.sql
     ports:
       - "5432:5432"
     environment:
