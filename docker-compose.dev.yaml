@@ -16,32 +16,6 @@ services:
       timeout: 10s
       retries: 3
 
-  qdrant:
-    image: qdrant/qdrant:v1.9.0
-    restart: unless-stopped
-    container_name: qdrant
-    # environment:
-    #   - QDRANT_API_KEY=${QDRANT_API_KEY}
-    ports:
-      - 6333:6333
-      - 6334:6334
-    expose:
-      - 6333
-      - 6334
-      - 6335
-    volumes:
-      - qdrant-data:/qdrant/storage
-      - ./qdrant_config.yaml:/qdrant/config/production.yaml # Mount the config file directly as a volume
-    networks:
-      - uiuc-chat-network
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   minio:
     image: minio/minio:RELEASE.2024-06-13T22-53-53Z
     restart: unless-stopped
@@ -211,7 +185,6 @@ networks:
 
 volumes:
   redis-data: {}
-  qdrant-data: {}
   minio-data: {}
   postgres-illinois-chat: {}
   postgres-keycloak: {}
