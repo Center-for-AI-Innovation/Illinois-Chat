@@ -88,12 +88,14 @@ services:
 #      - redis
 
   postgres-illinois-chat:
-    image: postgres
+    image: pgvector/pgvector:pg15
+    container_name: postgres-illinois-chat
     restart: unless-stopped
     networks:
       - uiuc-chat-network
     volumes:
-      - postgres-illinois-chat:/var/lib/postgres/data
+      - postgres-illinois-chat:/var/lib/postgresql/data
+      - ./init-scripts/init-vector.sql:/docker-entrypoint-initdb.d/init-vector.sql
     ports:
       - "5432:5432"
     environment:
@@ -134,7 +136,7 @@ services:
       - rabbitmq:/var/lib/rabbitmq
 
   keycloak:
-#    platform: linux/amd64  # M chip
+    platform: linux/amd64  # M chip
     image: quay.io/keycloak/keycloak:26.1
     container_name: keycloak
     restart: unless-stopped
@@ -151,7 +153,7 @@ services:
       - --hostname-strict=false
       - --db=postgres
       - --db-url=jdbc:postgresql://postgres-keycloak:5432/postgres
-      - --db-username=${POSTGRES_USER}
+      - --db-username=${POSTGRES_USERNAME}
       - --db-password=${POSTGRES_PASSWORD}
       - --import-realm
     environment:
@@ -170,33 +172,36 @@ services:
       timeout: 10s
       retries: 3
 
-  worker:
-    build:
-      context: ./uiuc-chat-backend
-      dockerfile: Self-Hosted-Dockerfile
-    restart: unless-stopped
-    networks:
-      - uiuc-chat-network
-    ports:
-      - "8001:8001"
-    depends_on:
-      - rabbitmq
-      - postgres-illinois-chat
-    environment:
-      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
-      POSTGRES_HOST: postgres-illinois-chat
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      QDRANT_URL: "http://qdrant:6333"
-      QDRANT_API_KEY: "your-strong-key-here"
-      QDRANT_COLLECTION_NAME: illinois_chat
-      MINIO_URL: http://minio:10000
-      AWS_ACCESS_KEY_ID: "minioadmin"
-      AWS_SECRET_ACCESS_KEY: "minioadmin"
-      S3_BUCKET_NAME: uiuc-chat
+#  worker:
+##    build:
+##      context: ./uiuc-chat-backend
+##      dockerfile: Self-Hosted-Dockerfile
+#    image: ingest_worker:latest
+#    restart: unless-stopped
+#    networks:
+#      - uiuc-chat-network
+#    ports:
+#      - "8001:8001"
+#    depends_on:
+#      - rabbitmq
+#      - postgres-illinois-chat
+#    environment:
+#      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
+#      POSTGRES_PORT: 5432
+#      POSTGRES_DB: postgres
+#      POSTGRES_USERNAME: postgres
+#      POSTGRES_PASSWORD: password
+#      POSTGRES_ENDPOINT: postgres-illinois-chat
+#      OPENAI_API_KEY: ${OPENAI_API_KEY}
+#      QDRANT_URL: "http://qdrant:6333"
+#      QDRANT_API_KEY: "your-strong-key-here"
+#      QDRANT_COLLECTION_NAME: illinois_chat
+#      MINIO_URL: http://minio:10000
+#      AWS_ACCESS_KEY_ID: minioadmin
+#      AWS_SECRET_ACCESS_KEY: minioadmin
+#      S3_BUCKET_NAME: uiuc-chat
+#      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE}
+#      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
 
 # declare the network resource
 # this will allow you to use service discovery and address a container by its name from within the network
