@@ -82,8 +82,8 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-postgres}
-      POSTGRES_USERNAME: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -98,11 +98,11 @@ services:
       - uiuc-chat-network
     volumes:
       - postgres-keycloak:/var/lib/postgresql
-#    ports:
-#      - "5433:5432"
+    ports:
+      - "5433:5432"
     environment:
-      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-postgres}
-      POSTGRES_USERNAME: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -141,12 +141,12 @@ services:
     command:
       - start-dev
       - --http-enabled=true
-      - --hostname=keycloak.localhost
+      - --hostname=localhost
       - --hostname-strict=false
       - --db=postgres
       - --db-url=jdbc:postgresql://postgres-keycloak:5432/postgres
       - --db-username=postgres
-      - --db-password=password
+      - --db-password=${POSTGRES_PASSWORD}
       - --import-realm
     environment:
       - KEYCLOAK_ADMIN=admin
@@ -170,8 +170,8 @@ services:
       args:
         NEXT_PUBLIC_KEYCLOAK_REALM: illinois_chat_realm
         NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: illinois_chat
-        NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: True
-        NEXT_PUBLIC_KEYCLOAK_URL: "http://keycloak.localhost:8080/"
+        NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: "True"
+        NEXT_PUBLIC_KEYCLOAK_URL: "http://localhost:8080/"
         NEXT_PUBLIC_S3_ENDPOINT: "http://localhost:9000"
         #NEXT_PUBLIC_SIGNING_KEY=""
 #        NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ""
@@ -206,8 +206,8 @@ services:
       # MinIO configuration
       LOCAL_MINIO: true
       AWS_REGION: us-east-1
-      AWS_KEY: minioadmin
-      AWS_SECRET: minioadmin
+      AWS_KEY: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET: ${AWS_SECRET_ACCESS_KEY}
       S3_BUCKET_NAME: uiuc-chat
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
@@ -215,8 +215,8 @@ services:
       VYRIAD_MINIO_ENDPOINT: http://minio:9000
       VYRIAD_MINIO_PUBLIC_ENDPOINT: http://localhost:9000
       VYRIAD_MINIO_REGION: us-east-1
-      VYRIAD_MINIO_KEY: minioadmin
-      VYRIAD_MINIO_SECRET: minioadmin
+      VYRIAD_MINIO_KEY: ${AWS_ACCESS_KEY_ID}
+      VYRIAD_MINIO_SECRET: ${AWS_SECRET_ACCESS_KEY}
       # qdrant
       QDRANT_API_KEY: ${QDRANT_API_KEY}
       QDRANT_COLLECTION_NAME: uiuc-chat
@@ -247,7 +247,7 @@ services:
     environment:
       REDIS_URL: "redis://default:${INGEST_REDIS_PASSWORD}@redis:6379"
       KV_REST_API_TOKEN: ${INGEST_REDIS_PASSWORD}
-      RABBITMQ_URL: 'amqp://guest:guest@rabbitmq:5672'
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672"
       POSTGRES_ENDPOINT: postgres-illinois-chat
       POSTGRES_PORT: 5432
       POSTGRES_DATABASE: postgres
@@ -258,14 +258,14 @@ services:
       QDRANT_COLLECTION_NAME: uiuc-chat
       QDRANT_URL: http://qdrant:6333
       # Not being used for self hosted. Need to avoid run time errors.
-      VYRIAD_QDRANT_URL: "http://localhost:6333"
+      VYRIAD_QDRANT_URL: "http://qdrant:6333"
       VYRIAD_QDRANT_PORT: "6333"
-      VYRIAD_QDRANT_API_KEY: "your-strong-key-here"
+      VYRIAD_QDRANT_API_KEY: ${QDRANT_API_KEY}
       # MinIO configuration
       LOCAL_MINIO: true
       AWS_REGION: us-east-1
-      AWS_KEY: minioadmin
-      AWS_SECRET: minioadmin
+      AWS_KEY: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET: ${AWS_SECRET_ACCESS_KEY}
       S3_BUCKET_NAME: uiuc-chat
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
@@ -273,8 +273,8 @@ services:
       VYRIAD_MINIO_ENDPOINT: http://minio:9000
       VYRIAD_MINIO_PUBLIC_ENDPOINT: http://localhost:9000
       VYRIAD_MINIO_REGION: us-east-1
-      VYRIAD_MINIO_KEY: minioadmin
-      VYRIAD_MINIO_SECRET: minioadmin
+      VYRIAD_MINIO_KEY: ${AWS_ACCESS_KEY_ID}
+      VYRIAD_MINIO_SECRET: ${AWS_SECRET_ACCESS_KEY}
       # llm
       OLLAMA_SERVER_URL: ${OLLAMA_SERVER_URL}
       NCSA_HOSTED_VLM_BASE_URL: ${NCSA_HOSTED_VLM_BASE_URL}
@@ -310,8 +310,8 @@ services:
       LOCAL_MINIO: true
       AWS_REGION: us-east-1
       MINIO_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       S3_BUCKET_NAME: uiuc-chat
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
       # llm
