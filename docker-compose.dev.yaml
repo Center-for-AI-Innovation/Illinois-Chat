@@ -111,7 +111,6 @@ services:
 
   keycloak:
     platform: linux/amd64  # M chip
-    platform: linux/amd64  # M chip
     image: quay.io/keycloak/keycloak:26.1
     ports:
       - "8080:8080"
@@ -124,7 +123,6 @@ services:
       - --hostname-strict=false
       - --db=postgres
       - --db-url=jdbc:postgresql://postgres-keycloak:5432/postgres
-      - --db-username=${POSTGRES_USERNAME}
       - --db-username=${POSTGRES_USERNAME}
       - --db-password=${POSTGRES_PASSWORD}
       - --import-realm
