@@ -7,6 +7,8 @@ wandb
 qdrant_data/*
 
 # don't expose env files
+.env.dev
+.env.prod
 .env
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
@@ -118,7 +120,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+.env.dev
 .venv
 env/
 venv/

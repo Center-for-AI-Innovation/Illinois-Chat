@@ -1,8 +1,0 @@
-services:
-  db:
-    volumes:
-      - ./db/migrations:/docker-entrypoint-initdb.d/migrations
-    # command:
-    #   - postgres
-    #   - -c
-    #   - max_connections=200
