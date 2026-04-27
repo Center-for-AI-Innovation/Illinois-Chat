@@ -149,20 +149,19 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
         }}
       >
         <button
-          className={`text-[--foreground-faded] hover:text-[--foreground] ${
-            isLastMessage
-              ? 'opacity-100'
-              : 'opacity-0 transition-opacity duration-200 focus:opacity-100 group-hover:opacity-100'
-          }`}
+          tabIndex={0}
+          className="text-[--foreground-faded] hover:text-[--foreground]"
           onClick={copyOnClick}
+          aria-label="Copy message"
         >
           {messagedCopied ? (
             <IconCheck
               size={20}
+              aria-hidden="true"
               className="text-green-500 dark:text-green-400"
             />
           ) : (
-            <IconCopy size={20} />
+            <IconCopy size={20} aria-hidden="true" />
           )}
         </button>
       </Tooltip>
@@ -182,24 +181,17 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
         }}
       >
         <button
-          className={`text-[--foreground-faded] hover:text-[--foreground] ${
-            isLastMessage
-              ? 'opacity-100'
-              : 'opacity-0 transition-opacity duration-200 focus:opacity-100 group-hover:opacity-100'
-          }`}
+          tabIndex={0}
+          aria-label={isThumbsUp ? 'Remove Good Response' : 'Good Response'}
+          aria-pressed={isThumbsUp}
+          className="text-[--foreground-faded] hover:text-[--foreground]"
           onClick={handleThumbsUp}
         >
-          <div
-            className={
-              isLastMessage
-                ? ''
-                : 'opacity-0 transition-opacity duration-200 group-hover:opacity-100'
-            }
-          >
+          <div>
             {isThumbsUp ? (
-              <IconThumbUpFilled size={20} />
+              <IconThumbUpFilled size={20} aria-hidden="true" />
             ) : (
-              <IconThumbUp size={20} />
+              <IconThumbUp size={20} aria-hidden="true" />
             )}
           </div>
         </button>
@@ -220,17 +212,16 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
         }}
       >
         <button
-          className={`text-[--foreground-faded] hover:text-[--foreground] ${
-            isLastMessage
-              ? 'opacity-100'
-              : 'opacity-0 transition-opacity duration-200 focus:opacity-100 group-hover:opacity-100'
-          }`}
+          tabIndex={0}
+          aria-label={isThumbsDown ? 'Remove Bad Response' : 'Bad Response'}
+          aria-pressed={isThumbsDown}
+          className="text-[--foreground-faded] hover:text-[--foreground]"
           onClick={handleThumbsDown}
         >
           {isThumbsDown ? (
-            <IconThumbDownFilled size={20} />
+            <IconThumbDownFilled size={20} aria-hidden="true" />
           ) : (
-            <IconThumbDown size={20} />
+            <IconThumbDown size={20} aria-hidden="true" />
           )}
         </button>
       </Tooltip>
@@ -250,15 +241,15 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
         }}
       >
         <button
+          tabIndex={0}
+          aria-label="Regenerate Response"
           className={`text-[--foreground-faded] hover:text-[--foreground] ${
-            isLastMessage
-              ? 'opacity-100'
-              : 'opacity-0 transition-opacity duration-200 focus:opacity-100 group-hover:opacity-100'
-          } ${isRegenerating ? 'animate-spin' : ''}`}
+            isRegenerating ? 'animate-spin' : ''
+          }`}
           onClick={handleRegenerate}
           disabled={isRegenerating}
         >
-          <IconRepeat size={20} />
+          <IconRepeat size={20} aria-hidden="true" />
         </button>
       </Tooltip>
     </div>

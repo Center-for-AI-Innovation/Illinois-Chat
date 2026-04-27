@@ -12,7 +12,9 @@ export async function getCourseMetadata(
   try {
     const redisClient = await ensureRedisConnected()
     const rawMetadata = await redisClient.hGet('course_metadatas', courseName)
-    return rawMetadata ? (JSON.parse(rawMetadata) as CourseMetadata) : null
+    if (!rawMetadata) return null
+    const parsed = JSON.parse(rawMetadata) as CourseMetadata
+    return parsed
   } catch (error) {
     console.error('Error fetching course metadata:', error)
     return null
@@ -88,8 +90,16 @@ export function withCourseAccess(courseName: string) {
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
-          error: 'Course not found',
-          message: `Course '${courseName}' does not exist`,
+          error: 'Project not found',
+          message: `Project '${courseName}' does not exist`,
+        })
+      }
+
+      // Check if course is frozen/archived
+      if (courseMetadata.is_frozen === true) {
+        return res.status(403).json({
+          error: 'Project is temporarily frozen by the administrator',
+          message: `Project '${courseName}' has been temporarily frozen by the administrator`,
         })
       }
 
@@ -97,7 +107,7 @@ export function withCourseAccess(courseName: string) {
       if (!hasCourseAccess(req.user, courseMetadata)) {
         return res.status(403).json({
           error: 'Access denied',
-          message: `You don't have access to course '${courseName}'`,
+          message: `You don't have access to Project '${courseName}'`,
         })
       }
 
@@ -123,8 +133,16 @@ export function withCourseAdminAccess(courseName: string) {
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
-          error: 'Course not found',
-          message: `Course '${courseName}' does not exist`,
+          error: 'Project not found',
+          message: `Project '${courseName}' does not exist`,
+        })
+      }
+
+      // Check if course is frozen/archived
+      if (courseMetadata.is_frozen === true) {
+        return res.status(403).json({
+          error: 'Project is temporarily frozen by the administrator',
+          message: `Project '${courseName}' has been temporarily frozen by the administrator`,
         })
       }
 
@@ -135,7 +153,7 @@ export function withCourseAdminAccess(courseName: string) {
       ) {
         return res.status(403).json({
           error: 'Insufficient permissions',
-          message: `This action requires admin access to course '${courseName}'`,
+          message: `This action requires admin access to Project '${courseName}'`,
         })
       }
 
@@ -161,8 +179,16 @@ export function withCourseOwnerAccess(courseName: string) {
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
-          error: 'Course not found',
-          message: `Course '${courseName}' does not exist`,
+          error: 'Project not found',
+          message: `Project '${courseName}' does not exist`,
+        })
+      }
+
+      // Check if course is frozen/archived
+      if (courseMetadata.is_frozen === true) {
+        return res.status(403).json({
+          error: 'Project is temporarily frozen by the administrator',
+          message: `Project '${courseName}' has been temporarily frozen by the administrator`,
         })
       }
 
@@ -170,7 +196,7 @@ export function withCourseOwnerAccess(courseName: string) {
       if (!isCourseOwner(req.user, courseMetadata)) {
         return res.status(403).json({
           error: 'Insufficient permissions',
-          message: `This action requires owner access to course '${courseName}'`,
+          message: `This action requires owner access to Project '${courseName}'`,
         })
       }
 
@@ -205,8 +231,16 @@ export function withCourseOwnerOrAdminAccess() {
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
-          error: 'Course not found',
-          message: `Course '${courseName}' does not exist`,
+          error: 'Project not found',
+          message: `Project '${courseName}' does not exist`,
+        })
+      }
+
+      // Check if course is frozen/archived
+      if (courseMetadata.is_frozen === true) {
+        return res.status(403).json({
+          error: 'Project is temporarily frozen by the administrator',
+          message: `Project '${courseName}' has been temporarily frozen by the administrator`,
         })
       }
 
@@ -217,7 +251,7 @@ export function withCourseOwnerOrAdminAccess() {
       ) {
         return res.status(403).json({
           error: 'Access denied',
-          message: `You don't have access to course '${courseName}'`,
+          message: `You don't have access to Project '${courseName}'`,
         })
       }
 
@@ -244,7 +278,8 @@ export function extractCourseName(req: NextApiRequest): string | null {
     req.body?.projectName ||
     req.body?.project_name ||
     (req.headers['x-course-name'] as string) ||
-    (req.headers['x-project_name'] as string) || null
+    (req.headers['x-project_name'] as string) ||
+    null
 
   return courseName
 }
@@ -287,11 +322,7 @@ export function withCourseAccessFromRequest(
       res: NextApiResponse,
     ) => Promise<void> | void,
   ) {
-    return withAuth(async (req: AuthenticatedRequest, res: NextApiResponse) => {
-      if (!req.user) {
-        return res.status(401).json({ error: 'User not authenticated' })
-      }
-
+    return async (req: AuthenticatedRequest, res: NextApiResponse) => {
       // Extract course name from request
       const courseName = extractCourseName(req)
       if (!courseName) {
@@ -306,26 +337,53 @@ export function withCourseAccessFromRequest(
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
-          error: 'Course not found',
-          message: `Course '${courseName}' does not exist`,
+          error: 'Project not found',
+          message: `Project '${courseName}' does not exist`,
         })
       }
 
-      // Determine required access for this HTTP method
-      const method = (req.method || 'GET').toUpperCase() as Method
-      const requiredLevel: AccessLevel =
-        typeof access === 'string' ? access : (access[method] ?? 'any')
-
-      // Check access
-      if (!hasAccessForLevel(requiredLevel, req.user, courseMetadata)) {
-        const label = requiredLevel
+      // Check if course is frozen/archived
+      if (courseMetadata.is_frozen === true) {
         return res.status(403).json({
-          error: 'Access denied',
-          message: `This ${method} action requires ${label} access to course '${courseName}'`,
+          error: 'Project is temporarily frozen by the administrator',
+          message: `Project '${courseName}' has been temporarily frozen by the administrator`,
         })
       }
 
-      return handler(req, res)
-    })
+      // For public courses, allow unauthenticated access
+      if (!courseMetadata.is_private) {
+        // Add course context to request
+        req.courseName = courseName
+        return await handler(req, res)
+      }
+
+      // For private courses, require authentication and access check
+      return withAuth(
+        async (req: AuthenticatedRequest, res: NextApiResponse) => {
+          if (!req.user) {
+            return res.status(401).json({ error: 'User not authenticated' })
+          }
+
+          // Determine required access for this HTTP method
+          const method = (req.method || 'GET').toUpperCase() as Method
+          const requiredLevel: AccessLevel =
+            typeof access === 'string' ? access : (access[method] ?? 'any')
+
+          // Check access
+          if (!hasAccessForLevel(requiredLevel, req.user, courseMetadata)) {
+            const label = requiredLevel
+            return res.status(403).json({
+              error: 'Access denied',
+              message: `This ${method} action requires ${label} access to course '${courseName}'`,
+            })
+          }
+
+          // Add course context to request
+          req.courseName = courseName
+
+          return await handler(req, res)
+        },
+      )(req, res)
+    }
   }
 }

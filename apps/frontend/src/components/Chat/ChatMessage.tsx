@@ -43,13 +43,17 @@ import HomeContext from '~/pages/api/home/home.context'
 import { fetchPresignedUrl } from '~/utils/apiUtils'
 import { CodeBlock } from '../Markdown/CodeBlock'
 import { MemoizedReactMarkdown } from '../Markdown/MemoizedReactMarkdown'
+import { generateSecureKey } from '~/utils/cryptoRandom'
 import { LoadingSpinner } from '../UIUC-Components/LoadingSpinner'
 import SourcesSidebar from '../UIUC-Components/SourcesSidebar'
 import { ImagePreview } from './ImagePreview'
 import MessageActions from './MessageActions'
 import ThinkTagDropdown, { extractThinkTagContent } from './ThinkTagDropdown'
 
-import { saveConversationToServer } from '@/utils/app/conversation'
+import {
+  saveConversationToServer,
+  createLogConversationPayload,
+} from '@/hooks/__internal__/conversation'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
@@ -57,6 +61,7 @@ import rehypeMathjax from 'rehype-mathjax'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { IntermediateStateAccordion } from '../UIUC-Components/IntermediateStateAccordion'
+import { AgentExecutionTimeline } from './AgentExecutionTimeline'
 import { FeedbackModal } from './FeedbackModal'
 
 const useStyles = createStyles((theme) => ({
@@ -114,18 +119,35 @@ const FileCard: React.FC<{
 }> = ({ fileName, fileType, fileUrl, onClick, isPreviewable = true }) => {
   const getFileIcon = (name: string, type?: string) => {
     const extension = name.split('.').pop()?.toLowerCase()
-    const iconProps = { size: 20 }
+    const iconProps = { size: 20, 'aria-hidden': true as const }
 
     if (type?.includes('pdf') || extension === 'pdf') {
-      return <IconFileTypePdf {...iconProps} style={{ color: 'var(--illinois-orange)' }} />
+      return (
+        <IconFileTypePdf
+          {...iconProps}
+          style={{ color: 'var(--illinois-orange)' }}
+        />
+      )
     }
     if (type?.includes('doc') || extension === 'docx' || extension === 'doc') {
-      return <IconFileTypeDocx {...iconProps} style={{ color: 'var(--illinois-orange)' }} />
+      return (
+        <IconFileTypeDocx
+          {...iconProps}
+          style={{ color: 'var(--illinois-orange)' }}
+        />
+      )
     }
     if (type?.includes('text') || extension === 'txt') {
-      return <IconFileTypeTxt {...iconProps} style={{ color: 'var(--illinois-orange)' }} />
+      return (
+        <IconFileTypeTxt
+          {...iconProps}
+          style={{ color: 'var(--illinois-orange)' }}
+        />
+      )
     }
-    return <IconFile {...iconProps} style={{ color: 'var(--illinois-orange)' }} />
+    return (
+      <IconFile {...iconProps} style={{ color: 'var(--illinois-orange)' }} />
+    )
   }
 
   const truncateFileName = (name: string, maxLength = 30) => {
@@ -140,7 +162,16 @@ const FileCard: React.FC<{
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open file ${fileName}`}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       style={{
         display: 'inline-flex',
         maxWidth: '320px',
@@ -161,9 +192,17 @@ const FileCard: React.FC<{
         e.currentTarget.style.borderColor = 'var(--border)'
         e.currentTarget.style.backgroundColor = 'var(--background-faded)'
       }}
+      onFocus={(e) => {
+        e.currentTarget.style.borderColor = 'var(--primary)'
+        e.currentTarget.style.backgroundColor = 'var(--background-dark)'
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border)'
+        e.currentTarget.style.backgroundColor = 'var(--background-faded)'
+      }}
     >
       {getFileIcon(fileName, fileType)}
-      <span 
+      <span
         style={{
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -176,9 +215,17 @@ const FileCard: React.FC<{
         {truncateFileName(fileName)}
       </span>
       {isPreviewable ? (
-        <IconEye size={16} style={{ color: 'var(--illinois-orange)' }} />
+        <IconEye
+          size={16}
+          aria-hidden="true"
+          style={{ color: 'var(--illinois-orange)' }}
+        />
       ) : (
-        <IconFile size={16} style={{ color: 'var(--illinois-orange)' }} />
+        <IconFile
+          size={16}
+          aria-hidden="true"
+          style={{ color: 'var(--illinois-orange)' }}
+        />
       )}
     </div>
   )
@@ -204,7 +251,6 @@ const FilePreviewModal: React.FC<{
       messageIsStreaming,
       isImg2TextLoading,
       isRouting,
-      isRunningTool,
       isRetrievalLoading,
       isQueryRewriting,
       loading,
@@ -217,7 +263,7 @@ const FilePreviewModal: React.FC<{
 
   // Handle PDFs and Office documents that can be displayed in iframes
   const isPdf =
-    fileType?.includes('pdf') || 
+    fileType?.includes('pdf') ||
     fileName.toLowerCase().match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx)$/i)
   const isTextFile =
     fileType?.includes('text') ||
@@ -236,9 +282,9 @@ const FilePreviewModal: React.FC<{
   useEffect(() => {
     if (isTextFile && actualFileUrl && isOpen) {
       fetch(actualFileUrl)
-        .then(response => response.text())
-        .then(text => setTextContent(text))
-        .catch(error => {
+        .then((response) => response.text())
+        .then((text) => setTextContent(text))
+        .catch((error) => {
           console.error('Failed to load text content:', error)
           setTextContent('Failed to load file content')
         })
@@ -255,7 +301,9 @@ const FilePreviewModal: React.FC<{
       <Modal.Overlay className="modal-overlay-common" />
       <Modal.Content className="modal-common">
         <Modal.Header className="modal-header-common">
-          <Modal.Title className={`modal-title-common ${montserrat_heading.variable} font-montserratHeading`}>
+          <Modal.Title
+            className={`modal-title-common ${montserrat_heading.variable} font-montserratHeading`}
+          >
             {fileName}
           </Modal.Title>
           <Modal.CloseButton
@@ -283,8 +331,6 @@ const FilePreviewModal: React.FC<{
     </Modal.Root>
   )
 }
-
-
 
 // Add context for managing the active sources sidebar
 const SourcesSidebarContext = createContext<{
@@ -334,7 +380,7 @@ export interface Props {
   ) => void
   context?: ContextWithMetadata[]
   contentRenderer?: (message: Message) => JSX.Element
-      onImageUrlsUpdate?: (message: Message, messageIndex: number) => void
+  onImageUrlsUpdate?: (message: Message, messageIndex: number) => void
   courseName: string
 }
 
@@ -398,19 +444,27 @@ function getFileType(s3Path?: string, url?: string) {
 
 function isFilePreviewable(fileName: string, fileType?: string): boolean {
   const extension = fileName.split('.').pop()?.toLowerCase()
-  
+
   // PDFs can be previewed
   if (fileType?.includes('pdf') || extension === 'pdf') {
     return true
   }
-  
+
   // Text files can be previewed
-  if (fileType?.includes('text') || extension === 'txt' || extension === 'md' || 
-      extension === 'html' || extension === 'xml' || extension === 'csv' || 
-      extension === 'py' || extension === 'srt' || extension === 'vtt') {
+  if (
+    fileType?.includes('text') ||
+    extension === 'txt' ||
+    extension === 'md' ||
+    extension === 'html' ||
+    extension === 'xml' ||
+    extension === 'csv' ||
+    extension === 'py' ||
+    extension === 'srt' ||
+    extension === 'vtt'
+  ) {
     return true
   }
-  
+
   // Office documents and other files cannot be previewed
   return false
 }
@@ -465,12 +519,61 @@ export const ChatMessage = memo(
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-    // SET TIMER for message writing (from gpt-4)
     const [timerVisible, setTimerVisible] = useState(false)
     const { classes } = useStyles() // for Accordion
 
+    const agentEvents = Array.isArray(message.agentEvents)
+      ? message.agentEvents
+      : []
+    const hasAgentEvents = agentEvents.length > 0
+
     // Remove the local state for sources sidebar and use only context
     const isSourcesSidebarOpen = activeSidebarMessageId === message.id
+
+    // State to hold the contexts to display (either from this message or previous user message)
+    const [displayContexts, setDisplayContexts] = useState<
+      ContextWithMetadata[]
+    >([])
+
+    // Check if we should use the previous user message's context
+    useEffect(() => {
+      // Only run this logic if:
+      // 1. Current message is an assistant message
+      // 2. Current message has no contexts or empty contexts array
+      if (
+        message.role === 'assistant' &&
+        (!message.contexts ||
+          !Array.isArray(message.contexts) ||
+          message.contexts.length === 0)
+      ) {
+        // Check if there's a previous message
+        if (
+          selectedConversation &&
+          selectedConversation.messages &&
+          messageIndex > 0
+        ) {
+          const previousMessage =
+            selectedConversation.messages[messageIndex - 1]
+
+          // Check if previous message is a user message and has contexts
+          if (
+            previousMessage &&
+            previousMessage.role === 'user' &&
+            Array.isArray(previousMessage.contexts) &&
+            previousMessage.contexts.length > 0
+          ) {
+            // Use the previous user message's contexts
+            setDisplayContexts(previousMessage.contexts)
+            return
+          }
+        }
+      }
+
+      // Otherwise, use the current message's contexts (or empty array)
+      setDisplayContexts(
+        Array.isArray(message.contexts) ? message.contexts : [],
+      )
+    }, [message.role, message.contexts, messageIndex, selectedConversation])
 
     useEffect(() => {
       // Close Sources sidebar if right sidebar is opened
@@ -503,7 +606,6 @@ export const ChatMessage = memo(
       return activeSidebarMessageId !== null
     }
 
-    // Cleanup effect for modal
     useEffect(() => {
       return () => {
         setIsFeedbackModalOpen(false)
@@ -567,32 +669,26 @@ export const ChatMessage = memo(
                       new Set([...prevUrls, content.image_url?.url as string]),
                   )
                   return content
-                } else {
-                  const path = extractPathFromUrl(content.image_url.url)
-                  const presignedUrl = await getPresignedUrl(path, courseName)
-                  setImageUrls(
-                    (prevUrls) => new Set([...prevUrls, presignedUrl]),
-                  )
-                  return { ...content, image_url: { url: presignedUrl } }
                 }
+
+                const path = extractPathFromUrl(content.image_url.url)
+                const presignedUrl = await getPresignedUrl(path, courseName)
+                setImageUrls((prevUrls) => new Set([...prevUrls, presignedUrl]))
+                return { ...content, image_url: { url: presignedUrl } }
               }
               return content
             }),
           )
-          if (
-            !isValid &&
-            // onImageUrlsUpdate && // Commented out image upload functionality
-            !deepEqual(updatedContent, message.content)
-          ) {
-            // onImageUrlsUpdate( // Commented out image upload functionality
-            //   { ...message, content: updatedContent }, // Commented out image upload functionality
-            //   messageIndex, // Commented out image upload functionality
-            // ) // Commented out image upload functionality
+          if (!isValid && !deepEqual(updatedContent, message.content)) {
+            return
           }
         }
       }
-      // Call fetchUrl for all messages that contain images
-      if (Array.isArray(message.content) && message.content.some(content => content.type === 'image_url')) {
+
+      if (
+        Array.isArray(message.content) &&
+        message.content.some((content) => content.type === 'image_url')
+      ) {
         fetchUrl()
       }
     }, [message.content, messageIndex, isRunningTool])
@@ -638,11 +734,15 @@ export const ChatMessage = memo(
 
       if (selectedConversation && onEdit) {
         let editedContent: string | Content[]
-        
+
         if (Array.isArray(message.content)) {
           // Preserve file and image content, only update text content
-          const nonTextContent = message.content.filter(content => content.type !== 'text')
-          const newTextContent = trimmedContent ? [{ type: 'text' as MessageType, text: trimmedContent }] : []
+          const nonTextContent = message.content.filter(
+            (content) => content.type !== 'text',
+          )
+          const newTextContent = trimmedContent
+            ? [{ type: 'text' as MessageType, text: trimmedContent }]
+            : []
           editedContent = [...newTextContent, ...nonTextContent]
         } else {
           // If it's a simple string message, just use the edited text
@@ -659,11 +759,36 @@ export const ChatMessage = memo(
             msg.id === message.id ? editedMessage : msg,
           ),
         }
-        saveConversationToServer(updatedConversation, courseName).catch(
-          (error: Error) => {
-            console.error('Error saving edited message to server:', error)
-          },
-        )
+        const latestMessage =
+          updatedConversation.messages?.[
+            updatedConversation.messages.length - 1
+          ] ?? null
+
+        saveConversationToServer(
+          updatedConversation,
+          courseName,
+          latestMessage,
+        ).catch((error: Error) => {
+          console.error('Error saving edited message to server:', error)
+        })
+
+        if (latestMessage) {
+          fetch('/api/UIUC-api/logConversation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(
+              createLogConversationPayload(
+                courseName,
+                updatedConversation,
+                latestMessage,
+              ),
+            ),
+          }).catch((error) => {
+            console.error('Error logging conversation delta:', error)
+          })
+        }
       }
       setIsEditing(false)
     }
@@ -787,7 +912,7 @@ export const ChatMessage = memo(
           }
           return path
         }
-        
+
         // It's a URL, try to parse it
         const urlObject = new URL(url)
         let path = urlObject.pathname
@@ -866,12 +991,12 @@ export const ChatMessage = memo(
 
       const loadThumbnails = async () => {
         // Early return if contexts is undefined, null, or not an array
-        if (!Array.isArray(message.contexts) || message.contexts.length === 0)
+        if (!Array.isArray(displayContexts) || displayContexts.length === 0)
           return
 
         // Track unique sources to avoid duplicates
         const seenSources = new Set<string>()
-        const uniqueContexts = message.contexts.filter((context) => {
+        const uniqueContexts = displayContexts.filter((context) => {
           const sourceKey = context.s3_path || context.url
           if (!sourceKey || seenSources.has(sourceKey)) return false
           seenSources.add(sourceKey)
@@ -923,7 +1048,7 @@ export const ChatMessage = memo(
       return () => {
         isMounted = false
       }
-    }, [message.contexts, courseName])
+    }, [displayContexts, courseName])
 
     // Add new function to replace expired links in text
     async function replaceExpiredLinksInText(
@@ -1133,6 +1258,14 @@ export const ChatMessage = memo(
         contentToRender = remainingContent
       }
 
+      // Handle MathJax not supported by remark-math
+      contentToRender = contentToRender
+        .replace(
+          /\\\[([\s\S]*?)\\\]/g,
+          (_, equation) => `$$\n${equation.trim()}\n$$`,
+        )
+        .replace(/\\\(([\s\S]*?)\\\)/g, (_, equation) => `$${equation.trim()}$`)
+
       return (
         <>
           {thoughtsContent && (
@@ -1193,7 +1326,7 @@ export const ChatMessage = memo(
 
                   return !inline ? (
                     <CodeBlock
-                      key={Math.random()}
+                      key={generateSecureKey()}
                       language={(match && match[1]) || ''}
                       value={String(children).replace(/\n$/, '')}
                       style={{
@@ -1219,124 +1352,127 @@ export const ChatMessage = memo(
                     </code>
                   )
                 },
-              p({ node, children }) {
-                return (
-                  <p
-                    className={`self-start text-base font-normal ${montserrat_paragraph.variable} pb-2 font-montserratParagraph`}
-                  >
-                    {children}
-                  </p>
-                )
-              },
-              ul({ children }) {
-                return (
-                  <ul
-                    className={`text-base font-normal ${montserrat_paragraph.variable} font-montserratParagraph`}
-                  >
-                    {children}
-                  </ul>
-                )
-              },
-              ol({ children }) {
-                return (
-                  <ol
-                    className={`text-base font-normal ${montserrat_paragraph.variable} ml-4 font-montserratParagraph lg:ml-6`}
-                  >
-                    {children}
-                  </ol>
-                )
-              },
-              li({ children }) {
-                return (
-                  <li
-                    className={`text-base font-normal ${montserrat_paragraph.variable} break-words font-montserratParagraph`}
-                  >
-                    {children}
-                  </li>
-                )
-              },
-              table({ children }) {
-                return (
-                  <table className="border-collapse border border-black px-3 py-1 dark:border-white">
-                    {children}
-                  </table>
-                )
-              },
-              th({ children }) {
-                return (
-                  <th className="break-words border border-black bg-gray-500 px-3 py-1 text-white dark:border-white">
-                    {children}
-                  </th>
-                )
-              },
-              td({ children }) {
-                return (
-                  <td className="break-words border border-black px-3 py-1 dark:border-white">
-                    {children}
-                  </td>
-                )
-              },
-              h1({ node, children }) {
-                return (
-                  <h1
-                    className={`text-4xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
-                  >
-                    {children}
-                  </h1>
-                )
-              },
-              h2({ node, children }) {
-                return (
-                  <h2
-                    className={`text-3xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
-                  >
-                    {children}
-                  </h2>
-                )
-              },
-              h3({ node, children }) {
-                return (
-                  <h3
-                    className={`text-2xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
-                  >
-                    {children}
-                  </h3>
-                )
-              },
-              h4({ node, children }) {
-                return (
-                  <h4
-                    className={`text-lg font-bold ${montserrat_heading.variable} font-montserratHeading`}
-                  >
-                    {children}
-                  </h4>
-                )
-              },
-              h5({ node, children }) {
-                return (
-                  <h5
-                    className={`text-base font-bold ${montserrat_heading.variable} font-montserratHeading`}
-                  >
-                    {children}
-                  </h5>
-                )
-              },
-              h6({ node, children }) {
-                return (
-                  <h6
-                    className={`text-base font-bold ${montserrat_heading.variable} font-montserratHeading`}
-                  >
-                    {children}
-                  </h6>
-                )
-              },
-              a({ node, className, children, ...props }) {
-                return <MarkdownLink {...props}>{children}</MarkdownLink>
-              },
-            }}
-          >
-            {contentToRender}
-          </MemoizedReactMarkdown>
+                p({ node, children }) {
+                  return (
+                    <p
+                      className={`self-start text-base font-normal ${montserrat_paragraph.variable} pb-2 font-montserratParagraph`}
+                    >
+                      {children}
+                    </p>
+                  )
+                },
+                ul({ children }) {
+                  return (
+                    <ul
+                      className={`text-base font-normal ${montserrat_paragraph.variable} font-montserratParagraph`}
+                    >
+                      {children}
+                    </ul>
+                  )
+                },
+                ol({ children }) {
+                  return (
+                    <ol
+                      className={`text-base font-normal ${montserrat_paragraph.variable} ml-4 font-montserratParagraph lg:ml-6`}
+                    >
+                      {children}
+                    </ol>
+                  )
+                },
+                li({ children }) {
+                  return (
+                    <li
+                      className={`text-base font-normal ${montserrat_paragraph.variable} break-words font-montserratParagraph`}
+                    >
+                      {children}
+                    </li>
+                  )
+                },
+                table({ children }) {
+                  return (
+                    <table
+                      aria-label="Data table from chat response"
+                      className="border-collapse border border-black px-3 py-1 dark:border-white"
+                    >
+                      {children}
+                    </table>
+                  )
+                },
+                th({ children }) {
+                  return (
+                    <th className="break-words border border-black bg-gray-500 px-3 py-1 text-white dark:border-white">
+                      {children}
+                    </th>
+                  )
+                },
+                td({ children }) {
+                  return (
+                    <td className="break-words border border-black px-3 py-1 dark:border-white">
+                      {children}
+                    </td>
+                  )
+                },
+                h1({ node, children }) {
+                  return (
+                    <h1
+                      className={`text-4xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      {children}
+                    </h1>
+                  )
+                },
+                h2({ node, children }) {
+                  return (
+                    <h2
+                      className={`text-3xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      {children}
+                    </h2>
+                  )
+                },
+                h3({ node, children }) {
+                  return (
+                    <h3
+                      className={`text-2xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      {children}
+                    </h3>
+                  )
+                },
+                h4({ node, children }) {
+                  return (
+                    <h4
+                      className={`text-lg font-bold ${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      {children}
+                    </h4>
+                  )
+                },
+                h5({ node, children }) {
+                  return (
+                    <h5
+                      className={`text-base font-bold ${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      {children}
+                    </h5>
+                  )
+                },
+                h6({ node, children }) {
+                  return (
+                    <h6
+                      className={`text-base font-bold ${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      {children}
+                    </h6>
+                  )
+                },
+                a({ node, className, children, ...props }) {
+                  return <MarkdownLink {...props}>{children}</MarkdownLink>
+                },
+              }}
+            >
+              {contentToRender}
+            </MemoizedReactMarkdown>
           )}
         </>
       )
@@ -1418,6 +1554,34 @@ export const ChatMessage = memo(
         setShowTooltip(false)
       }, [])
 
+      const handleFocus = useCallback(() => {
+        if (!linkRef.current || !title) return
+        setShowTooltip(true)
+        const linkRect = linkRef.current.getBoundingClientRect()
+        const tooltipWidth = 200
+        if (linkRect.left < tooltipWidth / 2) {
+          setTooltipAlignment('left')
+        } else if (linkRect.right + tooltipWidth / 2 > window.innerWidth) {
+          setTooltipAlignment('right')
+        } else {
+          setTooltipAlignment('center')
+        }
+      }, [title])
+
+      const handleBlur = useCallback(() => {
+        setShowTooltip(false)
+      }, [])
+
+      const handleKeyDown = useCallback(
+        (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' && href) {
+            e.preventDefault()
+            window.open(href, '_blank')?.focus()
+          }
+        },
+        [href],
+      )
+
       // Check if this message is currently streaming
       const isCurrentlyStreaming =
         messageIsStreaming &&
@@ -1431,6 +1595,9 @@ export const ChatMessage = memo(
         onMouseUp: handleClick,
         onMouseEnter: handleMouseEnter,
         onMouseLeave: handleMouseLeave,
+        onFocus: handleFocus,
+        onBlur: handleBlur,
+        onKeyDown: handleKeyDown,
         onClick: (e: React.MouseEvent) => e.preventDefault(), // Prevent default click behavior
         style: { pointerEvents: 'all' as const },
         ref: linkRef,
@@ -1470,9 +1637,36 @@ export const ChatMessage = memo(
           </span>
         )
       } else {
+        // When the link text is a bare URL, derive a readable label from the hostname + path
+        const childText =
+          typeof children === 'string'
+            ? children
+            : Array.isArray(children) && typeof children[0] === 'string'
+              ? children[0]
+              : null
+
+        const isBareUrl =
+          childText != null &&
+          /^https?:\/\//i.test(childText.trim()) &&
+          href &&
+          childText.trim().replace(/\/+$/, '') ===
+            href.trim().replace(/\/+$/, '')
+
+        let displayContent: React.ReactNode = children
+        if (isBareUrl && href) {
+          try {
+            const parsed = new URL(href)
+            const host = parsed.hostname.replace(/^www\./, '')
+            const path = parsed.pathname.replace(/\/+$/, '')
+            displayContent = path && path !== '/' ? `${host}${path}` : host
+          } catch {
+            // Fall back to raw children if URL parsing fails
+          }
+        }
+
         return (
           <a {...commonProps} className={'linkMarkDown'}>
-            {children}
+            {displayContent}
           </a>
         )
       }
@@ -1532,7 +1726,12 @@ export const ChatMessage = memo(
         // For non-previewable files, trigger direct download
         if (fileUrl) {
           try {
-            const presignedUrl = await fetchPresignedUrl(fileUrl, courseName, undefined, fileName)
+            const presignedUrl = await fetchPresignedUrl(
+              fileUrl,
+              courseName,
+              undefined,
+              fileName,
+            )
             if (presignedUrl) {
               const link = document.createElement('a')
               link.href = presignedUrl
@@ -1554,6 +1753,30 @@ export const ChatMessage = memo(
         fileName: '',
       })
     }
+    const condArrayIsArray = Array.isArray(displayContexts)
+    const condHasContexts = condArrayIsArray && displayContexts.length > 0
+
+    const condIsStreamingAndLastMsg =
+      messageIsStreaming &&
+      messageIndex === (selectedConversation?.messages.length ?? 0) - 1
+
+    const condLoadingAndLastMsg =
+      loading &&
+      messageIndex === (selectedConversation?.messages.length ?? 0) - 1
+
+    const hasFinalResponseEvent = agentEvents.some(
+      (event) => event.type === 'final_response',
+    )
+
+    const isCurrentAgentRunMessage =
+      hasAgentEvents &&
+      !hasFinalResponseEvent &&
+      message.role === 'user' &&
+      messageIsStreaming &&
+      messageIndex === (selectedConversation?.messages.length ?? 0) - 1
+
+    const shouldShowSources =
+      condHasContexts && !condIsStreamingAndLastMsg && !condLoadingAndLastMsg
 
     return (
       <>
@@ -1565,15 +1788,19 @@ export const ChatMessage = memo(
           } max-w-[100%]`}
           style={{ overflowWrap: 'anywhere' }}
         >
-          <div className="relative flex w-full overflow-visible px-2 py-2 pt-4 text-base md:mx-[5%] md:max-w-[90%] md:gap-6  lg:mx-[10%]">
+          <div className="relative flex w-full overflow-visible px-2 py-2 pt-4 text-base md:mx-[5%] md:max-w-[90%] md:gap-6 lg:mx-[10%]">
             <div className="min-w-[40px] text-left">
               {message.role === 'assistant' ? (
                 <>
-                  <IconRobot size={30} />
+                  <IconRobot size={30} aria-hidden="true" />
                   <Timer timerVisible={timerVisible} />
                 </>
               ) : (
-                <IconUser size={30} color="var(--chat-user)" />
+                <IconUser
+                  size={30}
+                  aria-hidden="true"
+                  color="var(--chat-user)"
+                />
               )}
             </div>
 
@@ -1584,7 +1811,7 @@ export const ChatMessage = memo(
                     <div className="flex w-full flex-col">
                       <textarea
                         ref={textareaRef}
-                        className="w-full resize-none whitespace-pre-wrap rounded-md border border-[--foreground-faded] bg-[--background-faded] p-3 focus:border-[--primary] focus:outline-none"
+                        className="w-full resize-none whitespace-pre-wrap rounded-md border border-[--foreground-faded] bg-[--background-faded] p-3 focus:border-[--primary]"
                         value={messageContent}
                         onChange={handleInputChange}
                         onKeyDown={handlePressEnter}
@@ -1605,7 +1832,7 @@ export const ChatMessage = memo(
                             setIsEditing(false)
                           }}
                         >
-                          <IconX size={16} />
+                          <IconX size={16} aria-hidden="true" />
                           {t('Cancel')}
                         </button>
                         <button
@@ -1613,7 +1840,7 @@ export const ChatMessage = memo(
                           onClick={handleEditMessage}
                           disabled={messageContent.trim().length <= 0}
                         >
-                          <IconCheck size={16} />
+                          <IconCheck size={16} aria-hidden="true" />
                           {t('Save & Submit')}
                         </button>
                       </div>
@@ -1645,59 +1872,74 @@ export const ChatMessage = memo(
                                 }
                               })}
                               {/* File cards for all messages */}
-                              <div className="-m-1 flex w-full flex-wrap justify-start">
-                                {message.content
-                                  .filter((item) => item.type === 'file')
-                                  .map((content, index) => {
-                                    const fileName = content.fileName || 'Unknown file'
-                                    const isPreviewable = isFilePreviewable(fileName, content.fileType)
-                                    return (
-                                      <div key={index} className="mb-2">
-                                        <FileCard
-                                          fileName={fileName}
-                                          fileType={content.fileType}
-                                          fileUrl={content.fileUrl}
-                                          isPreviewable={isPreviewable}
-                                          onClick={() =>
-                                            handleFileAction(
-                                              fileName,
-                                              content.fileUrl,
-                                              content.fileType,
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                    )
-                                  })}
-                              </div>
-
-                              {/* Image previews for all messages */}
-                              <div className="-m-1 flex w-full flex-wrap justify-start">
-                                {message.content
-                                  .filter((item) => item.type === 'image_url')
-                                  .map((content, index) => {
-                                    // Try to get the processed URL from imageUrls state first
-                                    const imageUrlsArray = Array.from(imageUrls)
-                                    const processedUrl = imageUrlsArray[index] || content.image_url?.url
-                                    
-
-                                    
-                                    return (
-                                      <div
-                                        key={index}
-                                        className={classes.imageContainerStyle}
-                                      >
-                                        <div className="overflow-hidden rounded-lg">
-                                          <ImagePreview
-                                            src={processedUrl as string}
-                                            alt="Chat message"
-                                            className={classes.imageStyle}
+                              {message.content.some(
+                                (item) => item.type === 'file',
+                              ) && (
+                                <div className="-m-1 flex w-full flex-wrap justify-start">
+                                  {message.content
+                                    .filter((item) => item.type === 'file')
+                                    .map((content, index) => {
+                                      const fileName =
+                                        content.fileName || 'Unknown file'
+                                      const isPreviewable = isFilePreviewable(
+                                        fileName,
+                                        content.fileType,
+                                      )
+                                      return (
+                                        <div key={index} className="mb-2">
+                                          <FileCard
+                                            fileName={fileName}
+                                            fileType={content.fileType}
+                                            fileUrl={content.fileUrl}
+                                            isPreviewable={isPreviewable}
+                                            onClick={() =>
+                                              handleFileAction(
+                                                fileName,
+                                                content.fileUrl,
+                                                content.fileType,
+                                              )
+                                            }
                                           />
                                         </div>
-                                      </div>
-                                    )
-                                  })}
-                              </div>
+                                      )
+                                    })}
+                                </div>
+                              )}
+
+                              {/* Image previews for all messages */}
+                              {message.content.some(
+                                (item) => item.type === 'image_url',
+                              ) && (
+                                <div className="-m-1 flex w-full flex-wrap justify-start">
+                                  {message.content
+                                    .filter((item) => item.type === 'image_url')
+                                    .map((content, index) => {
+                                      // Try to get the processed URL from imageUrls state first
+                                      const imageUrlsArray =
+                                        Array.from(imageUrls)
+                                      const processedUrl =
+                                        imageUrlsArray[index] ||
+                                        content.image_url?.url
+
+                                      return (
+                                        <div
+                                          key={index}
+                                          className={
+                                            classes.imageContainerStyle
+                                          }
+                                        >
+                                          <div className="overflow-hidden rounded-lg">
+                                            <ImagePreview
+                                              src={processedUrl as string}
+                                              alt="Chat message"
+                                              className={classes.imageStyle}
+                                            />
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                </div>
+                              )}
 
                               {/* Image description loading state for last message */}
                               {isImg2TextLoading &&
@@ -1754,336 +1996,328 @@ export const ChatMessage = memo(
                         ) : (
                           <>{message.content}</>
                         )}
-                        <div className="mt-2 flex w-full flex-col items-start space-y-2">
-                          {/* Query rewrite loading state - only show for current message */}
-                          {isQueryRewriting &&
-                            messageIndex ===
-                              (selectedConversation?.messages?.length ?? 0) -
-                                1 && (
-                              <IntermediateStateAccordion
-                                accordionKey="query-rewrite"
-                                title="Optimizing search query"
-                                isLoading={isQueryRewriting}
-                                error={false}
-                                content={<></>}
-                              />
-                            )}
-
-                          {/* Query rewrite result - show for any message that was optimized */}
-                          {(!isQueryRewriting ||
-                            messageIndex <
-                              (selectedConversation?.messages?.length ?? 0) -
-                                1) &&
-                            message.wasQueryRewritten !== undefined &&
-                            message.wasQueryRewritten !== null && (
-                              <IntermediateStateAccordion
-                                accordionKey="query-rewrite-result"
-                                title={
-                                  message.wasQueryRewritten
-                                    ? 'Optimized search query'
-                                    : 'No query optimization necessary'
-                                }
-                                isLoading={false}
-                                error={false}
-                                content={
-                                  message.wasQueryRewritten
-                                    ? message.queryRewriteText
-                                    : "The LLM determined no optimization was necessary. We only optimize when it's necessary to turn a single message into a stand-alone search to retrieve the best documents."
-                                }
-                              />
-                            )}
-
-                          {/* Retrieval results for all messages */}
-                          {Array.isArray(message.contexts) &&
-                            message.contexts.length > 0 && (
-                              <IntermediateStateAccordion
-                                accordionKey="retrieval loading"
-                                title="Retrieved documents"
-                                isLoading={false}
-                                error={false}
-                                content={`Found ${getContextsLength(message.contexts)} document chunks.`}
-                              />
-                            )}
-
-                          {/* Retrieval loading state for last message */}
-                          {isRetrievalLoading &&
-                            (messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                1 ||
-                              messageIndex ===
-                                (selectedConversation?.messages.length ?? 0) -
-                                  2) && (
-                              <IntermediateStateAccordion
-                                accordionKey="retrieval loading"
-                                title="Retrieving documents"
-                                isLoading={isRetrievalLoading}
-                                error={false}
-                                content={`Found ${getContextsLength(message.contexts)} document chunks.`}
-                              />
-                            )}
-
-                          {/* Tool Routing loading state for last message */}
-                          {isRouting &&
-                            (messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                1 ||
-                              messageIndex ===
-                                (selectedConversation?.messages.length ?? 0) -
-                                  2) && (
-                              <IntermediateStateAccordion
-                                accordionKey={`routing tools`}
-                                title={'Routing the request to relevant tools'}
-                                isLoading={isRouting}
-                                error={false}
-                                content={<></>}
-                              />
-                            )}
-
-                          {/* Tool input arguments state for last message */}
-                          {isRouting === false &&
-                            message.tools &&
-                            (messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                1 ||
-                              messageIndex ===
-                                (selectedConversation?.messages.length ?? 0) -
-                                  2) && (
-                              <>
-                                {message.tools.map((response, index) => (
+                        <div className="mt-4 flex w-full flex-col items-start space-y-3">
+                          {hasAgentEvents ? (
+                            <AgentExecutionTimeline
+                              events={agentEvents}
+                              isRunning={isCurrentAgentRunMessage}
+                            />
+                          ) : (
+                            <>
+                              {/* Query rewrite loading state - only show for current message */}
+                              {isQueryRewriting &&
+                                messageIndex ===
+                                  (selectedConversation?.messages?.length ??
+                                    0) -
+                                    1 && (
                                   <IntermediateStateAccordion
-                                    key={`routing-${index}`}
-                                    accordionKey={`routing-${index}`}
+                                    accordionKey="query-rewrite"
+                                    title="Optimizing search query"
+                                    isLoading={isQueryRewriting}
+                                    error={false}
+                                    content={<></>}
+                                  />
+                                )}
+
+                              {/* Query rewrite result - show for any message that was optimized */}
+                              {(!isQueryRewriting ||
+                                messageIndex <
+                                  (selectedConversation?.messages?.length ??
+                                    0) -
+                                    1) &&
+                                message.wasQueryRewritten !== undefined &&
+                                message.wasQueryRewritten !== null && (
+                                  <IntermediateStateAccordion
+                                    accordionKey="query-rewrite-result"
                                     title={
-                                      <>
-                                        Routing the request to{' '}
-                                        <Badge
-                                          color="var(--background-dark)"
-                                          radius="md"
-                                          size="sm"
-                                          styles={{
-                                            root: {
-                                              color: 'var(--foreground)',
-                                              backgroundColor:
-                                                'var(--background-dark)',
-                                            },
-                                          }}
-                                        >
-                                          {response.readableName}
-                                        </Badge>
-                                      </>
+                                      message.wasQueryRewritten
+                                        ? 'Optimized search query'
+                                        : 'No query optimization necessary'
+                                    }
+                                    isLoading={false}
+                                    error={false}
+                                    content={
+                                      message.wasQueryRewritten
+                                        ? message.queryRewriteText
+                                        : "The LLM determined no optimization was necessary. We only optimize when it's necessary to turn a single message into a stand-alone search to retrieve the best documents."
+                                    }
+                                  />
+                                )}
+
+                              {/* Retrieval results for all messages */}
+                              {Array.isArray(message.contexts) &&
+                                message.contexts.length > 0 && (
+                                  <IntermediateStateAccordion
+                                    accordionKey="retrieval loading"
+                                    title="Retrieved documents"
+                                    isLoading={false}
+                                    error={false}
+                                    content={`Found ${getContextsLength(
+                                      message.contexts,
+                                    )} document chunks.`}
+                                  />
+                                )}
+
+                              {/* Retrieval loading state for last message */}
+                              {isRetrievalLoading &&
+                                (messageIndex ===
+                                  (selectedConversation?.messages.length ?? 0) -
+                                    1 ||
+                                  messageIndex ===
+                                    (selectedConversation?.messages.length ??
+                                      0) -
+                                      2) && (
+                                  <IntermediateStateAccordion
+                                    accordionKey="retrieval loading"
+                                    title="Retrieving documents"
+                                    isLoading={isRetrievalLoading}
+                                    error={false}
+                                    content={`Found ${getContextsLength(
+                                      message.contexts,
+                                    )} document chunks.`}
+                                  />
+                                )}
+
+                              {/* Tool Routing loading state for last message */}
+                              {isRouting &&
+                                (messageIndex ===
+                                  (selectedConversation?.messages.length ?? 0) -
+                                    1 ||
+                                  messageIndex ===
+                                    (selectedConversation?.messages.length ??
+                                      0) -
+                                      2) && (
+                                  <IntermediateStateAccordion
+                                    accordionKey={`routing tools`}
+                                    title={
+                                      'Routing the request to relevant tools'
                                     }
                                     isLoading={isRouting}
                                     error={false}
-                                    content={
-                                      <>
-                                        Arguments :{' '}
-                                        {response.aiGeneratedArgumentValues
-                                          ?.image_urls ? (
-                                          <div>
-                                            <div className="flex overflow-x-auto">
-                                              {JSON.parse(
-                                                response
-                                                  .aiGeneratedArgumentValues
-                                                  .image_urls,
-                                              ).length > 0 ? (
-                                                JSON.parse(
-                                                  response
-                                                    .aiGeneratedArgumentValues
-                                                    .image_urls,
-                                                ).map(
-                                                  (
-                                                    imageUrl: string,
-                                                    index: number,
-                                                  ) => (
-                                                    <div
-                                                      key={index}
-                                                      className={
-                                                        classes.imageContainerStyle
-                                                      }
-                                                    >
-                                                      <div className="overflow-hidden rounded-lg">
-                                                        <ImagePreview
-                                                          src={imageUrl}
-                                                          alt={`Tool image argument ${index}`}
-                                                          className={
-                                                            classes.imageStyle
-                                                          }
-                                                        />
-                                                      </div>
-                                                    </div>
-                                                  ),
-                                                )
-                                              ) : (
-                                                <p>No arguments provided</p>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <pre>
-                                            {JSON.stringify(
-                                              response.aiGeneratedArgumentValues,
-                                              null,
-                                              2,
-                                            )}
-                                          </pre>
-                                        )}
-                                      </>
-                                    }
+                                    content={<></>}
                                   />
-                                ))}
-                              </>
-                            )}
+                                )}
 
-                          {/* Tool output states for last message */}
-                          {(messageIndex ===
-                            (selectedConversation?.messages.length ?? 0) - 1 ||
-                            messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                2) && (
-                            <>
-                              {message.tools?.map((response, index) => (
-                                <IntermediateStateAccordion
-                                  key={`tool-${index}`}
-                                  accordionKey={`tool-${index}`}
-                                  title={
-                                    <>
-                                      Tool output from{' '}
-                                      <Badge
-                                        color="var(--background-dark)"
-                                        radius="md"
-                                        size="sm"
-                                        styles={{
-                                          root: {
-                                            color: response.error
-                                              ? 'var(--illinois-white)'
-                                              : 'var(--foreground)',
-                                            backgroundColor: response.error
-                                              ? 'var(--badge-error)'
-                                              : 'var(--background-dark)',
-                                          },
-                                        }}
-                                      >
-                                        {response.readableName}
-                                      </Badge>
-                                    </>
-                                  }
-                                  isLoading={
-                                    response.output === undefined &&
-                                    response.error === undefined
-                                  }
-                                  error={response.error ? true : false}
-                                  content={
-                                    <>
-                                      {response.error ? (
-                                        <span>{response.error}</span>
-                                      ) : (
-                                        <>
-                                          <div
-                                            style={{
-                                              display: 'flex',
-                                              overflowX: 'auto',
-                                              gap: '10px',
-                                            }}
-                                          >
-                                            {response.output?.imageUrls &&
-                                              response.output?.imageUrls.map(
-                                                (imageUrl, index) => (
-                                                  <div
-                                                    key={index}
-                                                    className={
-                                                      classes.imageContainerStyle
-                                                    }
-                                                  >
-                                                    <div className="overflow-hidden rounded-lg">
-                                                      <ImagePreview
-                                                        src={imageUrl}
-                                                        alt={`Tool output image ${index}`}
-                                                        className={
-                                                          classes.imageStyle
-                                                        }
-                                                      />
-                                                    </div>
-                                                  </div>
-                                                ),
-                                              )}
-                                          </div>
-                                          <div>
-                                            {response.output?.text
-                                              ? response.output.text
-                                              : JSON.stringify(
-                                                  response.output?.data,
+                              {/* Tool input arguments state for last message */}
+                              {isRouting === false &&
+                                message.tools &&
+                                (messageIndex ===
+                                  (selectedConversation?.messages.length ?? 0) -
+                                    1 ||
+                                  messageIndex ===
+                                    (selectedConversation?.messages.length ??
+                                      0) -
+                                      2) && (
+                                  <>
+                                    {message.tools.map((response, index) => (
+                                      <IntermediateStateAccordion
+                                        key={`routing-${index}`}
+                                        accordionKey={`routing-${index}`}
+                                        title={
+                                          <>
+                                            Routing the request to{' '}
+                                            <Badge
+                                              color="var(--background-dark)"
+                                              radius="md"
+                                              size="sm"
+                                              styles={{
+                                                root: {
+                                                  color: 'var(--foreground)',
+                                                  backgroundColor:
+                                                    'var(--background-dark)',
+                                                },
+                                              }}
+                                            >
+                                              {response.readableName}
+                                            </Badge>
+                                          </>
+                                        }
+                                        isLoading={isRouting}
+                                        error={false}
+                                        content={
+                                          <>
+                                            Arguments :{' '}
+                                            {response.aiGeneratedArgumentValues
+                                              ?.image_urls ? (
+                                              <div>
+                                                <div className="flex overflow-x-auto">
+                                                  {JSON.parse(
+                                                    response
+                                                      .aiGeneratedArgumentValues
+                                                      .image_urls,
+                                                  ).length > 0 ? (
+                                                    JSON.parse(
+                                                      response
+                                                        .aiGeneratedArgumentValues
+                                                        .image_urls,
+                                                    ).map(
+                                                      (
+                                                        imageUrl: string,
+                                                        index: number,
+                                                      ) => (
+                                                        <div
+                                                          key={index}
+                                                          className={
+                                                            classes.imageContainerStyle
+                                                          }
+                                                        >
+                                                          <div className="overflow-hidden rounded-lg">
+                                                            <ImagePreview
+                                                              src={imageUrl}
+                                                              alt={`Tool image argument ${index}`}
+                                                              className={
+                                                                classes.imageStyle
+                                                              }
+                                                            />
+                                                          </div>
+                                                        </div>
+                                                      ),
+                                                    )
+                                                  ) : (
+                                                    <p>No arguments provided</p>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <pre>
+                                                {JSON.stringify(
+                                                  response.aiGeneratedArgumentValues,
                                                   null,
                                                   2,
                                                 )}
-                                          </div>
+                                              </pre>
+                                            )}
+                                          </>
+                                        }
+                                      />
+                                    ))}
+                                  </>
+                                )}
+
+                              {/* Tool output states for last message */}
+                              {(messageIndex ===
+                                (selectedConversation?.messages.length ?? 0) -
+                                  1 ||
+                                messageIndex ===
+                                  (selectedConversation?.messages.length ?? 0) -
+                                    2) && (
+                                <>
+                                  {message.tools?.map((response, index) => (
+                                    <IntermediateStateAccordion
+                                      key={`tool-${index}`}
+                                      accordionKey={`tool-${index}`}
+                                      title={
+                                        <>
+                                          Tool output from{' '}
+                                          <Badge
+                                            color="var(--background-dark)"
+                                            radius="md"
+                                            size="sm"
+                                            styles={{
+                                              root: {
+                                                color: response.error
+                                                  ? 'var(--illinois-white)'
+                                                  : 'var(--foreground)',
+                                                backgroundColor: response.error
+                                                  ? 'var(--badge-error)'
+                                                  : 'var(--background-dark)',
+                                              },
+                                            }}
+                                          >
+                                            {response.readableName}
+                                          </Badge>
                                         </>
-                                      )}
-                                    </>
-                                  }
-                                />
-                              ))}
+                                      }
+                                      isLoading={
+                                        response.output === undefined &&
+                                        response.error === undefined
+                                      }
+                                      error={response.error ? true : false}
+                                      content={
+                                        <>
+                                          {response.error ? (
+                                            <span>{response.error}</span>
+                                          ) : (
+                                            <>
+                                              <div
+                                                style={{
+                                                  display: 'flex',
+                                                  overflowX: 'auto',
+                                                  gap: '10px',
+                                                }}
+                                              >
+                                                {response.output?.imageUrls &&
+                                                  response.output?.imageUrls.map(
+                                                    (imageUrl, index) => (
+                                                      <div
+                                                        key={index}
+                                                        className={
+                                                          classes.imageContainerStyle
+                                                        }
+                                                      >
+                                                        <div className="overflow-hidden rounded-lg">
+                                                          <ImagePreview
+                                                            src={imageUrl}
+                                                            alt={`Tool output image ${index}`}
+                                                            className={
+                                                              classes.imageStyle
+                                                            }
+                                                          />
+                                                        </div>
+                                                      </div>
+                                                    ),
+                                                  )}
+                                              </div>
+                                              <div>
+                                                {response.output?.text
+                                                  ? response.output.text
+                                                  : JSON.stringify(
+                                                      response.output?.data,
+                                                      null,
+                                                      2,
+                                                    )}
+                                              </div>
+                                            </>
+                                          )}
+                                        </>
+                                      }
+                                    />
+                                  ))}
+                                </>
+                              )}
+
+                              {/* Only show "Generating final response" for NON-agent mode.
+                                  Agent mode shows status via AgentExecutionTimeline instead. */}
+                              {!isRouting &&
+                                !isRetrievalLoading &&
+                                !isImg2TextLoading &&
+                                !isQueryRewriting &&
+                                loading &&
+                                !selectedConversation?.agentModeEnabled && // Don't show for agent mode
+                                (messageIndex ===
+                                  (selectedConversation?.messages.length ?? 0) -
+                                    1 ||
+                                  messageIndex ===
+                                    (selectedConversation?.messages.length ??
+                                      0) -
+                                      2) &&
+                                (!message.tools ||
+                                  message.tools.every(
+                                    (tool) =>
+                                      tool.output !== undefined ||
+                                      tool.error !== undefined,
+                                  )) && (
+                                  <div className="flex items-center gap-3 px-4 py-3">
+                                    <p
+                                      className={`text-sm font-semibold ${montserrat_paragraph.variable} font-montserratParagraph`}
+                                    >
+                                      Generating final response…
+                                    </p>
+                                    <LoadingSpinner size="xs" />
+                                  </div>
+                                )}
                             </>
                           )}
-                          {(() => {
-                            if (
-                              messageIsStreaming === undefined ||
-                              !messageIsStreaming
-                            ) {
-                              // console.log(
-                              //   'isRouting: ',
-                              //   isRouting,
-                              //   'isRetrievalLoading: ',
-                              //   isRetrievalLoading,
-                              //   'isImg2TextLoading: ',
-                              //   isImg2TextLoading,
-                              //   'messageIsStreaming: ',
-                              //   messageIsStreaming,
-                              //   'loading: ',
-                              //   loading,
-                              // )
-                            }
-                            return null
-                          })()}
-                          {!isRouting &&
-                            !isRetrievalLoading &&
-                            !isImg2TextLoading &&
-                            !isQueryRewriting &&
-                            loading &&
-                            (messageIndex ===
-                              (selectedConversation?.messages.length ?? 0) -
-                                1 ||
-                              messageIndex ===
-                                (selectedConversation?.messages.length ?? 0) -
-                                  2) &&
-                            (!message.tools ||
-                              message.tools.every(
-                                (tool) =>
-                                  tool.output !== undefined ||
-                                  tool.error !== undefined,
-                              )) && (
-                              <>
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    marginLeft: '10px',
-                                    marginTop: '10px',
-                                  }}
-                                >
-                                  <p
-                                    style={{
-                                      marginRight: '10px',
-                                      fontWeight: 'bold',
-                                      textShadow: '0 0 15px',
-                                    }}
-                                    className={`pulsate text-base ${montserrat_paragraph.variable} font-montserratParagraph`}
-                                  >
-                                    Generating final response:
-                                  </p>
-                                  <LoadingSpinner size="xs" />
-                                </div>
-                              </>
-                            )}
                         </div>
                       </div>
                       {!isEditing && (
@@ -2107,12 +2341,22 @@ export const ChatMessage = memo(
                             }}
                           >
                             <button
-                              className={`invisible text-[--foreground-faded] hover:text-[--foreground] focus:visible group-hover:visible
-                                ${Array.isArray(message.content) && message.content.some((content) => content.type === 'image_url') ? 'hidden' : ''}`}
+                              type="button"
+                              aria-label="Edit message"
+                              className={`text-[--foreground-faded] hover:text-[--foreground]
+                                ${
+                                  Array.isArray(message.content) &&
+                                  message.content.some(
+                                    (content) => content.type === 'image_url',
+                                  )
+                                    ? 'hidden'
+                                    : ''
+                                }`}
                               onClick={toggleEditing}
                             >
                               <IconEdit
                                 size={20}
+                                aria-hidden="true"
                                 className="text-[--button-faded] hover:text-[--button]"
                               />
                             </button>
@@ -2124,70 +2368,63 @@ export const ChatMessage = memo(
                 </div>
               ) : (
                 <div className="flex w-[90%] flex-col">
-                  <div className="w-full max-w-full flex-1 overflow-visible">
+                  <div
+                    className="w-full max-w-full flex-1 overflow-visible"
+                    aria-live="polite"
+                  >
                     {renderContent()}
                   </div>
                   {/* Action Buttons Container */}
                   <div className="flex flex-col gap-2">
                     {/* Sources button */}
-                    {Array.isArray(message.contexts) &&
-                      message.contexts.length > 0 &&
-                      !(
-                        messageIsStreaming &&
-                        messageIndex ===
-                          (selectedConversation?.messages.length ?? 0) - 1
-                      ) &&
-                      !(
-                        loading &&
-                        messageIndex ===
-                          (selectedConversation?.messages.length ?? 0) - 1
-                      ) && (
-                        <div className="relative z-0 mb-1 flex justify-start">
-                          <button
-                            className="group/button relative flex items-center gap-0 rounded-xl bg-[--dashboard-button] px-3 py-1.5 text-sm font-medium text-[--dashboard-button-foreground] transition-all duration-200 hover:bg-[--dashboard-button-hover]"
-                            onClick={() => handleSourcesSidebarToggle(true)}
+                    {shouldShowSources && (
+                      <div className="relative z-0 mb-1 flex justify-start">
+                        <button
+                          className="group/button relative flex items-center gap-0 rounded-xl bg-[--dashboard-button] px-3 py-1.5 text-sm font-medium text-[--dashboard-button-foreground] transition-all duration-200 hover:bg-[--dashboard-button-hover]"
+                          onClick={() => handleSourcesSidebarToggle(true)}
+                        >
+                          <span
+                            className={`whitespace-nowrap ${montserrat_paragraph.variable} font-montserratParagraph font-bold`}
                           >
-                            <span
-                              className={`whitespace-nowrap ${montserrat_paragraph.variable} font-montserratParagraph font-bold`}
-                            >
-                              Sources
-                              <span className="ml-0.5 rounded-full bg-[--background] px-1.5 py-0.5 text-xs text-[--foreground]">
-                                {getContextsLength(message.contexts)}
-                              </span>
+                            Sources
+                            <span className="ml-0.5 rounded-full bg-[--background] px-1.5 py-0.5 text-xs text-[--foreground]">
+                              {getContextsLength(displayContexts)}
                             </span>
+                          </span>
 
-                            {sourceThumbnails.length > 0 && (
-                              <div className="flex items-center">
-                                <div className="ml-1 mr-1 h-4 border-l border-gray-300"></div>
-                                <div className="relative flex">
-                                  {sourceThumbnails.map((thumbnail, index) => (
-                                    <div
-                                      key={index}
-                                      className="relative h-7 w-7 overflow-hidden rounded-md border-2 border-gray-200 bg-[--dashboard-button-foreground] transition-transform duration-200"
-                                      style={{
-                                        marginLeft:
-                                          index > 0 ? '-0.75rem' : '0',
-                                        zIndex: index,
-                                        transform: `rotate(${index % 2 === 0 ? '-1deg' : '1deg'})`,
+                          {sourceThumbnails.length > 0 && (
+                            <div className="flex items-center">
+                              <div className="ml-1 mr-1 h-4 border-l border-gray-300"></div>
+                              <div className="relative flex">
+                                {sourceThumbnails.map((thumbnail, index) => (
+                                  <div
+                                    key={index}
+                                    className="relative h-7 w-7 overflow-hidden rounded-md border-2 border-gray-200 bg-[--dashboard-button-foreground] transition-transform duration-200"
+                                    style={{
+                                      marginLeft: index > 0 ? '-0.75rem' : '0',
+                                      zIndex: index,
+                                      transform: `rotate(${
+                                        index % 2 === 0 ? '-1deg' : '1deg'
+                                      })`,
+                                    }}
+                                  >
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-100 transition-opacity duration-200"></div>
+                                    <img
+                                      src={thumbnail}
+                                      alt={`Source ${index + 1}`}
+                                      className="h-full w-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none'
                                       }}
-                                    >
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-100 transition-opacity duration-200"></div>
-                                      <img
-                                        src={thumbnail}
-                                        alt={`Source ${index + 1}`}
-                                        className="h-full w-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none'
-                                        }}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
+                                    />
+                                  </div>
+                                ))}
                               </div>
-                            )}
-                          </button>
-                        </div>
-                      )}
+                            </div>
+                          )}
+                        </button>
+                      </div>
+                    )}
 
                     {/* Other buttons in their container */}
                     {!(
@@ -2229,7 +2466,7 @@ export const ChatMessage = memo(
         {isSourcesSidebarOpen && (
           <SourcesSidebar
             isOpen={isSourcesSidebarOpen}
-            contexts={Array.isArray(message.contexts) ? message.contexts : []}
+            contexts={Array.isArray(displayContexts) ? displayContexts : []}
             onClose={handleSourcesSidebarClose}
             hideRightSidebarIcon={isAnySidebarOpen}
             courseName={courseName}

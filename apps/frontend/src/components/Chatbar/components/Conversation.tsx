@@ -23,9 +23,13 @@ import ChatbarContext from '@/components/Chatbar/Chatbar.context'
 
 interface Props {
   conversation: Conversation
+  isFirstItem?: boolean
 }
 
-export const ConversationComponent = ({ conversation }: Props) => {
+export const ConversationComponent = ({
+  conversation,
+  isFirstItem = false,
+}: Props) => {
   const {
     state: { selectedConversation, messageIsStreaming },
     handleSelectConversation,
@@ -114,9 +118,14 @@ export const ConversationComponent = ({ conversation }: Props) => {
           }
         `}
         >
-          <IconMessage size={16} className="text-[--sidebar]" />
+          <IconMessage
+            size={16}
+            aria-hidden="true"
+            className="text-[--sidebar]"
+          />
           <input
-            className="mr-12 flex-1 overflow-hidden overflow-ellipsis border-0 bg-transparent text-left text-[.75rem] leading-3 text-[--sidebar] outline-none"
+            aria-label="Rename Chat Input"
+            className="mr-12 flex-1 overflow-hidden overflow-ellipsis border-0 bg-transparent text-left text-[.75rem] leading-3 text-[--sidebar]"
             type="text"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
@@ -126,6 +135,13 @@ export const ConversationComponent = ({ conversation }: Props) => {
         </div>
       ) : (
         <button
+          data-conversation
+          role="option"
+          aria-selected={selectedConversation?.id === conversation.id}
+          tabIndex={
+            selectedConversation?.id === conversation.id || isFirstItem ? 0 : -1
+          }
+          aria-label={'Select Chat, ' + conversation.name}
           className={`flex w-full cursor-pointer items-start gap-3 rounded-lg p-3 text-[.75rem] transition-colors duration-200 ${
             messageIsStreaming ? 'disabled:cursor-not-allowed' : ''
           } ${
@@ -138,7 +154,11 @@ export const ConversationComponent = ({ conversation }: Props) => {
           draggable="true"
           onDragStart={(e) => handleDragStart(e, conversation)}
         >
-          <IconMessage size={16} className="text-[--sidebar]" />
+          <IconMessage
+            size={16}
+            aria-hidden="true"
+            className="text-[--sidebar]"
+          />
           {/* <div
             className={`relative max-h-5 flex-1 overflow-hidden text-ellipsis whitespace-nowrap break-all text-left text-[12.5px] leading-3 ${selectedConversation?.id === conversation.id ? 'pr-12' : 'pr-1'
               }`}
@@ -151,7 +171,9 @@ export const ConversationComponent = ({ conversation }: Props) => {
             {conversation.name}
             {/* Add a new div to display the course_name */}
             {courseName && (
-              <div className="text-xs opacity-50">{courseName.trim()}</div>
+              <div className="text-xs text-[--foreground-faded]">
+                {courseName.trim()}
+              </div>
             )}
           </div>
         </button>
@@ -160,15 +182,20 @@ export const ConversationComponent = ({ conversation }: Props) => {
       {(isDeleting || isRenaming) &&
         selectedConversation?.id === conversation.id && (
           <div className="absolute right-1 top-[.5rem] z-10 flex">
-            <SidebarActionButton handleClick={handleConfirm}>
+            <SidebarActionButton
+              ariaLabel={isDeleting ? 'Confirm Delete' : 'Confirm Rename'}
+              handleClick={handleConfirm}
+            >
               <IconCheck
                 size={16}
+                aria-hidden="true"
                 className="text-[--sidebar] opacity-50 hover:opacity-100"
               />
             </SidebarActionButton>
-            <SidebarActionButton handleClick={handleCancel}>
+            <SidebarActionButton ariaLabel="Cancel" handleClick={handleCancel}>
               <IconX
                 size={16}
+                aria-hidden="true"
                 className="text-[--sidebar] opacity-50 hover:opacity-100"
               />
             </SidebarActionButton>
@@ -179,15 +206,23 @@ export const ConversationComponent = ({ conversation }: Props) => {
         !isDeleting &&
         !isRenaming && (
           <div className="absolute right-1 top-[.5rem] z-10 flex">
-            <SidebarActionButton handleClick={handleOpenRenameModal}>
+            <SidebarActionButton
+              ariaLabel="Edit Chat"
+              handleClick={handleOpenRenameModal}
+            >
               <IconPencil
                 size={16}
+                aria-hidden="true"
                 className="text-[--sidebar] opacity-50 hover:opacity-100"
               />
             </SidebarActionButton>
-            <SidebarActionButton handleClick={handleOpenDeleteModal}>
+            <SidebarActionButton
+              ariaLabel="Delete Chat"
+              handleClick={handleOpenDeleteModal}
+            >
               <IconTrash
                 size={16}
+                aria-hidden="true"
                 className="text-[--sidebar] opacity-50 hover:opacity-100"
               />
             </SidebarActionButton>

@@ -1,5 +1,6 @@
 // chatinput.tsx
 import {
+  type ChatBody,
   type Content,
   type Message,
   type MessageType,
@@ -54,7 +55,8 @@ import { type CSSProperties } from 'react'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconChevronRight } from '@tabler/icons-react'
 import { montserrat_heading } from 'fonts'
-import { fetchPresignedUrl, uploadToS3 } from 'src/utils/apiUtils'
+import { useRouteChat } from '@/hooks/queries/useRouteChat'
+import { fetchPresignedUrl, uploadToS3 } from '~/utils/apiUtils'
 import { UserSettings } from '~/components/Chat/UserSettings'
 import {
   selectBestModel,
@@ -64,6 +66,9 @@ import { type OpenAIModelID } from '~/utils/modelProviders/types/openai'
 import type ChatUI from '~/utils/modelProviders/WebLLM'
 import { webLLMModels } from '~/utils/modelProviders/WebLLM'
 import { ContextWithMetadata } from '~/types/chat'
+import { modelSupportsTools } from '~/utils/modelProviders/capabilities'
+import posthog from 'posthog-js'
+import { deriveAgentModeEnabled } from '~/utils/app/agentMode'
 
 const montserrat_med = Montserrat({
   weight: '500',
@@ -126,7 +131,7 @@ type FileUploadStatus = {
 }
 
 interface Props {
-  onSend: (message: Message, plugin: Plugin | null) => void
+  onSend: (message: Message, plugin: Plugin | null) => Promise<void>
   onScrollDownClick: () => void
   stopConversationRef: MutableRefObject<boolean>
   textareaRef: MutableRefObject<HTMLTextAreaElement | null>
@@ -137,6 +142,7 @@ interface Props {
   courseName: string
   chat_ui?: ChatUI
   onRegenerate?: () => void
+  agentModeFeatureEnabled?: boolean
 }
 
 async function createNewConversation(
@@ -159,6 +165,7 @@ async function createNewConversation(
     temperature: 0.5,
     folderId: null,
     createdAt: new Date().toISOString(),
+    agentModeEnabled: false,
   }
 
   homeDispatch({ field: 'selectedConversation', value: newConversation })
@@ -227,6 +234,7 @@ export const ChatInput = ({
   courseName,
   chat_ui,
   onRegenerate,
+  agentModeFeatureEnabled = false,
 }: Props) => {
   const { t } = useTranslation('chat')
 
@@ -237,10 +245,15 @@ export const ChatInput = ({
       prompts,
       showModelSettings,
       llmProviders,
+      tools,
     },
 
     dispatch: homeDispatch,
+    handleUpdateConversation,
   } = useContext(HomeContext)
+
+  const agentModeEnabled = deriveAgentModeEnabled(selectedConversation)
+  const { mutateAsync: routeChatAsync } = useRouteChat()
 
   const [content, setContent] = useState<string>(() => inputContent)
   const [isTyping, setIsTyping] = useState<boolean>(false)
@@ -264,7 +277,7 @@ export const ChatInput = ({
   const handleFocus = () => {
     setIsFocused(true)
     if (chatInputParentContainerRef.current) {
-      chatInputParentContainerRef.current.style.boxShadow = `0 0 2px rgba(42,42,120, 1)`
+      chatInputParentContainerRef.current.style.boxShadow = `0 0 0 2px var(--background), 0 0 0 4px var(--illinois-orange)`
     }
   }
 
@@ -427,11 +440,20 @@ export const ChatInput = ({
       contexts: allFileContexts.length > 0 ? allFileContexts : undefined,
     }
 
-    // Use the onSend prop to send the structured message
+    // Clear the composer immediately so the text disappears
+    setContent('')
+    setInputContent('')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'inherit'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+      textareaRef.current.style.overflow =
+        textareaRef.current.scrollHeight > 400 ? 'auto' : 'hidden'
+    }
+
+    // Send the message
     onSend(messageForChat, plugin)
 
     // Reset states
-    setContent('')
     setPlugin(null)
     setFileUploads([]) // Clear file uploads after sending message
 
@@ -470,7 +492,7 @@ export const ChatInput = ({
     setShowPromptList(false)
   }
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = async (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (showPromptList) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -555,27 +577,16 @@ export const ChatInput = ({
       return
     }
 
-    try {
-      const response = await fetch('/api/allNewRoutingChat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          conversation: selectedConversation,
-          course_name: courseName,
-          stream: true,
-        }),
-      })
+    const chatBody: ChatBody = {
+      conversation: selectedConversation ?? undefined,
+      course_name: courseName,
+      stream: true,
+      key: '',
+      mode: 'chat',
+    }
 
-      if (!response.ok) {
-        const errorResponse = await response.json()
-        const errorMessage =
-          errorResponse.error ||
-          'An error occurred while processing your request'
-        showErrorToast(errorMessage)
-        return
-      }
+    try {
+      await routeChatAsync(chatBody)
     } catch (error) {
       console.error('Error in chat submission:', error)
       showErrorToast(
@@ -607,7 +618,9 @@ export const ChatInput = ({
     if (totalSize > limit) {
       showToast({
         title: 'Files Too Large',
-        message: `The total size of all files cannot exceed ${limit / 1024 / 1024}MB. Please remove large files or upload smaller ones.`,
+        message: `The total size of all files cannot exceed ${
+          limit / 1024 / 1024
+        }MB. Please remove large files or upload smaller ones.`,
         type: 'error',
         autoClose: 6000,
       })
@@ -620,7 +633,11 @@ export const ChatInput = ({
       if (!ext || !ALLOWED_FILE_EXTENSIONS.includes(ext)) {
         showToast({
           title: 'Unsupported File Type',
-          message: `The file "${file.name}" is not supported. Please upload files of the following types: ${ALLOWED_FILE_EXTENSIONS.join(', ')}.`,
+          message: `The file "${
+            file.name
+          }" is not supported. Please upload files of the following types: ${ALLOWED_FILE_EXTENSIONS.join(
+            ', ',
+          )}.`,
           type: 'error',
           autoClose: 6000,
         })
@@ -786,7 +803,9 @@ export const ChatInput = ({
           ),
         )
         showErrorToast(
-          `Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          `Failed to process ${file.name}: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
         )
       }
     }
@@ -813,7 +832,7 @@ export const ChatInput = ({
   useEffect(() => {
     const handleFocus = () => {
       if (chatInputParentContainerRef.current) {
-        chatInputParentContainerRef.current.style.boxShadow = `0 0 2px rgba(42,42,120, 1)`
+        chatInputParentContainerRef.current.style.boxShadow = `0 0 0 2px var(--background), 0 0 0 4px var(--illinois-orange)`
       }
     }
 
@@ -851,15 +870,8 @@ export const ChatInput = ({
   }, [])
 
   useEffect(() => {
-    // This will focus the div as soon as the component mounts
-    if (chatInputContainerRef.current) {
-      chatInputContainerRef.current.focus()
-    }
-  }, [])
-
-  useEffect(() => {
     setContent(inputContent)
-    if (textareaRef.current) {
+    if (inputContent && textareaRef.current) {
       textareaRef.current.focus()
     }
   }, [inputContent, textareaRef])
@@ -920,7 +932,8 @@ export const ChatInput = ({
               onClick={handleStopConversation}
               style={{ pointerEvents: 'auto' }}
             >
-              <IconPlayerStop size={16} /> {t('Stop Generating')}
+              <IconPlayerStop size={16} aria-hidden="true" />{' '}
+              {t('Stop Generating')}
             </button>
           )}
 
@@ -932,11 +945,16 @@ export const ChatInput = ({
               selectedConversation.messages.length - 1
             ]?.role === 'user' && (
               <button
-                className={`absolute -top-14 left-0 right-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-[--primary] bg-[--primary] px-4 py-2 text-[--illinois-white] opacity-[.85] hover:opacity-100 md:mb-0 md:mt-2`}
-                style={{ pointerEvents: 'auto' }}
+                className={`absolute -top-14 left-0 right-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-[--primary] bg-[--primary] px-4 py-2 text-[--illinois-white] hover:brightness-110 md:mb-0 md:mt-2`}
+                style={{
+                  backgroundColor:
+                    'color-mix(in srgb, var(--primary), black 15%)',
+                  pointerEvents: 'auto',
+                }}
                 onClick={onRegenerate}
               >
-                <IconRepeat size={16} /> {t('Regenerate Response')}
+                <IconRepeat size={16} aria-hidden="true" />{' '}
+                {t('Regenerate Response')}
               </button>
             )}
 
@@ -966,7 +984,7 @@ export const ChatInput = ({
                 {fileUploads.map((fu, index) => {
                   const getFileIcon = (name: string, type?: string) => {
                     const extension = name.split('.').pop()?.toLowerCase()
-                    const iconProps = { size: 20 }
+                    const iconProps = { size: 20, 'aria-hidden': true as const }
 
                     if (type?.includes('pdf') || extension === 'pdf') {
                       return (
@@ -1041,6 +1059,8 @@ export const ChatInput = ({
                               }}
                               fill="currentColor"
                               viewBox="0 0 20 20"
+                              role="img"
+                              aria-label="Completed"
                             >
                               <path
                                 fillRule="evenodd"
@@ -1071,6 +1091,8 @@ export const ChatInput = ({
                               }}
                               fill="currentColor"
                               viewBox="0 0 20 20"
+                              role="img"
+                              aria-label="Error"
                             >
                               <path
                                 fillRule="evenodd"
@@ -1092,7 +1114,9 @@ export const ChatInput = ({
                       0,
                       name.lastIndexOf('.'),
                     )
-                    return `${nameWithoutExt.substring(0, maxLength - 3)}...${extension ? `.${extension}` : ''}`
+                    return `${nameWithoutExt.substring(0, maxLength - 3)}...${
+                      extension ? `.${extension}` : ''
+                    }`
                   }
 
                   return (
@@ -1160,7 +1184,7 @@ export const ChatInput = ({
                           e.currentTarget.style.backgroundColor = 'transparent'
                         }}
                       >
-                        <IconX size={16} />
+                        <IconX size={16} aria-hidden="true" />
                       </button>
                     </div>
                   )
@@ -1178,7 +1202,7 @@ export const ChatInput = ({
                 title="Upload files"
                 style={{ pointerEvents: 'auto' }}
               >
-                <IconPaperclip size={20} />
+                <IconPaperclip size={20} aria-hidden="true" />
               </button>
               <input
                 type="file"
@@ -1203,6 +1227,7 @@ export const ChatInput = ({
               {/* Textarea for message input */}
               <textarea
                 ref={textareaRef}
+                aria-label="Message input"
                 className="chat-input m-0 h-[24px] max-h-[400px] w-full flex-1 resize-none bg-transparent py-2 pl-2 pr-12 text-white outline-none"
                 style={{
                   resize: 'none',
@@ -1225,6 +1250,8 @@ export const ChatInput = ({
 
               {/* Send button */}
               <button
+                type="button"
+                aria-label="Send message"
                 className="absolute right-2 top-1/2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-[white/30] p-2 opacity-50 hover:opacity-100"
                 onClick={handleSend}
                 style={{ pointerEvents: 'auto' }}
@@ -1232,7 +1259,7 @@ export const ChatInput = ({
                 {messageIsStreaming ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-t-2 border-neutral-800 opacity-60"></div>
                 ) : (
-                  <IconSend size={18} />
+                  <IconSend size={18} aria-hidden="true" />
                 )}
               </button>
             </div>
@@ -1266,11 +1293,13 @@ export const ChatInput = ({
             {showScrollDownButton && (
               <div className="absolute bottom-2 right-10 lg:-right-10 lg:bottom-0">
                 <button
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[--background-faded] text-[--foreground] hover:bg-[--background-dark] focus:outline-none"
+                  type="button"
+                  aria-label="Scroll Down"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[--background-faded] text-[--foreground] hover:bg-[--background-dark] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--foreground]"
                   onClick={onScrollDownClick}
                   style={{ pointerEvents: 'auto' }}
                 >
-                  <IconArrowDown size={18} />
+                  <IconArrowDown size={18} aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -1302,21 +1331,66 @@ export const ChatInput = ({
             )}
           </div>
 
-          <Text
-            size={isSmallScreen ? '10px' : 'xs'}
-            className={`font-montserratHeading ${montserrat_heading.variable} absolute bottom-[.35rem] left-5 -ml-2 flex items-center gap-1 break-words rounded-full px-3 py-1 text-[--message-faded] opacity-60 hover:bg-white/20 hover:text-[--message] hover:opacity-100`}
-            onClick={handleTextClick}
-            style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-          >
-            {selectBestModel(llmProviders)?.name}
-            {selectedConversation?.model &&
-              webLLMModels.some(
-                (m) => m.name === selectedConversation?.model?.name,
-              ) &&
-              chat_ui?.isModelLoading() &&
-              '  Please wait while the model is loading...'}
-            <IconChevronRight size={isSmallScreen ? '10px' : '13px'} />
-          </Text>
+          {/* Model picker and Agent Mode pill container */}
+          <div className="absolute bottom-[.35rem] left-5 -ml-2 flex items-center gap-2">
+            <Text
+              role="button"
+              tabIndex={0}
+              aria-label="Chat Settings"
+              size={isSmallScreen ? '10px' : 'xs'}
+              className={`font-montserratHeading ${montserrat_heading.variable} flex items-center gap-1 break-words rounded-full px-3 py-1 text-[--message-faded] opacity-60 hover:bg-white/20 hover:text-[--message] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+              onClick={handleTextClick}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleTextClick()
+                }
+              }}
+              style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+            >
+              {selectBestModel(llmProviders)?.name}
+              {selectedConversation?.model &&
+                webLLMModels.some(
+                  (m) => m.name === selectedConversation?.model?.name,
+                ) &&
+                chat_ui?.isModelLoading() &&
+                '  Please wait while the model is loading...'}
+              <IconChevronRight
+                size={isSmallScreen ? '10px' : '13px'}
+                aria-hidden="true"
+              />
+            </Text>
+            {/* Agent Mode pill */}
+            {agentModeFeatureEnabled &&
+            selectedConversation?.model &&
+            llmProviders &&
+            modelSupportsTools(selectedConversation.model, llmProviders) ? (
+              <button
+                className={`rounded-full px-3 py-1 text-xs transition-colors md:text-sm ${
+                  agentModeEnabled
+                    ? 'bg-[--primary] text-[--background]'
+                    : 'bg-[--background-faded] text-[--foreground]'
+                }`}
+                disabled={messageIsStreaming}
+                onClick={() => {
+                  const next = !agentModeEnabled
+                  posthog.capture('agent_mode_toggled', {
+                    enabled: next,
+                    model_id: selectedConversation?.model?.id,
+                  })
+                  if (selectedConversation) {
+                    handleUpdateConversation(selectedConversation, {
+                      key: 'agentModeEnabled',
+                      value: next,
+                    })
+                  }
+                }}
+                style={{ pointerEvents: 'auto' }}
+              >
+                Agent Mode
+              </button>
+            ) : null}
+          </div>
           {showModelSettings && (
             <div
               ref={modelSelectContainerRef}

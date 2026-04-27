@@ -16,6 +16,7 @@ export const Import: FC<Props> = ({ onImport }) => {
   return (
     <>
       <input
+        aria-label="Import history"
         id="import-file"
         className="sr-only"
         tabIndex={-1}
@@ -35,8 +36,9 @@ export const Import: FC<Props> = ({ onImport }) => {
       />
 
       <SidebarButton
+        ariaLabel={t('Import history')}
         text={t('Import history')}
-        icon={<IconFileImport size={18} />}
+        icon={<IconFileImport size={18} aria-hidden="true" />}
         onClick={() => {
           const importFile = document.querySelector(
             '#import-file',

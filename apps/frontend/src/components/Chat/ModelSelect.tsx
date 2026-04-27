@@ -77,8 +77,11 @@ export const getModelLogo = (modelType: string) => {
       return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png'
     case ProviderNames.SambaNova:
       return 'https://sambanova.ai/hubfs/logotype_sambanova_orange.png'
+    case ProviderNames.OpenAICompatible:
+      return '/media/llm_icons/OpenAI.png' // Reuse OpenAI icon for OpenAI-compatible models
     default:
-      throw new Error(`Unknown model type: ${modelType}`)
+      console.warn(`Unknown model type: ${modelType}`)
+      return '/media/llm_icons/OpenAI.png'
   }
 }
 export const ModelItem = forwardRef<
@@ -155,6 +158,7 @@ export const ModelItem = forwardRef<
           <div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <Image
+                aria-hidden="true"
                 src={getModelLogo(modelType)}
                 alt={`${modelType} logo`}
                 width={20}
@@ -208,13 +212,18 @@ export const ModelItem = forwardRef<
                       <>
                         <IconCircleCheck
                           size="1rem"
+                          aria-hidden="true"
                           style={{ marginLeft: '8px' }}
                           className=""
                         />
                         {/* {isLoading && setLoadingModelId(null)} */}
                       </>
                     ) : (
-                      <IconDownload size="1rem" style={{ marginLeft: '8px' }} />
+                      <IconDownload
+                        size="1rem"
+                        aria-hidden="true"
+                        style={{ marginLeft: '8px' }}
+                      />
                     )}
                     <Text
                       size="xs"
@@ -237,7 +246,11 @@ export const ModelItem = forwardRef<
                 )}
                 {showSparkles && (
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <IconSparkles size="1rem" style={{ marginLeft: '8px' }} />
+                    <IconSparkles
+                      size="1rem"
+                      aria-hidden="true"
+                      style={{ marginLeft: '8px' }}
+                    />
                     <Text
                       size="xs"
                       opacity={0.65}
@@ -251,6 +264,7 @@ export const ModelItem = forwardRef<
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <IconAlertTriangleFilled
                       size="1rem"
+                      aria-hidden="true"
                       style={{ marginLeft: '8px' }}
                     />
                     <Text
@@ -303,7 +317,9 @@ const ModelDropdown: React.FC<
       const provider = llmProviders[key as keyof typeof llmProviders]
       if (provider && provider.enabled) {
         const enabledModels =
-          provider.models?.filter((model) => model.enabled) || []
+          provider.models?.filter(
+            (model: AnySupportedModel) => model.enabled,
+          ) || []
         if (enabledModels.length > 0) {
           // @ts-ignore -- Can't figure out why the types aren't perfect.
           acc.enabledProvidersAndModels[key as keyof typeof llmProviders] = {
@@ -311,7 +327,7 @@ const ModelDropdown: React.FC<
             models: enabledModels,
           }
           acc.allModels.push(
-            ...enabledModels.map((model) => ({
+            ...enabledModels.map((model: AnySupportedModel) => ({
               ...model,
               provider: provider.provider,
             })),
@@ -346,6 +362,7 @@ const ModelDropdown: React.FC<
           className="menu z-[50] w-full"
           size="md"
           placeholder="Select a model"
+          aria-label="Select a model"
           searchable
           value={value}
           onChange={async (modelId) => {
@@ -375,7 +392,7 @@ const ModelDropdown: React.FC<
             })
             .flatMap(
               ([_, provider]) =>
-                provider.models?.map((model) => ({
+                provider.models?.map((model: AnySupportedModel) => ({
                   value: model.id,
                   label: model.name,
                   // @ts-ignore -- this being missing is fine
@@ -413,15 +430,20 @@ const ModelDropdown: React.FC<
           rightSection={
             <IconChevronDown
               size="1rem"
+              aria-hidden="true"
               className="mr-2 text-[--modal-button-text]"
             />
           }
           classNames={{
             root: 'w-full',
             wrapper: 'w-full',
-            input: `${montserrat_paragraph.variable} font-montserratParagraph ${isSmallScreen ? 'text-xs' : 'text-sm'} w-full`,
+            input: `${montserrat_paragraph.variable} font-montserratParagraph ${
+              isSmallScreen ? 'text-xs' : 'text-sm'
+            } w-full`,
             rightSection: 'pointer-events-none',
-            item: `${montserrat_paragraph.variable} font-montserratParagraph ${isSmallScreen ? 'text-xs' : 'text-sm'}`,
+            item: `${montserrat_paragraph.variable} font-montserratParagraph ${
+              isSmallScreen ? 'text-xs' : 'text-sm'
+            }`,
           }}
           styles={(theme) => ({
             input: {
@@ -543,6 +565,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                   </Title>
                   <IconChevronDown
                     size={'1em'}
+                    aria-hidden="true"
                     className={`transition-transform duration-200 ${
                       isAccordionOpen ? 'rotate-180' : ''
                     }`}
@@ -603,6 +626,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 model details and pricing.{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />
@@ -636,6 +660,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 Azure OpenAI models{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />
@@ -666,6 +691,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 Anthropic&apos;s API{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />
@@ -697,6 +723,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 Ollama{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />
@@ -730,6 +757,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 must pass this compatability check for WebGPU.{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />
@@ -763,6 +791,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 Gemini&apos;s full suite{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />
@@ -791,6 +820,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 Bedrock&apos;s full suite{' '}
                                 <IconExternalLink
                                   size={15}
+                                  aria-hidden="true"
                                   style={{ position: 'relative', top: '2px' }}
                                   className={'mb-2 inline'}
                                 />

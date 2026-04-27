@@ -81,7 +81,7 @@ function UploadNotificationContent({
       return response.json()
     },
     staleTime: 10000,
-    enabled: !!projectName,
+    enabled: !!projectName && files.length > 0,
   })
   useEffect(() => {
     if (files && Array.isArray(files)) {
@@ -147,6 +147,7 @@ function UploadNotificationContent({
     const iconProps = {
       size: 20,
       stroke: 1.5,
+      'aria-hidden': true as const,
       className: 'flex-shrink-0',
     }
 
@@ -237,7 +238,7 @@ function UploadNotificationContent({
       shadow="sm"
       padding={0}
       radius="md"
-      className={`fixed bottom-4 right-4 z-50 w-[320px] overflow-hidden border border-[--modal-border] bg-[--modal] shadow-xl shadow-black/25 md:w-[420px] ${montserrat_paragraph.variable}`}
+      className={`fixed bottom-20 right-4 z-50 w-[320px] overflow-hidden border border-[--modal-border] bg-[--modal] shadow-xl shadow-black/25 md:w-[420px] ${montserrat_paragraph.variable}`}
     >
       <div className="flex items-center justify-between border-b border-[--modal-border] bg-[--modal-dark] px-5 py-4 text-[--modal-text]">
         <div className="flex flex-col gap-1">
@@ -247,8 +248,12 @@ function UploadNotificationContent({
             className={`${montserrat_heading.variable} font-montserratHeading`}
           >
             {allComplete
-              ? `${currentFiles.length} document${currentFiles.length > 1 ? 's' : ''} ready for chat`
-              : `Processing ${currentFiles.length} document${currentFiles.length > 1 ? 's' : ''}`}
+              ? `${currentFiles.length} document${
+                  currentFiles.length > 1 ? 's' : ''
+                } ready for chat`
+              : `Processing ${currentFiles.length} document${
+                  currentFiles.length > 1 ? 's' : ''
+                }`}
           </Text>
           <Text
             size="xs"
@@ -270,12 +275,13 @@ function UploadNotificationContent({
             color="gray"
             compact
             onClick={toggleMinimize}
+            aria-label={isMinimized ? 'Expand uploads' : 'Minimize uploads'}
             className="h-8 w-8 rounded-md p-0 text-[--modal-button] hover:bg-[--background-dark] hover:text-[--modal-button-text-hover]"
           >
             {isMinimized ? (
-              <IconChevronUp size={18} />
+              <IconChevronUp size={18} aria-hidden="true" />
             ) : (
-              <IconChevronDown size={18} />
+              <IconChevronDown size={18} aria-hidden="true" />
             )}
           </Button>
           <Button
@@ -283,9 +289,10 @@ function UploadNotificationContent({
             color="gray"
             compact
             onClick={onClose}
+            aria-label="Close uploads"
             className="h-8 w-8 rounded-md p-0 text-[--modal-button] hover:bg-[--background-dark] hover:text-[--modal-button-text-hover]"
           >
-            <IconX size={18} />
+            <IconX size={18} aria-hidden="true" />
           </Button>
         </div>
       </div>
@@ -305,7 +312,7 @@ function UploadNotificationContent({
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center text-[--foreground-faded]">
                     {file.type === 'webscrape' ? (
-                      <IconWorld size={18} />
+                      <IconWorld size={18} aria-hidden="true" />
                     ) : file.name ? (
                       getFileIcon(file.name.split('.').pop() || '')
                     ) : (
@@ -359,6 +366,7 @@ function UploadNotificationContent({
                       >
                         <IconCheck
                           size={18}
+                          aria-hidden="true"
                           className="text-[--modal-button]"
                         />
                       </Tooltip>
@@ -370,7 +378,11 @@ function UploadNotificationContent({
                           tooltip: `${montserrat_paragraph.variable} font-montserratParagraph`,
                         }}
                       >
-                        <IconX size={18} className="text-[--error]" />
+                        <IconX
+                          size={18}
+                          aria-hidden="true"
+                          className="text-[--error]"
+                        />
                       </Tooltip>
                     )}
                   </div>

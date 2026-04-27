@@ -11,7 +11,7 @@ import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
 import Home from '~/pages/api/home/home'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
-import { AuthComponent } from '~/components/UIUC-Components/AuthToEditCourse'
+import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 
 const ChatPage: NextPage = () => {
   const [metadata, setMetadata] = useState<CourseMetadata | null>()
@@ -21,8 +21,18 @@ const ChatPage: NextPage = () => {
   const email = auth.user?.profile.email
   const [currentEmail, setCurrentEmail] = useState('')
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
+  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+
   const course_metadata = metadata
-  const { course_name } = router.query
+  const getCurrentPageName = () => {
+    const raw = router.query.course_name
+    return typeof raw === 'string'
+      ? raw
+      : Array.isArray(raw)
+        ? raw[0]
+        : undefined
+  }
+  const courseName = getCurrentPageName() as string
 
   useEffect(() => {
     if (!router.isReady) return
@@ -32,6 +42,11 @@ const ChatPage: NextPage = () => {
           'chat',
         )) as CourseMetadata
 
+        if (local_metadata === null) {
+          setErrorType(404)
+          return
+        }
+
         if (local_metadata && local_metadata.is_private) {
           local_metadata.is_private = JSON.parse(
             local_metadata.is_private as unknown as string,
@@ -40,6 +55,12 @@ const ChatPage: NextPage = () => {
         setMetadata(local_metadata)
       } catch (error) {
         console.error(error)
+
+        const errorWithStatus = error as Error & { status?: number }
+        const status = errorWithStatus.status
+        if (status === 401 || status === 403 || status === 404) {
+          setErrorType(status as 401 | 403 | 404)
+        }
       }
     }
     fetchCourseData()
@@ -64,9 +85,12 @@ const ChatPage: NextPage = () => {
       if (postHogUserObj) {
         const postHogUser = JSON.parse(postHogUserObj)
         setCurrentEmail(postHogUser.distinct_id)
+      } else {
+        // Stay in loading state until PostHog ID is available for public chat
+        setCurrentEmail('')
       }
     }
-  }, [auth.isLoading, email])
+  }, [auth.isLoading, email, metadata?.is_private])
 
   // Enforce permissions similar to /[course_name]/chat
   useEffect(() => {
@@ -133,8 +157,8 @@ const ChatPage: NextPage = () => {
     )
   }
 
-  // redirect to login page if needed
-  if (!auth.isAuthenticated) {
+  // redirect to login page if needed (only for private courses)
+  if (!auth.isAuthenticated && metadata?.is_private) {
     console.log(
       'User not logged in',
       auth.isAuthenticated,
@@ -142,8 +166,17 @@ const ChatPage: NextPage = () => {
       'NewCoursePage',
     )
     return (
-      <AuthComponent
-        course_name={course_name ? (course_name as string) : 'new'}
+      <PermissionGate
+        course_name={courseName ? (courseName as string) : 'new'}
+      />
+    )
+  }
+
+  if (errorType !== null) {
+    return (
+      <PermissionGate
+        course_name={courseName ? (courseName as string) : 'new'}
+        errorType={errorType}
       />
     )
   }
@@ -153,15 +186,15 @@ const ChatPage: NextPage = () => {
       {!isLoading &&
         !auth.isLoading &&
         router.isReady &&
-        ((currentEmail && currentEmail !== '') ||
-          !course_metadata?.is_private) &&
+        // Only render once we have a valid identifier (email or posthog id)
+        !!currentEmail &&
         course_metadata &&
         isAuthorized && (
           <Home
             current_email={currentEmail}
             course_metadata={course_metadata}
             course_name={'chat'}
-            document_count={0}
+            document_exists={false}
             link_parameters={{
               guidedLearning: false,
               documentsOnly: false,
@@ -170,17 +203,17 @@ const ChatPage: NextPage = () => {
           />
         )}
       {isLoading ||
-        !currentEmail ||
-        (currentEmail === '' && (
-          <MainPageBackground>
-            <div
-              className={`flex items-center justify-center font-montserratHeading text-white ${montserrat_heading.variable}`}
-            >
-              <span className="mr-2">Warming up the knowledge engines...</span>
-              <LoadingSpinner size="sm" />
-            </div>
-          </MainPageBackground>
-        ))}
+      (!currentEmail && metadata?.is_private) ||
+      (currentEmail === '' && metadata?.is_private) ? (
+        <MainPageBackground>
+          <div
+            className={`flex items-center justify-center font-montserratHeading text-white ${montserrat_heading.variable}`}
+          >
+            <span className="mr-2">Warming up the knowledge engines...</span>
+            <LoadingSpinner size="sm" />
+          </div>
+        </MainPageBackground>
+      ) : null}
     </>
   )
 }
