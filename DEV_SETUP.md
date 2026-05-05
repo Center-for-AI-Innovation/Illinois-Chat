@@ -13,15 +13,16 @@ This guide will help you set up the UIUC.chat development environment for local 
 
 ### 1. Start Infrastructure Services
 
-First, initialize the required infrastructure services:
+First, start the required infrastructure services:
 
 ```bash
-bash infra/scripts/init-dev.sh
+bash infra/scripts/start-dev.sh
 ```
 
 This script will:
 
 - Create a repository-root `.env` file from `.env.template` if needed
+- Create or update app-local env files for backend, frontend, and Crawlee without overwriting existing values
 - Start shared development infrastructure from `infra/docker/docker-compose.dev.yaml`
 - Apply the Postgres schema from `infra/db/migrations/20250328_remote_schema.sql`
 - Create the MinIO `uiuc-chat` bucket
@@ -30,10 +31,10 @@ This script will:
 To start from a clean local data state:
 
 ```bash
-bash infra/scripts/init-dev.sh --clean
+bash infra/scripts/start-dev.sh --clean
 ```
 
-This removes the dev Compose containers and volumes before reinitializing them.
+This removes the dev Compose containers and volumes before starting them again.
 
 ### 2. Configure Environment Variables
 
@@ -182,7 +183,7 @@ SQLITE_DB_NAME=uiuc_chat_local.db
 
 ## Development Workflow
 
-1. **Initialize infrastructure**: `bash infra/scripts/init-dev.sh`
+1. **Start infrastructure**: `bash infra/scripts/start-dev.sh`
 2. **Start backend**: `cd apps/backend && infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port 8000`
 3. **Start worker**: `cd apps/backend && python ai_ta_backend/rabbitmq/worker.py`
 4. **Start frontend**: `cd apps/frontend && npm run local`

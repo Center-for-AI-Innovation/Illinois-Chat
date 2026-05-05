@@ -21,7 +21,7 @@ Failure to obtain a commercial license for commercial use is a violation of the 
 ### 🎉 Get started with a single command
 
 ```bash
-bash infra/scripts/init.sh
+bash infra/scripts/start-all.sh
 ```
 This will:
 * Create a repository-root `.env` file from `.env.template` if needed.
@@ -33,7 +33,7 @@ This will:
 To start fresh, you can use: 
 ```bash
 # erase and factory reset all databases
-bash infra/scripts/init.sh --wipe_data
+bash infra/scripts/start-all.sh --wipe_data
 ```
 
 ### Configuring Postgres (Supabase)
@@ -111,10 +111,19 @@ npm run local
 
 ```bash
 # rebuild only the frontend after file changes
-bash infra/scripts/init.sh --rebuild=frontend
+bash infra/scripts/start-all.sh --rebuild=frontend
 
 # rebuild both frontend and backend after file changes
-bash infra/scripts/init.sh --rebuild=frontend,backend
+bash infra/scripts/start-all.sh --rebuild=frontend,backend
+```
+
+## Stop the full Docker stack
+
+```bash
+bash infra/scripts/stop-all.sh
+
+# stop and remove full-stack volumes
+bash infra/scripts/stop-all.sh --volumes
 ```
 
 If you're interested in contributing, check out our [official developer quickstart](https://docs.uiuc.chat/developers/developer-quickstart).
