@@ -21,28 +21,29 @@ Failure to obtain a commercial license for commercial use is a violation of the 
 ### 🎉 Get started with a single command
 
 ```bash
-sudo bash init.sh
+bash infra/scripts/init.sh
 ```
-This will: 
-* Create a `.env` file. You can customize this later to change the default passwords.
-* Initialize all our databases (Redis, Minio, Qdrant, Postgres/Suapabse)
-* Start the backend service running on http://localhost:3012 To customize HTTP port used as the main entrypoint, set the `FLASK_PORT` variabel in your `.env`.
+This will:
+* Create a repository-root `.env` file from `.env.template` if needed.
+* Start the full Docker stack: frontend, Flask backend, ingest worker, Redis, MinIO, Qdrant, Postgres, RabbitMQ, Crawlee, and Keycloak.
+* Initialize Postgres from `infra/db/migrations/20250328_remote_schema.sql`.
+* Ensure the configured Qdrant collection exists with 4096-dimensional cosine vectors.
 
 
 To start fresh, you can use: 
 ```bash
 # erase and factory reset all databases
-sudo bash init.sh --wipe_data
+bash infra/scripts/init.sh --wipe_data
 ```
 
 ### Configuring Postgres (Supabase)
 
-It's strongly recommende to change your passwords away from the defaults. The Supabase .env file is separate from the rest of the code for seamless compatibility with Supabase's self hosted offering on github, and to maintain compatibility with their guides and general community information.
+It's strongly recommended to change your passwords away from the defaults. The Supabase `.env` file is separate from the rest of the code for compatibility with Supabase's self-hosted offering and community documentation.
 The .env file is stored in the local path: `./supabase/docker/.env`
 
 ### Configuring Database passwords
 
-Customize your env variables. The SQL database can be any of SQLite, Postgres, and Supabase. The object storage can be Minio or AWS S3. 
+Customize your env variables. The SQL database can be SQLite, Postgres, or Supabase. The object storage can be MinIO or AWS S3.
 
 ### Take schema dump from Postgres (Supabase)
 ```bash
@@ -57,6 +58,25 @@ PGPASSWORD=<password> psql -h <new-hostname> -U <new-db> -d postgres -f schema.s
 Works on version: `Docker Compose version v2.27.1-desktop.1`
 
 Works on Apple Silicon M1 `aarch64`, and `x86`.
+
+Because the compose files live under `infra/docker`, commands use `--project-directory .` so Docker Compose resolves `.env`, `./apps/*`, and `./infra/*` from the repository root.
+
+### Environment files
+
+For the full Docker stack and e2e testing, the repository-root `.env` is the source file Docker Compose reads. `infra/docker/docker-compose.yaml` maps those values into the frontend, backend, ingest worker, Crawlee, Keycloak, Postgres, MinIO, RabbitMQ, Redis, and Qdrant containers.
+
+Inside Docker, service-to-service URLs use Compose service names, for example `http://backend:8001`, `http://qdrant:6333`, `http://minio:9000`, and `postgres-illinois-chat`. Browser-facing URLs still use localhost, for example `http://localhost:3000`, `http://localhost:8080`, and `http://localhost:9000`.
+
+The app-local env files are for running services outside the full Docker stack:
+
+- `apps/backend/.env` is used by the Flask backend and ingest worker when you run them directly.
+- `apps/frontend/.env` is used by `npm run local` in `apps/frontend`.
+- `apps/crawlee/.env` is used only when running Crawlee directly from `apps/crawlee`; the full Docker stack uses the root `.env` plus explicit values in `infra/docker/docker-compose.yaml`.
+
+MinIO ports differ by mode:
+
+- Full Docker/e2e stack: browser API endpoint `http://localhost:9000`, console `http://localhost:9001`.
+- Local dev infrastructure: browser and local app API endpoint `http://localhost:10000`, console `http://localhost:9001`.
 
 
 ### 🛠️ Technical Architecture
@@ -76,20 +96,25 @@ Backend:
 cd apps/backend
 infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port 8000
 ```
+Ingest worker:
+```bash
+cd apps/backend
+python ai_ta_backend/rabbitmq/worker.py
+```
 Frontend:
 ```bash
 cd apps/frontend
-npm run dev
+npm run local
 ```
 
 ## Fastest way to rebuild the images during dev
 
 ```bash
-# rebuild only the frontend after file changes in that repo. Super quick, supports Docker's Layer Cache.
-sudo bash init.sh --rebuild=apps/frontend
+# rebuild only the frontend after file changes
+bash infra/scripts/init.sh --rebuild=frontend
 
 # rebuild both frontend and backend after file changes
-sudo bash init.sh --rebuild="apps/frontend flask-app "
+bash infra/scripts/init.sh --rebuild=frontend,backend
 ```
 
 If you're interested in contributing, check out our [official developer quickstart](https://docs.uiuc.chat/developers/developer-quickstart).
