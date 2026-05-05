@@ -142,12 +142,16 @@ export function LargeDropzone({
 
       formData.append('file', file)
 
-      await fetch(url, {
+      const uploadResponse = await fetch(url, {
         method: 'POST',
         body: formData,
       })
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 upload failed with status ${uploadResponse.status}`)
+      }
     } catch (error) {
       console.error('Error uploading file:', error)
+      throw error
     }
   }
 

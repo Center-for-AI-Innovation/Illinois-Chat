@@ -346,7 +346,7 @@ describe('LargeDropzone', () => {
   // Upload error handling
   // -----------------------------------------------------------------------
 
-  it('logs error when uploadToS3 fails but continues to ingest', async () => {
+  it('sets file status to error and skips ingest when uploadToS3 fails', async () => {
     const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
     mockTimers()
@@ -358,13 +358,13 @@ describe('LargeDropzone', () => {
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    // uploadToS3 has its own try/catch that swallows the error and logs it.
-    // The outer ingestFiles code then continues to call the ingest API.
+    const ingestSpy = vi.fn()
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       buildFetchMock({
         uploadToS3: () => {
           throw new Error('Network failure')
         },
+        ingest: ingestSpy,
       }),
     )
 
@@ -373,15 +373,16 @@ describe('LargeDropzone', () => {
     await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
 
     await waitFor(() => {
-      // uploadToS3 catches the error and logs it
       expect(consoleSpy).toHaveBeenCalledWith(
         'Error uploading file:',
         expect.any(Error),
       )
     })
 
-    // Upload still proceeds (the file was added to the upload list initially)
-    expect(setUploadFiles).toHaveBeenCalled()
+    expect(ingestSpy).not.toHaveBeenCalled()
+    expect(uploads).toContainEqual(
+      expect.objectContaining({ name: 'My-File.pdf', status: 'error' }),
+    )
   }, 10000)
 
   it('sets file status to error when ingest API throws', async () => {

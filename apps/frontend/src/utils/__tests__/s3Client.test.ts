@@ -44,6 +44,28 @@ describe('s3Client', () => {
     )
   })
 
+  it('prefers MINIO_PUBLIC_ENDPOINT for presigned URLs', async () => {
+    const ctor = vi.fn()
+    vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: ctor }))
+
+    vi.stubEnv('AWS_REGION', 'us-east-1')
+    vi.stubEnv('AWS_KEY', 'k')
+    vi.stubEnv('AWS_SECRET', 's')
+    vi.stubEnv('LOCAL_MINIO', 'true')
+    vi.stubEnv('MINIO_ENDPOINT', 'http://minio:9000')
+    vi.stubEnv('MINIO_PUBLIC_ENDPOINT', 'http://localhost:9000')
+
+    vi.resetModules()
+    const mod = await import('../s3Client')
+    mod.getPresignedUrlClient()
+    expect(ctor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endpoint: 'http://localhost:9000',
+        forcePathStyle: true,
+      }),
+    )
+  })
+
   it('creates a region-only S3Client when credentials are missing', async () => {
     const ctor = vi.fn()
     vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: ctor }))
