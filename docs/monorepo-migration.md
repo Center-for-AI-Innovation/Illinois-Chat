@@ -65,9 +65,9 @@ git subtree pull --prefix=apps/crawlee uiuc-crawlee main
 Infra-related files were moved into `infra/*`:
 
 - Database migrations and init:
-  - `db/` → `infra/db/`
+  - `db/` → `infra/db/db/`
 - Keycloak realms and theme:
-  - `keycloak/` → `infra/keycloak/`
+  - `keycloak/` → `infra/keycloak/keycloak/`
   - `keycloak-theme/` → `infra/keycloak/theme/`
 - Docker Compose:
   - `docker-compose.yaml` → `infra/docker/docker-compose.yaml`
@@ -80,5 +80,5 @@ All documentation and scripts were updated to reference:
 
 - `apps/frontend`, `apps/backend`, `apps/crawlee` for service code.
 - `infra/docker/docker-compose*.yaml` for compose.
-- `infra/db/migrations` for DB bootstrap.
+- `infra/db/db/migrations` for DB bootstrap.
 - `infra/keycloak/theme` for Keycloak theme mounts.
