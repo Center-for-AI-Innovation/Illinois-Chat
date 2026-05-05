@@ -2,17 +2,38 @@
 import * as path from 'path';
 import axios from 'axios';
 import { S3Client, PutObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
-import { supabase } from '../utils/supabaseClient.js';
 
-export const aws_config = {
-  bucketName: process.env.S3_BUCKET_NAME,
-  region: process.env.AWS_REGION,
-  accessKeyId: process.env.AWS_KEY,
-  secretAccessKey: process.env.AWS_SECRET,
-};
+function createS3Client(): S3Client {
+  const region = process.env.AWS_REGION
+  const accessKeyId = process.env.AWS_KEY
+  const secretAccessKey = process.env.AWS_SECRET
+
+  const baseConfig: any = region
+    ? { region }
+    : {}
+
+  if (accessKeyId && secretAccessKey) {
+    baseConfig.credentials = { accessKeyId, secretAccessKey }
+  }
+
+  // MinIO override (local dev)
+  if (process.env.MINIO_ENDPOINT) {
+    baseConfig.endpoint = process.env.MINIO_ENDPOINT
+    baseConfig.forcePathStyle = true
+  }
+
+  return new S3Client(baseConfig)
+}
+
+const s3BucketName = process.env.S3_BUCKET_NAME
+if (!s3BucketName) {
+  console.error('❌ Missing S3_BUCKET_NAME in environment!')
+}
 
 // Upload PDF to S3 and send the S3 path to the ingest function
 export async function uploadPdfToS3(url: string, courseName: string) {
+  const s3Client = createS3Client()
+
   // Sanitize filename
   const humanURI = decodeURI(path.basename(url));
   const extension = path.extname(humanURI);
@@ -20,21 +41,6 @@ export async function uploadPdfToS3(url: string, courseName: string) {
   const filename = nameWithoutExtension.replace(/[^a-zA-Z0-9]/g, '-') + extension;
 
   console.log(`Uploading PDF to S3. Filename: ${filename}, Url: ${url}`);
-  const s3Client = new S3Client({
-    region: process.env.AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_KEY as string,
-      secretAccessKey: process.env.AWS_SECRET as string,
-    },
-    // If MINIO_ENDPOINT is defined, use it instead of AWS S3.
-    ...(process.env.MINIO_ENDPOINT
-      ? {
-        endpoint: process.env.MINIO_ENDPOINT,
-        forcePathStyle: true,
-      }
-      : {}),
-  })
-  const s3BucketName = aws_config.bucketName;
 
   // Check if the bucket exists, and create it if it does not
   try {
@@ -117,27 +123,11 @@ export async function ingestPdf(s3Key: string, courseName: string, base_url: str
   }
 
   try {
-    const { error } = await supabase.from('documents_in_progress').insert({
-      base_url: base_url,
-      url: url,
-      readable_filename: path.basename(s3Key),
-      s3_path: s3Key,
-      course_name: courseName,
-      doc_groups: documentGroups,
-    })
-
-    if (error) {
-      console.error(
-        '❌❌ Supabase failed to insert into `documents_in_progress`:',
-        error,)
-    }
-
     fetch(ingestUrl, {
       "method": "POST",
       "headers": {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate",
-        "Authorization": `Bearer ${process.env.BEAM_API_KEY}`,
         "Content-Type": "application/json"
       },
       "body": JSON.stringify({
@@ -157,10 +147,8 @@ export async function ingestPdf(s3Key: string, courseName: string, base_url: str
       .catch(err => console.error(err));
   } catch (error) {
     if (error instanceof Error) {
-      // Now TypeScript knows 'error' is of type 'Error'
-      console.error('Error message:', error.message);
+      console.error('❌❌ Database failed to insert into `documents_in_progress`:', error.message);
     } else {
-      // Handle other types of errors (if any)
       console.error('Unknown error:', error);
     }
   }

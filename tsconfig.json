@@ -9,7 +9,8 @@
         "noUnusedLocals": false,
         "lib": [
             "DOM"
-        ]
+        ],
+        "skipLibCheck": true
     },
     "include": [
         "./src/**/*"

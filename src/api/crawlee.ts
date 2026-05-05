@@ -6,7 +6,7 @@ import axios from 'axios';
 
 import { Config, configSchema } from "./configValidation.js";
 import { ingestPdf, uploadPdfToS3 } from "./uploadToS3.js";
-import { supabase } from "../utils/supabaseClient.js";
+
 
 export async function crawl(rawConfig: Config) {
   const config = configSchema.parse(removeUndefinedFromObject(rawConfig));
@@ -27,7 +27,7 @@ export async function crawl(rawConfig: Config) {
       try {
         crawler = new PlaywrightCrawler({
 
-          // TODO: add these back... 
+          // TODO: add these back...
           maxConcurrency: config.maxConcurrency,
           maxRequestsPerMinute: config.maxRequestsPerMinute,
 
@@ -83,27 +83,11 @@ export async function crawl(rawConfig: Config) {
                   return;
                 }
 
-                const { error } = await supabase.from('documents_in_progress').insert({
-                  base_url: config.url,
-                  url: request.loadedUrl,
-                  readable_filename: title,
-                  contexts: html,
-                  course_name: config.courseName,
-                  doc_groups: config.documentGroups,
-                })
-
-                if (error) {
-                  console.error(
-                    '❌❌ Supabase failed to insert into `documents_in_progress`:',
-                    error,)
-                }
-
                 fetch(ingestUrl, {
                   "method": "POST",
                   "headers": {
                     "Accept": "*/*",
                     "Accept-Encoding": "gzip, deflate",
-                    "Authorization": `Bearer ${process.env.BEAM_API_KEY}`,
                     "Content-Type": "application/json"
                   },
                   "body": JSON.stringify({
@@ -164,7 +148,7 @@ export async function crawl(rawConfig: Config) {
                 // Keep this here so if we encounter .pdfs (no matter what URL or strategy), we still grab them
                 transformRequestFunction(req) {
                   if (req.url.endsWith('.pdf')) {
-                    // Download PDFs specially 
+                    // Download PDFs specially
                     console.log(`Downloading PDF: ${req.url}`);
                     handlePdf(config.courseName, config.url, req.url, config.documentGroups);
                     return false;
@@ -187,7 +171,7 @@ export async function crawl(rawConfig: Config) {
                 // Keep this here so if we encounter .pdfs (no matter what URL or strategy), we still grab them
                 transformRequestFunction(req) {
                   if (req.url.endsWith('.pdf')) {
-                    // Download PDFs specially 
+                    // Download PDFs specially
                     console.log(`Downloading PDF: ${req.url}`);
                     handlePdf(config.courseName, config.url, req.url, config.documentGroups);
                     return false;
