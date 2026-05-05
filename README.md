@@ -1,129 +1,122 @@
-# [In active development] Self Hostable UIUC.chat
+# Illinois Chat
 
-## License
+Illinois Chat is a self-hostable AI chat platform for building course, research, and organization-specific assistants over curated documents and web content.
 
-This project is available under [our Research Use Only license fully defined here](https://github.com/UIUC-Chatbot/self-hostable-ai-ta-backend/blob/main/ResearchUseONLYLicense-UIUC.CHAT.pdf). This license is similar in spirit to the [CC BY-NC 4.0 License](https://creativecommons.org/licenses/by-nc/4.0/) which restricts commercial use.
+This repository contains the full monorepo needed to run Illinois Chat locally or in a Docker-based self-hosted environment.
 
-It's free to use for non-commercial use, like research. Any and all commercial use requires a commercial license, see below.
+## What Is Included
 
-By contributing to this project, you accept the [CLA here](https://github.com/UIUC-Chatbot/self-hostable-ai-ta-backend/blob/main/CLA%20for%20Self%20Hostable%20UIUC.chat.pdf).
+- `apps/frontend`: Next.js web application.
+- `apps/backend`: Flask API and ingest worker.
+- `apps/crawlee`: Crawlee service for web crawling.
+- `infra/docker`: Docker Compose files for full-stack and local-development runs.
+- `infra/db`: Postgres schema and database configuration.
+- `infra/keycloak`: Keycloak realm and theme assets.
 
-[![CC BY-NC 4.0 License Image](https://github.com/user-attachments/assets/21f4d62f-6a34-4e73-aae3-3129f81b8140)](https://creativecommons.org/licenses/by-nc/4.0/)
+## Prerequisites
 
-### Commercial Use
+- Docker and Docker Compose
+- Python 3.10 or 3.11 for local backend development
+- Node.js 20.19+ or 22.12+ for local frontend development
 
-For commercial use of this project, you must obtain a separate commercial license. Please contact [otm@illinois.edu](mailto:otm@illinois.edu) and [ai@ncsa.illinois.edu](mailto:ai@ncsa.illinois.edu) to inquire about commercial licensing terms.
+## Quickstart
 
-Failure to obtain a commercial license for commercial use is a violation of the terms of this project.
-
-## Quickstart (Self host with Docker)
-
-### 🎉 Get started with a single command
+Use the full Docker stack when you want the closest self-hosted or e2e environment. It starts the application services and all required infrastructure.
 
 ```bash
 bash infra/scripts/start-all.sh
 ```
-This will:
-* Create a repository-root `.env` file from `.env.template` if needed.
-* Start the full Docker stack: frontend, Flask backend, ingest worker, Redis, MinIO, Qdrant, Postgres, RabbitMQ, Crawlee, and Keycloak.
-* Initialize Postgres from `infra/db/migrations/20250328_remote_schema.sql`.
-* Ensure the configured Qdrant collection exists with 4096-dimensional cosine vectors.
 
+The script creates a repository-root `.env` from `.env.template` if needed, starts the frontend, backend, ingest worker, Crawlee, Postgres, Redis, RabbitMQ, MinIO, Qdrant, and Keycloak, then initializes the database and Qdrant collection.
 
-To start fresh, you can use: 
+To reset local Docker data before starting:
+
 ```bash
-# erase and factory reset all databases
 bash infra/scripts/start-all.sh --wipe_data
 ```
 
-### Configuring Postgres (Supabase)
+To stop the full stack:
 
-It's strongly recommended to change your passwords away from the defaults. The Supabase `.env` file is separate from the rest of the code for compatibility with Supabase's self-hosted offering and community documentation.
-The .env file is stored in the local path: `./supabase/docker/.env`
-
-### Configuring Database passwords
-
-Customize your env variables. The SQL database can be SQLite, Postgres, or Supabase. The object storage can be MinIO or AWS S3.
-
-### Take schema dump from Postgres (Supabase)
 ```bash
-PGPASSWORD=<password> pg_dump -h aws-0-us-east-1.pooler.supabase.com -U postgres.twzwfuydgnnjcaopyfdv -d postgres --schema-only > schema.sql
+bash infra/scripts/stop-all.sh
+
+# also remove full-stack volumes
+bash infra/scripts/stop-all.sh --volumes
 ```
 
-### Restore dump in new Postgres
+## Local Development
+
+Use the dev stack when you want to run app processes directly with hot reload while Docker provides shared infrastructure.
+
 ```bash
-PGPASSWORD=<password> psql -h <new-hostname> -U <new-db> -d postgres -f schema.sql
+bash infra/scripts/start-dev.sh
 ```
 
-Works on version: `Docker Compose version v2.27.1-desktop.1`
+This starts `infra/docker/docker-compose.dev.yaml` and non-destructively creates or appends missing keys in:
 
-Works on Apple Silicon M1 `aarch64`, and `x86`.
+- `apps/backend/.env`
+- `apps/frontend/.env`
+- `apps/crawlee/.env`
 
-Because the compose files live under `infra/docker`, commands use `--project-directory .` so Docker Compose resolves `.env`, `./apps/*`, and `./infra/*` from the repository root.
+Run the backend, ingest worker, and frontend in separate terminals:
 
-### Environment files
-
-For the full Docker stack and e2e testing, the repository-root `.env` is the source file Docker Compose reads. `infra/docker/docker-compose.yaml` maps those values into the frontend, backend, ingest worker, Crawlee, Keycloak, Postgres, MinIO, RabbitMQ, Redis, and Qdrant containers.
-
-Inside Docker, service-to-service URLs use Compose service names, for example `http://backend:8001`, `http://qdrant:6333`, `http://minio:9000`, and `postgres-illinois-chat`. Browser-facing URLs still use localhost, for example `http://localhost:3000`, `http://localhost:8080`, and `http://localhost:9000`.
-
-The app-local env files are for running services outside the full Docker stack:
-
-- `apps/backend/.env` is used by the Flask backend and ingest worker when you run them directly.
-- `apps/frontend/.env` is used by `npm run local` in `apps/frontend`.
-- `apps/crawlee/.env` is used only when running Crawlee directly from `apps/crawlee`; the full Docker stack uses the root `.env` plus explicit values in `infra/docker/docker-compose.yaml`.
-
-MinIO ports differ by mode:
-
-- Full Docker/e2e stack: browser API endpoint `http://localhost:9000`, console `http://localhost:9001`.
-- Local dev infrastructure: browser and local app API endpoint `http://localhost:10000`, console `http://localhost:9001`.
-
-
-### 🛠️ Technical Architecture
-
-![Architecture diagram](https://github.com/UIUC-Chatbot/ai-ta-backend/assets/13607221/bda7b4d6-79ce-4d12-bf8f-cff9207c37af)
-
-## Documentation
-
-See docs on https://docs.uiuc.chat
-
-## 📣 Development
-
-## Run the frontend and backend with hot reload:
-
-Backend:
 ```bash
 cd apps/backend
-infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port 8000
+flask --app ai_ta_backend.main:app --debug run --port 8000
 ```
-Ingest worker:
+
 ```bash
 cd apps/backend
 python ai_ta_backend/rabbitmq/worker.py
 ```
-Frontend:
+
 ```bash
 cd apps/frontend
 npm run local
 ```
 
-## Fastest way to rebuild the images during dev
+To stop local development infrastructure:
 
 ```bash
-# rebuild only the frontend after file changes
+bash infra/scripts/stop-dev.sh
+
+# also remove local-development volumes
+bash infra/scripts/stop-dev.sh --volumes
+```
+
+## Configuration
+
+There are two environment modes:
+
+- Full Docker/e2e reads the repository-root `.env`.
+- Local development reads `apps/backend/.env`, `apps/frontend/.env`, and `apps/crawlee/.env`.
+
+Change default passwords before using any non-local environment. Hosted model, embedding, and API-key values are intentionally generated as empty keys so each deployment can choose its own providers.
+
+Inside Docker, services talk to each other through Compose names such as `backend`, `minio`, `qdrant`, and `postgres-illinois-chat`. Browser-facing URLs use localhost.
+
+### MinIO
+
+Use the MinIO API endpoint for uploads and presigned URLs, not the MinIO console port.
+
+- Full Docker/e2e API: `http://localhost:9000`
+- Local development API: `http://localhost:10000`
+- MinIO console: `http://localhost:9001`
+
+## Common Commands
+
+```bash
+# rebuild only the frontend image
 bash infra/scripts/start-all.sh --rebuild=frontend
 
-# rebuild both frontend and backend after file changes
+# rebuild both frontend and backend images
 bash infra/scripts/start-all.sh --rebuild=frontend,backend
 ```
 
-## Stop the full Docker stack
+## Documentation
 
-```bash
-bash infra/scripts/stop-all.sh
+See `DEV_SETUP.md` for local development details. Published docs are available at https://docs.uiuc.chat.
 
-# stop and remove full-stack volumes
-bash infra/scripts/stop-all.sh --volumes
-```
+## License
 
-If you're interested in contributing, check out our [official developer quickstart](https://docs.uiuc.chat/developers/developer-quickstart).
+Illinois Chat is licensed under the Apache License, Version 2.0. See `LICENSE`.

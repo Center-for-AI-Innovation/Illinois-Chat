@@ -7,7 +7,6 @@ This guide will help you set up the UIUC.chat development environment for local 
 - Docker and Docker Compose
 - Python 3.10 or 3.11 for the backend and ingest worker
 - Node.js 20.19+ or 22.12+ for the frontend toolchain
-- Infisical CLI (for environment management)
 
 ## Quick Start
 
@@ -73,7 +72,7 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:10000
 
 ```bash
 cd apps/backend
-infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port 8000
+flask --app ai_ta_backend.main:app --debug run --port 8000
 ```
 
 In another terminal, start the ingest worker:
@@ -109,7 +108,7 @@ pip install -r ai_ta_backend/rabbitmq/requirements.txt
 
 # Set up environment variables (see apps/backend/.env)
 # Start the server
-infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port 8000
+flask --app ai_ta_backend.main:app --debug run --port 8000
 
 # In another terminal, start the ingest worker
 python ai_ta_backend/rabbitmq/worker.py
@@ -178,13 +177,13 @@ SQLITE_DB_NAME=uiuc_chat_local.db
 
 ### Environment Variables
 
-- Use `infisical secrets list` to see available secrets
-- Use `infisical secrets set KEY=VALUE` to set new secrets
+- Run `bash infra/scripts/start-dev.sh` to create or append missing local env keys.
+- Fill hosted model/API values in the app-local `.env` files when you need non-local services.
 
 ## Development Workflow
 
 1. **Start infrastructure**: `bash infra/scripts/start-dev.sh`
-2. **Start backend**: `cd apps/backend && infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port 8000`
+2. **Start backend**: `cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000`
 3. **Start worker**: `cd apps/backend && python ai_ta_backend/rabbitmq/worker.py`
 4. **Start frontend**: `cd apps/frontend && npm run local`
 5. **Make changes** to your code
