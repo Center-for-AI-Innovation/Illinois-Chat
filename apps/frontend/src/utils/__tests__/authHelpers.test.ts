@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   getKeycloakBaseFromHost,
   getKeycloakBaseUrl,
+  getKeycloakIssuerUrl,
   initiateSignIn,
 } from '../authHelpers'
 
@@ -43,7 +44,16 @@ describe('keycloak base URL helpers', () => {
     )
   })
 
-  it('getKeycloakBaseFromHost prefers NEXT_PUBLIC_KEYCLOAK_URL when set', () => {
+  it('getKeycloakBaseFromHost prefers KEYCLOAK_URL when set', () => {
+    vi.stubEnv('KEYCLOAK_URL', 'http://keycloak:8080/')
+    vi.stubEnv('NEXT_PUBLIC_KEYCLOAK_URL', 'https://override.example/')
+    expect(getKeycloakBaseFromHost('example.com')).toBe('http://keycloak:8080/')
+    vi.stubEnv('KEYCLOAK_URL', '')
+    vi.stubEnv('NEXT_PUBLIC_KEYCLOAK_URL', '')
+  })
+
+  it('getKeycloakBaseFromHost falls back to NEXT_PUBLIC_KEYCLOAK_URL', () => {
+    vi.stubEnv('KEYCLOAK_URL', '')
     vi.stubEnv('NEXT_PUBLIC_KEYCLOAK_URL', 'https://override.example/')
     expect(getKeycloakBaseFromHost('example.com')).toBe(
       'https://override.example/',
@@ -54,5 +64,14 @@ describe('keycloak base URL helpers', () => {
   it('getKeycloakBaseUrl prefers NEXT_PUBLIC_KEYCLOAK_URL when set', () => {
     vi.stubEnv('NEXT_PUBLIC_KEYCLOAK_URL', 'https://override.example/')
     expect(getKeycloakBaseUrl()).toBe('https://override.example/')
+  })
+
+  it('getKeycloakIssuerUrl uses the public issuer URL', () => {
+    vi.stubEnv('KEYCLOAK_URL', 'http://keycloak:8080/')
+    vi.stubEnv('NEXT_PUBLIC_KEYCLOAK_URL', '')
+    expect(getKeycloakIssuerUrl('localhost')).toBe(
+      'http://localhost:8080/realms/illinois_chat_realm',
+    )
+    vi.stubEnv('KEYCLOAK_URL', '')
   })
 })
