@@ -5,8 +5,9 @@ import re
 from ollama import Client
 
 OLLAMA_SERVER_URL = os.getenv("OLLAMA_SERVER_URL")
+NCSA_HOSTED_API_KEY = os.getenv("NCSA_HOSTED_API_KEY", "")
 
-OLLAMA_CLIENT = Client(host=OLLAMA_SERVER_URL, headers={"Authorization": f"Bearer {os.environ['NCSA_HOSTED_API_KEY']}"})
+OLLAMA_CLIENT = Client(host=OLLAMA_SERVER_URL, headers={"Authorization": f"Bearer {NCSA_HOSTED_API_KEY}"})
 LLM = 'qwen3:32b'
 
 
