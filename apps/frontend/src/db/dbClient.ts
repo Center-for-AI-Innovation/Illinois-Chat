@@ -8,6 +8,7 @@ function createPostgresClient(
   endpoint?: string,
   port?: string,
   database?: string,
+  ssl?: string,
 ) {
   if (!username || !password || !endpoint || !port || !database) {
     return postgres('postgres://postgres:postgres@localhost:5432/postgres', {
@@ -16,10 +17,12 @@ function createPostgresClient(
   }
 
   const connectionString = `postgres://${username}:${password}@${endpoint}:${port}/${database}`
-  const isLocal = endpoint === 'localhost' || endpoint === '127.0.0.1'
+  const useSsl =
+    ssl === 'true' ||
+    (ssl !== 'false' && endpoint !== 'localhost' && endpoint !== '127.0.0.1')
   return postgres(
     connectionString,
-    isLocal ? {} : { ssl: { rejectUnauthorized: false } },
+    useSsl ? { ssl: { rejectUnauthorized: false } } : {},
   )
 }
 
@@ -29,6 +32,7 @@ export const client = createPostgresClient(
   process.env.POSTGRES_ENDPOINT,
   process.env.POSTGRES_PORT,
   process.env.POSTGRES_DATABASE,
+  process.env.POSTGRES_SSL,
 )
 
 const keycloakClient = createPostgresClient(
@@ -37,6 +41,7 @@ const keycloakClient = createPostgresClient(
   process.env.KEYCLOAK_DB_ENDPOINT,
   process.env.KEYCLOAK_DB_PORT,
   process.env.KEYCLOAK_DB_DATABASE,
+  process.env.KEYCLOAK_DB_SSL,
 )
 
 export const db = drizzle(client, { schema: schema })
