@@ -1,0 +1,125 @@
+name: Deploy Crawlee to AWS ECS Fargate
+
+on:
+  push:
+    branches: [ illinois-chat ]
+    paths:
+      - 'src/**'
+      - 'dist/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+      - '.github/workflows/deploy-crawlee-ecs.yml'
+  workflow_dispatch:  # allow manual triggers
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: uiuc-chat-crawlee
+  ECS_SERVICE: crawlee-service-9fr3asb1
+  ECS_CLUSTER: uiuc-chat-dev
+  ECS_TASK_DEFINITION: crawlee
+  CONTAINER_NAME: crawlee
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Crawlee Actor to ECS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    # Checkout repository
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # Configure AWS Identity
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    # Login to Amazon ECR
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # Compute tag for ECR
+    - name: Compute Image Tag
+      id: set-tag
+      run: |
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        BRANCH_TAG=$(echo "${GITHUB_REF##*/}" | tr '/' '-')
+        IMAGE_TAG="${BRANCH_TAG}-${SHORT_SHA}"
+
+        echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+        echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+        echo "branch_tag=${BRANCH_TAG}" >> $GITHUB_OUTPUT
+        echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+    # Build and push the Docker image
+    - name: Build + Push Crawlee Docker Image
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        BRANCH_TAG: ${{ steps.set-tag.outputs.branch_tag }}
+      run: |
+        set -euo pipefail
+        echo "Building Crawlee image: ${IMAGE_TAG}"
+
+        docker build \
+          -t "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" \
+          .
+
+        docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+        # Tag with branch + latest
+        docker tag "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:${BRANCH_TAG}"
+        docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${BRANCH_TAG}"
+
+        docker tag "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+        docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+
+        echo "image=${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+    # Download latest ECS task definition
+    - name: Download current ECS Task Definition
+      run: |
+        aws ecs describe-task-definition \
+          --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+          --query taskDefinition \
+          > task-definition-raw.json
+
+        # Strip AWS-managed fields
+        jq 'del(
+          .taskDefinitionArn,
+          .revision,
+          .status,
+          .registeredAt,
+          .registeredBy,
+          .compatibilities,
+          .requiresAttributes,
+          .placementConstraints,
+          .enableFaultInjection
+        )' task-definition-raw.json > task-definition.json
+
+    # Update image reference
+    - name: Render New Task Definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.build-image.outputs.image }}
+
+    # Deploy to ECS
+    - name: Deploy to ECS Fargate
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
