@@ -4,6 +4,8 @@ Illinois Chat is a self-hostable AI chat platform for building course, research,
 
 This repository contains the full monorepo needed to run Illinois Chat locally or in a Docker-based self-hosted environment.
 
+![Illinois Chat homepage showing chatbot creation and material upload](media/illinois_chat_ss.png)
+
 ## What Is Included
 
 - `apps/frontend`: Next.js web application.
