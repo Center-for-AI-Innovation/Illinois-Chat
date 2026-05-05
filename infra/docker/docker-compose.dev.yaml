@@ -44,15 +44,15 @@ services:
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
       MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
-      MINIO_API_PORT: ${DOCKER_INTERNAL_MINIO_API_PORT}
-      MINIO_CONSOLE_PORT: ${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT}
-    command: server /data --console-address ":${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT}" --address ":${DOCKER_INTERNAL_MINIO_API_PORT}"
+      MINIO_API_PORT: ${DOCKER_INTERNAL_MINIO_API_PORT:-10000}
+      MINIO_CONSOLE_PORT: ${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT:-9001}
+    command: server /data --console-address ":${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT:-9001}" --address ":${DOCKER_INTERNAL_MINIO_API_PORT:-10000}"
     ports:
-      - ${PUBLIC_MINIO_API_PORT}:${DOCKER_INTERNAL_MINIO_API_PORT} # API access
-      - ${PUBLIC_MINIO_DASHBOARD_PORT}:${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT} # Dashboard access
+      - ${PUBLIC_MINIO_API_PORT:-10000}:${DOCKER_INTERNAL_MINIO_API_PORT:-10000} # API access
+      - ${PUBLIC_MINIO_DASHBOARD_PORT:-9001}:${DOCKER_INTERNAL_MINIO_DASHBOARD_PORT:-9001} # Dashboard access
     expose:
-      - ${PUBLIC_MINIO_API_PORT}
-      - ${PUBLIC_MINIO_DASHBOARD_PORT}
+      - ${PUBLIC_MINIO_API_PORT:-10000}
+      - ${PUBLIC_MINIO_DASHBOARD_PORT:-9001}
     networks:
       - uiuc-chat-network
     volumes:
@@ -60,7 +60,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - bash -c ':> /dev/tcp/127.0.0.1/${DOCKER_INTERNAL_MINIO_API_PORT}' || exit 1
+        - bash -c ':> /dev/tcp/127.0.0.1/${DOCKER_INTERNAL_MINIO_API_PORT:-10000}' || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
@@ -77,7 +77,7 @@ services:
   #   env_file:
   #     - .env
   #   environment:
-  #     - INGEST_URL=http://flask-app:8001/ingest
+  #     - INGEST_URL=http://backend:8001/ingest
   #   depends_on:
   #     - redis
 
@@ -90,9 +90,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DATABASE: postgres
-      POSTGRES_USERNAME: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -108,9 +108,9 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_DATABASE: postgres
-      POSTGRES_USERNAME: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DATABASE:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -138,6 +138,7 @@ services:
   keycloak:
     platform: linux/amd64 # M chip
     image: quay.io/keycloak/keycloak:26.1
+    entrypoint: /bin/bash
     env_file:
       - .env
     ports:
@@ -145,23 +146,22 @@ services:
     networks:
       - uiuc-chat-network
     command:
-      - start-dev
-      - --http-enabled=true
-      - --hostname=localhost
-      - --hostname-strict=false
-      - --db=postgres
-      - --db-url=jdbc:postgresql://postgres-keycloak:5432/postgres
-      - --db-username=${POSTGRES_USERNAME}
-      - --db-password=${POSTGRES_PASSWORD}
-      - --import-realm
+      - -lc
+      - |
+        /opt/keycloak/bin/kc.sh start-dev --http-enabled=true --hostname=localhost --hostname-strict=false --db=postgres --db-url=jdbc:postgresql://postgres-keycloak:5432/postgres --db-username=${POSTGRES_USER:-postgres} --db-password=${POSTGRES_PASSWORD:-password} --import-realm &
+        pid=$$!
+        until bash -c '</dev/tcp/localhost/8080' 2>/dev/null; do sleep 2; done
+        until /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user "${KEYCLOAK_ADMIN_USERNAME:-admin}" --password "${KEYCLOAK_ADMIN_PASSWORD:-admin}"; do sleep 2; done
+        /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=none
+        wait "$$pid"
     environment:
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USERNAME}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN_USERNAME:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       - KC_METRICS_ENABLED=true
       - KC_HEALTH_ENABLED=true
     volumes:
       - ./infra/keycloak/theme:/opt/keycloak/themes/keywind
-      - ./keycloak/realms/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./infra/keycloak/realms:/opt/keycloak/data/import
     healthcheck:
       test:
         - CMD-SHELL
