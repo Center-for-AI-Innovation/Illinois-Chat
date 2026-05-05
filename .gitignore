@@ -6,6 +6,7 @@ wandb
 *.pem
 qdrant_data/*
 
+venv-*/
 # don't expose env files
 .env
 # Created by https://www.toptal.com/developers/gitignore/api/python
@@ -159,7 +160,7 @@ dmypy.json
 [Ll]ib
 [Ll]ib64
 [Ll]ocal
-[Ss]cripts
+/[Ss]cripts
 pyvenv.cfg
 .venv
 pip-selfcheck.json
