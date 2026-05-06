@@ -102,7 +102,7 @@ Inside Docker, services talk to each other through Compose names such as `backen
 Use the MinIO API endpoint for uploads and presigned URLs, not the MinIO console port.
 
 - Full Docker/e2e API: `http://localhost:9000`
-- Local development API: `http://localhost:10000`
+- Local development API: `http://localhost:9001`
 - MinIO console: `http://localhost:9001`
 
 ## Common Commands

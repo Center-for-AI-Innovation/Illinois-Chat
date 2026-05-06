@@ -1,4 +1,4 @@
-psycopg2
+psycopg2-binary
 openai==1.63.0
 pandas
 tiktoken==0.9.0

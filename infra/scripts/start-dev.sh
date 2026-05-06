@@ -100,9 +100,9 @@ ensure_local_app_envs() {
 	append_env_if_missing "$backend_env" "QDRANT_URL" "http://localhost:6333"
 	append_env_if_missing "$backend_env" "QDRANT_API_KEY" "$qdrant_api_key"
 	append_env_if_missing "$backend_env" "LOCAL_MINIO" "true"
-	append_env_if_missing "$backend_env" "MINIO_URL" "http://localhost:10000"
-	append_env_if_missing "$backend_env" "MINIO_ENDPOINT" "http://localhost:10000"
-	append_env_if_missing "$backend_env" "MINIO_PUBLIC_ENDPOINT" "http://localhost:10000"
+	append_env_if_missing "$backend_env" "MINIO_URL" "http://localhost:9001"
+	append_env_if_missing "$backend_env" "MINIO_ENDPOINT" "http://localhost:9001"
+	append_env_if_missing "$backend_env" "MINIO_PUBLIC_ENDPOINT" "http://localhost:9001"
 	append_env_if_missing "$backend_env" "AWS_REGION" "$aws_region"
 	append_env_if_missing "$backend_env" "AWS_ACCESS_KEY_ID" "$aws_access_key"
 	append_env_if_missing "$backend_env" "AWS_SECRET_ACCESS_KEY" "$aws_secret_key"
@@ -152,9 +152,9 @@ ensure_local_app_envs() {
 	append_env_if_missing "$frontend_env" "AWS_ACCESS_KEY_ID" "$aws_access_key"
 	append_env_if_missing "$frontend_env" "AWS_SECRET_ACCESS_KEY" "$aws_secret_key"
 	append_env_if_missing "$frontend_env" "S3_BUCKET_NAME" "$s3_bucket"
-	append_env_if_missing "$frontend_env" "MINIO_ENDPOINT" "http://localhost:10000"
-	append_env_if_missing "$frontend_env" "MINIO_PUBLIC_ENDPOINT" "http://localhost:10000"
-	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_S3_ENDPOINT" "http://localhost:10000"
+	append_env_if_missing "$frontend_env" "MINIO_ENDPOINT" "http://localhost:9001"
+	append_env_if_missing "$frontend_env" "MINIO_PUBLIC_ENDPOINT" "http://localhost:9001"
+	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_S3_ENDPOINT" "http://localhost:9001"
 	append_env_if_missing "$frontend_env" "QDRANT_COLLECTION_NAME" "$qdrant_collection"
 	append_env_if_missing "$frontend_env" "QDRANT_URL" "http://localhost:6333"
 	append_env_if_missing "$frontend_env" "QDRANT_API_KEY" "$qdrant_api_key"
@@ -186,7 +186,7 @@ ensure_local_app_envs() {
 	append_env_if_missing "$crawlee_env" "AWS_ACCESS_KEY_ID" "$aws_access_key"
 	append_env_if_missing "$crawlee_env" "AWS_SECRET_ACCESS_KEY" "$aws_secret_key"
 	append_env_if_missing "$crawlee_env" "S3_BUCKET_NAME" "$s3_bucket"
-	append_env_if_missing "$crawlee_env" "MINIO_ENDPOINT" "http://localhost:10000"
+	append_env_if_missing "$crawlee_env" "MINIO_ENDPOINT" "http://localhost:9001"
 	append_env_if_missing "$crawlee_env" "NO_CRAWL" ""
 	append_env_if_missing "$crawlee_env" "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" ""
 	append_env_if_missing "$crawlee_env" "OPENAI_API_KEY" ""
@@ -276,9 +276,9 @@ DOCKER_INTERNAL_MINIO_API_PORT=10000
 DOCKER_INTERNAL_MINIO_DASHBOARD_PORT=9001
 PUBLIC_MINIO_API_PORT=10000
 PUBLIC_MINIO_DASHBOARD_PORT=9001
-MINIO_ENDPOINT=http://localhost:10000
-MINIO_PUBLIC_ENDPOINT=http://localhost:10000
-MINIO_URL=http://localhost:10000
+MINIO_ENDPOINT=http://localhost:9001
+MINIO_PUBLIC_ENDPOINT=http://localhost:9001
+MINIO_URL=http://localhost:9001
 
 # RabbitMQ Configuration
 RABBITMQ_USER=guest

@@ -56,14 +56,14 @@ For local dev uploads and ingest, use the MinIO API port, not the MinIO console 
 
 ```env
 # apps/frontend/.env
-MINIO_ENDPOINT=http://localhost:10000
-MINIO_PUBLIC_ENDPOINT=http://localhost:10000
-NEXT_PUBLIC_S3_ENDPOINT=http://localhost:10000
+MINIO_ENDPOINT=http://localhost:9001
+MINIO_PUBLIC_ENDPOINT=http://localhost:9001
+NEXT_PUBLIC_S3_ENDPOINT=http://localhost:9001
 
 # apps/backend/.env
-MINIO_URL=http://localhost:10000
-MINIO_ENDPOINT=http://localhost:10000
-MINIO_PUBLIC_ENDPOINT=http://localhost:10000
+MINIO_URL=http://localhost:9001
+MINIO_ENDPOINT=http://localhost:9001
+MINIO_PUBLIC_ENDPOINT=http://localhost:9001
 ```
 
 `http://localhost:9001` is the MinIO management console and should not be used for S3 uploads.
@@ -134,7 +134,7 @@ npm run local
 | Frontend            | http://localhost:3000  | Next.js application       |
 | Backend API         | http://localhost:8000  | Flask API                 |
 | Keycloak            | http://localhost:8080  | Authentication service    |
-| MinIO API           | http://localhost:10000 | Object storage API        |
+| MinIO API           | http://localhost:9001 | Object storage API        |
 | MinIO Console       | http://localhost:9001  | Object storage management |
 | RabbitMQ Management | http://localhost:15672 | Message queue management  |
 
