@@ -99,6 +99,10 @@ ensure_local_app_envs() {
 	append_env_if_missing "$backend_env" "QDRANT_COLLECTION_NAME" "$qdrant_collection"
 	append_env_if_missing "$backend_env" "QDRANT_URL" "http://localhost:6333"
 	append_env_if_missing "$backend_env" "QDRANT_API_KEY" "$qdrant_api_key"
+	# VectorDatabase (Flask); same pattern as infra/docker/docker-compose.yaml backend service
+	append_env_if_missing "$backend_env" "VYRIAD_QDRANT_URL" "http://localhost:6333"
+	append_env_if_missing "$backend_env" "VYRIAD_QDRANT_PORT" "6333"
+	append_env_if_missing "$backend_env" "VYRIAD_QDRANT_API_KEY" "$qdrant_api_key"
 	append_env_if_missing "$backend_env" "LOCAL_MINIO" "true"
 	append_env_if_missing "$backend_env" "MINIO_URL" "http://localhost:9001"
 	append_env_if_missing "$backend_env" "MINIO_ENDPOINT" "http://localhost:9001"
