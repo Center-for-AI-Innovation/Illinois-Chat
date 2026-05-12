@@ -23,7 +23,7 @@ export const cleanSelectedConversation = (
     updatedConversation = {
       ...updatedConversation,
       model:
-        updatedConversation.model || OpenAIModels[OpenAIModelID.GPT_4o_mini],
+        updatedConversation.model || OpenAIModels[OpenAIModelID.GPT_5_4_mini],
     }
   }
 
@@ -87,7 +87,7 @@ export const cleanConversationHistory = (history: any[]): ConversationPage => {
   for (const conversation of history) {
     try {
       if (!conversation.model) {
-        conversation.model = OpenAIModels[OpenAIModelID.GPT_4o_mini]
+        conversation.model = OpenAIModels[OpenAIModelID.GPT_5_4_mini]
       }
 
       if (!conversation.prompt) {
