@@ -813,11 +813,11 @@ CRITICAL: The optimized prompt must:
             },
           ],
           model: {
-            id: selectedModel || 'gpt-4',
+            id: selectedModel || 'gpt-4o-mini',
             name:
               modelOptions.find((opt) => opt.value === selectedModel)?.label ||
-              'GPT-4',
-            tokenLimit: 8192,
+              'GPT-4o mini',
+            tokenLimit: 128000,
             enabled: true,
             extendedThinking:
               modelOptions.find((opt) => opt.value === selectedModel)
