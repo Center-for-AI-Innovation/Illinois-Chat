@@ -74,6 +74,12 @@ export const LEGACY_NCSA_DEFAULT_MODEL_IDS = new Set<string>([
 
 export const CURRENT_NCSA_DEFAULT_MODEL_ID = NCSAHostedVLMModelID.QWEN3_6_27B
 
+/** Prefer newest NCSA default; fall back to Qwen 3.5 when 3.6 is not deployed. */
+export const NCSA_PREFERRED_DEFAULT_MODEL_IDS: readonly string[] = [
+  CURRENT_NCSA_DEFAULT_MODEL_ID,
+  NCSAHostedVLMModelID.QWEN3_5_27B,
+]
+
 type NCSAHostedVLMModelState = {
   enabled: boolean
   default: boolean
@@ -89,9 +95,17 @@ type NCSAHostedVLMApiResponse = {
   data: NCSAHostedVLMApiModel[]
 }
 
-const canUseCurrentNCSADefault = (
+const pickPreferredAvailableNCSADefault = (
   availableModelIds: Iterable<string>,
-): boolean => new Set(availableModelIds).has(CURRENT_NCSA_DEFAULT_MODEL_ID)
+): string | null => {
+  const available = new Set(availableModelIds)
+  for (const id of NCSA_PREFERRED_DEFAULT_MODEL_IDS) {
+    if (available.has(id)) {
+      return id
+    }
+  }
+  return null
+}
 
 const isKnownNCSAHostedVLMModelId = (
   modelId: string,
@@ -106,9 +120,7 @@ export const resolveStoredNCSADefaultModelId = (
     return storedModelId
   }
 
-  return canUseCurrentNCSADefault(availableModelIds)
-    ? CURRENT_NCSA_DEFAULT_MODEL_ID
-    : storedModelId
+  return pickPreferredAvailableNCSADefault(availableModelIds) ?? storedModelId
 }
 
 export const migrateNCSADefaultModelStates = (
@@ -119,7 +131,9 @@ export const migrateNCSADefaultModelStates = (
     (modelId) => existingModelStates.get(modelId)?.default,
   )
 
-  if (!hasLegacyDefault || !canUseCurrentNCSADefault(availableModelIds)) {
+  const targetDefaultId = pickPreferredAvailableNCSADefault(availableModelIds)
+
+  if (!hasLegacyDefault || !targetDefaultId) {
     return existingModelStates
   }
 
@@ -137,7 +151,7 @@ export const migrateNCSADefaultModelStates = (
     })
   }
 
-  migratedModelStates.set(CURRENT_NCSA_DEFAULT_MODEL_ID, {
+  migratedModelStates.set(targetDefaultId, {
     enabled: true,
     default: true,
   })
@@ -149,7 +163,7 @@ export const findAvailableNCSAFallbackModel = <T extends { id: string }>(
   models: T[],
 ): T | undefined => {
   const fallbackModelIds = [
-    CURRENT_NCSA_DEFAULT_MODEL_ID,
+    ...NCSA_PREFERRED_DEFAULT_MODEL_IDS,
     ...LEGACY_NCSA_DEFAULT_MODEL_IDS,
   ]
 
