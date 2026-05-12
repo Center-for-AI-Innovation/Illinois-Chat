@@ -16,6 +16,7 @@ export enum NCSAHostedVLMModelID {
   QWEN2_5VL_72B_INSTRUCT = 'Qwen/Qwen2.5-VL-72B-Instruct',
   QWEN2_5VL_32B_INSTRUCT = 'Qwen/Qwen2.5-VL-32B-Instruct',
   QWEN3_5_27B = 'Qwen/Qwen3.5-27B',
+  QWEN3_6_27B = 'Qwen/Qwen3.6-27B',
 }
 
 export const NCSAHostedVLMModels: Record<
@@ -58,6 +59,12 @@ export const NCSAHostedVLMModels: Record<
     tokenLimit: 262144,
     enabled: true,
   },
+  [NCSAHostedVLMModelID.QWEN3_6_27B]: {
+    id: NCSAHostedVLMModelID.QWEN3_6_27B,
+    name: 'Qwen 3.6 27B',
+    tokenLimit: 262144,
+    enabled: true,
+  },
 }
 
 export const LEGACY_NCSA_DEFAULT_MODEL_IDS = new Set<string>([
@@ -65,7 +72,7 @@ export const LEGACY_NCSA_DEFAULT_MODEL_IDS = new Set<string>([
   NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT,
 ])
 
-export const CURRENT_NCSA_DEFAULT_MODEL_ID = NCSAHostedVLMModelID.QWEN3_5_27B
+export const CURRENT_NCSA_DEFAULT_MODEL_ID = NCSAHostedVLMModelID.QWEN3_6_27B
 
 type NCSAHostedVLMModelState = {
   enabled: boolean
