@@ -46,6 +46,7 @@ import { AnthropicModelID } from '../modelProviders/types/anthropic'
 import { BedrockModelID } from '../modelProviders/types/bedrock'
 import { GeminiModelID } from '../modelProviders/types/gemini'
 import { SambaNovaModelID } from '../modelProviders/types/SambaNova'
+import { OllamaModelIDs } from '../modelProviders/ollama'
 
 import {
   State,
@@ -417,7 +418,7 @@ describe('validateRequestBody', () => {
   it('throws when image content is used with a non-vision model', async () => {
     await expect(
       validateRequestBody({
-        model: 'gpt-3.5-turbo',
+        model: OllamaModelIDs.LLAMA32_1b_fp16,
         messages: [
           {
             id: 'm1',
@@ -1147,7 +1148,7 @@ describe('routeModelRequest', () => {
   })
 
   it('routes Bedrock model IDs to runBedrockChat', async () => {
-    const conv = baseConversation(BedrockModelID.Claude_3_5_Sonnet_Latest)
+    const conv = baseConversation(BedrockModelID.Nova_Pro)
     const llmProviders: any = { Bedrock: { enabled: true, models: [] } }
 
     await routeModelRequest({
@@ -1159,7 +1160,7 @@ describe('routeModelRequest', () => {
   })
 
   it('routes Gemini model IDs to runGeminiChat', async () => {
-    const conv = baseConversation(GeminiModelID.Gemini_2_0_Flash)
+    const conv = baseConversation(GeminiModelID.Gemini_3_1_Flash_Lite)
     const llmProviders: any = { Gemini: { enabled: true, models: [] } }
 
     await routeModelRequest({
