@@ -4,11 +4,21 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ThinkTagDropdown from '../ThinkTagDropdown'
 
+function getThinkTagContentPanel(container: HTMLElement) {
+  const el = container.querySelector('.think-tag-content')
+  if (!el || !(el instanceof HTMLElement)) {
+    throw new Error('Expected .think-tag-content panel in container')
+  }
+  return el
+}
+
 describe('ThinkTagDropdown behavior', () => {
   it('does not animate on initial render for historical chats', () => {
-    render(<ThinkTagDropdown content="Thoughts" isReasoningStreaming={false} />)
+    const { container } = render(
+      <ThinkTagDropdown content="Thoughts" isReasoningStreaming={false} />,
+    )
 
-    const contentRegion = document.getElementById('think-tag-content')
+    const contentRegion = getThinkTagContentPanel(container)
     expect(contentRegion).toBeInTheDocument()
     expect(contentRegion).toHaveClass(
       'think-tag-content',
@@ -18,7 +28,7 @@ describe('ThinkTagDropdown behavior', () => {
   })
 
   it('auto-collapses with animation when live streaming finishes', async () => {
-    const { rerender } = render(
+    const { rerender, container } = render(
       <ThinkTagDropdown content="Thoughts" isReasoningStreaming={true} />,
     )
 
@@ -27,7 +37,7 @@ describe('ThinkTagDropdown behavior', () => {
     )
 
     await waitFor(() => {
-      const contentRegion = document.getElementById('think-tag-content')
+      const contentRegion = getThinkTagContentPanel(container)
       expect(contentRegion).toBeInTheDocument()
       expect(contentRegion).toHaveClass(
         'think-tag-content',
@@ -43,7 +53,9 @@ describe('ThinkTagDropdown behavior', () => {
 
   it('animates manual opening and closing with the faster variant', async () => {
     const user = userEvent.setup()
-    render(<ThinkTagDropdown content="Thoughts" isReasoningStreaming={false} />)
+    const { container } = render(
+      <ThinkTagDropdown content="Thoughts" isReasoningStreaming={false} />,
+    )
 
     const toggle = screen.getByRole('button', {
       name: /AI's Thought Process/i,
@@ -51,7 +63,7 @@ describe('ThinkTagDropdown behavior', () => {
 
     await user.click(toggle)
 
-    let contentRegion = document.getElementById('think-tag-content')
+    let contentRegion = getThinkTagContentPanel(container)
     expect(contentRegion).toBeInTheDocument()
     expect(contentRegion).toHaveClass(
       'think-tag-content',
@@ -62,7 +74,7 @@ describe('ThinkTagDropdown behavior', () => {
 
     await user.click(toggle)
 
-    contentRegion = document.getElementById('think-tag-content')
+    contentRegion = getThinkTagContentPanel(container)
     expect(contentRegion).toBeInTheDocument()
     expect(contentRegion).toHaveClass(
       'think-tag-content',

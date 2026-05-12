@@ -1,6 +1,7 @@
 import React, {
   Fragment,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -11,7 +12,10 @@ import { LoadingSpinner } from '../UIUC-Components/LoadingSpinner'
 
 interface ThinkTagDropdownProps {
   content: string
+  /** When the assistant is still streaming reasoning into the think block */
   isReasoningStreaming?: boolean
+  /** @deprecated Prefer `isReasoningStreaming` — kept for tests and older call sites */
+  isStreaming?: boolean
 }
 
 type AnimationMode = 'none' | 'manual' | 'auto'
@@ -43,13 +47,20 @@ export function extractThinkTagContent(content: string): {
 export const ThinkTagDropdown: React.FC<ThinkTagDropdownProps> = ({
   content,
   isReasoningStreaming,
+  isStreaming,
 }) => {
+  const reasoningStreaming =
+    isReasoningStreaming ?? isStreaming ?? false
+
   const [isExpanded, setIsExpanded] = useState(true) // open by default
   const [animationMode, setAnimationMode] = useState<AnimationMode>('none')
   const [contentHeight, setContentHeight] = useState(0)
-  const previousIsReasoningStreamingRef = useRef(isReasoningStreaming)
+  const previousIsReasoningStreamingRef = useRef(reasoningStreaming)
   const hasAutoCollapsedRef = useRef(false)
   const contentRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const id = useId()
+  const contentId = `think-tag-content-${id}`
 
   // Function to process the content and preserve formatting
   const formatContent = (text: string) => {
@@ -93,7 +104,7 @@ export const ThinkTagDropdown: React.FC<ThinkTagDropdownProps> = ({
   useEffect(() => {
     const wasReasoningStreaming = previousIsReasoningStreamingRef.current
     const reasoningStreamingJustFinished =
-      Boolean(wasReasoningStreaming) && !isReasoningStreaming
+      Boolean(wasReasoningStreaming) && !reasoningStreaming
 
     if (reasoningStreamingJustFinished && !hasAutoCollapsedRef.current) {
       setAnimationMode('auto')
@@ -101,12 +112,12 @@ export const ThinkTagDropdown: React.FC<ThinkTagDropdownProps> = ({
       const animationFrameId = requestAnimationFrame(() => {
         setIsExpanded(false)
       })
-      previousIsReasoningStreamingRef.current = isReasoningStreaming
+      previousIsReasoningStreamingRef.current = reasoningStreaming
       return () => cancelAnimationFrame(animationFrameId)
     }
 
-    previousIsReasoningStreamingRef.current = isReasoningStreaming
-  }, [isReasoningStreaming])
+    previousIsReasoningStreamingRef.current = reasoningStreaming
+  }, [reasoningStreaming])
 
   const handleTransitionEnd = (
     event: React.TransitionEvent<HTMLDivElement>,
@@ -132,25 +143,29 @@ export const ThinkTagDropdown: React.FC<ThinkTagDropdownProps> = ({
   return (
     <div className="think-tag-dropdown" role="region">
       <div
+        ref={headerRef}
         className="think-tag-header"
         onClick={handleHeaderClick}
         role="button"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         aria-expanded={isExpanded}
-        aria-controls="think-tag-content"
+        aria-controls={contentId}
       >
         <div className="flex items-center gap-2">
-          <IconBrain size={20} className="think-tag-brain-icon" />
+          <IconBrain
+            size={20}
+            aria-hidden="true"
+            className="think-tag-brain-icon"
+          />
           <span
-            id="ai-thought-process-label"
             className={`text-base font-medium ${montserrat_paragraph.variable} font-montserratParagraph`}
           >
             AI&apos;s Thought Process
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {isReasoningStreaming && <LoadingSpinner size="xs" />}
+          {reasoningStreaming && <LoadingSpinner size="xs" />}
           <IconChevronDown
             size={20}
             className={`think-tag-icon ${isExpanded ? 'expanded' : ''}`}
@@ -159,7 +174,7 @@ export const ThinkTagDropdown: React.FC<ThinkTagDropdownProps> = ({
         </div>
       </div>
       <div
-        id="think-tag-content"
+        id={contentId}
         className={`think-tag-content ${animationClassName} ${isClosing ? 'closing' : ''} ${
           isExpanded ? 'expanded' : ''
         }`}
@@ -167,7 +182,6 @@ export const ThinkTagDropdown: React.FC<ThinkTagDropdownProps> = ({
         onTransitionEnd={handleTransitionEnd}
         role="region"
         aria-hidden={!isExpanded}
-        aria-labelledby="ai-thought-process-label"
       >
         <div
           ref={contentRef}
