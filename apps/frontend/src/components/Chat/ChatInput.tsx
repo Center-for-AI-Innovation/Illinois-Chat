@@ -1339,7 +1339,6 @@ export const ChatInput = ({
                         size={isSmallScreen ? '12px' : '14px'}
                         stroke={2}
                         aria-hidden="true"
-                        style={{ color: '#f59e0b' }}
                       />
                     </span>
                   </Tooltip>
