@@ -2134,6 +2134,9 @@ export const Chat = memo(
                               onRegenerate={() => handleRegenerate(index)}
                               onFeedback={handleFeedback}
                               courseName={courseName}
+                              disableCitations={
+                                courseMetadata?.disableCitations || false
+                              }
                             />
                           ),
                         )}
