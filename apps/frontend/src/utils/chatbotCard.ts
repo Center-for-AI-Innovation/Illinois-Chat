@@ -53,13 +53,7 @@ export function toChatbotCardData(
     generalTags,
     owner: isOwner ? 'You' : metadata.course_owner,
     collaboratorCount: admins.length,
-    userRole: isOwner
-      ? 'owner'
-      : isAdmin
-        ? 'admin'
-        : callerIsUserBot
-          ? 'member'
-          : undefined,
+    userRole: isOwner ? 'owner' : isAdmin ? 'admin' : undefined,
     accessLevel: accessLevel === 'logged_in' ? 'unlisted' : accessLevel,
     isPrivate: metadata.is_private,
     bannerImageS3: metadata.banner_image_s3,
