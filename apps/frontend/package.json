@@ -45,7 +45,7 @@
     "@emotion/react": "^11.11.1",
     "@google/generative-ai": "^0.21.0",
     "@hookform/resolvers": "^5.2.2",
-    "@keycloak/keycloak-admin-client": "^26.3.4",
+    "@keycloak/keycloak-admin-client": "^26.6.3",
     "@magicbell/magicbell-react": "^10.9.10",
     "@mantine/core": "^6.0.10",
     "@mantine/dates": "^6.0.10",
