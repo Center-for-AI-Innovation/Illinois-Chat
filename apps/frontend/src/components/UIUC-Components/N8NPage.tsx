@@ -698,7 +698,7 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                     Your n8n tools
                   </Title>
                 </div>
-                <div className=" flex flex-col items-end justify-center">
+                <div className="flex flex-col items-end justify-center">
                   {/* Can add more buttons here */}
                   {/* <Button className={`${montserrat_paragraph.variable} font-montserratParagraph ${classes.downloadButton}`} rightIcon={isLoading ? <LoadingSpinner size="sm" /> : <IconCloudDownload />}
                     onClick={() => downloadConversationHistory(course_name)}>
