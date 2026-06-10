@@ -634,9 +634,8 @@ describe('Chat (coverage)', () => {
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat' }
     const tools = [{ name: 'tool-1', enabled: true }]
 
-    const toolMod = await import(
-      '~/utils/functionCalling/handleFunctionCalling'
-    )
+    const toolMod =
+      await import('~/utils/functionCalling/handleFunctionCalling')
     ;(toolMod as any).handleFunctionCall.mockResolvedValueOnce([
       { name: 'tool-1' },
     ])
@@ -1052,9 +1051,8 @@ describe('Chat (coverage)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat' }
 
-    const toolMod = await import(
-      '~/utils/functionCalling/handleFunctionCalling'
-    )
+    const toolMod =
+      await import('~/utils/functionCalling/handleFunctionCalling')
     ;(toolMod as any).handleFunctionCall.mockRejectedValueOnce(
       new Error('boom'),
     )

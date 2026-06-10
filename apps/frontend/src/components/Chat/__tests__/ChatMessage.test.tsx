@@ -165,9 +165,8 @@ describe('ChatMessage', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const ctxPdf = makeContextWithMetadata({
       readable_filename: 'Lecture1.pdf',
@@ -601,9 +600,8 @@ describe('ChatMessage', () => {
         messages: [userMsg, assistantMsg],
       })
 
-      const { ChatMessage, SourcesSidebarProvider } = await import(
-        '../ChatMessage'
-      )
+      const { ChatMessage, SourcesSidebarProvider } =
+        await import('../ChatMessage')
 
       renderWithProviders(
         <SourcesSidebarProvider>
@@ -675,9 +673,8 @@ describe('ChatMessage', () => {
       messages: [userMsg, assistantMsg],
     })
 
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     renderWithProviders(
       <SourcesSidebarProvider>
@@ -1011,9 +1008,8 @@ describe('ChatMessage', () => {
 
   it('extracts citation indices from array content when opening the sources sidebar', async () => {
     const user = userEvent.setup()
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const ctxPdf = makeContextWithMetadata({
       readable_filename: 'Lecture1.pdf',
@@ -1298,9 +1294,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders "Generating final response" spinner when loading and tools are done', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-loading',
@@ -1350,9 +1345,8 @@ describe('ChatMessage', () => {
   })
 
   it('does NOT show "Generating final response" when agent mode is enabled', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-agent-loading',
@@ -1398,9 +1392,8 @@ describe('ChatMessage', () => {
   })
 
   it('shows wasQueryRewritten=false accordion text', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-noqr',
@@ -1440,9 +1433,8 @@ describe('ChatMessage', () => {
   })
 
   it('shows tool routing accordions with argument display when isRouting=false and tools present', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-toolroute',
@@ -1506,9 +1498,8 @@ describe('ChatMessage', () => {
   })
 
   it('shows tool error state in output accordion', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-toolerr',
@@ -1555,9 +1546,8 @@ describe('ChatMessage', () => {
   })
 
   it('shows tool output with data (JSON) when no text field', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-tooldata',
@@ -1784,9 +1774,8 @@ describe('ChatMessage', () => {
   })
 
   it('does not show Sources button while streaming the last assistant message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const ctxPdf = makeContextWithMetadata({
       readable_filename: 'Doc.pdf',
@@ -1840,9 +1829,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders assistant message with own contexts (not from previous user message)', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const ctx = makeContextWithMetadata({
       readable_filename: 'OwnCtx.pdf',
@@ -1890,9 +1878,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders user message with image description text in accordion', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-imgdesc',
@@ -2003,9 +1990,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders retrieval loading accordion for user message at second-to-last position', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-ret',
@@ -2048,9 +2034,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders routing accordion for user message at second-to-last position', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-route2',
@@ -2095,9 +2080,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders query rewriting accordion for last user message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-qr',
@@ -2135,9 +2119,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders tool output with imageUrls in output accordion', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-toolimg',
@@ -2189,9 +2172,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders tool still loading (no output, no error)', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-toolpending',
@@ -2236,9 +2218,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders tool argument values with image_urls containing items', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-toolargimg',
@@ -2301,9 +2282,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders tool argument values with empty image_urls array showing "No arguments provided"', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-toolnoarg',
@@ -2353,9 +2333,8 @@ describe('ChatMessage', () => {
   it('renders web context thumbnails as favicons', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const ctxWeb = makeContextWithMetadata({
       readable_filename: 'Web page',
@@ -2491,9 +2470,8 @@ describe('ChatMessage', () => {
   })
 
   it('handles img2Text loading accordion for second-to-last user message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-img2t',
@@ -2667,9 +2645,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders "Generating final response" for second-to-last user message when loading', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-gen2',
@@ -2717,9 +2694,8 @@ describe('ChatMessage', () => {
   })
 
   it('renders tool routing accordion with non-image argument values as JSON pre block', async () => {
-    const { ChatMessage, SourcesSidebarProvider } = await import(
-      '../ChatMessage'
-    )
+    const { ChatMessage, SourcesSidebarProvider } =
+      await import('../ChatMessage')
 
     const userMsg = makeMessage({
       id: 'u-tooljson',
