@@ -1281,7 +1281,7 @@ export const ChatMessage = memo(
                   ? `${thoughtsContent} ▍`
                   : thoughtsContent
               }
-              isStreaming={
+              isReasoningStreaming={
                 messageIsStreaming &&
                 messageIndex ===
                   (selectedConversation?.messages.length ?? 0) - 1 &&
