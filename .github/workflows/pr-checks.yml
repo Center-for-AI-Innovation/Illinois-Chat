@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: read
+  checks: write # trunk-action posts lint results as check-run annotations
 
 jobs:
   trunk-and-tests:
