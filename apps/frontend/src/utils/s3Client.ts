@@ -2,6 +2,14 @@ import { S3Client } from '@aws-sdk/client-s3'
 
 const region = process.env.AWS_REGION
 
+// Since AWS SDK 3.729.0, uploads default to CRC32 checksums and downloads to
+// checksum validation, which MinIO and other S3-compatible stores may reject.
+// 'WHEN_REQUIRED' restores the pre-3.729 behavior for custom-endpoint clients.
+const s3CompatibleChecksumConfig = {
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
+} as const
+
 // Default S3 client used when a project has no per-project s3_config override.
 // Per-project clients are built dynamically by ConnectionManager.
 // With LOCAL_MINIO=true this points at the Docker-internal MinIO endpoint.
@@ -18,6 +26,7 @@ if (region && process.env.AWS_KEY && process.env.AWS_SECRET) {
   if (process.env.LOCAL_MINIO === 'true' && process.env.MINIO_ENDPOINT) {
     baseConfig.endpoint = process.env.MINIO_ENDPOINT
     baseConfig.forcePathStyle = true // required for MinIO / LocalStack
+    Object.assign(baseConfig, s3CompatibleChecksumConfig)
   }
 
   s3Client = new S3Client(baseConfig)
@@ -47,6 +56,7 @@ function getPresignedUrlClient(): S3Client | null {
     if (process.env.LOCAL_MINIO === 'true' && publicEndpoint) {
       baseConfig.endpoint = publicEndpoint
       baseConfig.forcePathStyle = true
+      Object.assign(baseConfig, s3CompatibleChecksumConfig)
     }
 
     return new S3Client(baseConfig)
