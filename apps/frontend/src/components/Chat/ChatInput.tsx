@@ -21,7 +21,7 @@ import {
   IconFile,
   IconPaperclip,
 } from '@tabler/icons-react'
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 import {
   type KeyboardEvent,
   type MutableRefObject,

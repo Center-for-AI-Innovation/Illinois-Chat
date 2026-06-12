@@ -1,7 +1,7 @@
 import { IconFileExport } from '@tabler/icons-react'
 import { useContext, useState } from 'react'
 
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 
 import HomeContext from '~/components/home/home.context'
 
