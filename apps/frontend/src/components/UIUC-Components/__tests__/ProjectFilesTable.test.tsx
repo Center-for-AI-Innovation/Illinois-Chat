@@ -141,8 +141,8 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
   }
 })
 
-vi.mock('~/pages/util/handleExport', () => ({
-  default: vi.fn(async () => ({ message: 'export started' })),
+vi.mock('~/utils/handleExport', () => ({
+  handleExport: vi.fn(async () => ({ message: 'export started' })),
 }))
 
 describe('ProjectFilesTable', () => {

@@ -27,7 +27,7 @@ import { type Plugin } from '@/types/plugin'
 import posthog from 'posthog-js'
 import { v4 as uuidv4 } from 'uuid'
 
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 
 import { fetchPresignedUrl } from '~/utils/apiUtils'
 import { ChatInput } from './ChatInput'
