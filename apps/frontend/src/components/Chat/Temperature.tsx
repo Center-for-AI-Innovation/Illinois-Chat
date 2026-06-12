@@ -1,5 +1,5 @@
 import { type FC, useContext, useEffect, useState } from 'react'
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 import { DEFAULT_TEMPERATURE } from '@/utils/app/const'
 import HomeContext from '~/components/home/home.context'
 import { Title, Slider } from '@mantine/core' // Import Slider from @mantine/core

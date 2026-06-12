@@ -1,6 +1,7 @@
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
-import { appWithTranslation } from 'next-i18next'
+import { appWithTranslation } from 'next-i18next/pages'
+import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
 import Maintenance from '~/components/UIUC-Components/Maintenance'
@@ -189,4 +190,4 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
 
 // export default .withTRPC(MyApp)
 
-export default appWithTranslation(MyApp)
+export default appWithTranslation(MyApp, nextI18NextConfig)

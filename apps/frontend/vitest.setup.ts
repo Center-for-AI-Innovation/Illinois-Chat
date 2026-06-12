@@ -230,7 +230,7 @@ vi.mock('next/font/google', () => {
   }
 })
 
-vi.mock('next-i18next', () => ({
+vi.mock('next-i18next/pages', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
     i18n: { language: 'en', changeLanguage: vi.fn() },
