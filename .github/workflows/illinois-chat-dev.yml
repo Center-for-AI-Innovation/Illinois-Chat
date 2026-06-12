@@ -85,14 +85,33 @@ jobs:
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+      - name: Build crawlee image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: uiuc-chat-crawlee
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd apps/crawlee
+          docker build -f Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+
+      - name: Push crawlee image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: uiuc-chat-crawlee
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
       - name: Update ECS services
         env:
           CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
           FRONTEND_SERVICE_NAME: ${{ secrets.ECS_FRONTEND_SERVICE_NAME }}
           BACKEND_SERVICE_NAME: ${{ secrets.ECS_BACKEND_SERVICE_NAME }}
           WORKER_SERVICE_NAME: ${{ secrets.ECS_WORKER_SERVICE_NAME }}
+          CRAWLEE_SERVICE_NAME: ${{ secrets.ECS_CRAWLEE_SERVICE_NAME }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           aws ecs update-service --cluster "$CLUSTER_NAME" --service "$FRONTEND_SERVICE_NAME" --force-new-deployment
           aws ecs update-service --cluster "$CLUSTER_NAME" --service "$BACKEND_SERVICE_NAME" --force-new-deployment
           aws ecs update-service --cluster "$CLUSTER_NAME" --service "$WORKER_SERVICE_NAME" --force-new-deployment
+          aws ecs update-service --cluster "$CLUSTER_NAME" --service "$CRAWLEE_SERVICE_NAME" --force-new-deployment
