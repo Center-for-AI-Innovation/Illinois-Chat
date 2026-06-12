@@ -6,7 +6,7 @@ import { encrypt, isEncrypted } from '~/utils/crypto'
 import { getCourseMetadata } from './getCourseMetadata'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { superAdmins } from '~/utils/superAdmins'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { courseName, courseMetadata } = req.body as {

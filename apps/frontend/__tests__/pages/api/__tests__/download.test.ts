@@ -7,7 +7,7 @@ const hoisted = vi.hoisted(() => ({
   getSignedUrl: vi.fn(),
 }))
 
-vi.mock('~/pages/api/authorization', () => ({
+vi.mock('~/server/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

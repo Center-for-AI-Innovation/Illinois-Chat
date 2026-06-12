@@ -3,7 +3,7 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { NextResponse } from 'next/server'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { ensureRedisConnected } from '~/utils/redisClient'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

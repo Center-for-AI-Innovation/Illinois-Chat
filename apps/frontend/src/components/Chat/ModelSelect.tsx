@@ -9,7 +9,7 @@ import {
 } from '@tabler/icons-react'
 import { forwardRef, useContext, useEffect, useState } from 'react'
 import { useMediaQuery } from '@mantine/hooks'
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { Group, Select, Title, Text, ActionIcon } from '@mantine/core'
 import Link from 'next/link'

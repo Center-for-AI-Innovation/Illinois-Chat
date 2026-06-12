@@ -7,12 +7,12 @@ const hoisted = vi.hoisted(() => ({
   fetchContextsFromBackend: vi.fn(async () => ({ data: [] })),
 }))
 
-vi.mock('~/pages/api/authorization', () => ({
+vi.mock('~/server/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 
-vi.mock('~/pages/util/fetchContexts', () => ({
-  default: hoisted.fetchContextsFromBackend,
+vi.mock('~/utils/fetchContexts', () => ({
+  fetchContextsFromBackend: hoisted.fetchContextsFromBackend,
 }))
 
 import handler from '~/pages/api/getContexts'

@@ -16,7 +16,7 @@ vi.mock('~/utils/s3Client', () => ({
   vyriadMinioClient: {},
 }))
 
-vi.mock('~/pages/api/authorization', () => ({
+vi.mock('~/server/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

@@ -2,7 +2,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { db, documents } from '~/db/dbClient'
 import { eq } from 'drizzle-orm'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 // This is for "Documents" table, completed docs.
 
 type SuccessDocsResponse = {
