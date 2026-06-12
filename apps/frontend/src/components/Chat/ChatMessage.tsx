@@ -39,7 +39,7 @@ import {
   type MessageType,
 } from '@/types/chat'
 import { useTranslation } from 'next-i18next'
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 import { fetchPresignedUrl } from '~/utils/apiUtils'
 import { CodeBlock } from '../Markdown/CodeBlock'
 import { MemoizedReactMarkdown } from '../Markdown/MemoizedReactMarkdown'

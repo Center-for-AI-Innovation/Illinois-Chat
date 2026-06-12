@@ -5,7 +5,7 @@ import { DEFAULT_SYSTEM_PROMPT, DEFAULT_TEMPERATURE } from '@/utils/app/const'
 import { type Conversation } from '@/types/chat'
 import { OpenAIModels } from '~/utils/modelProviders/types/openai'
 
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 import { ChatFolders } from './components/ChatFolders'
 import { ChatbarSettings } from './components/ChatbarSettings'
 import { Conversations } from './components/Conversations'
