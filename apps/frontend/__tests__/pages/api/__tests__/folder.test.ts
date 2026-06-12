@@ -25,7 +25,7 @@ const hoisted = vi.hoisted(() => {
   return { db, folders, insert, del, findMany }
 })
 
-vi.mock('~/pages/api/authorization', () => ({
+vi.mock('~/server/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

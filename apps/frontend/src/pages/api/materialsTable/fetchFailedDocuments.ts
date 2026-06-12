@@ -2,7 +2,7 @@ import { db, documentsFailed } from '~/db/dbClient'
 import { eq, sql, and, gte, InferSelectModel } from 'drizzle-orm'
 import type { NextApiResponse, NextApiRequest } from 'next'
 import { AuthenticatedRequest } from '~/utils/authMiddleware'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 
 // export const runtime = 'edge'
 

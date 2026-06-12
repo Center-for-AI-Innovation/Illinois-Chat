@@ -8,7 +8,7 @@ const hoisted = vi.hoisted(() => ({
   posthogCapture: vi.fn(),
 }))
 
-vi.mock('~/pages/api/authorization', () => ({
+vi.mock('~/server/authorization', () => ({
   withCourseOwnerOrAdminAccess: () => (handler: any) => handler,
   withCourseAccessFromRequest: () => (handler: any) => handler,
 }))
