@@ -149,9 +149,9 @@ export function ProjectFilesTable({
   }>({})
 
   // Refs for each row of failed documents
-  const textRefs = useRef<{ [key: number]: React.RefObject<HTMLDivElement> }>(
-    {},
-  )
+  const textRefs = useRef<{
+    [key: number]: React.RefObject<HTMLDivElement | null>
+  }>({})
   const multiSelectRef = useRef<HTMLDivElement>(null)
   const [selectedDocGroups, setSelectedDocGroups] = useState<string[]>([])
 
