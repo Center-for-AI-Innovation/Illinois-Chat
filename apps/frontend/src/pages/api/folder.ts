@@ -1,6 +1,6 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { db, folders } from '~/db/dbClient'
+import { db, folders, conversations } from '~/db/dbClient'
 import { type FolderWithConversation } from '@/types/folder'
 import { type Database } from 'database.types'
 import { convertDBToChatConversation } from './conversation'
@@ -47,6 +47,7 @@ export function convertChatFolderToDBFolder(
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { method } = req
   const userIdentifier = getUserIdentifier(req)
+  const courseName = req.query.courseName as string | undefined
   if (!userIdentifier) {
     return res.status(400).json({
       error: 'No valid user identifier provided',
@@ -88,6 +89,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       break
 
     case 'GET':
+      if (!courseName) {
+        return res.status(400).json({ error: 'courseName query parameter is required' })
+      }
       try {
         // Query folders and their related conversations and messages using DrizzleORM
         const fetchedFolders = await db.query.folders.findMany({
@@ -95,6 +99,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           orderBy: desc(folders.created_at),
           with: {
             conversations: {
+              where: eq(conversations.project_name, courseName),
               with: {
                 messages: {
                   columns: {
@@ -133,6 +138,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             },
           },
         })
+
+        if (
+          !fetchedFolders.some(
+            (folder) => folder.conversations && folder.conversations.length > 0,
+          )
+        ) {
+          return res.status(200).json([])
+        }
 
         // Convert the fetched data to match the expected format
         const formattedFolders = fetchedFolders.map((folder) => {
