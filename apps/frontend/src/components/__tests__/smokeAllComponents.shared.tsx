@@ -88,12 +88,6 @@ vi.mock('recharts', () => {
   }
 })
 
-vi.mock('react-grid-heatmap', () => ({
-  __esModule: true,
-  default: (props: any) =>
-    React.createElement('div', { 'data-testid': 'heatmap', ...props }),
-}))
-
 vi.mock('react-syntax-highlighter', () => ({
   Prism: (props: any) => React.createElement('pre', props),
   Light: (props: any) => React.createElement('pre', props),
