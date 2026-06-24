@@ -9,7 +9,7 @@
     "bd": "infisical run --env=dev -- next build --webpack",
     "dev": "infisical run --env=dev -- next dev --webpack",
     "local": "next dev --webpack",
-    "lint": "next lint --max-warnings=10000",
+    "lint": "eslint src __tests__ --ext .js,.jsx,.ts,.tsx --max-warnings=10000",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
