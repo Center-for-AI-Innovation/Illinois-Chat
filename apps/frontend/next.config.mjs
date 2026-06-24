@@ -13,11 +13,6 @@ const bundleAnalyzerConfig = {
 /** @type {import("next").NextConfig} */
 const config = {
   i18n: nextI18NextConfig.i18n,
-  serverRuntimeConfig: {
-    bodyParser: {
-      sizeLimit: '100mb',
-    },
-  },
   webpack(config) {
     // Merge existing experiments with the required ones
     config.experiments = {
@@ -50,15 +45,18 @@ const config = {
   // },
   images: {
     unoptimized: true,
-    domains: [
-      'images.unsplash.com',
-      'github.com',
-      'uiuc-chatbot.s3.us-east-1.amazonaws.com',
-      'images.squarespace-cdn.com',
-      'raw.githubusercontent.com',
-      'avatars.githubusercontent.com',
-      'anthropic.com',
-      'via.placeholder.com',
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'github.com' },
+      {
+        protocol: 'https',
+        hostname: 'uiuc-chatbot.s3.us-east-1.amazonaws.com',
+      },
+      { protocol: 'https', hostname: 'images.squarespace-cdn.com' },
+      { protocol: 'https', hostname: 'raw.githubusercontent.com' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+      { protocol: 'https', hostname: 'anthropic.com' },
+      { protocol: 'https', hostname: 'via.placeholder.com' },
     ],
   },
   async headers() {
