@@ -71,11 +71,6 @@ const config = {
       'via.placeholder.com',
     ],
   },
-  experimental: {
-    esmExternals: false, // To make certain packages work with the /pages router.
-    // Keep Node-only packages (postgres uses tls, perf_hooks) out of the bundle; required for API routes that use dbClient/vectorSearch.
-    serverComponentsExternalPackages: ['postgres'],
-  },
   async headers() {
     return [
       {
