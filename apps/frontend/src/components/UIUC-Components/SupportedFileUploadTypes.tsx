@@ -11,7 +11,7 @@ import {
   IconMusic,
   IconCode,
   IconFileTypeTxt,
-  type TablerIconsProps,
+  type TablerIcon,
 } from '@tabler/icons-react'
 import {
   Tooltip,
@@ -22,8 +22,7 @@ import {
 import { motion } from 'framer-motion'
 
 interface FileType {
-  icon: (props: TablerIconsProps) => JSX.Element
-  // icon: React.FC<TablerIconsProps>,
+  icon: TablerIcon
   label: string
   color: string
 }

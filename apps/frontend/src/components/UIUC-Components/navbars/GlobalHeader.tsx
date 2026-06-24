@@ -4,7 +4,7 @@ import {
   IconNews,
   IconSparkles,
 } from '@tabler/icons-react'
-import { Menu2 } from 'tabler-icons-react'
+import { IconMenu2 } from '@tabler/icons-react'
 
 import { useAuth } from 'react-oidc-context'
 import { AuthMenu } from './AuthMenu'
@@ -448,7 +448,7 @@ export function LandingPageHeader({
               }}
               ref={menuButtonRef as React.RefObject<HTMLDivElement>}
             >
-              <Menu2
+              <IconMenu2
                 size={24}
                 strokeWidth={2}
                 color="var(--illinois-orange)"
