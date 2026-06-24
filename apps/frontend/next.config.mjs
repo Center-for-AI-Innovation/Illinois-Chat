@@ -61,9 +61,6 @@ const config = {
       'via.placeholder.com',
     ],
   },
-  experimental: {
-    esmExternals: false, // To make certain packages work with the /pages router.
-  },
   async headers() {
     return [
       {
