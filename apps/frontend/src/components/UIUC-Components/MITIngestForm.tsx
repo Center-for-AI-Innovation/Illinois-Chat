@@ -10,44 +10,106 @@ import {
   DialogTrigger,
 } from '../Dialog'
 import NextLink from 'next/link'
+import axios from 'axios'
+import { type FileUpload } from './UploadNotification'
 import { type QueryClient } from '@tanstack/react-query'
-import {
-  isValidMitOcwUrl,
-  notifyMitIngestUnavailable,
-} from '~/utils/mitIngest'
-
 export default function MITIngestForm({
-  project_name: _project_name,
-  setUploadFiles: _setUploadFiles,
-  queryClient: _queryClient,
+  project_name,
+  setUploadFiles,
 }: {
   project_name: string
-  setUploadFiles: React.Dispatch<
-    React.SetStateAction<import('./UploadNotification').FileUpload[]>
-  >
+  setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }): JSX.Element {
+  const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [isUrlValid, setIsUrlValid] = useState(false)
   const [url, setUrl] = useState('')
+  const [maxUrls, setMaxUrls] = useState('50')
   const [open, setOpen] = useState(false)
-
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value
     setUrl(input)
-    setIsUrlValid(isValidMitOcwUrl(input))
+    setIsUrlValid(validateUrl(input))
+  }
+  const validateUrl = (input: string) => {
+    const regex = /^https?:\/\/ocw\.mit\.edu\/.+/
+    return regex.test(input)
+  }
+  const downloadMITCourse = async (
+    url: string | null,
+    courseName: string | null,
+    localDir: string | null,
+  ) => {
+    try {
+      if (!url || !courseName || !localDir) return null
+      console.log('calling downloadMITCourse')
+      const response = await axios.get(`/api/UIUC-api/downloadMITCourse`, {
+        params: {
+          url: url,
+          course_name: courseName,
+          local_dir: localDir,
+        },
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error during MIT course download:', error)
+      return null
+    }
   }
 
-  const handleIngest = () => {
+  const handleIngest = async () => {
     setOpen(false)
     if (isUrlValid) {
-      notifyMitIngestUnavailable()
+      const newFile: FileUpload = {
+        name: url,
+        status: 'uploading',
+        type: 'mit',
+      }
+      setUploadFiles((prevFiles) => [...prevFiles, newFile])
+      setUploadFiles((prevFiles) =>
+        prevFiles.map((file) =>
+          file.name === url ? { ...file, status: 'ingesting' } : file,
+        ),
+      )
+      try {
+        const data = await downloadMITCourse(url, project_name, 'local_dir')
+        if (data) {
+          setUploadFiles((prevFiles) =>
+            prevFiles.map((file) =>
+              file.name === url ? { ...file, status: 'complete' } : file,
+            ),
+          )
+        } else {
+          // downloadMITCourse returned null, treat as error
+          setUploadFiles((prevFiles) =>
+            prevFiles.map((file) =>
+              file.name === url ? { ...file, status: 'error' } : file,
+            ),
+          )
+        }
+      } catch (error) {
+        console.error('Error during MIT course import:', error)
+        setUploadFiles((prevFiles) =>
+          prevFiles.map((file) =>
+            file.name === url ? { ...file, status: 'error' } : file,
+          ),
+        )
+      }
     } else {
       alert('Invalid URL (please include https://)')
     }
   }
+  const [inputErrors, setInputErrors] = useState({
+    maxUrls: { error: false, message: '' },
+    maxDepth: { error: false, message: '' },
+  })
 
   useEffect(() => {
-    setIsUrlValid(url.length > 0 && isValidMitOcwUrl(url))
+    if (url && url.length > 0 && validateUrl(url)) {
+      setIsUrlUpdated(true)
+    } else {
+      setIsUrlUpdated(false)
+    }
   }, [url])
 
   return (
@@ -59,6 +121,8 @@ export default function MITIngestForm({
           if (!isOpen) {
             setUrl('')
             setIsUrlValid(false)
+            setIsUrlUpdated(false)
+            setMaxUrls('50')
           }
         }}
       >
@@ -97,10 +161,6 @@ export default function MITIngestForm({
               Import content from MIT OpenCourseWare, including lecture notes,
               assignments, and course materials.
             </Text>
-            <Text className="mb-2 text-xs text-[--dashboard-foreground-faded]">
-              Temporarily unavailable — bulk course import is being moved to the
-              frontend.
-            </Text>
             <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
               <span>Configure import</span>
               <IconArrowRight
@@ -118,62 +178,72 @@ export default function MITIngestForm({
               Ingest MIT Course
             </DialogTitle>
           </DialogHeader>
-          <div>
-            <div className="break-words text-sm sm:text-base">
-              <strong>For MIT Open Course Ware</strong>, enter a URL like{' '}
-              <code className="inline-flex items-center rounded-md bg-[--illinois-orange] px-2 py-1 font-mono text-xs text-[--illinois-white] sm:text-sm">
-                ocw.mit.edu/courses/ANY_COURSE
-              </code>
-              , for example:{' '}
-              <span className="break-all">
-                <NextLink
-                  target="_blank"
-                  rel="noreferrer"
-                  href="https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017"
-                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                  className="text-[--dashboard-button]"
-                >
-                  https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017
-                </NextLink>
-              </span>
-              .
-            </div>
+          <div className="">
+            <div className="">
+              <div>
+                <div className="break-words text-sm sm:text-base">
+                  <strong>For MIT Open Course Ware</strong>, just enter a URL
+                  like{' '}
+                  <code className="inline-flex items-center rounded-md bg-[--illinois-orange] px-2 py-1 font-mono text-xs text-[--illinois-white] sm:text-sm">
+                    ocw.mit.edu/courses/ANY_COURSE
+                  </code>
+                  ,<br />
+                  for example:{' '}
+                  <span className="break-all">
+                    <NextLink
+                      target="_blank"
+                      rel="noreferrer"
+                      href={
+                        'https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017'
+                      }
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      className="text-[--dashboard-button]"
+                    >
+                      https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017
+                    </NextLink>
+                  </span>
+                  .
+                </div>
 
-            <Input
-              icon={
-                <Image
-                  src="/media/mitocw_logo.jpg"
-                  alt="MIT OCW Logo"
-                  width={24}
-                  height={24}
-                  className="object-contain"
+                <Input
+                  icon={
+                    <Image
+                      src="/media/mitocw_logo.jpg"
+                      alt="MIT OCW Logo"
+                      width={24}
+                      height={24}
+                      className="object-contain"
+                    />
+                  }
+                  aria-label="MIT OCW course URL"
+                  className="mt-4 w-full rounded-full"
+                  styles={{
+                    input: {
+                      color: 'var(--foreground)',
+                      backgroundColor: 'var(--background-faded)',
+                      borderColor: 'var(--background-dark)',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      '&:focus': {
+                        borderColor: 'var(--illinois-orange)',
+                      },
+                    },
+                    wrapper: {
+                      width: '100%',
+                    },
+                  }}
+                  placeholder="Enter URL..."
+                  radius="md"
+                  type="url"
+                  value={url}
+                  size="lg"
+                  onChange={(e) => {
+                    handleUrlChange(e)
+                  }}
                 />
-              }
-              aria-label="MIT OCW course URL"
-              className="mt-4 w-full rounded-full"
-              styles={{
-                input: {
-                  color: 'var(--foreground)',
-                  backgroundColor: 'var(--background-faded)',
-                  borderColor: 'var(--background-dark)',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  '&:focus': {
-                    borderColor: 'var(--illinois-orange)',
-                  },
-                },
-                wrapper: {
-                  width: '100%',
-                },
-              }}
-              placeholder="Enter URL..."
-              radius="md"
-              type="url"
-              value={url}
-              size="lg"
-              onChange={handleUrlChange}
-            />
+              </div>
+            </div>
           </div>
           <div className="mt-4">
             <Button

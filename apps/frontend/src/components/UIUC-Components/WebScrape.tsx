@@ -26,7 +26,6 @@ import axios from 'axios'
 import { useRouter } from 'next/router'
 import { useMediaQuery } from '@mantine/hooks'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
-import { notifyMitIngestUnavailable } from '~/utils/mitIngest'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { LoadingSpinner } from './LoadingSpinner'
 import { Montserrat } from 'next/font/google'
@@ -133,7 +132,9 @@ export const WebScrape = ({
           'Coursera ingest is not yet automated (auth is hard). Please email rohan13@illinois.edu to do it for you',
         )
       } else if (url.includes('ocw.mit.edu')) {
-        notifyMitIngestUnavailable()
+        data = downloadMITCourse(url, courseName, 'local_dir') // no await -- do in background
+
+        showToast()
       } else if (url.includes('canvas.illinois.edu/courses/')) {
         const response = await fetch('/api/UIUC-api/ingestCanvas', {
           method: 'POST',
@@ -305,6 +306,28 @@ export const WebScrape = ({
         loading: false,
       })
       throw error
+    }
+  }
+
+  const downloadMITCourse = async (
+    url: string | null,
+    courseName: string | null,
+    localDir: string | null,
+  ) => {
+    try {
+      if (!url || !courseName || !localDir) return null
+      console.log('calling downloadMITCourse')
+      const response = await axios.get(`/api/UIUC-api/downloadMITCourse`, {
+        params: {
+          url: url,
+          course_name: courseName,
+          local_dir: localDir,
+        },
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error during MIT course download:', error)
+      return null
     }
   }
 
