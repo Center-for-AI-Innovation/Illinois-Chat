@@ -464,44 +464,6 @@ describe('WebScrape - additional coverage', () => {
     })
   })
 
-  describe('downloadMITCourse null param handling', () => {
-    it('calls MIT download endpoint and handles failure gracefully', async () => {
-      const user = userEvent.setup()
-      const axiosMod = await import('axios')
-      ;(axiosMod as any).default.get.mockRejectedValueOnce(
-        new Error('Network error'),
-      )
-
-      const { WebScrape } = await import('../WebScrape')
-      renderWithProviders(<WebScrape {...defaultProps} />)
-
-      await user.type(
-        screen.getAllByPlaceholderText('Enter URL...')[0]!,
-        'https://ocw.mit.edu/courses/test-course',
-      )
-      await user.click(screen.getByRole('button', { name: /Ingest/i }))
-
-      await waitFor(() => {
-        expect((axiosMod as any).default.get).toHaveBeenCalledWith(
-          '/api/UIUC-api/downloadMITCourse',
-          expect.objectContaining({
-            params: expect.objectContaining({
-              url: 'https://ocw.mit.edu/courses/test-course',
-              course_name: 'CS101',
-              local_dir: 'local_dir',
-            }),
-          }),
-        )
-      })
-
-      // Should log the error but not crash
-      expect(console.error).toHaveBeenCalledWith(
-        'Error during MIT course download:',
-        expect.anything(),
-      )
-    })
-  })
-
   describe('Enter key on loading state input', () => {
     it('triggers handleSubmit when Enter is pressed on the loading state URL input', async () => {
       const user = userEvent.setup()

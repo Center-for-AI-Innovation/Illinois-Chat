@@ -16,33 +16,15 @@ from flask import (
 )
 from flask_cors import CORS
 from flask_executor import Executor
-from flask_injector import FlaskInjector, RequestScope
-from injector import Binder, SingletonScope
 
-from ai_ta_backend.database.aws import AWSStorage
-from ai_ta_backend.database.graph import GraphDatabase
-from ai_ta_backend.database.sql import SQLDatabase
-from ai_ta_backend.database.vector import VectorDatabase
-from ai_ta_backend.executors.flask_executor import (
-    ExecutorInterface,
-    FlaskExecutorAdapter,
+from ai_ta_backend.dependencies import (
+    get_export_service,
+    get_nomic_service,
+    get_project_service,
+    get_retrieval_service,
+    get_workflow_service,
 )
-from ai_ta_backend.executors.process_pool_executor import (
-    ProcessPoolExecutorAdapter,
-    ProcessPoolExecutorInterface,
-)
-from ai_ta_backend.executors.thread_pool_executor import (
-    ThreadPoolExecutorAdapter,
-    ThreadPoolExecutorInterface,
-)
-from ai_ta_backend.service.export_service import ExportService
-from ai_ta_backend.service.nomic_service import NomicService
-from ai_ta_backend.service.posthog_service import PosthogService
-from ai_ta_backend.service.project_service import ProjectService
-from ai_ta_backend.service.retrieval_service import RetrievalService
-from ai_ta_backend.service.workflow_service import WorkflowService
 from ai_ta_backend.utils.email.send_transactional_email import send_email
-from ai_ta_backend.utils.pubmed_extraction import extractPubmedData
 from ai_ta_backend.utils.rerun_webcrawl_for_project import webscrape_documents
 from ai_ta_backend.rabbitmq.rmqueue import Queue
 from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
@@ -90,7 +72,7 @@ def health() -> Response:
 
 
 @app.route('/getTopContexts', methods=['POST'])
-def getTopContexts(service: RetrievalService) -> Response:
+def getTopContexts() -> Response:
   """Get most relevant contexts for a given search query.
   
   Return value
@@ -136,6 +118,7 @@ def getTopContexts(service: RetrievalService) -> Response:
   Exception
       Testing how exceptions are handled.
   """
+  service = get_retrieval_service()
   start_time = time.monotonic()
   data = request.get_json()
   search_query: str = data.get('search_query', '')
@@ -160,10 +143,11 @@ def getTopContexts(service: RetrievalService) -> Response:
 
 
 @app.route('/llm-monitor-message', methods=['POST'])
-def llm_monitor_message_main(service: RetrievalService, flaskExecutor: ExecutorInterface) -> Response:
+def llm_monitor_message_main() -> Response:
   """
   Analyze a message from a conversation and store the results in the database.
   """
+  service = get_retrieval_service()
   start_time = time.monotonic()
   data = request.get_json()
   # messages: List[str] = data.get('messages', [])
@@ -180,7 +164,7 @@ def llm_monitor_message_main(service: RetrievalService, flaskExecutor: ExecutorI
         f"Missing one or more required parameters: 'course_name' and 'conversation_id' must be provided. Course name: `{course_name}`, Conversation ID: `{conversation_id }`"
     )
 
-  flaskExecutor.submit(service.llm_monitor_message, course_name, conversation_id, user_email, model_name)
+  executor.submit(service.llm_monitor_message, course_name, conversation_id, user_email, model_name)
   response = jsonify({"outcome": "Task started"})
   response.headers.add('Access-Control-Allow-Origin', '*')
   print(f"⏰ Runtime of /llm-monitor-message in main.py: {(time.monotonic() - start_time):.2f} seconds")
@@ -189,9 +173,10 @@ def llm_monitor_message_main(service: RetrievalService, flaskExecutor: ExecutorI
 
 
 @app.route('/getAll', methods=['GET'])
-def getAll(service: RetrievalService) -> Response:
+def getAll() -> Response:
   """Get all course materials based on the course_name
   """
+  service = get_retrieval_service()
   course_name: List[str] | str = request.args.get('course_name', default='', type=str)
 
   if course_name == '':
@@ -208,11 +193,12 @@ def getAll(service: RetrievalService) -> Response:
 
 
 @app.route('/delete', methods=['DELETE'])
-def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
+def delete():
   """
   Delete a single file from all our database: S3, Qdrant, and Supabase (for now).
   Note, of course, we still have parts of that file in our logs.
   """
+  service = get_retrieval_service()
   course_name: str = request.args.get('course_name', default='', type=str)
   s3_path: str = request.args.get('s3_path', default='', type=str)
   source_url: str = request.args.get('url', default='', type=str)
@@ -227,7 +213,7 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
 
   start_time = time.monotonic()
   # background execution of tasks!!
-  flaskExecutor.submit(service.delete_data, course_name, s3_path, source_url)
+  executor.submit(service.delete_data, course_name, s3_path, source_url)
   logging.info(f"From {course_name}, deleted file: {s3_path}")
   logging.debug(f"⏰ Runtime of FULL delete func: {(time.monotonic() - start_time):.2f} seconds")
   # we need instant return. Delets are "best effort" assume always successful... sigh :(
@@ -236,74 +222,73 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
   return response
 
 @app.route('/process-chat-file', methods=['POST'])
-def process_chat_file_sync(service: RetrievalService):
-    """
-    Process files uploaded in chat conversations synchronously.
-    """
-    
-    try:
-        data = request.get_json()
-        print(f"📋 Request data: {data}")
-        
-        # Extract required parameters
-        conversation_id = data.get('conversation_id')
-        s3_path = data.get('s3_path')
-        course_name = data.get('course_name', 'chat')
-        readable_filename = data.get('readable_filename', '')
-        user_id = data.get('user_id', '')
-        
-        if not conversation_id or not s3_path:
-            error_response = {
-                "success": False,
-                "status": "error",
-                "error": "Missing required parameters: conversation_id and s3_path"
-            }
-            
-            return jsonify(error_response), 400
-        
-        # Process file synchronously (wait for completion)
-        result = service.process_chat_file_sync(
-            conversation_id=conversation_id,
-            s3_path=s3_path,
-            course_name=course_name,
-            readable_filename=readable_filename,
-            user_id=user_id,
-            is_chat_upload=True
-        )
-        
-        if result['success']:
-            response_data = {
-                'success': True,
-                'chunks_created': result['chunks_created'],
-                'status': 'completed',
-                'message': 'File processed and ready for chat',
-            }
-            response = jsonify(response_data)
-        else:
-            response_data = {
-                'success': False,
-                'chunks_created': result.get('chunks_created', 0),
-                'status': 'failed',
-                'error': result.get('error', 'Unknown error occurred')
-            }
-            response = jsonify(response_data)
-            response.status_code = 500
-        
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-        
-    except Exception as e:
-        error_response = {
-            'success': False,
-            'chunks_created': 0,
-            'status': 'failed',
-            'error': f'Server error: {str(e)}'
-        }
-        return jsonify(error_response), 500
+def process_chat_file_sync():
+  """
+  Process files uploaded in chat conversations synchronously.
+  """
+  service = get_retrieval_service()
+
+  try:
+    data = request.get_json()
+    print(f"📋 Request data: {data}")
+
+    conversation_id = data.get('conversation_id')
+    s3_path = data.get('s3_path')
+    course_name = data.get('course_name', 'chat')
+    readable_filename = data.get('readable_filename', '')
+    user_id = data.get('user_id', '')
+
+    if not conversation_id or not s3_path:
+      error_response = {
+          "success": False,
+          "status": "error",
+          "error": "Missing required parameters: conversation_id and s3_path"
+      }
+      return jsonify(error_response), 400
+
+    result = service.process_chat_file_sync(
+        conversation_id=conversation_id,
+        s3_path=s3_path,
+        course_name=course_name,
+        readable_filename=readable_filename,
+        user_id=user_id,
+        is_chat_upload=True
+    )
+
+    if result['success']:
+      response_data = {
+          'success': True,
+          'chunks_created': result['chunks_created'],
+          'status': 'completed',
+          'message': 'File processed and ready for chat',
+      }
+      response = jsonify(response_data)
+    else:
+      response_data = {
+          'success': False,
+          'chunks_created': result.get('chunks_created', 0),
+          'status': 'failed',
+          'error': result.get('error', 'Unknown error occurred')
+      }
+      response = jsonify(response_data)
+      response.status_code = 500
+
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+  except Exception as e:
+    error_response = {
+        'success': False,
+        'chunks_created': 0,
+        'status': 'failed',
+        'error': f'Server error: {str(e)}'
+    }
+    return jsonify(error_response), 500
 
 
 @app.route('/getNomicMap', methods=['GET'])
-def nomic_map(service: NomicService):
+def nomic_map():
+  service = get_nomic_service()
   course_name: str = request.args.get('course_name', default='', type=str)
   map_type: str = request.args.get('map_type', default='conversation', type=str)
 
@@ -320,10 +305,11 @@ def nomic_map(service: NomicService):
 
 
 @app.route('/updateConversationMaps', methods=['GET'])
-def updateConversationMaps(service: NomicService, flaskExecutor: ExecutorInterface):
+def updateConversationMaps():
+  service = get_nomic_service()
   print("Starting conversation map update...")
 
-  response = flaskExecutor.submit(service.update_conversation_maps)
+  response = executor.submit(service.update_conversation_maps)
 
   response = jsonify({"outcome": "Task started"})
   response.headers.add('Access-Control-Allow-Origin', '*')
@@ -331,40 +317,22 @@ def updateConversationMaps(service: NomicService, flaskExecutor: ExecutorInterfa
 
 
 @app.route('/updateDocumentMaps', methods=['GET'])
-def updateDocumentMaps(service: NomicService, flaskExecutor: ExecutorInterface):
+def updateDocumentMaps():
+  service = get_nomic_service()
   print("Starting conversation map update...")
 
-  response = flaskExecutor.submit(service.update_document_maps)
+  response = executor.submit(service.update_document_maps)
 
   response = jsonify({"outcome": "Task started"})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
 
-@app.route('/cleanUpConversationMaps', methods=['GET'])
-def cleanUpConversationMaps(service: NomicService, flaskExecutor: ExecutorInterface):
-  print("Starting conversation map cleanup...")
-
-  #response = flaskExecutor.submit(service.clean_up_conversation_maps)
-
-  response = jsonify({"outcome": "Task started"})
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
-
-
-@app.route('/cleanUpDocumentMaps', methods=['GET'])
-def cleanUpDocumentMaps(service: NomicService, flaskExecutor: ExecutorInterface):
-  print("Starting document map cleanup...")
-
-  #response = flaskExecutor.submit(service.clean_up_document_maps)
-
-  response = jsonify({"outcome": "Document Map cleanup temporarily disabled"})
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
 
 
 @app.route('/createDocumentMap', methods=['GET'])
-def createDocumentMap(service: NomicService):
+def createDocumentMap():
+  service = get_nomic_service()
   course_name: str = request.args.get('course_name', default='', type=str)
 
   if course_name == '':
@@ -379,7 +347,8 @@ def createDocumentMap(service: NomicService):
 
 
 @app.route('/createConversationMap', methods=['GET'])
-def createConversationMap(service: NomicService):
+def createConversationMap():
+  service = get_nomic_service()
   course_name: str = request.args.get('course_name', default='', type=str)
 
   if course_name == '':
@@ -393,51 +362,11 @@ def createConversationMap(service: NomicService):
   return response
 
 
-@app.route('/export-convo-history-csv', methods=['GET'])
-def export_convo_history(service: ExportService):
-  course_name: str = request.args.get('course_name', default='', type=str)
-  from_date: str = request.args.get('from_date', default='', type=str)
-  to_date: str = request.args.get('to_date', default='', type=str)
-
-  if course_name == '':
-    # proper web error "400 Bad request"
-    abort(400, description=f"Missing required parameter: 'course_name' must be provided. Course name: `{course_name}`")
-
-  export_status = service.export_convo_history_json(course_name, from_date, to_date)
-  print("EXPORT FILE LINKS: ", export_status)
-
-  if export_status['response'] == "No data found between the given dates.":
-    response = Response(status=204)
-    response.headers.add('Access-Control-Allow-Origin', '*')
-
-  elif export_status['response'] == "Download from S3":
-    response = jsonify({"response": "Download from S3", "s3_path": export_status['s3_path']})
-    response.headers.add('Access-Control-Allow-Origin', '*')
-
-  else:
-    file_path = export_status['response']
-    filename = os.path.basename(file_path)
-
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    os.remove(file_path)
-
-  return response
-
-
-@app.route('/test-process', methods=['GET'])
-def test_process(service: ExportService):
-  service.test_process()
-  return jsonify({"response": "success"})
 
 
 @app.route('/export-convo-history', methods=['GET'])
-def export_convo_history_v2(service: ExportService):
+def export_convo_history_v2():
+  service = get_export_service()
   course_name: str = request.args.get('course_name', default='', type=str)
   from_date: str = request.args.get('from_date', default='', type=str)
   to_date: str = request.args.get('to_date', default='', type=str)
@@ -473,7 +402,8 @@ def export_convo_history_v2(service: ExportService):
 
 
 @app.route('/export-convo-history-user', methods=['GET'])
-def export_convo_history_user(service: ExportService):
+def export_convo_history_user():
+  service = get_export_service()
   user_email: str = request.args.get('user_email', default='', type=str)
   project_name: str = request.args.get('project_name', default='', type=str)
 
@@ -516,46 +446,10 @@ def export_convo_history_user(service: ExportService):
   return response
 
 
-@app.route('/export-conversations-custom', methods=['GET'])
-def export_conversations_custom(service: ExportService):
-  course_name: str = request.args.get('course_name', default='', type=str)
-  from_date: str = request.args.get('from_date', default='', type=str)
-  to_date: str = request.args.get('to_date', default='', type=str)
-  emails: str = request.args.getlist('destination_emails_list')
-
-  if course_name == '' and emails == []:
-    # proper web error "400 Bad request"
-    abort(400, description=f"Missing required parameter: 'course_name' and 'destination_email_ids' must be provided.")
-
-  export_status = service.export_conversations(course_name, from_date, to_date, emails)
-  print("EXPORT FILE LINKS: ", export_status)
-
-  if export_status['response'] == "No data found between the given dates.":
-    response = Response(status=204)
-    response.headers.add('Access-Control-Allow-Origin', '*')
-
-  elif export_status['response'] == "Download from S3":
-    response = jsonify({"response": "Download from S3", "s3_path": export_status['s3_path']})
-    response.headers.add('Access-Control-Allow-Origin', '*')
-
-  else:
-    file_path = export_status['response']
-    filename = os.path.basename(file_path)
-
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    os.remove(file_path)
-
-  return response
-
 
 @app.route('/exportDocuments', methods=['GET'])
-def exportDocuments(service: ExportService):
+def exportDocuments():
+  service = get_export_service()
   course_name: str = request.args.get('course_name', default='', type=str)
   from_date: str = request.args.get('from_date', default='', type=str)
   to_date: str = request.args.get('to_date', default='', type=str)
@@ -591,41 +485,13 @@ def exportDocuments(service: ExportService):
   return response
 
 
-@app.route('/getTopContextsWithMQR', methods=['GET'])
-def getTopContextsWithMQR(service: RetrievalService, posthog_service: PosthogService) -> Response:
-  """
-  Get relevant contexts for a given search query, using Multi-query retrieval + filtering method.
-  """
-  search_query: str = request.args.get('search_query', default='', type=str)
-  course_name: str = request.args.get('course_name', default='', type=str)
-  token_limit: int = request.args.get('token_limit', default=3000, type=int)
-  if search_query == '' or course_name == '':
-    # proper web error "400 Bad request"
-    abort(
-        400,
-        description=
-        f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
-    )
-
-  posthog_service.capture(event_name='filter_top_contexts_invoked',
-                          properties={
-                              'user_query': search_query,
-                              'course_name': course_name,
-                              'token_limit': token_limit,
-                          })
-
-  found_documents = service.getTopContextsWithMQR(search_query, course_name, token_limit)
-
-  response = jsonify(found_documents)
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
-
 
 @app.route('/getworkflows', methods=['GET'])
-def get_all_workflows(service: WorkflowService) -> Response:
+def get_all_workflows() -> Response:
   """
   Get all workflows from user.
   """
+  service = get_workflow_service()
 
   api_key = request.args.get('api_key', default='', type=str)
   limit = request.args.get('limit', default=100, type=int)
@@ -656,10 +522,11 @@ def get_all_workflows(service: WorkflowService) -> Response:
 
 
 @app.route('/switch_workflow', methods=['GET'])
-def switch_workflow(service: WorkflowService) -> Response:
+def switch_workflow() -> Response:
   """
   Activate or deactivate flow for user.
   """
+  service = get_workflow_service()
 
   api_key = request.args.get('api_key', default='', type=str)
   activate = request.args.get('activate', default='', type=str)
@@ -685,10 +552,11 @@ def switch_workflow(service: WorkflowService) -> Response:
 
 
 @app.route('/getConversationStats', methods=['GET'])
-def get_conversation_stats(service: RetrievalService) -> Response:
+def get_conversation_stats() -> Response:
   """
     Retrieves statistical metrics about conversations for a specific course.
     """
+  service = get_retrieval_service()
   course_name = request.args.get('course_name', default='', type=str)
   from_date = request.args.get('from_date', default='', type=str)
   to_date = request.args.get('to_date', default='', type=str)
@@ -704,10 +572,11 @@ def get_conversation_stats(service: RetrievalService) -> Response:
 
 
 @app.route('/run_flow', methods=['POST'])
-def run_flow(service: WorkflowService) -> Response:
+def run_flow() -> Response:
   """
   Run flow for a user and return results.
   """
+  service = get_workflow_service()
 
   api_key = request.json.get('api_key', '')
   name = request.json.get('name', '')
@@ -815,10 +684,11 @@ def canvas_ingest() -> Response:
       return response
 
 @app.route('/createProject', methods=['POST'])
-def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> Response:
+def createProject() -> Response:
   """
   Create a new project in UIUC.Chat
   """
+  service = get_project_service()
   data = request.get_json()
   project_name = data.get('project_name', '')
   project_description = data.get('project_description', '')
@@ -833,27 +703,17 @@ def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> 
   result = service.create_project(project_name, project_description, project_owner_email, is_private, allow_logged_in_users)
 
   # Do long-running LLM task in the background.
-  flaskExecutor.submit(service.generate_json_schema, project_name, project_description)
+  executor.submit(service.generate_json_schema, project_name, project_description)
 
   response = jsonify(result)
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
-
-@app.route('/pubmedExtraction', methods=['GET'])
-def pubmedExtraction():
-  """
-  Extracts metadata and download papers from PubMed.
-  """
-  result = extractPubmedData()
-
-  response = jsonify(result)
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
 
 
 @app.route('/getProjectStats', methods=['GET'])
-def get_project_stats(service: RetrievalService) -> Response:
+def get_project_stats() -> Response:
+  service = get_retrieval_service()
   project_name = request.args.get('project_name', default='', type=str)
 
   if project_name == '':
@@ -867,10 +727,11 @@ def get_project_stats(service: RetrievalService) -> Response:
 
 
 @app.route('/getWeeklyTrends', methods=['GET'])
-def get_weekly_trends(service: RetrievalService) -> Response:
+def get_weekly_trends() -> Response:
   """
     Provides week-over-week percentage changes in key project metrics.
     """
+  service = get_retrieval_service()
   project_name = request.args.get('project_name', default='', type=str)
 
   if project_name == '':
@@ -884,10 +745,11 @@ def get_weekly_trends(service: RetrievalService) -> Response:
 
 
 @app.route('/getModelUsageCounts', methods=['GET'])
-def get_model_usage_counts(service: RetrievalService) -> Response:
+def get_model_usage_counts() -> Response:
   """
     Get counts of different models used in conversations.
     """
+  service = get_retrieval_service()
   project_name = request.args.get('project_name', default='', type=str)
 
   if project_name == '':
@@ -901,7 +763,7 @@ def get_model_usage_counts(service: RetrievalService) -> Response:
 
 
 @app.route('/send-transactional-email', methods=['POST'])
-def send_transactional_email(service: ExportService):
+def send_transactional_email():
   to_recipients: str = request.json.get('to_recipients_list', [])
   bcc_recipients: str = request.json.get('bcc_recipients_list', [])
   sender: str = request.json.get('sender', '')
@@ -929,64 +791,17 @@ def send_transactional_email(service: ExportService):
 
 
 @app.route('/updateProjectDocuments', methods=['GET'])
-def updateProjectDocuments(flaskExecutor: ExecutorInterface) -> Response:
+def updateProjectDocuments() -> Response:
   project_name = request.args.get('project_name', default='', type=str)
 
   if project_name == '':
     abort(400, description="Missing required parameter: 'project_name' must be provided.")
 
-  result = flaskExecutor.submit(webscrape_documents, project_name)
+  result = executor.submit(webscrape_documents, project_name)
 
   response = jsonify({"message": "success"})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
-
-@app.route('/getClinicalKGContexts', methods=['GET'])
-def clinicalKGContexts(graph_db: GraphDatabase) -> Response:
-  user_query = request.args.get('user_query', default='', type=str)
-
-  if user_query == '':
-    abort(400, description="Missing required parameter: 'user_query' must be provided.")
-
-  try:
-    results = graph_db.getClinicalKGContexts(user_query)
-    response = jsonify(results)
-  except Exception as e:
-    response = Response(status=500)
-    response.data = f"An unexpected error occurred: {e}".encode()
-
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
-
-@app.route('/getPrimeKGContexts', methods=['GET'])
-def getPrimeKGContexts(graph_db: GraphDatabase) -> Response:
-  user_query = request.args.get('user_query', default='', type=str)
-
-  if user_query == '':
-    abort(400, description="Missing required parameter: 'user_query' must be provided.")
-
-  results = graph_db.getPrimeKGContexts(user_query)
-  response = jsonify(results)
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
-
-def configure(binder: Binder) -> None:
-  binder.bind(ThreadPoolExecutorInterface, to=ThreadPoolExecutorAdapter(max_workers=10), scope=SingletonScope)
-  binder.bind(ProcessPoolExecutorInterface, to=ProcessPoolExecutorAdapter(max_workers=10), scope=SingletonScope)
-  binder.bind(RetrievalService, to=RetrievalService, scope=RequestScope)
-  binder.bind(PosthogService, to=PosthogService, scope=SingletonScope)
-  # binder.bind(SentryService, to=SentryService, scope=SingletonScope)
-  binder.bind(NomicService, to=NomicService, scope=SingletonScope)
-  binder.bind(ExportService, to=ExportService, scope=SingletonScope)
-  binder.bind(WorkflowService, to=WorkflowService, scope=SingletonScope)
-  binder.bind(VectorDatabase, to=VectorDatabase, scope=SingletonScope)
-  binder.bind(SQLDatabase, to=SQLDatabase, scope=SingletonScope)
-  binder.bind(AWSStorage, to=AWSStorage, scope=SingletonScope)
-  binder.bind(ExecutorInterface, to=FlaskExecutorAdapter(executor), scope=SingletonScope)
-  binder.bind(GraphDatabase, to=GraphDatabase, scope=SingletonScope)
-
-
-FlaskInjector(app=app, modules=[configure])
 
 if __name__ == '__main__':
   app.run(debug=True, port=int(os.getenv("PORT", default=8000)))  # nosec -- reasonable bandit error suppression

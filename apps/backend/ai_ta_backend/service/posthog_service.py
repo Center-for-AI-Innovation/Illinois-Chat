@@ -1,12 +1,10 @@
 import os
 
-from injector import inject
 from posthog import Posthog
 
 
 class PosthogService:
 
-  @inject
   def __init__(self):
     self.posthog = Posthog(
         sync_mode=False,

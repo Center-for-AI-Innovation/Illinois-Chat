@@ -82,10 +82,9 @@ describe('WebScrape', () => {
     ).toBeInTheDocument()
   })
 
-  it('downloads MIT OCW content and shows a notification toast', async () => {
+  it('alerts for MIT OCW URLs (ingest no longer available)', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
-    const axiosMod = await import('axios')
+    const alertSpy = vi.spyOn(globalThis, 'alert').mockImplementation(() => {})
 
     const { WebScrape } = await import('../WebScrape')
     renderWithProviders(
@@ -104,15 +103,9 @@ describe('WebScrape', () => {
     )
     await user.click(screen.getByRole('button', { name: /Ingest/i }))
 
-    expect((axiosMod as any).default.get).toHaveBeenCalledWith(
-      '/api/UIUC-api/downloadMITCourse',
-      expect.objectContaining({
-        params: expect.objectContaining({
-          course_name: 'CS101',
-        }),
-      }),
+    expect(alertSpy).toHaveBeenCalledWith(
+      expect.stringContaining('MIT OCW bulk ingest is temporarily unavailable'),
     )
-    expect((notifications as any).show).toHaveBeenCalled()
   })
 
   it('alerts for Coursera URLs (not automated yet)', async () => {

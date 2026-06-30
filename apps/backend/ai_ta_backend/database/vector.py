@@ -3,7 +3,6 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
-from injector import inject
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Qdrant
 from qdrant_client import QdrantClient, models
@@ -15,7 +14,6 @@ class VectorDatabase():
   Contains all methods for building and using vector databases.
   """
 
-  @inject
   def __init__(self):
     """
     Initialize AWS S3, Qdrant, and Supabase.

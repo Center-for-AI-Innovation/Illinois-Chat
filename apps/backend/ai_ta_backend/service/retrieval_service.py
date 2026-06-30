@@ -13,7 +13,7 @@ from pathlib import Path
 import openai
 import pytz
 from dateutil import parser
-from injector import inject
+from concurrent.futures import ThreadPoolExecutor
 from langchain.embeddings.ollama import OllamaEmbeddings
 
 # from langchain.chat_models import AzureChatOpenAI
@@ -28,7 +28,6 @@ from ai_ta_backend.database.sql import (
     WeeklyMetric,
 )
 from ai_ta_backend.database.vector import VectorDatabase
-from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapter
 
 # from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
@@ -48,9 +47,8 @@ class RetrievalService:
     Contains all methods for business logic of the retrieval service.
   """
 
-  @inject
   def __init__(self, vdb: VectorDatabase, sqlDb: SQLDatabase, aws: AWSStorage, posthog: PosthogService,
-               sentry: SentryService, thread_pool_executor: ThreadPoolExecutorAdapter):
+               sentry: SentryService, thread_pool_executor: ThreadPoolExecutor):
     self.vdb = vdb
     self.sqlDb = sqlDb
     self.aws = aws
@@ -384,100 +382,6 @@ class RetrievalService:
       else:
         print("Error in deleting file from Qdrant:", e)
         self.sentry.capture_exception(e)
-
-  def getTopContextsWithMQR(self,
-                            search_query: str,
-                            course_name: str,
-                            token_limit: int = 4_000) -> Union[List[Dict], str]:
-    """
-    New info-retrieval pipeline that uses multi-query retrieval + filtering + reciprocal rank fusion + context padding.
-    1. Generate multiple queries based on the input search query.
-    2. Retrieve relevant docs for each query.
-    3. Filter the relevant docs based on the user query and pass them to the rank fusion step.
-    4. [CANCELED BEC POINTLESS] Rank the docs based on the relevance score.
-    5. Parent-doc-retrieval: Pad just the top 5 docs with expanded context from the original document.
-    """
-    raise NotImplementedError("Method deprecated for performance reasons. Hope to bring back soon.")
-
-    # try:
-    #   top_n_per_query = 40  # HARD CODE TO ENSURE WE HIT THE MAX TOKENS
-    #   start_time_overall = time.monotonic()
-    #   mq_start_time = time.monotonic()
-
-    #   # 1. GENERATE MULTIPLE QUERIES
-    #   generate_queries = (
-    #       MULTI_QUERY_PROMPT | self.llm | StrOutputParser() | (lambda x: x.split("\n")) |
-    #       (lambda x: list(filter(None, x)))  # filter out non-empty strings
-    #   )
-
-    #   generated_queries = generate_queries.invoke({"original_query": search_query})
-    #   print("generated_queries", generated_queries)
-
-    #   # 2. VECTOR SEARCH FOR EACH QUERY
-    #   batch_found_docs_nested: list[list[Document]] = self.batch_vector_search(search_queries=generated_queries,
-    #                                                                            course_name=course_name,
-    #                                                                            top_n=top_n_per_query)
-
-    #   # 3. RANK REMAINING DOCUMENTS -- good for parent doc padding of top 5 at the end.
-    #   found_docs = self.reciprocal_rank_fusion(batch_found_docs_nested)
-    #   found_docs = [doc for doc, score in found_docs]
-    #   print(f"Num docs after re-ranking: {len(found_docs)}")
-    #   if len(found_docs) == 0:
-    #     return []
-    #   print(f"⏰ Total multi-query processing runtime: {(time.monotonic() - mq_start_time):.2f} seconds")
-
-    #   # 4. FILTER DOCS
-    #   filtered_docs = filter_top_contexts(contexts=found_docs, user_query=search_query, timeout=30, max_concurrency=180)
-    #   if len(filtered_docs) == 0:
-    #     return []
-
-    #   # 5. TOP DOC CONTEXT PADDING // parent document retriever
-    #   final_docs = context_parent_doc_padding(filtered_docs, search_query, course_name)
-    #   print(f"Number of final docs after context padding: {len(final_docs)}")
-
-    #   pre_prompt = "Please answer the following question. Use the context below, called your documents, only if it's helpful and don't use parts that are very irrelevant. It's good to quote from your documents directly, when you do always use Markdown footnotes for citations. Use react-markdown superscript to number the sources at the end of sentences (1, 2, 3...) and use react-markdown Footnotes to list the full document names for each number. Use ReactMarkdown aka 'react-markdown' formatting for super script citations, use semi-formal style. Feel free to say you don't know. \nHere's a few passages of the high quality documents:\n"
-    #   token_counter, _ = count_tokens_and_cost(pre_prompt + '\n\nNow please respond to my query: ' +
-    #                                            search_query)  # type: ignore
-
-    #   valid_docs = []
-    #   num_tokens = 0
-    #   for doc in final_docs:
-    #     doc_string = f"Document: {doc['readable_filename']}{', page: ' + str(doc['pagenumber']) if doc['pagenumber'] else ''}\n{str(doc['text'])}\n"
-    #     num_tokens, prompt_cost = count_tokens_and_cost(doc_string)  # type: ignore
-
-    #     print(f"token_counter: {token_counter}, num_tokens: {num_tokens}, max_tokens: {token_limit}")
-    #     if token_counter + num_tokens <= token_limit:
-    #       token_counter += num_tokens
-    #       valid_docs.append(doc)
-    #     else:
-    #       # filled our token size, time to return
-    #       break
-
-    #   print(f"Total tokens used: {token_counter} Used {len(valid_docs)} of total unique docs {len(found_docs)}.")
-    #   print(f"Course: {course_name} ||| search_query: {search_query}")
-    #   print(f"⏰ ^^ Runtime of getTopContextsWithMQR: {(time.monotonic() - start_time_overall):.2f} seconds")
-
-    #   if len(valid_docs) == 0:
-    #     return []
-
-    #   self.posthog.capture('distinct_id_of_the_user',
-    #                        event='filter_top_contexts_succeeded',
-    #                        properties={
-    #                            'user_query': search_query,
-    #                            'course_name': course_name,
-    #                            'token_limit': token_limit,
-    #                            'total_tokens_used': token_counter,
-    #                            'total_contexts_used': len(valid_docs),
-    #                            'total_unique_docs_retrieved': len(found_docs),
-    #                        })
-
-    #   return self.format_for_json_mqr(valid_docs)
-    # except Exception as e:
-    #   # return full traceback to front end
-    #   err: str = f"ERROR: In /getTopContextsWithMQR. Course: {course_name} ||| search_query: {search_query}\nTraceback: {traceback.format_exc()}❌❌ Error in {inspect.currentframe().f_code.co_name}:\n{e}"  # type: ignore
-    #   print(err)
-    #   sentry_sdk.capture_exception(e)
-    #   return err
 
   def delete_from_nomic_and_database(self, course_name: str, identifier_key: str, identifier_value: str):
     # try:

@@ -6,7 +6,6 @@ import time
 import nomic
 import pandas as pd
 import numpy as np
-from injector import inject
 from nomic import AtlasDataset, atlas
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -18,7 +17,6 @@ from ollama import Client
 
 class NomicService():
 
-  @inject
   def __init__(self, sentry: SentryService, sql: SQLDatabase):
     nomic.cli.login(os.environ['NOMIC_API_KEY'])
     self.ollama_client = Client(host=os.environ['OLLAMA_SERVER_URL'])
@@ -479,90 +477,6 @@ class NomicService():
       print(e)
       self.sentry.capture_exception(e)
       return f"Error in creating document map: {str(e)}"
-
-  def clean_up_conversation_maps(self):
-    """
-    Deletes all Nomic maps and re-creates them. To be called weekly via a CRON job.
-    This is to clean up all the new map indices generated daily.
-    """
-    try:
-      # step 1: get all conversation maps from SQL
-      data = self.sql.getProjectsWithConvoMaps().data
-      print("Length of projects: ", len(data))
-      # step 2: delete all conversation maps from Nomic
-      for project in data:
-        try:
-          project_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
-                                (f"Conversation Map for {project['course_name']}").replace(" ",
-                                                                                           "-").replace("_",
-                                                                                                        "-").lower())
-          print(f"Deleting conversation map: {project_name}")
-          dataset = AtlasDataset(project_name)
-          dataset.delete()
-
-          # step 3: update SQL table to remove map info
-          self.sql.updateProjects(project['course_name'], {
-              'convo_map_id': None,
-              'last_uploaded_convo_id': None,
-              'conversation_map_index': None
-          })
-
-        except Exception as e:
-          print(f"Error in deleting conversation map: {e}")
-          self.sentry.capture_exception(e)
-          continue
-      print("Deleted all conversation maps.")
-
-      # step 4: re-create conversation maps by calling update function
-      status = self.update_conversation_maps()  # this function will create new maps if not already present!
-      print("Map re-creation status: ", status)
-
-      return "success"
-    except Exception as e:
-      print(e)
-      self.sentry.capture_exception(e)
-      return f"Error in cleaning up conversation maps: {str(e)}"
-
-  def clean_up_document_maps(self):
-    """
-    Deletes all Nomic maps and re-creates them. To be called weekly via a CRON job.
-    This is to clean up all the new map indices generated daily.
-    """
-    try:
-      # step 1: get all document maps from SQL
-      data = self.sql.getProjectsWithDocMaps().data
-      print("Length of projects: ", len(data))
-      # step 2: delete all document maps from Nomic
-      for project in data:
-        try:
-          project_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
-                                (f"Document Map for {project['course_name']}").replace(" ", "-").replace("_",
-                                                                                                         "-").lower())
-          print(f"Deleting document map: {project_name}")
-          dataset = AtlasDataset(project_name)
-          dataset.delete()
-
-          # step 3: update SQL table to remove map info
-          self.sql.updateProjects(project['course_name'], {
-              'doc_map_id': None,
-              'last_uploaded_doc_id': None,
-              'document_map_index': None
-          })
-
-        except Exception as e:
-          print(f"Error in deleting document map: {e}")
-          self.sentry.capture_exception(e)
-          continue
-
-      # step 4: re-create conversation maps by calling update function
-      status = self.update_document_maps()  # this function will create new maps if not already present!
-      print("Map re-creation status: ", status)
-
-      return "success"
-    except Exception as e:
-      print(e)
-      self.sentry.capture_exception(e)
-      return f"Error in cleaning up document maps: {str(e)}"
 
 
 #   ## -------------------------------- SUPPLEMENTARY MAP FUNCTIONS --------------------------------- ##
