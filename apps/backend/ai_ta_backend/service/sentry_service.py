@@ -1,13 +1,11 @@
 import os
 
 import sentry_sdk
-from injector import inject
 
 
 class SentryService:
 
-  @inject
-  def __init__(self, dsn: str):
+  def __init__(self):
     # Sentry.io error logging
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN"),

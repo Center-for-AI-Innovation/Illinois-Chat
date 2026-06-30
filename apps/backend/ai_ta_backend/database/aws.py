@@ -1,12 +1,10 @@
 import os
 
 import boto3
-from injector import inject
 
 
 class AWSStorage:
 
-  @inject
   def __init__(self):
     s3_config = {}
 

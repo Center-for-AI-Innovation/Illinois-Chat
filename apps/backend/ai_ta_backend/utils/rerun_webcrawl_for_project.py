@@ -1,11 +1,9 @@
 import os
-from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from dotenv import load_dotenv
 from supabase import create_client
-
-from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapter
 
 load_dotenv()
 
@@ -51,7 +49,7 @@ def webscrape_documents(project_name: str):
 
   print(f"Processed file name: {processed_file_name}")
 
-  with ThreadPoolExecutorAdapter(max_workers=batch_size) as executor:
+  with ThreadPoolExecutor(max_workers=batch_size) as executor:
     for base_url in base_urls:
       document_groups = base_urls[base_url]
       payload["params"]["url"] = base_url

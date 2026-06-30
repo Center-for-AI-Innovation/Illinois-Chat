@@ -8,7 +8,7 @@ import { runAnthropicChat } from '~/app/utils/anthropic'
 import { runOllamaChat } from '~/app/utils/ollama'
 import { runVLLM } from '~/app/utils/vllm'
 import { runOpenAICompatibleChat } from '~/app/utils/openaiCompatible'
-import { fetchContexts, fetchMQRContexts } from '~/utils/fetchContexts'
+import { fetchContexts } from '~/utils/fetchContexts'
 import { fetchImageDescription } from '~/pages/api/UIUC-api/fetchImageDescription'
 import {
   type ChatApiBody,
@@ -445,10 +445,7 @@ export const handleContextSearch = async (
   }
   if (courseName !== 'gpt4') {
     const token_limit = selectedConversation.model.tokenLimit
-    const useMQRetrieval = false
-
-    const fetchContextsFunc = useMQRetrieval ? fetchMQRContexts : fetchContexts
-    const curr_contexts = await fetchContextsFunc(
+    const curr_contexts = await fetchContexts(
       courseName,
       searchQuery,
       token_limit,

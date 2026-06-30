@@ -15,7 +15,6 @@ vi.mock('~/app/utils/openaiCompatible', () => ({
 }))
 vi.mock('~/utils/fetchContexts', () => ({
   fetchContexts: vi.fn(),
-  fetchMQRContexts: vi.fn(),
 }))
 vi.mock('~/pages/api/UIUC-api/fetchImageDescription', () => ({
   fetchImageDescription: vi.fn(),
