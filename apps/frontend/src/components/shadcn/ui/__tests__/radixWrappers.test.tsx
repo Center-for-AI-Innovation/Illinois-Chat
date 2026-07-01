@@ -121,9 +121,7 @@ describe('shadcn radix wrappers', () => {
   it('renders dropdown menu content when open', () => {
     render(
       <DropdownMenu open>
-        <DropdownMenuTrigger asChild>
-          <button type="button">Open</button>
-        </DropdownMenuTrigger>
+        <DropdownMenuTrigger render={<button type="button">Open</button>} />
         <DropdownMenuContent>
           <DropdownMenuItem>Item</DropdownMenuItem>
         </DropdownMenuContent>
