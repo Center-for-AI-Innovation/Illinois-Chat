@@ -1,5 +1,6 @@
 import { type NextPage } from 'next'
 import Link from 'next/link'
+import { montserrat_heading } from 'fonts'
 import { MainPageBackground } from '../components/UIUC-Components/MainPageBackground'
 import GlobalFooter from '../components/UIUC-Components/GlobalFooter'
 
@@ -7,8 +8,12 @@ const CropwizardLicenses: NextPage = () => {
   return (
     <>
       <MainPageBackground>
-        {/* was Mantine <Title order={2}> — h2 metrics: 1.625rem / 700 / lh 1.35 */}
-        <h2 className="text-[1.625rem] font-bold leading-[1.35]">
+        {/* was Mantine <Title order={2}>. The app's MantineProvider theme overrides
+            h2 to fontSize 2.2rem + headings.fontFamily 'Montserrat' (weight 700, lh 1.35),
+            NOT Mantine's 1.625rem default. Matches chat.illinois.edu exactly. */}
+        <h2
+          className={`${montserrat_heading.variable} font-montserratHeading text-[2.2rem] font-bold leading-[1.35]`}
+        >
           CropWizard Document Licenses
         </h2>
         <div className="flex min-h-[50px] flex-col flex-wrap items-start justify-start gap-4">
