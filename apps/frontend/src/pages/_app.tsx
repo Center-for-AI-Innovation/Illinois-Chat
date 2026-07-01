@@ -20,6 +20,7 @@ import { Analytics } from '@vercel/analytics/next'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
+import { Toaster } from '@/components/shadcn/ui/sonner'
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -120,6 +121,10 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               >
                 <Notifications position="bottom-center" zIndex={2077} />
               </aside>
+              {/* sonner toasts, backed by src/utils/toastUtils.ts. The Mantine
+                  <Notifications> above stays mounted for the remaining direct
+                  notifications.show callers until they migrate in later slices. */}
+              <Toaster position="bottom-center" />
               <ReactQueryDevtools
                 initialIsOpen={false}
                 position="left"
