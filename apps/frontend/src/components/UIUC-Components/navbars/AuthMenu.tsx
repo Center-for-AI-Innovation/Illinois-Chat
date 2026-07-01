@@ -72,7 +72,7 @@ export const AuthMenu = ({ size = 34 }: AuthMenuProps) => {
   return (
     <button
       tabIndex={0}
-      className="login-btn flex h-[2.2rem] min-w-[100px] cursor-pointer items-center justify-center rounded-md border border-[--illinois-orange] bg-transparent px-3 text-sm font-medium text-[--illinois-orange] transition-colors duration-100 hover:bg-[rgb(255_95_5_/_0.05)]"
+      className="login-btn flex h-[2.2rem] min-w-[100px] cursor-pointer items-center justify-center rounded-md border border-[--illinois-orange] bg-transparent px-3 text-sm font-bold text-[--illinois-orange] transition-colors duration-100 hover:bg-[rgb(255_95_5_/_0.05)]"
       onClick={() => void initiateSignIn(auth, window.location.pathname)}
     >
       <div
