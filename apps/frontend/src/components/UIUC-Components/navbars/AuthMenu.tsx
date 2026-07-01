@@ -27,19 +27,21 @@ export const AuthMenu = ({ size = 34 }: AuthMenuProps) => {
   if (auth.isAuthenticated) {
     return (
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          {/* Gradient avatar with a diagonal "shine" that sweeps across on hover.
-              Shine + lift reproduced from the former Mantine createStyles ::after. */}
-          <Avatar
-            aria-label="User Menu"
-            style={{ width: size, height: size }}
-            className="relative cursor-pointer overflow-hidden border-2 border-[--border] transition-all duration-200 after:absolute after:inset-0 after:-translate-x-full after:bg-[linear-gradient(120deg,transparent_0%,transparent_30%,rgba(255,255,255,0.2)_50%,transparent_70%,transparent_100%)] after:content-[''] after:[transition:transform_650ms] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:after:translate-x-full"
-          >
-            <AvatarFallback className="bg-[linear-gradient(135deg,var(--illinois-industrial),var(--illinois-blue))] text-sm font-medium text-white">
-              {getInitials(auth.user?.profile.name || '')}
-            </AvatarFallback>
-          </Avatar>
-        </DropdownMenuTrigger>
+        {/* Gradient avatar with a diagonal "shine" that sweeps across on hover.
+            Shine + lift reproduced from the former Mantine createStyles ::after. */}
+        <DropdownMenuTrigger
+          render={
+            <Avatar
+              aria-label="User Menu"
+              style={{ width: size, height: size }}
+              className="relative cursor-pointer overflow-hidden border-2 border-[--border] transition-all duration-200 after:absolute after:inset-0 after:-translate-x-full after:bg-[linear-gradient(120deg,transparent_0%,transparent_30%,rgba(255,255,255,0.2)_50%,transparent_70%,transparent_100%)] after:content-[''] after:[transition:transform_650ms] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:after:translate-x-full"
+            >
+              <AvatarFallback className="bg-[linear-gradient(135deg,var(--illinois-industrial),var(--illinois-blue))] text-sm font-medium text-white">
+                {getInitials(auth.user?.profile.name || '')}
+              </AvatarFallback>
+            </Avatar>
+          }
+        />
 
         <DropdownMenuContent
           align="end"

@@ -18,7 +18,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '../Tooltip'
+} from '@/components/shadcn/ui/tooltip'
 import { motion } from 'framer-motion'
 
 interface FileType {
@@ -138,22 +138,25 @@ const SupportedFileUploadTypes = () => {
 
             return (
               <Tooltip key={index}>
-                <TooltipTrigger tabIndex={-1}>
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className="flex flex-col items-center"
-                  >
-                    <IconComponent
-                      className={`h-6 w-6 ${type.color}`}
-                      size={24}
-                      stroke={1.5}
-                      aria-hidden="true"
-                    />
-                    <span className="mt-1 text-xs text-gray-500">
-                      {type.label}
-                    </span>
-                  </motion.div>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  tabIndex={-1}
+                  render={
+                    <motion.div
+                      whileHover={{ scale: 1.1 }}
+                      className="flex flex-col items-center"
+                    >
+                      <IconComponent
+                        className={`h-6 w-6 ${type.color}`}
+                        size={24}
+                        stroke={1.5}
+                        aria-hidden="true"
+                      />
+                      <span className="mt-1 text-xs text-gray-500">
+                        {type.label}
+                      </span>
+                    </motion.div>
+                  }
+                />
                 <TooltipContent>
                   <p>{type.label} files supported</p>
                 </TooltipContent>
