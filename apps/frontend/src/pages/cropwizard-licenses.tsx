@@ -1,5 +1,3 @@
-import { Group, List, Title, Text, Flex } from '@mantine/core'
-import { IconExternalLink } from '@tabler/icons-react'
 import { type NextPage } from 'next'
 import Link from 'next/link'
 import { MainPageBackground } from '../components/UIUC-Components/MainPageBackground'
@@ -9,24 +7,19 @@ const CropwizardLicenses: NextPage = () => {
   return (
     <>
       <MainPageBackground>
-        <Title order={2}>CropWizard Document Licenses</Title>
-        <Flex
-          mih={50}
-          // bg="rgba(0, 0, 0, .3)"
-          gap="md"
-          justify="flex-start"
-          align="flex-start"
-          direction="column"
-          wrap="wrap"
-        >
-          <Text className="max-w-[600px]">
+        {/* was Mantine <Title order={2}> — h2 metrics: 1.625rem / 700 / lh 1.35 */}
+        <h2 className="text-[1.625rem] font-bold leading-[1.35]">
+          CropWizard Document Licenses
+        </h2>
+        <div className="flex min-h-[50px] flex-col flex-wrap items-start justify-start gap-4">
+          <p className="max-w-[600px]">
             The documents in CropWizard are collected from many different
             sources, and each document is subject to its respective license,
             including the following. Any downstream use of CropWizard&apos;s
             results must respect the license of the documents that were used.
-          </Text>
-          <List className="pl-10">
-            <List.Item>
+          </p>
+          <ul className="list-disc pl-10">
+            <li>
               <Link
                 href="https://creativecommons.org/licenses/by/4.0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -34,8 +27,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC BY
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="http://creativecommons.org/licenses/by-nc/4.0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -43,8 +36,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC BY-NC
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="http://creativecommons.org/licenses/by-nc-nd/4.0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -52,8 +45,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC BY-NC-ND
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -61,8 +54,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC BY-NC-SA
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="https://creativecommons.org/licenses/by-nd/4.0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -70,8 +63,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC BY-ND
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="https://creativecommons.org/licenses/by-sa/4.0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -79,8 +72,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC BY-SA
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="https://creativecommons.org/public-domain/cc0/"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -88,8 +81,8 @@ const CropwizardLicenses: NextPage = () => {
               >
                 CC0
               </Link>
-            </List.Item>
-            <List.Item>
+            </li>
+            <li>
               <Link
                 href="https://www.springeropen.com/get-published/copyright"
                 className="hover:[--dashboard-button-hover] text-[--dashboard-button] active:text-[--dashboard-button]"
@@ -97,9 +90,9 @@ const CropwizardLicenses: NextPage = () => {
               >
                 Springer Open Access License
               </Link>
-            </List.Item>
-          </List>
-        </Flex>
+            </li>
+          </ul>
+        </div>
       </MainPageBackground>
 
       <GlobalFooter />
