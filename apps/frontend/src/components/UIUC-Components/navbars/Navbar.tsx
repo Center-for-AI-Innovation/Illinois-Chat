@@ -38,7 +38,7 @@ interface NavigationContentProps {
 // Mantine tokens resolved: spacing.xs=10px, spacing.sm=12px, spacing.lg=20px, radius.sm=4px.
 // All colors remain the existing --navbar-* CSS variables. See docs/mantine-retirement-styles-notes.md.
 const navLinkClass =
-  'flex items-center justify-center gap-[0.4rem] rounded px-3 py-2.5 text-[13px] font-medium text-[--navbar-foreground] transition-colors hover:bg-[--navbar-hover-background] hover:text-[--navbar-hover] hover:no-underline data-[active=true]:bg-[--navbar-background] data-[active=true]:text-[--navbar-active] data-[active=true]:no-underline max-md:justify-start max-md:rounded-none max-md:bg-[--navbar-background] max-md:px-3 max-md:py-5'
+  'flex items-center justify-center gap-[0.4rem] rounded px-3 py-2.5 text-[13px] font-bold text-[--navbar-foreground] transition-colors hover:bg-[--navbar-hover-background] hover:text-[--navbar-hover] hover:no-underline data-[active=true]:bg-[--navbar-background] data-[active=true]:text-[--navbar-active] data-[active=true]:no-underline max-md:justify-start max-md:rounded-none max-md:bg-[--navbar-background] max-md:px-3 max-md:py-5'
 
 const styles = {
   logoContainerBox: {

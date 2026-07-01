@@ -15,6 +15,8 @@ Running log of the Tailwind/CSS written while replacing Mantine components, so w
 
 ### Slice 1 — navbar chrome + static pages (2026-07-01)
 
+> ⚠️ **Next 16 `next/font` weight gotcha (found via VR against production).** Under Next 16, `montserrat_heading` (700) and `montserrat_paragraph` (500) both resolve to family **`Montserrat`** with _both_ faces loaded — so `font-montserratHeading` no longer forces bold; the element's own `font-weight` now selects the face. Production (older Next) had a **700-only** `__Montserrat_*` heading family, so nav labels (whose CSS is `font-weight:500`, confirmed in the original `GlobalHeader` `link` createStyles) rendered at **700 anyway**. Net effect: any `font-montserratHeading` element with a non-700 weight renders **lighter** than production. Slice-1 nav buttons (`orangeOutlineBtn`, `navLinkClass`, AuthMenu sign-in) were `font-medium` → now **`font-bold`** so they render Montserrat 700 like production. **This is a Next-16 (wave-3c) side effect that affects heading text app-wide — audit heading weights against prod in every later slice.**
+
 **AuthMenu.tsx** — `Menu`→`DropdownMenu`, `Avatar`(gradient)→shadcn `Avatar`/`AvatarFallback`.
 
 - Gradient fill: `bg-[linear-gradient(135deg,var(--illinois-industrial),var(--illinois-blue))]` on `AvatarFallback`.
