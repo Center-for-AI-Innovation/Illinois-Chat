@@ -422,6 +422,20 @@ class Ingest:
         logging.warning("No text chunks to embed (empty or whitespace-only content). Skipping upload.")
         return "Success"
 
+      # Preserve doc-group membership across an update. A re-scrape updates a
+      # page by deleting the old document row (inside check_for_duplicates
+      # below) and inserting a fresh one, which would otherwise drop the
+      # page's doc groups. Capture them now, but only when no groups were
+      # passed explicitly (web scrapes pass none; an upload with a chosen
+      # group set stays authoritative) and only for url-addressable docs.
+      incoming_groups = kwargs.get('groups', []) or []
+      preserved_doc_groups: List[str] = []
+      if not incoming_groups and metadatas[0].get('url'):
+        preserved_doc_groups = self.sql_session.get_doc_group_names_by_url(
+            metadatas[0].get('course_name'), metadatas[0].get('url'))
+        if preserved_doc_groups:
+          logging.info("Preserving doc groups across update: %s", preserved_doc_groups)
+
       # Check for duplicates (will also delete data if duplicate is found)
       is_duplicate = self.check_for_duplicates(input_texts, metadatas, force_embeddings)
       if is_duplicate and not force_embeddings:
@@ -441,7 +455,7 @@ class Ingest:
       # adding chunk index to metadata for parent doc retrieval
       for i, context in enumerate(contexts):
         context.metadata['chunk_index'] = i
-        context.metadata['doc_groups'] = kwargs.get('groups', [])
+        context.metadata['doc_groups'] = incoming_groups or preserved_doc_groups
 
       # Generate embeddings from OpenAI
       logging.info(f"Generating embeddings for {len(input_texts)} texts")
@@ -548,7 +562,10 @@ class Ingest:
               scrape_metadata_run_id=scrape_metadata_run_id,
               document_id=insert_status,
           )
-        groups = kwargs.get('groups', '')
+        # Explicitly-passed groups win; otherwise fall back to the groups
+        # preserved from the pre-update document so an updated page keeps
+        # its membership. New pages capture nothing, so they stay ungrouped.
+        groups = incoming_groups or preserved_doc_groups
         if groups:
           if contexts[0].metadata.get('url'):
             count = self.sql_session.add_document_to_group_url(contexts, groups)

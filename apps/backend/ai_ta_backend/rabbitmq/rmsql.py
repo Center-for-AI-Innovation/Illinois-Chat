@@ -248,6 +248,29 @@ class SQLAlchemyIngestDB:
                 logging.error(f"Stored procedure execution failed: {e}")
                 return None, 0
 
+    def get_doc_group_names_by_url(self, course_name, url):
+        """Names of the doc groups the existing document at this url belongs to.
+
+        Used to preserve group membership when a re-scrape *updates* a page: the
+        old document row is deleted and a fresh one inserted (see
+        check_for_duplicates), which would otherwise drop its doc groups. We read
+        the names before the delete and re-attach them after the re-insert."""
+        with self.get_session() as session:
+            try:
+                stmt = (
+                    select(models.DocGroup.name)
+                    .join(models.DocumentDocGroup,
+                          models.DocumentDocGroup.doc_group_id == models.DocGroup.id)
+                    .join(models.Document,
+                          models.Document.id == models.DocumentDocGroup.document_id)
+                    .where(models.Document.course_name == course_name)
+                    .where(models.Document.url == url)
+                )
+                return [row[0] for row in session.execute(stmt).all()]
+            except SQLAlchemyError as e:
+                logging.error(f"get_doc_group_names_by_url failed: {e}")
+                return []
+
     def get_like_docs_by_s3_path(self, course_name, original_filename):
         query = (
             select(models.Document.id, models.Document.contexts, models.Document.s3_path)
