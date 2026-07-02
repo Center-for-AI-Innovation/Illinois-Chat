@@ -281,4 +281,69 @@ describe('WebsiteIngestForm', () => {
       expect(filesJson).toContain('"status":"error"')
     })
   })
+
+  it('sends delete_files=true only when the delete-files toggle is on', async () => {
+    const run = {
+      id: 'run-1',
+      course_name: 'CS101',
+      url: 'https://example.com',
+      max_urls: 50,
+      scrape_strategy: 'equal-and-below',
+      created_at: '2026-06-01T00:00:00.000Z',
+      last_run_at: '2026-06-01T00:00:00.000Z',
+    }
+    let deleteUrl = ''
+    server.use(
+      http.get('*/api/scrapeRuns*', async () =>
+        HttpResponse.json({ runs: [run] }),
+      ),
+      http.delete('*/api/scrapeRuns*', async ({ request }) => {
+        deleteUrl = request.url
+        return HttpResponse.json({ success: true })
+      }),
+    )
+
+    const user = userEvent.setup()
+    const queryClient = createTestQueryClient()
+    const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
+    renderWithProviders(
+      <WebsiteIngestForm
+        project_name="CS101"
+        setUploadFiles={vi.fn() as any}
+        queryClient={queryClient}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    // Open the ingest dialog (the trigger reads "Configure import").
+    await user.click(screen.getByText(/Configure import/i))
+
+    // Focus the URL field so the saved-run dropdown (and its delete trash icon)
+    // renders in browse-all mode.
+    const urlInput = screen.getAllByPlaceholderText('Enter URL...')[0]!
+    await user.click(urlInput)
+
+    // Request deletion of the saved run -> confirm overlay appears.
+    const deleteRunBtn = await screen.findByLabelText(
+      /delete saved scrape https:\/\/example\.com/i,
+    )
+    await user.click(deleteRunBtn)
+
+    // The overlay's copy and toggle are present; toggle defaults OFF. The
+    // shadcn Switch renders a Radix element with role="switch" (its label is a
+    // sibling span, so query by role rather than label text).
+    expect(
+      await screen.findByText(/also delete the files this scrape created/i),
+    ).toBeInTheDocument()
+    const toggle = screen.getByRole('switch')
+    expect(toggle).not.toBeChecked()
+
+    // Turn it on and confirm.
+    await user.click(toggle)
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+
+    await waitFor(() => expect(deleteUrl).toContain('/api/scrapeRuns'))
+    expect(deleteUrl).toContain('delete_files=true')
+    expect(deleteUrl).toContain('id=run-1')
+  })
 })

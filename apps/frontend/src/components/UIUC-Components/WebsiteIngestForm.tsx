@@ -16,6 +16,7 @@ import {
 import { Switch } from '@/components/shadcn/ui/switch'
 import { formatDistanceToNow } from 'date-fns'
 import { useFetchScrapeRuns } from '~/hooks/queries/useFetchScrapeRuns'
+import { useDeleteScrapeRun } from '~/hooks/queries/useDeleteScrapeRun'
 import { type ScrapeRun } from '~/pages/api/scrapeRuns'
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
   IconWorld,
   IconWorldDownload,
   IconArrowRight,
+  IconTrash,
   IconInfoCircle,
   IconChevronDown,
   IconChevronUp,
@@ -87,6 +89,7 @@ interface ScrapeRunAutocompleteItem extends AutocompleteItem {
   url: string
   summary: string
   run: ScrapeRun
+  onRequestDelete: (run: ScrapeRun) => void
   highlightCurrent?: boolean
   onBrowseItemMouseEnter?: () => void
 }
@@ -97,6 +100,7 @@ const ScrapeRunAutocompleteOption = forwardRef<
     url: string
     summary: string
     run: ScrapeRun
+    onRequestDelete: (run: ScrapeRun) => void
     highlightCurrent?: boolean
     onBrowseItemMouseEnter?: () => void
   }
@@ -106,6 +110,7 @@ const ScrapeRunAutocompleteOption = forwardRef<
       url,
       summary,
       run,
+      onRequestDelete,
       highlightCurrent,
       onBrowseItemMouseEnter,
       value: _value,
@@ -146,6 +151,21 @@ const ScrapeRunAutocompleteOption = forwardRef<
           {summary}
         </Text>
       </div>
+      <ActionIcon
+        size="sm"
+        variant="subtle"
+        color="red"
+        aria-label={`Delete saved scrape ${url}`}
+        // mousedown (not click): Mantine commits a suggestion selection on
+        // mousedown, so prevent + stop it here to delete instead of pick.
+        onMouseDown={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onRequestDelete(run)
+        }}
+      >
+        <IconTrash size={16} />
+      </ActionIcon>
     </div>
     )
   },
@@ -217,6 +237,14 @@ export default function WebsiteIngestForm({
   // Toggles the per-method explanations under "Limit web crawl" (info icon).
   const [crawlInfoOpened, setCrawlInfoOpened] = useState(false)
 
+  // The saved scrape the user is about to delete (drives the confirm overlay).
+  const [runPendingDelete, setRunPendingDelete] = useState<ScrapeRun | null>(
+    null,
+  )
+  // When true, confirming the delete also removes the documents this scrape
+  // produced (not just the saved parameters). Reset whenever the overlay opens
+  // or closes — see the effect below.
+  const [deleteFilesWithRun, setDeleteFilesWithRun] = useState(false)
   const urlInputRef = useRef<HTMLInputElement>(null)
   const [urlDropdownOpened, setUrlDropdownOpened] = useState(false)
   // When true, the URL dropdown lists every saved scrape (not filtered by the
@@ -231,8 +259,22 @@ export default function WebsiteIngestForm({
     setUrlBrowseHighlightSuppressed(false)
   }
 
+  // Open the confirm overlay and close the autocomplete dropdown (blur the
+  // input) so the dropdown isn't left open behind the confirmation.
+  const requestDelete = (run: ScrapeRun) => {
+    setRunPendingDelete(run)
+    urlInputRef.current?.blur()
+  }
+
+  // Every time the confirm overlay is shown or hidden, start from the safe
+  // default (files kept) so a prior "on" never carries into the next delete.
+  useEffect(() => {
+    setDeleteFilesWithRun(false)
+  }, [runPendingDelete])
+
   // Previous scrape parameter sets for this project (most-recently-used first).
   const { data: scrapeRuns } = useFetchScrapeRuns({ courseName: project_name })
+  const deleteScrapeRun = useDeleteScrapeRun({ courseName: project_name })
 
   // One suggestion per distinct param set; `value` unique to avoid key clashes.
   const scrapeRunSuggestions: ScrapeRunAutocompleteItem[] = useMemo(
@@ -242,6 +284,7 @@ export default function WebsiteIngestForm({
         url: run.url,
         summary: scrapeRunSummary(run),
         run,
+        onRequestDelete: requestDelete,
       })),
     [scrapeRuns],
   )
@@ -318,6 +361,29 @@ export default function WebsiteIngestForm({
     highlightedScrapeRunId,
     scrapeRunAutocompleteData,
   ])
+
+  const handleConfirmDelete = () => {
+    if (!runPendingDelete) return
+    deleteScrapeRun.mutate(
+      { id: runPendingDelete.id, deleteFiles: deleteFilesWithRun },
+      {
+        onSuccess: () => setRunPendingDelete(null),
+        onError: () => {
+          notifications.show({
+            title: (
+              <Text size={'lg'} className={`${montserrat_med.className}`}>
+                Failed to delete saved scrape
+              </Text>
+            ),
+            message: deleteFilesWithRun
+              ? 'Some files could not be deleted. The saved scrape was kept. Please try again.'
+              : 'Please try again.',
+            color: 'red',
+          })
+        },
+      },
+    )
+  }
 
   const setUrlValue = (input: string) => {
     setUrl(input)
@@ -1118,6 +1184,68 @@ export default function WebsiteIngestForm({
               {isReingest ? 'Re-ingest the Website' : 'Ingest the Website'}
             </Button>
           </div>
+
+          {/* Confirm deleting a saved scrape. Rendered INSIDE the ingest dialog
+              (a DOM descendant) so confirming/cancelling never closes the
+              ingest window. Also the seam for a future "also delete the scraped
+              pages" option. */}
+          {runPendingDelete && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/60"
+                onClick={() => setRunPendingDelete(null)}
+                aria-hidden="true"
+              />
+              <div className="relative z-10 w-full max-w-md rounded-md bg-[--modal] p-6 text-[--modal-text] shadow-xl">
+                <Text
+                  className={`${montserrat_heading.variable} mb-3 font-montserratHeading`}
+                  style={{ fontSize: '18px', fontWeight: 700 }}
+                >
+                  Delete this saved scrape?
+                </Text>
+                <Text size="sm" truncate>
+                  {runPendingDelete.url}
+                </Text>
+                <Text size="xs" opacity={0.6}>
+                  {scrapeRunSummary(runPendingDelete)}
+                </Text>
+                <Text size="sm" className="mt-4">
+                  {deleteFilesWithRun
+                    ? 'This removes the saved parameters and permanently deletes the pages this scrape created from your project.'
+                    : 'This removes the saved parameters from your suggestions. It does not delete any pages already scraped from this URL.'}
+                </Text>
+                <div className="mt-4">
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Also delete the files this scrape created"
+                    checked={deleteFilesWithRun}
+                    onCheckedChange={(checked) =>
+                      setDeleteFilesWithRun(checked)
+                    }
+                  />
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <Button
+                    onClick={() => setRunPendingDelete(null)}
+                    disabled={deleteScrapeRun.isPending}
+                    className="mr-[7px] min-w-[3rem] rounded-s-md bg-[--background-faded] text-[--foreground] hover:bg-[--dashboard-button-hover] hover:text-[--dashboard-button-foreground] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmDelete}
+                    loading={deleteScrapeRun.isPending}
+                    className="min-w-[3rem] rounded-s-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </motion.div>
