@@ -291,6 +291,7 @@ describe('WebsiteIngestForm', () => {
       scrape_strategy: 'equal-and-below',
       created_at: '2026-06-01T00:00:00.000Z',
       last_run_at: '2026-06-01T00:00:00.000Z',
+      document_count: 3,
     }
     let deleteUrl = ''
     server.use(
@@ -333,7 +334,7 @@ describe('WebsiteIngestForm', () => {
     // shadcn Switch renders a Radix element with role="switch" (its label is a
     // sibling span, so query by role rather than label text).
     expect(
-      await screen.findByText(/also delete the files this scrape created/i),
+      await screen.findByText(/also delete the 3 files this scrape created/i),
     ).toBeInTheDocument()
     const toggle = screen.getByRole('switch')
     expect(toggle).not.toBeChecked()

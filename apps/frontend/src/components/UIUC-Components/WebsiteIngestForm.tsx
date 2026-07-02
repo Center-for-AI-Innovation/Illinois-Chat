@@ -67,7 +67,11 @@ const strategyLabel = (strategy: string | null | undefined) =>
   strategy ||
   'Equal and Below'
 
-// Secondary line for a suggestion: "Equal and Below · 50 urls · 3 days ago"
+// "3 files" / "1 file" / "0 files"
+const fileCountLabel = (count: number) =>
+  `${count} ${count === 1 ? 'file' : 'files'}`
+
+// Secondary line for a suggestion: "Equal and Below · 50 urls · 3 files · 3 days ago"
 const scrapeRunSummary = (run: ScrapeRun) => {
   const when = run.last_run_at
     ? formatDistanceToNow(new Date(run.last_run_at), { addSuffix: true })
@@ -75,6 +79,7 @@ const scrapeRunSummary = (run: ScrapeRun) => {
   return [
     strategyLabel(run.scrape_strategy),
     `${run.max_urls ?? 50} urls`,
+    fileCountLabel(run.document_count ?? 0),
     when,
   ]
     .filter(Boolean)
@@ -1220,7 +1225,9 @@ export default function WebsiteIngestForm({
                     showLabels
                     showThumbIcon
                     size="sm"
-                    label="Also delete the files this scrape created"
+                    label={`Also delete the ${fileCountLabel(
+                      runPendingDelete.document_count ?? 0,
+                    )} this scrape created`}
                     checked={deleteFilesWithRun}
                     onCheckedChange={(checked) =>
                       setDeleteFilesWithRun(checked)

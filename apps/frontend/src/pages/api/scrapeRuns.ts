@@ -7,7 +7,7 @@ import {
   scrapeMetadataDocuments,
   documents,
 } from '~/db/dbClient'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { deleteScrapeRunDocuments } from '~/utils/scrapeRunFiles'
 
 export interface ScrapeRun {
@@ -18,6 +18,10 @@ export interface ScrapeRun {
   scrape_strategy: string | null
   created_at: string
   last_run_at: string
+  // Live count of documents currently linked to this scrape (junction rows).
+  // The junction FK cascades on document delete, so this always reflects the
+  // real number of files the scrape still owns.
+  document_count: number
 }
 
 // GET    /api/scrapeRuns?course_name=<project>            -> past scrape param sets, most-recent first
@@ -36,10 +40,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     try {
+      // Left join the junction and count per run so each row carries a live
+      // document_count. Group by the run PK (functional dependency covers the
+      // other selected columns).
       const runs = await db
-        .select()
+        .select({
+          id: scrapeMetadataRun.id,
+          course_name: scrapeMetadataRun.course_name,
+          url: scrapeMetadataRun.url,
+          max_urls: scrapeMetadataRun.max_urls,
+          scrape_strategy: scrapeMetadataRun.scrape_strategy,
+          created_at: scrapeMetadataRun.created_at,
+          last_run_at: scrapeMetadataRun.last_run_at,
+          document_count: sql<number>`count(${scrapeMetadataDocuments.document_id})::int`,
+        })
         .from(scrapeMetadataRun)
+        .leftJoin(
+          scrapeMetadataDocuments,
+          eq(
+            scrapeMetadataDocuments.scrape_metadata_run_id,
+            scrapeMetadataRun.id,
+          ),
+        )
         .where(eq(scrapeMetadataRun.course_name, courseName))
+        .groupBy(scrapeMetadataRun.id)
         .orderBy(desc(scrapeMetadataRun.last_run_at))
 
       return res.status(200).json({ runs })

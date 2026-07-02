@@ -405,6 +405,9 @@ export function ProjectFilesTable({
       queryClient.invalidateQueries({
         queryKey: ['documentGroups', course_name],
       })
+      // Deleting a file changes how many documents a saved scrape owns, so
+      // refresh the scrape-run list (its per-run file counts) too.
+      queryClient.invalidateQueries({ queryKey: ['scrapeRuns', course_name] })
     },
   })
 
