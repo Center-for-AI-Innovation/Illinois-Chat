@@ -13,6 +13,8 @@ export async function crawl(rawConfig: Config) {
 
   let pageCounter = 0;
   const ingestionPromises: Promise<any>[] = [];
+  // URLs actually crawled this run (used for the delete-missing finalize).
+  const seenUrls = new Set<string>();
   // const results: Array<{ title: string; url: string; html: string }> = [];
 
   if (config.url) {
@@ -80,6 +82,7 @@ export async function crawl(rawConfig: Config) {
 
                 // Asynchronously call the ingestWebscrape endpoint without awaiting the result
                 if (html) {
+                  if (request.loadedUrl) seenUrls.add(request.loadedUrl);
                   const ingestUrl = process.env.INGEST_URL;
 
                   if (!ingestUrl) {
@@ -103,6 +106,12 @@ export async function crawl(rawConfig: Config) {
                       content: html,
                       course_name: config.courseName,
                       groups: config.documentGroups,
+                      // Threaded to the worker so the resulting document is linked
+                      // to its saved scrape run (web scrapes only; undefined ok).
+                      scrape_metadata_run_id: config.scrapeMetadataRunId,
+                      // Re-ingest classify flags (undefined => worker defaults true).
+                      update_existing: config.updateExisting,
+                      add_new: config.addNew,
                       // s3_paths: s3Key,
                     }),
                   })
@@ -269,6 +278,32 @@ export async function crawl(rawConfig: Config) {
   }
   // Before returning from the function, wait for all the ingestion promises to resolve
   await Promise.all(ingestionPromises);
+
+  // Delete-missing finalize: report the URLs actually crawled so the backend can
+  // delete docs linked to this scrape run that no longer exist. Safe at end of
+  // crawl: missing docs weren't crawled (not being re-ingested), and seen docs
+  // are excluded from deletion.
+  if (config.scrapeMetadataRunId && config.deleteMissing) {
+    try {
+      const ingestUrl = process.env.INGEST_URL || "";
+      const finalizeUrl = ingestUrl.replace(/\/ingest\/?$/, "/finalizeScrapeRun");
+      await fetch(finalizeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scrape_metadata_run_id: config.scrapeMetadataRunId,
+          course_name: config.courseName,
+          seen_urls: Array.from(seenUrls),
+          delete_missing: true,
+        }),
+      });
+      console.log(
+        `Finalize (delete_missing) sent for run ${config.scrapeMetadataRunId}, seen=${seenUrls.size}`,
+      );
+    } catch (e) {
+      console.error("Finalize scrape run failed:", e);
+    }
+  }
   return pageCounter;
 }
 
@@ -290,9 +325,14 @@ async function handlePdf(
 }
 function getPageHtml(page: Page, selector = "body") {
   return page.evaluate((selector) => {
-    // Exclude header, footer, nav from scraping
+    // Exclude header, footer, nav from the scraped TEXT — but HIDE them rather
+    // than remove them. innerText ignores display:none content, so the text is
+    // still excluded, while the <a> links inside nav/header/footer stay in the
+    // DOM so enqueueLinks (which runs after this) can still follow them.
     const elementsToExclude = document.querySelectorAll("header, footer, nav");
-    elementsToExclude.forEach((element) => element.remove());
+    elementsToExclude.forEach((element) => {
+      (element as HTMLElement).style.display = "none";
+    });
     // Check if the selector is an XPath
     if (selector.startsWith("/")) {
       console.log(`XPath: ${selector}`);

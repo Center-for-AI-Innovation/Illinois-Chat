@@ -50,6 +50,13 @@
       "when": 1782085293878,
       "tag": "0006_kind_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782854543324,
+      "tag": "0007_lush_paladin",
+      "breakpoints": true
     }
   ]
 }

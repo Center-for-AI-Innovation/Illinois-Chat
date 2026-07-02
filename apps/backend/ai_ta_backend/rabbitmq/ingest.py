@@ -185,11 +185,32 @@ class Ingest:
 
       content: str | List[str] | None = inputs.get('content', None)  # defined if ingest type is webtext
       doc_groups: List[str] | str = inputs.get('groups', '')
+      # Saved-scrape this page belongs to (web scrapes only). Used to link the
+      # resulting document to its scrape run. None for uploads / other ingests.
+      scrape_metadata_run_id = inputs.get('scrape_metadata_run_id')
+      # Re-ingest classify flags (default True => normal/new scrape ingests all).
+      update_existing = inputs.get('update_existing', True)
+      add_new = inputs.get('add_new', True)
+
+      # Classify gate (web scrapes with a run id only): skip pages we should
+      # not touch, before any embed/insert work. A page is "existing" if it
+      # was already linked to this scrape run by a previous crawl.
+      if content and scrape_metadata_run_id:
+        is_existing = self.sql_session.is_url_linked_to_run(scrape_metadata_run_id, url)
+        if is_existing and not update_existing:
+          logging.info("Skipping existing page (updateExisting=false): %s", url)
+          self.sql_session.delete_document_in_progress(job_id)
+          return json.dumps({"success_ingest": "skipped_existing", "failure_ingest": None})
+        if (not is_existing) and not add_new:
+          logging.info("Skipping new page (addNew=false): %s", url)
+          self.sql_session.delete_document_in_progress(job_id)
+          return json.dumps({"success_ingest": "skipped_new", "failure_ingest": None})
 
       print(
           f"In top of /ingest route. course: {course_name}, s3paths: {s3_paths}, readable_filename: {readable_filename}, base_url: {base_url}, url: {url}, content: {content}, doc_groups: {doc_groups}"
       )
-      success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content, doc_groups, force_embeddings)
+      success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content, doc_groups, force_embeddings,
+                                          scrape_metadata_run_id=scrape_metadata_run_id)
       # Skip retries for "no text" errors - retrying won't help
       failure_error = (success_fail_dict.get('failure_ingest', {}) or {})
       if isinstance(failure_error, dict):
@@ -236,7 +257,8 @@ class Ingest:
       success_fail_dict = {"failure_ingest": {'error': str(e)}}
       return json.dumps(success_fail_dict)
 
-  def run_ingest(self, course_name, s3_paths, base_url, url, readable_filename, content, document_groups, force_embeddings=False):
+  def run_ingest(self, course_name, s3_paths, base_url, url, readable_filename, content, document_groups, force_embeddings=False,
+                 scrape_metadata_run_id=None):
     """Routes ingest jobs based on the input data -> webscrape, url, readable_filename"""
     if content:
       return self.ingest_single_web_text(course_name,
@@ -245,7 +267,8 @@ class Ingest:
                                          content,
                                          readable_filename,
                                          groups=document_groups,
-                                         force_embeddings=force_embeddings)
+                                         force_embeddings=force_embeddings,
+                                         scrape_metadata_run_id=scrape_metadata_run_id)
     elif readable_filename == '':
       return self.bulk_ingest(course_name, s3_paths, base_url=base_url, url=url, groups=document_groups, force_embeddings=force_embeddings)
     else:
@@ -515,6 +538,16 @@ class Ingest:
       logging.info("Inserting document (size: %.2f MB)", document_size_mb)
       insert_status = self.sql_session.insert_document(document)
       if insert_status:
+        # On a web scrape, link the new document to its saved scrape run so
+        # re-crawls know which docs belong to the scrape. insert_status is
+        # the new document id. Works the same for a brand-new URL (no old
+        # docs) and a re-scrape.
+        scrape_metadata_run_id = kwargs.get('scrape_metadata_run_id')
+        if scrape_metadata_run_id:
+          self.sql_session.insert_scrape_metadata_document(
+              scrape_metadata_run_id=scrape_metadata_run_id,
+              document_id=insert_status,
+          )
         groups = kwargs.get('groups', '')
         if groups:
           if contexts[0].metadata.get('url'):

@@ -13,6 +13,7 @@ import {
   Center,
   rem,
 } from '@mantine/core'
+import { Switch } from '@/components/shadcn/ui/switch'
 import { formatDistanceToNow } from 'date-fns'
 import { useFetchScrapeRuns } from '~/hooks/queries/useFetchScrapeRuns'
 import { type ScrapeRun } from '~/pages/api/scrapeRuns'
@@ -208,6 +209,11 @@ export default function WebsiteIngestForm({
   const [scrapeStrategy, setScrapeStrategy] =
     useState<string>('equal-and-below')
   const [open, setOpen] = useState(false)
+  // Re-ingest options — shown only when the form exactly matches a saved scrape
+  // (an unchanged reuse). Editing any field breaks the match and hides them.
+  const [deleteMissing, setDeleteMissing] = useState(false)
+  const [updateExisting, setUpdateExisting] = useState(true)
+  const [addNew, setAddNew] = useState(true)
   // Toggles the per-method explanations under "Limit web crawl" (info icon).
   const [crawlInfoOpened, setCrawlInfoOpened] = useState(false)
 
@@ -241,6 +247,21 @@ export default function WebsiteIngestForm({
   )
 
   const hasScrapeHistory = scrapeRunSuggestions.length > 0
+
+  // The saved scrape the current form values exactly reproduce, if any. Present
+  // => the user reused a previous scrape and changed nothing => "re-ingest" mode
+  // (button label + the three re-ingest toggles). Any edit breaks the match.
+  const matchedReuseRun = useMemo(
+    () =>
+      (scrapeRuns ?? []).find(
+        (run) =>
+          run.url === url &&
+          String(run.max_urls ?? 50) === maxUrls &&
+          (run.scrape_strategy ?? 'equal-and-below') === scrapeStrategy,
+      ) ?? null,
+    [scrapeRuns, url, maxUrls, scrapeStrategy],
+  )
+  const isReingest = matchedReuseRun !== null && isUrlValid
 
   const highlightedScrapeRunId = useMemo(() => {
     if (!urlBrowseAll) return null
@@ -358,6 +379,7 @@ export default function WebsiteIngestForm({
           project_name,
           maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
           scrapeStrategy,
+          isReingest ? { deleteMissing, updateExisting, addNew } : undefined,
         )
         // Refresh the URL autocomplete suggestions with this run's params.
         await queryClient.invalidateQueries({
@@ -547,6 +569,11 @@ export default function WebsiteIngestForm({
     courseName: string | null,
     maxUrls: number,
     scrapeStrategy: string,
+    reingestOptions?: {
+      deleteMissing: boolean
+      updateExisting: boolean
+      addNew: boolean
+    },
   ) => {
     try {
       if (!url || !courseName) return null
@@ -557,6 +584,9 @@ export default function WebsiteIngestForm({
         courseName,
         maxUrls,
         scrapeStrategy,
+        // Only sent on an unchanged-reuse re-ingest; the backend wires these up
+        // separately. Harmless for a normal/new ingest (omitted).
+        ...(reingestOptions ?? {}),
       })
 
       console.log(
@@ -614,6 +644,9 @@ export default function WebsiteIngestForm({
             setUrlDropdownOpened(false)
             setUrlBrowseAll(false)
             setUrlBrowseHighlightSuppressed(false)
+            setDeleteMissing(false)
+            setUpdateExisting(true)
+            setAddNew(true)
             setInputErrors((prev) => ({
               ...prev,
               maxUrls: { error: false, message: '' },
@@ -1036,12 +1069,53 @@ export default function WebsiteIngestForm({
             </div>
           </div>
           <div className="mt-4">
+            {/* Re-ingest options: only when the form exactly matches a saved
+                scrape (unchanged reuse). Editing any field hides these. */}
+            {isReingest && (
+              <div className="mb-3 rounded-xl border border-[--background-dark] bg-[--background-faded] p-3">
+                <Text
+                  style={{ fontSize: '14px' }}
+                  className={`${montserrat_heading.variable} mb-2 font-montserratHeading text-[--modal-text]`}
+                >
+                  Re-ingest options
+                </Text>
+                <div className="flex flex-col gap-2">
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Add newly found pages"
+                    checked={addNew}
+                    onCheckedChange={(checked) => setAddNew(checked)}
+                  />
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Update pages that changed"
+                    checked={updateExisting}
+                    onCheckedChange={(checked) => setUpdateExisting(checked)}
+                  />
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Delete pages no longer found"
+                    checked={deleteMissing}
+                    onCheckedChange={(checked) => setDeleteMissing(checked)}
+                  />
+                </div>
+              </div>
+            )}
             <Button
               onClick={handleIngest}
               disabled={!isUrlValid}
               className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
             >
-              Ingest the Website
+              {isReingest ? 'Re-ingest the Website' : 'Ingest the Website'}
             </Button>
           </div>
         </DialogContent>

@@ -57,6 +57,15 @@ class Document(Base):
         }
 
 
+class ScrapingMetadataDocuments(Base):
+    __tablename__ = 'scraping_metadata_documents'
+    # FK + cascade are enforced by the DB (migration 0007); kept as plain columns
+    # here so the ORM mapper doesn't need a scraping_metadata_run model to resolve.
+    scrape_metadata_run_id = Column(UUID(as_uuid=True), primary_key=True)
+    document_id = Column(BigInteger, primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class DocumentDocGroup(Base):
     __tablename__ = 'documents_doc_groups'
     document_id = Column(BigInteger, primary_key=True)

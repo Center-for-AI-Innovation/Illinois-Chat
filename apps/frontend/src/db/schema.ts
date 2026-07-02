@@ -6,9 +6,11 @@ import {
   boolean,
   date,
   doublePrecision,
+  index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -245,6 +247,33 @@ export const scrapeMetadataRun = pgTable(
       table.url,
       table.max_urls,
       table.scrape_strategy,
+    ),
+  }),
+)
+
+// Junction: which documents a saved scrape produced. Lets a re-crawl tell, per
+// URL, whether a doc already belongs to the scrape (existing) vs is new vs is
+// now missing — driving delete-missing / update-existing / add-new. Both FKs
+// cascade, so deleting a scrape run or a document removes only the link row.
+export const scrapeMetadataDocuments = pgTable(
+  'scraping_metadata_documents',
+  {
+    scrape_metadata_run_id: uuid('scrape_metadata_run_id')
+      .notNull()
+      .references(() => scrapeMetadataRun.id, { onDelete: 'cascade' }),
+    document_id: bigint('document_id', { mode: 'number' })
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.scrape_metadata_run_id, table.document_id],
+    }),
+    documentIdx: index('scraping_metadata_documents_document_id_idx').on(
+      table.document_id,
     ),
   }),
 )

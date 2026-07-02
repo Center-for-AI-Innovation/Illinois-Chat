@@ -9,6 +9,7 @@ load_dotenv()
 from sqlalchemy import create_engine, NullPool, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
@@ -155,15 +156,57 @@ class SQLAlchemyIngestDB:
                 logging.error(f"Deletion failed: {e}")
                 return False
 
-    def insert_document(self, doc_payload: dict) -> bool:
+    def insert_document(self, doc_payload: dict):
+        """Insert a document and return its new id (or None on failure)."""
         with self.get_session() as session:
             try:
-                insert_stmt = insert(models.Document).values(doc_payload)
-                session.execute(insert_stmt)
-                return True  # Insertion successful
+                insert_stmt = (
+                    insert(models.Document).values(doc_payload).returning(models.Document.id)
+                )
+                result = session.execute(insert_stmt)
+                return result.scalar_one()  # new document id
             except SQLAlchemyError as e:
                 logging.error(f"Insertion failed: {e}")
-                return False  # Insertion failed
+                return None  # Insertion failed
+
+    def is_url_linked_to_run(self, scrape_metadata_run_id, url) -> bool:
+        """True if a document with this url is already linked to this scrape run
+        (i.e. it existed in a previous crawl of the same saved scrape)."""
+        with self.get_session() as session:
+            try:
+                stmt = (
+                    select(models.ScrapingMetadataDocuments.document_id)
+                    .join(models.Document,
+                          models.Document.id == models.ScrapingMetadataDocuments.document_id)
+                    .where(models.ScrapingMetadataDocuments.scrape_metadata_run_id == scrape_metadata_run_id)
+                    .where(models.Document.url == url)
+                    .limit(1)
+                )
+                return session.execute(stmt).first() is not None
+            except SQLAlchemyError as e:
+                logging.error(f"is_url_linked_to_run failed: {e}")
+                return False
+
+    def insert_scrape_metadata_document(self, scrape_metadata_run_id, document_id) -> bool:
+        """Link a successfully-ingested document to the saved scrape that produced
+        it. Idempotent: a duplicate (run_id, document_id) is ignored."""
+        with self.get_session() as session:
+            try:
+                stmt = (
+                    pg_insert(models.ScrapingMetadataDocuments)
+                    .values(
+                        scrape_metadata_run_id=scrape_metadata_run_id,
+                        document_id=document_id,
+                    )
+                    .on_conflict_do_nothing(
+                        index_elements=['scrape_metadata_run_id', 'document_id']
+                    )
+                )
+                session.execute(stmt)
+                return True
+            except SQLAlchemyError as e:
+                logging.error(f"Failed to link scrape metadata document: {e}")
+                return False
 
     def add_document_to_group_url(self, contexts, groups):
         params = {

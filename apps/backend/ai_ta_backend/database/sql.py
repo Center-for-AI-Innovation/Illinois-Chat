@@ -110,6 +110,24 @@ class SQLDatabase:
         finally:
             session.close()
 
+    def getDocumentsForScrapeRun(self, scrape_metadata_run_id):
+        """Return [{document_id, url, s3_path}] for docs linked to a scrape run.
+        Used by /finalizeScrapeRun to compute which docs are 'missing' after a
+        re-crawl and should be deleted."""
+        query = (
+            select(
+                models.ScrapingMetadataDocuments.document_id,
+                models.Document.url,
+                models.Document.s3_path,
+            )
+            .join(models.Document,
+                  models.Document.id == models.ScrapingMetadataDocuments.document_id)
+            .where(models.ScrapingMetadataDocuments.scrape_metadata_run_id == scrape_metadata_run_id)
+        )
+        with self.get_session() as session:
+            rows = session.execute(query).all()
+            return [{"document_id": r[0], "url": r[1], "s3_path": r[2]} for r in rows]
+
     def getAllMaterialsForCourse(self, course_name: str):
         query = (
             select(models.Document.course_name,

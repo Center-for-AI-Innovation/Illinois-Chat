@@ -235,6 +235,38 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
+@app.route('/finalizeScrapeRun', methods=['POST'])
+def finalize_scrape_run(sql_db: SQLDatabase, service: RetrievalService, flaskExecutor: ExecutorInterface):
+  """Called by Crawlee when a (re-)scrape finishes. If delete_missing is set,
+  delete the documents linked to this scrape run whose URL was NOT seen in this
+  crawl (scoped to the run, so concurrent scrapes never delete each other's docs).
+  """
+  data = request.get_json() or {}
+  run_id = data.get('scrape_metadata_run_id')
+  course_name = data.get('course_name')
+  seen_urls = data.get('seen_urls') or []
+  delete_missing = data.get('delete_missing', False)
+
+  if not run_id or not course_name:
+    abort(400, description="scrape_metadata_run_id and course_name are required")
+
+  deleted = 0
+  if delete_missing:
+    def _norm(u):
+      return (u or '').rstrip('/')
+    seen = {_norm(u) for u in seen_urls}
+    linked = sql_db.getDocumentsForScrapeRun(run_id)
+    for doc in linked:
+      if _norm(doc.get('url')) not in seen:
+        # reuse the normal delete path (S3 + Qdrant + documents row; link cascades)
+        flaskExecutor.submit(service.delete_data, course_name, doc.get('s3_path') or '', doc.get('url') or '')
+        deleted += 1
+
+  logging.info(f"finalizeScrapeRun run={run_id} delete_missing={delete_missing} deleted={deleted}")
+  response = jsonify({"outcome": "success", "deleted_missing": deleted})
+  response.headers.add('Access-Control-Allow-Origin', '*')
+  return response
+
 @app.route('/process-chat-file', methods=['POST'])
 def process_chat_file_sync(service: RetrievalService):
     """
