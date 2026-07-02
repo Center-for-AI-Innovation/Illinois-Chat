@@ -1,16 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Text,
   Card,
   Tooltip,
   Button,
-  Input,
+  Autocomplete,
+  type AutocompleteItem,
+  ActionIcon,
   TextInput,
   List,
   SegmentedControl,
   Center,
   rem,
 } from '@mantine/core'
+import { formatDistanceToNow } from 'date-fns'
+import { useFetchScrapeRuns } from '~/hooks/queries/useFetchScrapeRuns'
+import { type ScrapeRun } from '~/pages/api/scrapeRuns'
 import {
   Dialog,
   DialogContent,
@@ -26,10 +31,13 @@ import {
   IconWorld,
   IconWorldDownload,
   IconArrowRight,
+  IconInfoCircle,
+  IconChevronDown,
+  IconChevronUp,
 } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 // import { Checkbox } from '@radix-ui/react-checkbox'
 import { montserrat_heading } from 'fonts'
 import { notifications } from '@mantine/notifications'
@@ -42,6 +50,107 @@ const montserrat_med = Montserrat({
   weight: '500',
   subsets: ['latin'],
 })
+
+// Human-readable labels for the scrape strategy values used by SegmentedControl.
+const SCRAPE_STRATEGY_LABELS: Record<string, string> = {
+  'equal-and-below': 'Equal and Below',
+  'same-hostname': 'Subdomain',
+  'same-domain': 'Entire domain',
+  all: 'All',
+}
+
+const strategyLabel = (strategy: string | null | undefined) =>
+  (strategy && SCRAPE_STRATEGY_LABELS[strategy]) ||
+  strategy ||
+  'Equal and Below'
+
+// Secondary line for a suggestion: "Equal and Below · 50 urls · 3 days ago"
+const scrapeRunSummary = (run: ScrapeRun) => {
+  const when = run.last_run_at
+    ? formatDistanceToNow(new Date(run.last_run_at), { addSuffix: true })
+    : ''
+  return [
+    strategyLabel(run.scrape_strategy),
+    `${run.max_urls ?? 50} urls`,
+    when,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+// Each Autocomplete suggestion carries the underlying run so onItemSubmit can
+// apply its exact params. `value` is unique (url + id) to keep React keys clean
+// when the same URL has several param sets; the input is corrected back to the
+// bare URL on select (see handleSuggestionSubmit).
+interface ScrapeRunAutocompleteItem extends AutocompleteItem {
+  url: string
+  summary: string
+  run: ScrapeRun
+  highlightCurrent?: boolean
+  onBrowseItemMouseEnter?: () => void
+}
+
+const ScrapeRunAutocompleteOption = forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<'div'> & {
+    url: string
+    summary: string
+    run: ScrapeRun
+    highlightCurrent?: boolean
+    onBrowseItemMouseEnter?: () => void
+  }
+>(
+  (
+    {
+      url,
+      summary,
+      run,
+      highlightCurrent,
+      onBrowseItemMouseEnter,
+      value: _value,
+      onMouseEnter: mantineOnMouseEnter,
+      ...others
+    }: any,
+    ref,
+  ) => {
+    const mantineHovered = others['data-hovered']
+
+    return (
+      <div
+        ref={ref}
+        {...others}
+        onMouseEnter={(e) => {
+          mantineOnMouseEnter?.(e)
+          onBrowseItemMouseEnter?.()
+        }}
+        data-hovered={(mantineHovered || highlightCurrent) || undefined}
+        style={{
+          ...others.style,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          ...(highlightCurrent && !mantineHovered
+            ? {
+                color: 'var(--foreground)',
+                backgroundColor: 'var(--foreground-faded)',
+              }
+            : {}),
+        }}
+      >
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <Text size="sm" truncate>
+          {url}
+        </Text>
+        <Text size="xs" opacity={0.6} truncate>
+          {summary}
+        </Text>
+      </div>
+    </div>
+    )
+  },
+)
+ScrapeRunAutocompleteOption.displayName = 'ScrapeRunAutocompleteOption'
+
 export default function WebsiteIngestForm({
   project_name,
   setUploadFiles,
@@ -99,11 +208,116 @@ export default function WebsiteIngestForm({
   const [scrapeStrategy, setScrapeStrategy] =
     useState<string>('equal-and-below')
   const [open, setOpen] = useState(false)
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value
+  // Toggles the per-method explanations under "Limit web crawl" (info icon).
+  const [crawlInfoOpened, setCrawlInfoOpened] = useState(false)
+
+  const urlInputRef = useRef<HTMLInputElement>(null)
+  const [urlDropdownOpened, setUrlDropdownOpened] = useState(false)
+  // When true, the URL dropdown lists every saved scrape (not filtered by the
+  // current input). Typing switches back to search mode.
+  const [urlBrowseAll, setUrlBrowseAll] = useState(false)
+  // Clears the default "current selection" highlight once the user hovers any item.
+  const [urlBrowseHighlightSuppressed, setUrlBrowseHighlightSuppressed] =
+    useState(false)
+
+  const enterUrlBrowseMode = () => {
+    setUrlBrowseAll(true)
+    setUrlBrowseHighlightSuppressed(false)
+  }
+
+  // Previous scrape parameter sets for this project (most-recently-used first).
+  const { data: scrapeRuns } = useFetchScrapeRuns({ courseName: project_name })
+
+  // One suggestion per distinct param set; `value` unique to avoid key clashes.
+  const scrapeRunSuggestions: ScrapeRunAutocompleteItem[] = useMemo(
+    () =>
+      (scrapeRuns ?? []).map((run) => ({
+        value: `${run.url} ${run.id}`,
+        url: run.url,
+        summary: scrapeRunSummary(run),
+        run,
+      })),
+    [scrapeRuns],
+  )
+
+  const hasScrapeHistory = scrapeRunSuggestions.length > 0
+
+  const highlightedScrapeRunId = useMemo(() => {
+    if (!urlBrowseAll) return null
+    const match = (scrapeRuns ?? []).find(
+      (run) =>
+        run.url === url &&
+        String(run.max_urls ?? 50) === maxUrls &&
+        (run.scrape_strategy ?? 'equal-and-below') === scrapeStrategy,
+    )
+    return match?.id ?? null
+  }, [urlBrowseAll, scrapeRuns, url, maxUrls, scrapeStrategy])
+
+  const scrapeRunAutocompleteData: ScrapeRunAutocompleteItem[] = useMemo(
+    () =>
+      scrapeRunSuggestions.map((item) => ({
+        ...item,
+        highlightCurrent:
+          urlBrowseAll &&
+          !urlBrowseHighlightSuppressed &&
+          item.run.id === highlightedScrapeRunId,
+        onBrowseItemMouseEnter: () => setUrlBrowseHighlightSuppressed(true),
+      })),
+    [
+      scrapeRunSuggestions,
+      urlBrowseAll,
+      urlBrowseHighlightSuppressed,
+      highlightedScrapeRunId,
+    ],
+  )
+
+  const openUrlBrowseDropdown = () => {
+    if (!hasScrapeHistory) return
+    enterUrlBrowseMode()
+    urlInputRef.current?.focus()
+    urlInputRef.current?.click()
+  }
+
+  useEffect(() => {
+    if (!urlBrowseAll || !urlDropdownOpened || !highlightedScrapeRunId) return
+    const index = scrapeRunAutocompleteData.findIndex(
+      (item) => item.run.id === highlightedScrapeRunId,
+    )
+    if (index < 0) return
+    const inputId = urlInputRef.current?.id
+    if (!inputId) return
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`${inputId}-${index}`)
+        ?.scrollIntoView({ block: 'nearest' })
+    })
+  }, [
+    urlBrowseAll,
+    urlDropdownOpened,
+    highlightedScrapeRunId,
+    scrapeRunAutocompleteData,
+  ])
+
+  const setUrlValue = (input: string) => {
     setUrl(input)
     setIsUrlValid(validateUrl(input))
   }
+
+  // Picking a suggestion auto-applies its params and resets the input to the
+  // bare URL (overriding the unique `value` Mantine just committed). Both
+  // setState calls batch within this handler, so the composite never renders.
+  const handleSuggestionSubmit = (item: AutocompleteItem) => {
+    const run = (item as ScrapeRunAutocompleteItem).run
+    if (!run) return
+    setUrlValue(run.url)
+    setMaxUrls(String(run.max_urls ?? 50))
+    setScrapeStrategy(run.scrape_strategy ?? 'equal-and-below')
+    setInputErrors((prev) => ({
+      ...prev,
+      maxUrls: { error: false, message: '' },
+    }))
+  }
+
   const validateUrl = (input: string) => {
     const regex = /^(https?:\/\/)?.+/
     return regex.test(input)
@@ -145,6 +359,10 @@ export default function WebsiteIngestForm({
           maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
           scrapeStrategy,
         )
+        // Refresh the URL autocomplete suggestions with this run's params.
+        await queryClient.invalidateQueries({
+          queryKey: ['scrapeRuns', project_name],
+        })
         // Transition to 'ingesting' status after API call succeeds
         setUploadFiles((prevFiles) =>
           prevFiles.map((file) =>
@@ -393,6 +611,9 @@ export default function WebsiteIngestForm({
             setIsUrlValid(false)
             setIsUrlUpdated(false)
             setMaxUrls('50')
+            setUrlDropdownOpened(false)
+            setUrlBrowseAll(false)
+            setUrlBrowseHighlightSuppressed(false)
             setInputErrors((prev) => ({
               ...prev,
               maxUrls: { error: false, message: '' },
@@ -458,11 +679,80 @@ export default function WebsiteIngestForm({
                     event.preventDefault()
                   }}
                 >
-                  <Input
+                  <Autocomplete
+                    ref={urlInputRef}
                     icon={icon}
+                    rightSection={
+                      hasScrapeHistory ? (
+                        <button
+                          type="button"
+                          aria-label={
+                            urlDropdownOpened
+                              ? 'Hide saved scrapes'
+                              : 'Show saved scrapes'
+                          }
+                          aria-expanded={urlDropdownOpened}
+                          tabIndex={-1}
+                          className="flex h-full items-center justify-center border-0 bg-transparent p-0 text-[--foreground] hover:text-[--illinois-orange]"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            if (urlDropdownOpened) {
+                              urlInputRef.current?.blur()
+                            } else {
+                              openUrlBrowseDropdown()
+                            }
+                          }}
+                        >
+                          {urlDropdownOpened ? (
+                            <IconChevronUp
+                              size={18}
+                              stroke={2}
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <IconChevronDown
+                              size={18}
+                              stroke={2}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      ) : null
+                    }
+                    rightSectionWidth={hasScrapeHistory ? rem(40) : undefined}
+                    onDropdownOpen={() => setUrlDropdownOpened(true)}
+                    onDropdownClose={() => {
+                      setUrlDropdownOpened(false)
+                      setUrlBrowseAll(false)
+                      setUrlBrowseHighlightSuppressed(false)
+                    }}
+                    onFocus={() => {
+                      if (hasScrapeHistory) enterUrlBrowseMode()
+                    }}
+                    onClick={() => {
+                      if (hasScrapeHistory) enterUrlBrowseMode()
+                    }}
                     aria-label="Website URL"
                     className="w-full rounded-full"
-                    styles={{
+                    data={scrapeRunAutocompleteData}
+                    itemComponent={ScrapeRunAutocompleteOption}
+                    onItemSubmit={handleSuggestionSubmit}
+                    limit={50}
+                    maxDropdownHeight={280}
+                    // Suggest by URL match (and the summary), not the unique value.
+                    filter={(query, item) => {
+                      const it = item as ScrapeRunAutocompleteItem
+                      if (urlBrowseAll) return true
+                      const q = query.toLowerCase().trim()
+                      return (
+                        it.url.toLowerCase().includes(q) ||
+                        it.summary.toLowerCase().includes(q)
+                      )
+                    }}
+                    nothingFound={null}
+                    // Dropdown colors + hover match the default-model Select on
+                    // the LLMs admin page (see api-inputs/LLMsApiKeyInputForm.tsx).
+                    styles={(theme) => ({
                       input: {
                         color: 'var(--foreground)',
                         backgroundColor: 'var(--background-faded)',
@@ -477,14 +767,46 @@ export default function WebsiteIngestForm({
                       wrapper: {
                         width: '100%',
                       },
-                    }}
+                      rightSection: {
+                        pointerEvents: 'auto',
+                        color: 'var(--foreground)',
+                      },
+                      dropdown: {
+                        backgroundColor: 'var(--background)',
+                        border: '1px solid var(--background-dark)',
+                        borderRadius: theme.radius.md,
+                        marginTop: '2px',
+                        boxShadow: theme.shadows.xs,
+                      },
+                      item: {
+                        color: 'var(--foreground)',
+                        backgroundColor: 'var(--background)',
+                        borderRadius: theme.radius.md,
+                        margin: '2px',
+                        overflow: 'hidden',
+                        '&[data-hovered]': {
+                          color: 'var(--foreground)',
+                          backgroundColor: 'var(--foreground-faded)',
+                        },
+                        '&[data-selected]': {
+                          '&': {
+                            color: 'var(--foreground)',
+                            backgroundColor: 'transparent',
+                          },
+                          '&:hover': {
+                            color: 'var(--foreground)',
+                            backgroundColor: 'var(--foreground-faded)',
+                          },
+                        },
+                      },
+                    })}
                     placeholder="Enter URL..."
                     radius="md"
-                    type="url"
                     value={url}
                     size="lg"
-                    onChange={(e) => {
-                      handleUrlChange(e)
+                    onChange={(value) => {
+                      setUrlBrowseAll(false)
+                      setUrlValue(value)
                     }}
                   />
                   <div className="pb-2 pt-2">
@@ -557,14 +879,39 @@ export default function WebsiteIngestForm({
                     </p>
                   )}
 
-                  <Text
-                    style={{ fontSize: '16px' }}
-                    className={`${montserrat_heading.variable} mt-4 font-montserratHeading`}
-                  >
-                    Limit web crawl
-                  </Text>
-                  <div className="mt-2 pl-3">
-                    <List className="text-[--modal-text]">
+                  <div className="mt-4 flex items-center gap-2">
+                    <Text
+                      style={{ fontSize: '16px' }}
+                      className={`${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      Limit web crawl
+                    </Text>
+                    <ActionIcon
+                      variant="subtle"
+                      color="var(--foreground-faded)"
+                      onClick={() => setCrawlInfoOpened(!crawlInfoOpened)}
+                      className="hover:bg-[--background]"
+                      title="What does each crawl limit mean?"
+                    >
+                      <IconInfoCircle
+                        className="text-[--foreground-faded] hover:text-[--foreground]"
+                        aria-hidden="true"
+                      />
+                    </ActionIcon>
+                  </div>
+                  <AnimatePresence>
+                    {crawlInfoOpened && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <div className="flex bg-[--background-faded]">
+                          <div className="w-1 bg-[--illinois-orange]" />
+                          <div className="flex-1 p-4">
+                            <List className="text-[--modal-text]">
                       <List.Item>
                         <strong>Equal and Below:</strong> Only scrape content
                         that starts will the given URL. E.g. nasa.gov/blogs will
@@ -599,13 +946,18 @@ export default function WebsiteIngestForm({
                           </Text>
                         </span>
                       </List.Item>
-                    </List>
-                  </div>
-
-                  <Text className="mt-4">
-                    <strong>I suggest starting with Equal and Below</strong>,
-                    then just re-run this if you need more later.
-                  </Text>
+                            </List>
+                            <Text className="mt-4 text-[--modal-text]">
+                              <strong>
+                                I suggest starting with Equal and Below
+                              </strong>
+                              , then just re-run this if you need more later.
+                            </Text>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <SegmentedControl
                     fullWidth

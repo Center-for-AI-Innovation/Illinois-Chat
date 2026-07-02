@@ -2,6 +2,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import axios from 'axios'
 import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { db, scrapeMetadataRun } from '~/db/dbClient'
 
 interface ScrapeRequestBody {
   url: string | null
@@ -55,6 +56,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     const fullUrl = formatUrl(url)
+
+    // Record the scrape parameters so users can reuse them on future scrapes.
+    // One row per distinct (course_name, url, max_urls, scrape_strategy);
+    // re-running an identical scrape just bumps last_run_at. A DB failure here
+    // must not block the actual scrape, so it's best-effort.
+    try {
+      await db
+        .insert(scrapeMetadataRun)
+        .values({
+          course_name: courseName,
+          url: fullUrl,
+          max_urls: maxUrls,
+          scrape_strategy: scrapeStrategy,
+        })
+        .onConflictDoUpdate({
+          target: [
+            scrapeMetadataRun.course_name,
+            scrapeMetadataRun.url,
+            scrapeMetadataRun.max_urls,
+            scrapeMetadataRun.scrape_strategy,
+          ],
+          set: { last_run_at: new Date() },
+        })
+    } catch (recordError) {
+      console.error('Failed to record scrape run metadata:', recordError)
+    }
+
     const postParams = {
       url: fullUrl,
       courseName: courseName,

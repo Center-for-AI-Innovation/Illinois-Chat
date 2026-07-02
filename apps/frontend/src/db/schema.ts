@@ -221,6 +221,34 @@ export const courseNames = pgTable('course_names', {
   course_name: text('course_name'),
 })
 
+// Stored web-scrape parameters per project, so users can reuse them on future
+// scrapes. One row per distinct (course_name, url, max_urls, scrape_strategy);
+// re-running an identical scrape bumps last_run_at (see /api/scrapeWeb upsert).
+export const scrapeMetadataRun = pgTable(
+  'scraping_metadata_run',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    course_name: text('course_name').notNull(),
+    url: text('url').notNull(),
+    max_urls: integer('max_urls').default(50),
+    scrape_strategy: text('scrape_strategy').default('equal-and-below'),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    last_run_at: timestamp('last_run_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    uniqueRun: uniqueIndex('scraping_metadata_run_course_url_params_key').on(
+      table.course_name,
+      table.url,
+      table.max_urls,
+      table.scrape_strategy,
+    ),
+  }),
+)
+
 // DocGroups table
 export const docGroups = pgTable(
   'doc_groups',
