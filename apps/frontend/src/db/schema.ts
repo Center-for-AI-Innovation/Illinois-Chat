@@ -247,7 +247,11 @@ export const docGroups = pgTable(
 export const documentsDocGroups = pgTable(
   'documents_doc_groups',
   {
-    document_id: bigint('document_id', { mode: 'number' }).notNull(),
+    // FK cascade: deleting a document (or group) removes the link row, which
+    // fires update_doc_count() to keep doc_groups.doc_count accurate.
+    document_id: bigint('document_id', { mode: 'number' })
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
     doc_group_id: bigint('doc_group_id', { mode: 'number' }).notNull(),
     created_at: timestamp('created_at').defaultNow(),
   },

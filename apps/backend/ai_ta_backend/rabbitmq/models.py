@@ -59,7 +59,7 @@ class Document(Base):
 
 class DocumentDocGroup(Base):
     __tablename__ = 'documents_doc_groups'
-    document_id = Column(BigInteger, primary_key=True)
+    document_id = Column(BigInteger, ForeignKey('documents.id', ondelete='CASCADE'), primary_key=True)
     doc_group_id = Column(BigInteger, ForeignKey('doc_groups.id', ondelete='CASCADE'), primary_key=True)
     created_at = Column(DateTime, default=func.now())
 
