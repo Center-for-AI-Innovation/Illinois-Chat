@@ -1,5 +1,4 @@
 import { MantineProvider } from '@mantine/core'
-import { Notifications } from '@mantine/notifications'
 import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
@@ -114,16 +113,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
             <PostHogProvider client={posthog}>
               {/* <SpeedInsights /> */}
               <Analytics />
-              <aside
-                aria-label="Notifications"
-                aria-live="assertive"
-                aria-atomic="true"
-              >
-                <Notifications position="bottom-center" zIndex={2077} />
-              </aside>
-              {/* sonner toasts, backed by src/utils/toastUtils.ts. The Mantine
-                  <Notifications> above stays mounted for the remaining direct
-                  notifications.show callers until they migrate in later slices. */}
+              {/* sonner toasts, backed by src/utils/toastUtils.ts */}
               <Toaster position="bottom-center" />
               <ReactQueryDevtools
                 initialIsOpen={false}

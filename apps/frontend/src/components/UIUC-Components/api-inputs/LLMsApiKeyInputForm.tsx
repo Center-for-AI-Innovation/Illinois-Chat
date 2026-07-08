@@ -10,8 +10,7 @@ import {
   TextInput,
   Title,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import { IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react'
+import { IconX } from '@tabler/icons-react'
 import { useForm, type FieldApi } from '@tanstack/react-form'
 import { useQueryClient } from '@tanstack/react-query'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
@@ -43,6 +42,7 @@ import {
   type WebLLMProvider,
 } from '~/utils/modelProviders/LLMProvider'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
+import { showToast } from '~/utils/toastUtils'
 import { Skeleton } from '@/components/shadcn/ui/skeleton'
 import { GetCurrentPageName } from '../CanViewOnlyCourse'
 import GlobalFooter from '../GlobalFooter'
@@ -1157,46 +1157,11 @@ export const showConfirmationToast = ({
   isError?: boolean
   autoClose?: number
 }) => {
-  notifications.show({
-    id: 'success-toast',
-    withCloseButton: true,
-    onClose: () => console.log('unmounted'),
-    onOpen: () => console.log('mounted'),
-    autoClose: autoClose,
+  showToast({
     title: title,
     message: message,
-    color: isError ? 'red' : 'green',
-    radius: 'lg',
-    icon: isError ? <IconAlertCircle /> : <IconCheck />,
-    className: 'my-notification-class',
-    styles: {
-      root: {
-        backgroundColor: 'var(--notification)', // Dark background to match the page
-        borderColor: isError ? '#E53935' : 'var(--notification-border)', // Red for errors,  for success
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderRadius: '8px', // Added rounded corners
-      },
-      title: {
-        color: 'var(--notification-title)', // White text for the title
-        fontWeight: 600,
-      },
-      description: {
-        color: 'var(--notification-message)', // Light gray text for the message
-      },
-      closeButton: {
-        color: 'var(--notification-title)', // White color for the close button
-        borderRadius: '4px', // Added rounded corners to close button
-        '&:hover': {
-          backgroundColor: 'rgba(255, 255, 255, 0.1)', // Subtle hover effect
-        },
-      },
-      icon: {
-        backgroundColor: 'transparent', // Transparent background for the icon
-        color: isError ? '#E53935' : 'var(--notification-title)', // Icon color matches the border
-      },
-    },
-    loading: false,
+    type: isError ? 'error' : 'success',
+    autoClose: autoClose,
   })
 }
 ModelItem.displayName = 'ModelItem'

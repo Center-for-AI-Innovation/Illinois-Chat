@@ -1,10 +1,6 @@
 // src/components/Chat/Chat.tsx
 import { Button, Text } from '@mantine/core'
-import {
-  IconAlertCircle,
-  IconArrowRight,
-  IconSettings,
-} from '@tabler/icons-react'
+import { IconArrowRight, IconSettings } from '@tabler/icons-react'
 import { useTranslation } from 'next-i18next/pages'
 import {
   type MutableRefObject,
@@ -51,13 +47,11 @@ interface Props {
   documentExists: boolean | null
 }
 
-import { notifications } from '@mantine/notifications'
 import type * as webllm from '@mlc-ai/web-llm'
 import { MLCEngine } from '@mlc-ai/web-llm'
 import { useQueryClient } from '@tanstack/react-query'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { motion } from 'framer-motion'
-import { Montserrat } from 'next/font/google'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
@@ -93,11 +87,7 @@ import {
 import { createLogConversationPayload } from '@/hooks/__internal__/conversation'
 import { useRunAgent } from '@/hooks/queries/useRunAgent'
 import { runServerAgentMode } from './runServerAgentMode'
-
-const montserrat_med = Montserrat({
-  weight: '500',
-  subsets: ['latin'],
-})
+import { showToast } from '~/utils/toastUtils'
 
 const DEFAULT_DOCUMENT_GROUP = {
   id: 'DocGroup-all',
@@ -2201,39 +2191,10 @@ export function errorToast({
   title: string
   message: string
 }) {
-  notifications.show({
-    id: 'error-notification-reused',
-    withCloseButton: true,
-    closeButtonProps: { color: 'red' },
-    onClose: () => console.log('error unmounted'),
-    onOpen: () => console.log('error mounted'),
+  showToast({
+    title,
+    message,
+    type: 'error',
     autoClose: 12000,
-    title: (
-      <Text
-        size={'lg'}
-        className={`${montserrat_med.className} font-bold text-[--notification-title]`}
-      >
-        {title}
-      </Text>
-    ),
-    message: (
-      <Text
-        className={`${montserrat_med.className} text-[--notification-message]`}
-      >
-        {message}
-      </Text>
-    ),
-    color: '',
-    radius: 'lg',
-    icon: <IconAlertCircle color="#fff" aria-hidden="true" />,
-    className: 'my-notification-class',
-    style: {
-      backgroundColor: 'var(--notification)',
-      backdropFilter: 'blur(10px)',
-      borderColor: 'var(--notification-border)',
-      borderLeft: '5px solid var(--notification-highlight)',
-    },
-    withBorder: true,
-    loading: false,
   })
 }
