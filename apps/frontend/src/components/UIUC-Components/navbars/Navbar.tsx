@@ -187,7 +187,7 @@ function NavigationContent({
         aria-label="Toggle Menu"
         aria-expanded={opened}
         onClick={onToggle}
-        className="p-1 text-[--foreground] [&_svg]:size-5 md:hidden"
+        className="p-1 text-[--foreground] md:hidden [&_svg]:size-5"
       >
         {opened ? (
           <IconX size={20} aria-hidden="true" />
