@@ -1,7 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
-import { Button, Title, Flex, Text } from '@mantine/core'
 import { useAuth } from 'react-oidc-context'
 import { montserrat_heading } from 'fonts'
 import { initiateSignIn } from '~/utils/authHelpers'
@@ -74,31 +73,26 @@ export const PermissionGate = ({
           </Link>
         </div>
         <div className="items-left container flex flex-col justify-center gap-2 py-0">
-          <Flex direction="column" align="center" justify="center">
-            <Title
-              className={`${montserrat_heading.variable} font-montserratHeading text-[--foreground]`}
-              order={2}
-              p="xl"
+          <div className="flex flex-col items-center justify-center">
+            <h2
+              className={`${montserrat_heading.variable} p-8 font-montserratHeading text-[2.2rem] font-bold text-[--foreground]`}
             >
               {' '}
               {getTitle()}
-            </Title>
-            <Text
-              className={`${montserrat_heading.variable} font-montserratHeading text-[--foreground]`}
-              size="lg"
-              p="md"
-              ta="center"
+            </h2>
+            <p
+              className={`${montserrat_heading.variable} p-4 text-center font-montserratHeading text-lg text-[--foreground]`}
             >
               {getErrorMessage()}
-            </Text>
+            </p>
             {errorType === 403 && (
               <Link href="/chatbots">
-                <Button
+                <button
                   className="login-btn btn bg-[--button] text-white hover:bg-[--button-hover]"
                   style={{ fontSize: '24px' }}
                 >
                   My Chatbots →
-                </Button>
+                </button>
               </Link>
             )}
             {errorType === 404 && (
@@ -109,26 +103,26 @@ export const PermissionGate = ({
                     : '/new'
                 }
               >
-                <Button
+                <button
                   className="login-btn btn bg-[--button] text-white hover:bg-[--button-hover]"
                   style={{ fontSize: '24px' }}
                 >
                   Create New →
-                </Button>
+                </button>
               </Link>
             )}
             {errorType !== 404 && errorType !== 403 && (
               <Link href="/sign-in">
-                <Button
+                <button
                   className="login-btn btn bg-[--button] text-white hover:bg-[--button-hover]"
                   style={{ fontSize: '24px' }}
                   onClick={handleSignIn}
                 >
                   Sign in →
-                </Button>
+                </button>
               </Link>
             )}
-          </Flex>
+          </div>
         </div>
       </main>
     </>

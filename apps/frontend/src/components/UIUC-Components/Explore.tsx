@@ -1,8 +1,6 @@
 import Head from 'next/head'
 import { useEffect, useState } from 'react'
 
-import { Card } from '@mantine/core'
-import { useMediaQuery } from '@mantine/hooks'
 import router from 'next/router'
 import { createProject } from '~/utils/apiUtils'
 import Navbar from './navbars/Navbar'
@@ -20,7 +18,6 @@ const Dashboard = ({
   is_new_course?: boolean
   project_description?: string
 }) => {
-  const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const [projectName, setProjectName] = useState(project_name || '')
   const [projectDescription, setProjectDescription] = useState(
     project_description || '',
@@ -111,11 +108,8 @@ const Dashboard = ({
         }}
       >
         <h1 className="sr-only">Explore Chatbots</h1>
-        <Card
-          withBorder
-          padding="none"
-          radius="xl"
-          className="mx-auto mt-[2%] w-[96%] md:w-[90%] 2xl:w-[90%]"
+        <div
+          className="mx-auto mt-[2%] w-[96%] overflow-hidden rounded-[2rem] border md:w-[90%] 2xl:w-[90%]"
           style={{
             backgroundColor: 'var(--background)',
             borderColor: 'var(--dashboard-border)',
@@ -130,7 +124,7 @@ const Dashboard = ({
               LLMs, chatbots, and AI…oh my!
             </div>
           </div>
-        </Card>
+        </div>
       </main>
 
       <GlobalFooter />
