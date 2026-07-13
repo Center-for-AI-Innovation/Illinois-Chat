@@ -1,3 +1,5 @@
+import { Button } from '@/components/shadcn/ui/button'
+import { Card } from '@/components/shadcn/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -56,8 +58,8 @@ function DocumentsCard({
   }
 
   return (
-    <div
-      className={`mt-[2%] ${cardWidthClasses} overflow-hidden rounded-[2rem] border`}
+    <Card
+      className={`mt-[2%] ${cardWidthClasses} gap-0 rounded-[2rem] border py-0 text-base shadow-none ring-0`}
       style={{
         backgroundColor: 'var(--background)',
         borderColor: 'var(--dashboard-border)',
@@ -73,16 +75,18 @@ function DocumentsCard({
               {`Are you sure you want to export all the documents and embeddings?`}
             </p>
             <div className="mt-5 flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 className="rounded-md bg-transparent text-white hover:bg-[--dashboard-button-hover]"
                 onClick={() => setExportModalOpened(false)}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="rounded-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover]"
+                variant="dashboard"
+                className="rounded-md"
                 onClick={async () => {
                   setExportModalOpened(false)
                   const result = await handleExport(getCurrentPageName())
@@ -98,7 +102,7 @@ function DocumentsCard({
                 }}
               >
                 Export
-              </button>
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -144,7 +148,7 @@ function DocumentsCard({
           )}
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 
