@@ -3,7 +3,14 @@ import { useMemo, useState } from 'react'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { isSuperAdmin } from '~/utils/superAdmins'
 import { useRouter } from 'next/router'
-import styled from 'styled-components'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/ui/table'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Link from 'next/link'
 import React from 'react'
@@ -14,63 +21,10 @@ import {
 } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 
-const StyledRow = styled.tr`
-  &:hover {
-    color: var(--foreground);
-    background-color: var(--background-faded);
-  }
-`
-
-const StyledTable = styled.table`
-  table-layout: fixed;
-  width: 100%;
-  border-collapse: collapse;
-
-  th,
-  td {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-    padding: 8px;
-    text-align: left;
-
-    color: var(--foreground) !important;
-  }
-
-  thead th {
-    font-weight: 700;
-    border-bottom: 1px solid var(--table-border) !important;
-  }
-
-  tbody td {
-    border-top: 1px solid var(--table-border) !important;
-  }
-`
-
-const ResponsiveTableWrapper = styled.div`
-  overflow-x: auto;
-  width: 100%;
-  color: var(--foreground);
-  background-color: var(--background);
-  border-radius: 15px;
-  padding: 0;
-
-  @media (min-width: 640px) {
-    padding: 0 8px;
-  }
-
-  @media (min-width: 768px) {
-    padding: 0 16px;
-  }
-
-  @media (min-width: 1024px) {
-    padding: 0 24px;
-  }
-
-  @media (min-width: 1280px) {
-    padding: 0 32px;
-  }
-`
+// Shared cell styling: keep the word-wrap/padding/color behavior of the
+// previous custom table (cells must wrap, fixed layout).
+const cellClasses =
+  'whitespace-normal break-words p-2 text-left text-[--foreground] [hyphens:auto]'
 
 type SortDirection = 'asc' | 'desc' | null
 type SortableColumn = 'name' | 'privacy' | 'owner' | 'admins'
@@ -182,11 +136,12 @@ const ListProjectTable: React.FC = () => {
         )
 
         return (
-          <StyledRow
+          <TableRow
             role="row"
             tabIndex={0}
             aria-label={courseName}
             key={courseName}
+            className="cursor-pointer border-[--table-border] hover:bg-[--background-faded] hover:text-[--foreground]"
             onClick={(e) => {
               // Check if cmd (Mac) or ctrl (Windows/Linux) key is pressed
               if (e.metaKey || e.ctrlKey) {
@@ -209,17 +164,21 @@ const ListProjectTable: React.FC = () => {
             }}
             style={{ cursor: 'pointer', color: 'var(--foreground)' }}
           >
-            <td>{courseName}</td>
-            <td>
+            <TableCell className={cellClasses}>{courseName}</TableCell>
+            <TableCell className={cellClasses}>
               {courseMetadata.is_private
                 ? courseMetadata.allow_logged_in_users
                   ? 'Logged-in Users'
                   : 'Private'
                 : 'Public'}
-            </td>
-            <td>{courseMetadata.course_owner}</td>
-            <td>{filteredAdmins.join(', ')}</td>
-          </StyledRow>
+            </TableCell>
+            <TableCell className={cellClasses}>
+              {courseMetadata.course_owner}
+            </TableCell>
+            <TableCell className={cellClasses}>
+              {filteredAdmins.join(', ')}
+            </TableCell>
+          </TableRow>
         )
       })
       .filter((row): row is JSX.Element => row !== null)
@@ -253,16 +212,19 @@ const ListProjectTable: React.FC = () => {
                   padding: '4px',
                 }}
               >
-                <StyledTable role="table" aria-label="Chatbots list">
-                  <thead>
-                    <tr>
+                <Table
+                  className="table-fixed text-base"
+                  aria-label="Chatbots list"
+                >
+                  <TableHeader>
+                    <TableRow className="border-[--table-border] hover:bg-transparent">
                       {[
                         { label: 'Chatbot Name', key: 'name' },
                         { label: 'Privacy', key: 'privacy' },
                         { label: 'Owner', key: 'owner' },
                         { label: 'Admins', key: 'admins' },
                       ].map(({ label, key }) => (
-                        <th
+                        <TableHead
                           key={key}
                           tabIndex={0}
                           aria-sort={
@@ -279,7 +241,7 @@ const ListProjectTable: React.FC = () => {
                               handleSort(key as SortableColumn)
                             }
                           }}
-                          style={{ cursor: 'pointer' }}
+                          className={`h-auto cursor-pointer font-bold ${cellClasses}`}
                         >
                           <div
                             style={{
@@ -296,12 +258,12 @@ const ListProjectTable: React.FC = () => {
                             </span>
                             {getSortIcon(key as SortableColumn)}
                           </div>
-                        </th>
+                        </TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>{rows}</tbody>
-                </StyledTable>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>{rows}</TableBody>
+                </Table>
               </div>
             </>
           ) : (

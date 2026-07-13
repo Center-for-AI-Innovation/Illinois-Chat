@@ -2,6 +2,7 @@ import React from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
 import { useAuth } from 'react-oidc-context'
+import { Button } from '@/components/shadcn/ui/button'
 import { montserrat_heading } from 'fonts'
 import { initiateSignIn } from '~/utils/authHelpers'
 
@@ -87,12 +88,12 @@ export const PermissionGate = ({
             </p>
             {errorType === 403 && (
               <Link href="/chatbots">
-                <button
-                  className="login-btn btn bg-[--button] text-white hover:bg-[--button-hover]"
+                <Button
+                  className="login-btn btn h-auto bg-[--button] text-white hover:bg-[--button-hover]"
                   style={{ fontSize: '24px' }}
                 >
                   My Chatbots →
-                </button>
+                </Button>
               </Link>
             )}
             {errorType === 404 && (
@@ -103,23 +104,23 @@ export const PermissionGate = ({
                     : '/new'
                 }
               >
-                <button
-                  className="login-btn btn bg-[--button] text-white hover:bg-[--button-hover]"
+                <Button
+                  className="login-btn btn h-auto bg-[--button] text-white hover:bg-[--button-hover]"
                   style={{ fontSize: '24px' }}
                 >
                   Create New →
-                </button>
+                </Button>
               </Link>
             )}
             {errorType !== 404 && errorType !== 403 && (
               <Link href="/sign-in">
-                <button
-                  className="login-btn btn bg-[--button] text-white hover:bg-[--button-hover]"
+                <Button
+                  className="login-btn btn h-auto bg-[--button] text-white hover:bg-[--button-hover]"
                   style={{ fontSize: '24px' }}
                   onClick={handleSignIn}
                 >
                   Sign in →
-                </button>
+                </Button>
               </Link>
             )}
           </div>
