@@ -1,6 +1,7 @@
 import Head from 'next/head'
 import { useEffect, useState } from 'react'
 
+import { Card } from '@/components/shadcn/ui/card'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import router from 'next/router'
 import { createProject } from '~/utils/apiUtils'
@@ -126,15 +127,15 @@ const Dashboard = ({
             </p>
           </div>
 
-          <div
-            className="mt-8 min-h-[10rem] overflow-hidden rounded-[2rem] border"
+          <Card
+            className="mt-8 min-h-[10rem] gap-0 rounded-[2rem] border py-0 text-base shadow-none ring-0"
             style={{
               backgroundColor: 'var(--background)',
               borderColor: 'var(--dashboard-border)',
             }}
           >
             <ProjectTable />
-          </div>
+          </Card>
         </div>
       </main>
 

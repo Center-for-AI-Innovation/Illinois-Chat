@@ -7,6 +7,7 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import { montserrat_heading } from 'fonts'
+import { Button } from '@/components/shadcn/ui/button'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -178,20 +179,22 @@ function NavigationContent({
         </div>
       </nav>
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-sm"
         tabIndex={0}
         aria-label="Toggle Menu"
         aria-expanded={opened}
         onClick={onToggle}
-        className="flex items-center justify-center p-1 text-[--foreground] md:hidden"
+        className="p-1 text-[--foreground] md:hidden [&_svg]:size-5"
       >
         {opened ? (
           <IconX size={20} aria-hidden="true" />
         ) : (
           <IconMenu2 size={20} aria-hidden="true" />
         )}
-      </button>
+      </Button>
     </>
   )
 }
