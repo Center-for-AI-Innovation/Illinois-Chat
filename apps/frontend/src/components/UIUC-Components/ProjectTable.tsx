@@ -1,5 +1,4 @@
 import { useAuth } from 'react-oidc-context'
-import { Table, Text } from '@mantine/core'
 import { useMemo, useState } from 'react'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { isSuperAdmin } from '~/utils/superAdmins'
@@ -8,7 +7,6 @@ import styled from 'styled-components'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Link from 'next/link'
 import React from 'react'
-import { useMediaQuery } from '@mantine/hooks'
 import {
   IconChevronUp,
   IconChevronDown,
@@ -23,9 +21,10 @@ const StyledRow = styled.tr`
   }
 `
 
-const StyledTable = styled(Table)`
+const StyledTable = styled.table`
   table-layout: fixed;
   width: 100%;
+  border-collapse: collapse;
 
   th,
   td {
@@ -33,16 +32,18 @@ const StyledTable = styled(Table)`
     overflow-wrap: break-word;
     hyphens: auto;
     padding: 8px;
+    text-align: left;
 
     color: var(--foreground) !important;
   }
 
   thead th {
-    border-bottom-color: var(--table-border) !important;
+    font-weight: 700;
+    border-bottom: 1px solid var(--table-border) !important;
   }
 
   tbody td {
-    border-top-color: var(--table-border) !important;
+    border-top: 1px solid var(--table-border) !important;
   }
 `
 
@@ -77,7 +78,6 @@ type SortableColumn = 'name' | 'privacy' | 'owner' | 'admins'
 const ListProjectTable: React.FC = () => {
   const auth = useAuth()
   const router = useRouter()
-  const isMobile = useMediaQuery('(max-width: 768px)')
   const [sortColumn, setSortColumn] = useState<SortableColumn>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
@@ -317,10 +317,8 @@ const ListProjectTable: React.FC = () => {
               </div>
             </>
           ) : (
-            <Text
-              size="md"
-              className={`pt-2 ${montserrat_heading.variable} font-montserratHeading`}
-              bg={'bg-transparent'}
+            <p
+              className={`pt-2 text-base ${montserrat_heading.variable} font-montserratHeading`}
               style={{
                 backgroundColor: 'transparent',
                 textAlign: 'center',
@@ -338,7 +336,7 @@ const ListProjectTable: React.FC = () => {
                 go make one here
               </Link>
               , don&apos;t worry it&apos;s easy.
-            </Text>
+            </p>
           )}
         </div>
       </>
