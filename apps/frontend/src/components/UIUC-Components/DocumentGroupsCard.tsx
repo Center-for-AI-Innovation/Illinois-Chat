@@ -1,5 +1,3 @@
-import { ActionIcon, Card, Text, Title } from '@mantine/core'
-import { useMediaQuery } from '@mantine/hooks'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -14,18 +12,14 @@ function DocumentGroupsCard({
   course_name: string
   sidebarCollapsed?: boolean
 }) {
-  const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const [accordionOpened, setAccordionOpened] = useState(false)
 
   // Get responsive card width classes based on sidebar state
   const cardWidthClasses = useResponsiveCardWidth(sidebarCollapsed || false)
 
   return (
-    <Card
-      withBorder
-      padding="none"
-      radius="xl"
-      className={`mt-[2%] ${cardWidthClasses}`}
+    <div
+      className={`mt-[2%] ${cardWidthClasses} overflow-hidden rounded-[2rem] border`}
       style={{
         backgroundColor: 'var(--background)',
         borderColor: 'var(--dashboard-border)',
@@ -40,24 +34,22 @@ function DocumentGroupsCard({
         <div className="w-full border-b border-[--dashboard-border] px-4 py-3 sm:px-6 sm:py-4 md:px-8">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <Title
-                order={3}
-                className={`${montserrat_heading.variable} font-montserratHeading text-lg text-[--foreground] sm:text-2xl`}
+              <h3
+                className={`${montserrat_heading.variable} font-montserratHeading text-lg font-bold text-[--foreground] sm:text-2xl`}
               >
                 Document Groups
-              </Title>
-              <ActionIcon
-                variant="subtle"
-                color="var(--foreground-faded)"
+              </h3>
+              <button
+                type="button"
                 onClick={() => setAccordionOpened(!accordionOpened)}
-                className="hover:bg-[--background]"
                 title="More info on document groups"
+                className="inline-flex items-center justify-center rounded-md p-1 hover:bg-[--background]"
               >
                 <IconInfoCircle
                   className="text-[--foreground-faded] hover:text-[--foreground]"
                   aria-hidden="true"
                 />
-              </ActionIcon>
+              </button>
             </div>
           </div>
         </div>
@@ -77,12 +69,12 @@ function DocumentGroupsCard({
                   <div
                     className={`${montserrat_paragraph.variable} mb-4 flex-1 p-4 font-montserratParagraph`}
                   >
-                    <Text
+                    <p
                       className={`${montserrat_paragraph.variable} mb-4 font-montserratParagraph text-[--foreground]`}
                     >
                       Document Groups help you organize and control your
                       content:
-                    </Text>
+                    </p>
                     <ul className="list-inside list-disc space-y-2 text-[--foreground]">
                       <li className="text-sm">
                         <span className="text-[--illinois-orange]">
@@ -112,7 +104,7 @@ function DocumentGroupsCard({
           <DocGroupsTable course_name={course_name} />
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
