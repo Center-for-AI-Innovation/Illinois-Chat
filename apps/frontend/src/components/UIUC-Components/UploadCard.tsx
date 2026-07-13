@@ -1,3 +1,5 @@
+import { Button } from '@/components/shadcn/ui/button'
+import { Card } from '@/components/shadcn/ui/card'
 import { Textarea } from '@/components/shadcn/ui/textarea'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import {
@@ -87,8 +89,8 @@ export const UploadCard = memo(function UploadCard({
     setUploadFiles(updateFn)
   }
   return (
-    <div
-      className={`mt-[2%] ${cardWidthClasses} overflow-hidden rounded-[2rem] border`}
+    <Card
+      className={`mt-[2%] ${cardWidthClasses} gap-0 rounded-[2rem] border py-0 text-base shadow-none ring-0`}
       style={{
         backgroundColor: 'var(--background)',
         borderColor: 'var(--dashboard-border)',
@@ -126,10 +128,11 @@ export const UploadCard = memo(function UploadCard({
               </div>
 
               <div className="-inset-0.25 relative shrink-0 rounded-3xl p-0.5">
-                <button
+                <Button
                   type="button"
+                  variant="dashboard"
                   onClick={() => setIsShareModalOpen(true)}
-                  className={`relative transform rounded-3xl bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button] ${montserrat_paragraph.variable} min-h-[2rem] px-2 font-montserratParagraph text-sm sm:min-h-[2.5rem] sm:px-4 sm:text-base`}
+                  className={`relative h-auto transform rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button] ${montserrat_paragraph.variable} min-h-[2rem] px-2 font-montserratParagraph text-sm font-normal sm:min-h-[2.5rem] sm:px-4 sm:text-base`}
                 >
                   <span className="hidden sm:inline">Sharing and Access</span>
                   <span className="inline sm:hidden">Access</span>
@@ -143,7 +146,7 @@ export const UploadCard = memo(function UploadCard({
                     className="ml-2 hidden sm:inline"
                     aria-hidden="true"
                   />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -216,10 +219,11 @@ export const UploadCard = memo(function UploadCard({
                 onChange={(e) => setProjectDescription(e.target.value)}
                 className={`${montserrat_paragraph.variable} min-h-[7rem] bg-[--background] font-montserratParagraph text-base text-[--foreground]`}
               />
-              <button
+              <Button
                 type="button"
+                variant="dashboard"
                 tabIndex={0}
-                className="mt-3 w-24 self-end bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover]"
+                className="mt-3 w-24 self-end"
                 onClick={async () => {
                   if (metadata) {
                     metadata.project_description = projectDescription
@@ -237,7 +241,7 @@ export const UploadCard = memo(function UploadCard({
                 }}
               >
                 Update
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-2">
@@ -273,9 +277,10 @@ export const UploadCard = memo(function UploadCard({
                 />
                 {isIntroMessageUpdated && (
                   <>
-                    <button
+                    <Button
+                      variant="dashboard"
                       tabIndex={0}
-                      className="relative m-1 w-[30%] self-end bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover]"
+                      className="relative m-1 w-[30%] self-end"
                       type="submit"
                       onClick={async () => {
                         setIsIntroMessageUpdated(false)
@@ -297,7 +302,7 @@ export const UploadCard = memo(function UploadCard({
                       }}
                     >
                       Submit
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -369,6 +374,6 @@ export const UploadCard = memo(function UploadCard({
           course_admins: metadata.course_admins || [],
         }}
       />
-    </div>
+    </Card>
   )
 })

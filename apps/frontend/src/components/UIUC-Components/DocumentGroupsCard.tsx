@@ -1,3 +1,5 @@
+import { Button } from '@/components/shadcn/ui/button'
+import { Card } from '@/components/shadcn/ui/card'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -18,8 +20,8 @@ function DocumentGroupsCard({
   const cardWidthClasses = useResponsiveCardWidth(sidebarCollapsed || false)
 
   return (
-    <div
-      className={`mt-[2%] ${cardWidthClasses} overflow-hidden rounded-[2rem] border`}
+    <Card
+      className={`mt-[2%] ${cardWidthClasses} gap-0 rounded-[2rem] border py-0 text-base shadow-none ring-0`}
       style={{
         backgroundColor: 'var(--background)',
         borderColor: 'var(--dashboard-border)',
@@ -39,17 +41,19 @@ function DocumentGroupsCard({
               >
                 Document Groups
               </h3>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => setAccordionOpened(!accordionOpened)}
                 title="More info on document groups"
-                className="inline-flex items-center justify-center rounded-md p-1 hover:bg-[--background]"
+                className="hover:bg-[--background] [&_svg]:size-6"
               >
                 <IconInfoCircle
                   className="text-[--foreground-faded] hover:text-[--foreground]"
                   aria-hidden="true"
                 />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -104,7 +108,7 @@ function DocumentGroupsCard({
           <DocGroupsTable course_name={course_name} />
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 
