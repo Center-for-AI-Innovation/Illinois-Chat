@@ -7,13 +7,8 @@ import { http, HttpResponse } from 'msw'
 import { server } from '~/test-utils/server'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
 }))
 
 vi.mock('~/components/Layout/SettingsLayout', () => ({
@@ -272,7 +267,7 @@ describe('N8NPage – API key fetch edge cases', () => {
 describe('N8NPage – handleSaveApiKey edge cases', () => {
   it('shows error toast when isErrorTools is true after saving', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/tools' }
     globalThis.__TEST_AUTH__ = {
@@ -310,9 +305,10 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
     await user.click(screen.getByRole('button', { name: /Save/i }))
 
     await waitFor(() => {
-      expect((notifications as any).show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'error-notification',
+          title: 'Error fetching workflows',
+          message: 'No records found. Please check your API key and try again.',
         }),
       )
     })
@@ -320,7 +316,7 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
 
   it('shows error toast when flows_table is null/undefined after saving', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/tools' }
     globalThis.__TEST_AUTH__ = {
@@ -358,7 +354,7 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
     await user.click(screen.getByRole('button', { name: /Save/i }))
 
     await waitFor(() => {
-      expect((notifications as any).show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
           message: 'Failed to fetch workflows. Please try again later.',
@@ -369,7 +365,7 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
 
   it('shows error toast when upsert response is not ok', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/tools' }
     globalThis.__TEST_AUTH__ = {
@@ -407,7 +403,7 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
     await user.click(screen.getByRole('button', { name: /Save/i }))
 
     await waitFor(() => {
-      expect((notifications as any).show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
           message: 'Failed to save n8n API Key. Please try again later.',
@@ -418,7 +414,7 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
 
   it('shows success toast when upsert succeeds with valid key', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/tools' }
     globalThis.__TEST_AUTH__ = {
@@ -456,10 +452,10 @@ describe('N8NPage – handleSaveApiKey edge cases', () => {
     await user.click(screen.getByRole('button', { name: /Save/i }))
 
     await waitFor(() => {
-      expect((notifications as any).show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'n8n-api-key-saved',
           title: 'Success',
+          message: 'n8n API Key saved successfully!',
         }),
       )
     })

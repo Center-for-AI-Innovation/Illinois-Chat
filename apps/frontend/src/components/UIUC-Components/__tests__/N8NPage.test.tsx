@@ -7,13 +7,8 @@ import { http, HttpResponse } from 'msw'
 import { server } from '~/test-utils/server'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
 }))
 
 vi.mock('~/components/Layout/SettingsLayout', () => ({
@@ -113,7 +108,7 @@ describe('N8NPage', () => {
 
   it('shows an error toast and does not upsert when the key test fails', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/tools' }
     globalThis.__TEST_AUTH__ = {
@@ -145,13 +140,18 @@ describe('N8NPage', () => {
     )
     await user.click(screen.getByRole('button', { name: /Save/i }))
 
-    expect((notifications as any).show).toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Key appears invalid',
+        type: 'error',
+      }),
+    )
     expect(upsertedKey).toBe(false)
   }, 20_000)
 
   it('allows saving an empty key and marks the workflow table as empty', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/tools' }
     globalThis.__TEST_AUTH__ = {
@@ -185,7 +185,7 @@ describe('N8NPage', () => {
     await user.clear(input)
     await user.click(screen.getByRole('button', { name: /Save/i }))
 
-    expect((notifications as any).show).toHaveBeenCalled()
+    expect(showToast).toHaveBeenCalled()
     globalThis.__TEST_N8N_WORKFLOWS__ = undefined
   }, 20_000)
 })

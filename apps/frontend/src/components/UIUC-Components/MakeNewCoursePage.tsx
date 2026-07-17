@@ -6,10 +6,10 @@ import { Card, Flex, Title } from '@mantine/core'
 import { Button } from '@/components/shadcn/ui/button'
 import { LoaderCircle } from 'lucide-react'
 import { useDebouncedValue } from '@mantine/hooks'
-import { notifications } from '@mantine/notifications'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createProject } from '~/utils/apiUtils'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
+import { showToast } from '~/utils/toastUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import Navbar from './navbars/Navbar'
 import UploadNotification, { type FileUpload } from './UploadNotification'
@@ -270,12 +270,12 @@ const MakeNewCoursePage = ({
       const err = error as Error & { status?: number; error?: string }
       if (err.status === 409) {
         // Project name already exists - race condition caught by server
-        notifications.show({
+        showToast({
           title: 'Project name already taken',
           message:
             err.message ||
             `A project with the name "${project_name}" already exists. Please choose a different name.`,
-          color: 'red',
+          type: 'error',
           autoClose: 5000,
         })
         // Invalidate the query to refresh availability check
@@ -285,12 +285,12 @@ const MakeNewCoursePage = ({
         })
       } else {
         // Other errors
-        notifications.show({
+        showToast({
           title: 'Failed to create project',
           message:
             err.message ||
             'An error occurred while creating the project. Please try again.',
-          color: 'red',
+          type: 'error',
           autoClose: 5000,
         })
       }
