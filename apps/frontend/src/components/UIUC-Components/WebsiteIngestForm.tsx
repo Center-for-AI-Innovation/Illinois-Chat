@@ -71,6 +71,12 @@ const strategyLabel = (strategy: string | null | undefined) =>
 const fileCountLabel = (count: number) =>
   `${count} ${count === 1 ? 'file' : 'files'}`
 
+// Normalize a URL for equality checks: strip trailing slashes so a saved
+// scrape (the backend stores its url without one, see formatUrl in
+// scrapeWeb.ts) matches a typed URL that has one — and vice versa.
+const normalizeUrlForMatch = (url: string | null | undefined) =>
+  (url ?? '').replace(/\/+$/, '')
+
 // Secondary line for a suggestion: "Equal and Below · 50 urls · 3 files · 3 days ago"
 const scrapeRunSummary = (run: ScrapeRun) => {
   const when = run.last_run_at
@@ -303,7 +309,7 @@ export default function WebsiteIngestForm({
     () =>
       (scrapeRuns ?? []).find(
         (run) =>
-          run.url === url &&
+          normalizeUrlForMatch(run.url) === normalizeUrlForMatch(url) &&
           String(run.max_urls ?? 50) === maxUrls &&
           (run.scrape_strategy ?? 'equal-and-below') === scrapeStrategy,
       ) ?? null,
@@ -315,7 +321,7 @@ export default function WebsiteIngestForm({
     if (!urlBrowseAll) return null
     const match = (scrapeRuns ?? []).find(
       (run) =>
-        run.url === url &&
+        normalizeUrlForMatch(run.url) === normalizeUrlForMatch(url) &&
         String(run.max_urls ?? 50) === maxUrls &&
         (run.scrape_strategy ?? 'equal-and-below') === scrapeStrategy,
     )
@@ -502,6 +508,24 @@ export default function WebsiteIngestForm({
         `/api/materialsTable/successDocs?course_name=${project_name}`,
       )
       const docsData = await docsResponse.json()
+      // Strip trailing slashes so the user-entered URL and the backend-stored
+      // base_url compare equal even when one has a trailing slash and the
+      // other doesn't. Without this a "/a/" base URL never matches its
+      // completed doc, so the toast is stuck "ingesting" forever.
+      const normalizeUrl = (url: string | undefined | null) =>
+        (url ?? '').replace(/\/+$/, '')
+
+      const baseUrlMatchesFile = (
+        docBaseUrl: string,
+        file: FileUpload,
+      ): boolean => {
+        const normBase = normalizeUrl(docBaseUrl)
+        return (
+          normalizeUrl(file.name) === normBase ||
+          normalizeUrl(file.url) === normBase
+        )
+      }
+
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (
         docs: Array<{ base_url: string; url: string }>,
@@ -509,10 +533,11 @@ export default function WebsiteIngestForm({
         const baseUrlMap = new Map<string, Set<string>>()
 
         docs.forEach((doc) => {
-          if (!baseUrlMap.has(doc.base_url)) {
-            baseUrlMap.set(doc.base_url, new Set())
+          const key = normalizeUrl(doc.base_url)
+          if (!baseUrlMap.has(key)) {
+            baseUrlMap.set(key, new Set())
           }
-          baseUrlMap.get(doc.base_url)?.add(doc.url)
+          baseUrlMap.get(key)?.add(doc.url)
         })
 
         return baseUrlMap
@@ -527,10 +552,8 @@ export default function WebsiteIngestForm({
           if (file.type !== 'webscrape') return file
           const fileUrl = file.url ?? ''
 
-          const isStillIngesting = docsInProgress.some(
-            (doc) =>
-              doc.base_url === file.name ||
-              (file.isBaseUrl && doc.base_url === file.url),
+          const isStillIngesting = docsInProgress.some((doc) =>
+            baseUrlMatchesFile(doc.base_url, file),
           )
 
           if (file.status === 'uploading' && isStillIngesting) {
@@ -549,8 +572,9 @@ export default function WebsiteIngestForm({
 
               const isInCompletedDocs = docsData?.documents?.some(
                 (doc: { url: string; base_url?: string }) =>
-                  doc.url === file.url ||
-                  (file.isBaseUrl && doc.base_url === file.url),
+                  normalizeUrl(doc.url) === normalizeUrl(file.url) ||
+                  (file.isBaseUrl &&
+                    normalizeUrl(doc.base_url) === normalizeUrl(file.url)),
               )
 
               if (file.isBaseUrl && allChildrenDone && isInCompletedDocs) {
@@ -569,37 +593,54 @@ export default function WebsiteIngestForm({
         })
       }
 
-      // Helper function to create new file entries for additional URLs
+      // Helper function to create new file entries for additional URLs.
+      // Includes both in-progress and already-completed docs so that URLs
+      // which finished crawling between polls still show up in the toast.
       const createAdditionalFileEntries = (
-        baseUrlMap: Map<string, Set<string>>,
+        inProgressBaseUrlMap: Map<string, Set<string>>,
+        successBaseUrlMap: Map<string, Set<string>>,
         currentFiles: FileUpload[],
-        docsInProgress: Array<{ base_url: string; readable_filename: string }>,
       ) => {
         const newFiles: FileUpload[] = []
+        const seenUrls = new Set<string>()
 
-        baseUrlMap.forEach((urls, baseUrl) => {
-          // Only process if we have this base URL in our current files
-          if (currentFiles.some((file) => file.name === baseUrl)) {
-            const matchingDoc = docsInProgress.find(
-              (doc) => doc.base_url === baseUrl,
-            )
+        const hasMatchingBaseUrl = (baseUrl: string) =>
+          currentFiles.some((file) => baseUrlMatchesFile(baseUrl, file))
 
-            const isStillIngesting = matchingDoc !== undefined
+        const alreadyTracked = (url: string) =>
+          seenUrls.has(url) ||
+          currentFiles.some(
+            (file) =>
+              normalizeUrl(file.url) === normalizeUrl(url) ||
+              normalizeUrl(file.name) === normalizeUrl(url),
+          )
 
-            urls.forEach((url) => {
-              if (
-                !currentFiles.some((file) => file.url === url) &&
-                matchingDoc
-              ) {
-                newFiles.push({
-                  name: url,
-                  status: isStillIngesting ? 'ingesting' : 'complete',
-                  type: 'webscrape',
-                  url: url,
-                })
-              }
+        inProgressBaseUrlMap.forEach((urls, baseUrl) => {
+          if (!hasMatchingBaseUrl(baseUrl)) return
+          urls.forEach((url) => {
+            if (alreadyTracked(url)) return
+            seenUrls.add(url)
+            newFiles.push({
+              name: url,
+              status: 'ingesting',
+              type: 'webscrape',
+              url: url,
             })
-          }
+          })
+        })
+
+        successBaseUrlMap.forEach((urls, baseUrl) => {
+          if (!hasMatchingBaseUrl(baseUrl)) return
+          urls.forEach((url) => {
+            if (alreadyTracked(url)) return
+            seenUrls.add(url)
+            newFiles.push({
+              name: url,
+              status: 'complete',
+              type: 'webscrape',
+              url: url,
+            })
+          })
         })
 
         return newFiles
@@ -608,15 +649,23 @@ export default function WebsiteIngestForm({
       setUploadFiles((prev) => {
         const matchingDocsInProgress =
           data?.documents?.filter((doc: { base_url: string }) =>
-            prev.some((file) => file.name === doc.base_url),
+            prev.some((file) => baseUrlMatchesFile(doc.base_url, file)),
           ) || []
 
-        const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress)
+        const matchingSuccessDocs =
+          docsData?.documents?.filter((doc: { base_url: string }) =>
+            prev.some((file) => baseUrlMatchesFile(doc.base_url, file)),
+          ) || []
+
+        const inProgressBaseUrlMap = organizeDocsByBaseUrl(
+          matchingDocsInProgress,
+        )
+        const successBaseUrlMap = organizeDocsByBaseUrl(matchingSuccessDocs)
 
         const additionalFiles = createAdditionalFileEntries(
-          baseUrlMap,
+          inProgressBaseUrlMap,
+          successBaseUrlMap,
           prev,
-          matchingDocsInProgress,
         )
 
         const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress)

@@ -15,6 +15,26 @@ vi.mock('axios', () => ({
   default: { post: hoisted.axiosPost },
 }))
 
+// Avoid opening a real Postgres client (dbClient connects at import). The run
+// upsert is best-effort in the handler, so a lightweight stub is enough.
+vi.mock('~/db/dbClient', () => ({
+  db: {
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([{ id: 'run-1' }]),
+        }),
+      }),
+    }),
+  },
+  scrapeMetadataRun: {
+    course_name: 'course_name',
+    url: 'url',
+    max_urls: 'max_urls',
+    scrape_strategy: 'scrape_strategy',
+  },
+}))
+
 import handler from '~/pages/api/scrapeWeb'
 
 describe('scrapeWeb API', () => {
@@ -80,6 +100,32 @@ describe('scrapeWeb API', () => {
       'http://crawlee',
       expect.any(Object),
     )
+    expect(res.status).toHaveBeenCalledWith(200)
+  })
+
+  it('strips a trailing slash so slash variants map to one scrape run', async () => {
+    process.env.CRAWLEE_API_URL = 'http://crawlee'
+    hoisted.axiosPost.mockResolvedValueOnce({ data: { ok: true } })
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          url: 'https://crawl-fixture.netlify.app/',
+          courseName: 'CS101',
+          maxUrls: 2,
+          scrapeStrategy: 'default',
+        },
+      }) as any,
+      res as any,
+    )
+
+    // fullUrl feeds both the stored scrape-run identity and this crawlee body,
+    // so a canonical (slash-stripped) value here means '.../' and '...' upsert
+    // into the same run row instead of creating a duplicate empty run.
+    const [, payload] = hoisted.axiosPost.mock.calls[0]
+    expect(payload.params.url).toBe('https://crawl-fixture.netlify.app')
     expect(res.status).toHaveBeenCalledWith(200)
   })
 

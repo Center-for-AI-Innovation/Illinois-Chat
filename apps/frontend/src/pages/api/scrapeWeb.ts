@@ -21,7 +21,8 @@ const formatUrl = (url: string) => {
   if (!/^https?:\/\//i.test(url)) {
     url = 'http://' + url
   }
-  return url
+  // Canonicalize trailing slashes.
+  return url.replace(/\/+$/, '')
 }
 
 const formatUrlAndMatchRegex = (url: string) => {
