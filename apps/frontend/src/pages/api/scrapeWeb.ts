@@ -2,12 +2,17 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import axios from 'axios'
 import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { db, scrapeMetadataRun } from '~/db/dbClient'
 
 interface ScrapeRequestBody {
   url: string | null
   courseName: string | null
   maxUrls: number
   scrapeStrategy: string
+  // Only present on an "unchanged reuse" re-ingest. Absent for new/changed scrapes.
+  deleteMissing?: boolean
+  updateExisting?: boolean
+  addNew?: boolean
 }
 
 export default withCourseOwnerOrAdminAccess()(handler)
@@ -16,7 +21,8 @@ const formatUrl = (url: string) => {
   if (!/^https?:\/\//i.test(url)) {
     url = 'http://' + url
   }
-  return url
+  // Canonicalize trailing slashes.
+  return url.replace(/\/+$/, '')
 }
 
 const formatUrlAndMatchRegex = (url: string) => {
@@ -46,7 +52,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { url, courseName, maxUrls, scrapeStrategy } =
+  const { url, courseName, maxUrls, scrapeStrategy, deleteMissing, updateExisting, addNew } =
     req.body as ScrapeRequestBody
 
   if (!url || !courseName) {
@@ -55,6 +61,37 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     const fullUrl = formatUrl(url)
+
+    // Record the scrape parameters so users can reuse them on future scrapes.
+    // One row per distinct (course_name, url, max_urls, scrape_strategy);
+    // re-running an identical scrape just bumps last_run_at. We need the row id
+    // to thread to Crawlee (so ingested docs get linked to this scrape). A DB
+    // failure here must not block the actual scrape, so it's best-effort.
+    let scrapeMetadataRunId: string | undefined
+    try {
+      const rows = await db
+        .insert(scrapeMetadataRun)
+        .values({
+          course_name: courseName,
+          url: fullUrl,
+          max_urls: maxUrls,
+          scrape_strategy: scrapeStrategy,
+        })
+        .onConflictDoUpdate({
+          target: [
+            scrapeMetadataRun.course_name,
+            scrapeMetadataRun.url,
+            scrapeMetadataRun.max_urls,
+            scrapeMetadataRun.scrape_strategy,
+          ],
+          set: { last_run_at: new Date() },
+        })
+        .returning({ id: scrapeMetadataRun.id })
+      scrapeMetadataRunId = rows[0]?.id
+    } catch (recordError) {
+      console.error('Failed to record scrape run metadata:', recordError)
+    }
+
     const postParams = {
       url: fullUrl,
       courseName: courseName,
@@ -62,6 +99,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       scrapeStrategy: scrapeStrategy,
       match: formatUrlAndMatchRegex(fullUrl).matchRegex,
       maxTokens: 2000000,
+      // Threaded to Crawlee -> each page's /ingest body -> the worker, which
+      // links the resulting document to this scrape run. The three flags are
+      // only meaningful on an unchanged-reuse re-ingest (otherwise undefined).
+      scrapeMetadataRunId,
+      deleteMissing,
+      updateExisting,
+      addNew,
     }
 
     const crawleeApiUrl = process.env.CRAWLEE_API_URL

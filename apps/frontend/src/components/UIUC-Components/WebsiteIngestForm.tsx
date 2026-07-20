@@ -1,16 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Text,
   Card,
   Tooltip,
   Button,
-  Input,
+  Autocomplete,
+  type AutocompleteItem,
+  ActionIcon,
   TextInput,
   List,
   SegmentedControl,
   Center,
   rem,
 } from '@mantine/core'
+import { Switch } from '@/components/shadcn/ui/switch'
+import { formatDistanceToNow } from 'date-fns'
+import { useFetchScrapeRuns } from '~/hooks/queries/useFetchScrapeRuns'
+import { useDeleteScrapeRun } from '~/hooks/queries/useDeleteScrapeRun'
+import { type ScrapeRun } from '~/pages/api/scrapeRuns'
 import {
   Dialog,
   DialogContent,
@@ -26,10 +33,14 @@ import {
   IconWorld,
   IconWorldDownload,
   IconArrowRight,
+  IconTrash,
+  IconInfoCircle,
+  IconChevronDown,
+  IconChevronUp,
 } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 // import { Checkbox } from '@radix-ui/react-checkbox'
 import { montserrat_heading } from 'fonts'
 import { notifications } from '@mantine/notifications'
@@ -42,6 +53,136 @@ const montserrat_med = Montserrat({
   weight: '500',
   subsets: ['latin'],
 })
+
+// Human-readable labels for the scrape strategy values used by SegmentedControl.
+const SCRAPE_STRATEGY_LABELS: Record<string, string> = {
+  'equal-and-below': 'Equal and Below',
+  'same-hostname': 'Subdomain',
+  'same-domain': 'Entire domain',
+  all: 'All',
+}
+
+const strategyLabel = (strategy: string | null | undefined) =>
+  (strategy && SCRAPE_STRATEGY_LABELS[strategy]) ||
+  strategy ||
+  'Equal and Below'
+
+// "3 files" / "1 file" / "0 files"
+const fileCountLabel = (count: number) =>
+  `${count} ${count === 1 ? 'file' : 'files'}`
+
+// Normalize a URL for equality checks: strip trailing slashes so a saved
+// scrape (the backend stores its url without one, see formatUrl in
+// scrapeWeb.ts) matches a typed URL that has one — and vice versa.
+const normalizeUrlForMatch = (url: string | null | undefined) =>
+  (url ?? '').replace(/\/+$/, '')
+
+// Secondary line for a suggestion: "Equal and Below · 50 urls · 3 files · 3 days ago"
+const scrapeRunSummary = (run: ScrapeRun) => {
+  const when = run.last_run_at
+    ? formatDistanceToNow(new Date(run.last_run_at), { addSuffix: true })
+    : ''
+  return [
+    strategyLabel(run.scrape_strategy),
+    `${run.max_urls ?? 50} urls`,
+    fileCountLabel(run.document_count ?? 0),
+    when,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+// Each Autocomplete suggestion carries the underlying run so onItemSubmit can
+// apply its exact params. `value` is unique (url + id) to keep React keys clean
+// when the same URL has several param sets; the input is corrected back to the
+// bare URL on select (see handleSuggestionSubmit).
+interface ScrapeRunAutocompleteItem extends AutocompleteItem {
+  url: string
+  summary: string
+  run: ScrapeRun
+  onRequestDelete: (run: ScrapeRun) => void
+  highlightCurrent?: boolean
+  onBrowseItemMouseEnter?: () => void
+}
+
+const ScrapeRunAutocompleteOption = forwardRef<
+  HTMLDivElement,
+  React.ComponentPropsWithoutRef<'div'> & {
+    url: string
+    summary: string
+    run: ScrapeRun
+    onRequestDelete: (run: ScrapeRun) => void
+    highlightCurrent?: boolean
+    onBrowseItemMouseEnter?: () => void
+  }
+>(
+  (
+    {
+      url,
+      summary,
+      run,
+      onRequestDelete,
+      highlightCurrent,
+      onBrowseItemMouseEnter,
+      value: _value,
+      onMouseEnter: mantineOnMouseEnter,
+      ...others
+    }: any,
+    ref,
+  ) => {
+    const mantineHovered = others['data-hovered']
+
+    return (
+      <div
+        ref={ref}
+        {...others}
+        onMouseEnter={(e) => {
+          mantineOnMouseEnter?.(e)
+          onBrowseItemMouseEnter?.()
+        }}
+        data-hovered={(mantineHovered || highlightCurrent) || undefined}
+        style={{
+          ...others.style,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          ...(highlightCurrent && !mantineHovered
+            ? {
+                color: 'var(--foreground)',
+                backgroundColor: 'var(--foreground-faded)',
+              }
+            : {}),
+        }}
+      >
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <Text size="sm" truncate>
+          {url}
+        </Text>
+        <Text size="xs" opacity={0.6} truncate>
+          {summary}
+        </Text>
+      </div>
+      <ActionIcon
+        size="sm"
+        variant="subtle"
+        color="red"
+        aria-label={`Delete saved scrape ${url}`}
+        // mousedown (not click): Mantine commits a suggestion selection on
+        // mousedown, so prevent + stop it here to delete instead of pick.
+        onMouseDown={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onRequestDelete(run)
+        }}
+      >
+        <IconTrash size={16} />
+      </ActionIcon>
+    </div>
+    )
+  },
+)
+ScrapeRunAutocompleteOption.displayName = 'ScrapeRunAutocompleteOption'
+
 export default function WebsiteIngestForm({
   project_name,
   setUploadFiles,
@@ -99,11 +240,182 @@ export default function WebsiteIngestForm({
   const [scrapeStrategy, setScrapeStrategy] =
     useState<string>('equal-and-below')
   const [open, setOpen] = useState(false)
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value
+  // Re-ingest options — shown only when the form exactly matches a saved scrape
+  // (an unchanged reuse). Editing any field breaks the match and hides them.
+  const [deleteMissing, setDeleteMissing] = useState(false)
+  const [updateExisting, setUpdateExisting] = useState(true)
+  const [addNew, setAddNew] = useState(true)
+  // Toggles the per-method explanations under "Limit web crawl" (info icon).
+  const [crawlInfoOpened, setCrawlInfoOpened] = useState(false)
+
+  // The saved scrape the user is about to delete (drives the confirm overlay).
+  const [runPendingDelete, setRunPendingDelete] = useState<ScrapeRun | null>(
+    null,
+  )
+  // When true, confirming the delete also removes the documents this scrape
+  // produced (not just the saved parameters). Reset whenever the overlay opens
+  // or closes — see the effect below.
+  const [deleteFilesWithRun, setDeleteFilesWithRun] = useState(false)
+  const urlInputRef = useRef<HTMLInputElement>(null)
+  const [urlDropdownOpened, setUrlDropdownOpened] = useState(false)
+  // When true, the URL dropdown lists every saved scrape (not filtered by the
+  // current input). Typing switches back to search mode.
+  const [urlBrowseAll, setUrlBrowseAll] = useState(false)
+  // Clears the default "current selection" highlight once the user hovers any item.
+  const [urlBrowseHighlightSuppressed, setUrlBrowseHighlightSuppressed] =
+    useState(false)
+
+  const enterUrlBrowseMode = () => {
+    setUrlBrowseAll(true)
+    setUrlBrowseHighlightSuppressed(false)
+  }
+
+  // Open the confirm overlay and close the autocomplete dropdown (blur the
+  // input) so the dropdown isn't left open behind the confirmation.
+  const requestDelete = (run: ScrapeRun) => {
+    setRunPendingDelete(run)
+    urlInputRef.current?.blur()
+  }
+
+  // Every time the confirm overlay is shown or hidden, start from the safe
+  // default (files kept) so a prior "on" never carries into the next delete.
+  useEffect(() => {
+    setDeleteFilesWithRun(false)
+  }, [runPendingDelete])
+
+  // Previous scrape parameter sets for this project (most-recently-used first).
+  const { data: scrapeRuns } = useFetchScrapeRuns({ courseName: project_name })
+  const deleteScrapeRun = useDeleteScrapeRun({ courseName: project_name })
+
+  // One suggestion per distinct param set; `value` unique to avoid key clashes.
+  const scrapeRunSuggestions: ScrapeRunAutocompleteItem[] = useMemo(
+    () =>
+      (scrapeRuns ?? []).map((run) => ({
+        value: `${run.url} ${run.id}`,
+        url: run.url,
+        summary: scrapeRunSummary(run),
+        run,
+        onRequestDelete: requestDelete,
+      })),
+    [scrapeRuns],
+  )
+
+  const hasScrapeHistory = scrapeRunSuggestions.length > 0
+
+  // The saved scrape the current form values exactly reproduce, if any. Present
+  // => the user reused a previous scrape and changed nothing => "re-ingest" mode
+  // (button label + the three re-ingest toggles). Any edit breaks the match.
+  const matchedReuseRun = useMemo(
+    () =>
+      (scrapeRuns ?? []).find(
+        (run) =>
+          normalizeUrlForMatch(run.url) === normalizeUrlForMatch(url) &&
+          String(run.max_urls ?? 50) === maxUrls &&
+          (run.scrape_strategy ?? 'equal-and-below') === scrapeStrategy,
+      ) ?? null,
+    [scrapeRuns, url, maxUrls, scrapeStrategy],
+  )
+  const isReingest = matchedReuseRun !== null && isUrlValid
+
+  const highlightedScrapeRunId = useMemo(() => {
+    if (!urlBrowseAll) return null
+    const match = (scrapeRuns ?? []).find(
+      (run) =>
+        normalizeUrlForMatch(run.url) === normalizeUrlForMatch(url) &&
+        String(run.max_urls ?? 50) === maxUrls &&
+        (run.scrape_strategy ?? 'equal-and-below') === scrapeStrategy,
+    )
+    return match?.id ?? null
+  }, [urlBrowseAll, scrapeRuns, url, maxUrls, scrapeStrategy])
+
+  const scrapeRunAutocompleteData: ScrapeRunAutocompleteItem[] = useMemo(
+    () =>
+      scrapeRunSuggestions.map((item) => ({
+        ...item,
+        highlightCurrent:
+          urlBrowseAll &&
+          !urlBrowseHighlightSuppressed &&
+          item.run.id === highlightedScrapeRunId,
+        onBrowseItemMouseEnter: () => setUrlBrowseHighlightSuppressed(true),
+      })),
+    [
+      scrapeRunSuggestions,
+      urlBrowseAll,
+      urlBrowseHighlightSuppressed,
+      highlightedScrapeRunId,
+    ],
+  )
+
+  const openUrlBrowseDropdown = () => {
+    if (!hasScrapeHistory) return
+    enterUrlBrowseMode()
+    urlInputRef.current?.focus()
+    urlInputRef.current?.click()
+  }
+
+  useEffect(() => {
+    if (!urlBrowseAll || !urlDropdownOpened || !highlightedScrapeRunId) return
+    const index = scrapeRunAutocompleteData.findIndex(
+      (item) => item.run.id === highlightedScrapeRunId,
+    )
+    if (index < 0) return
+    const inputId = urlInputRef.current?.id
+    if (!inputId) return
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`${inputId}-${index}`)
+        ?.scrollIntoView({ block: 'nearest' })
+    })
+  }, [
+    urlBrowseAll,
+    urlDropdownOpened,
+    highlightedScrapeRunId,
+    scrapeRunAutocompleteData,
+  ])
+
+  const handleConfirmDelete = () => {
+    if (!runPendingDelete) return
+    deleteScrapeRun.mutate(
+      { id: runPendingDelete.id, deleteFiles: deleteFilesWithRun },
+      {
+        onSuccess: () => setRunPendingDelete(null),
+        onError: () => {
+          notifications.show({
+            title: (
+              <Text size={'lg'} className={`${montserrat_med.className}`}>
+                Failed to delete saved scrape
+              </Text>
+            ),
+            message: deleteFilesWithRun
+              ? 'Some files could not be deleted. The saved scrape was kept. Please try again.'
+              : 'Please try again.',
+            color: 'red',
+          })
+        },
+      },
+    )
+  }
+
+  const setUrlValue = (input: string) => {
     setUrl(input)
     setIsUrlValid(validateUrl(input))
   }
+
+  // Picking a suggestion auto-applies its params and resets the input to the
+  // bare URL (overriding the unique `value` Mantine just committed). Both
+  // setState calls batch within this handler, so the composite never renders.
+  const handleSuggestionSubmit = (item: AutocompleteItem) => {
+    const run = (item as ScrapeRunAutocompleteItem).run
+    if (!run) return
+    setUrlValue(run.url)
+    setMaxUrls(String(run.max_urls ?? 50))
+    setScrapeStrategy(run.scrape_strategy ?? 'equal-and-below')
+    setInputErrors((prev) => ({
+      ...prev,
+      maxUrls: { error: false, message: '' },
+    }))
+  }
+
   const validateUrl = (input: string) => {
     const regex = /^(https?:\/\/)?.+/
     return regex.test(input)
@@ -144,7 +456,12 @@ export default function WebsiteIngestForm({
           project_name,
           maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
           scrapeStrategy,
+          isReingest ? { deleteMissing, updateExisting, addNew } : undefined,
         )
+        // Refresh the URL autocomplete suggestions with this run's params.
+        await queryClient.invalidateQueries({
+          queryKey: ['scrapeRuns', project_name],
+        })
         // Transition to 'ingesting' status after API call succeeds
         setUploadFiles((prevFiles) =>
           prevFiles.map((file) =>
@@ -191,6 +508,24 @@ export default function WebsiteIngestForm({
         `/api/materialsTable/successDocs?course_name=${project_name}`,
       )
       const docsData = await docsResponse.json()
+      // Strip trailing slashes so the user-entered URL and the backend-stored
+      // base_url compare equal even when one has a trailing slash and the
+      // other doesn't. Without this a "/a/" base URL never matches its
+      // completed doc, so the toast is stuck "ingesting" forever.
+      const normalizeUrl = (url: string | undefined | null) =>
+        (url ?? '').replace(/\/+$/, '')
+
+      const baseUrlMatchesFile = (
+        docBaseUrl: string,
+        file: FileUpload,
+      ): boolean => {
+        const normBase = normalizeUrl(docBaseUrl)
+        return (
+          normalizeUrl(file.name) === normBase ||
+          normalizeUrl(file.url) === normBase
+        )
+      }
+
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (
         docs: Array<{ base_url: string; url: string }>,
@@ -198,10 +533,11 @@ export default function WebsiteIngestForm({
         const baseUrlMap = new Map<string, Set<string>>()
 
         docs.forEach((doc) => {
-          if (!baseUrlMap.has(doc.base_url)) {
-            baseUrlMap.set(doc.base_url, new Set())
+          const key = normalizeUrl(doc.base_url)
+          if (!baseUrlMap.has(key)) {
+            baseUrlMap.set(key, new Set())
           }
-          baseUrlMap.get(doc.base_url)?.add(doc.url)
+          baseUrlMap.get(key)?.add(doc.url)
         })
 
         return baseUrlMap
@@ -216,10 +552,8 @@ export default function WebsiteIngestForm({
           if (file.type !== 'webscrape') return file
           const fileUrl = file.url ?? ''
 
-          const isStillIngesting = docsInProgress.some(
-            (doc) =>
-              doc.base_url === file.name ||
-              (file.isBaseUrl && doc.base_url === file.url),
+          const isStillIngesting = docsInProgress.some((doc) =>
+            baseUrlMatchesFile(doc.base_url, file),
           )
 
           if (file.status === 'uploading' && isStillIngesting) {
@@ -238,8 +572,9 @@ export default function WebsiteIngestForm({
 
               const isInCompletedDocs = docsData?.documents?.some(
                 (doc: { url: string; base_url?: string }) =>
-                  doc.url === file.url ||
-                  (file.isBaseUrl && doc.base_url === file.url),
+                  normalizeUrl(doc.url) === normalizeUrl(file.url) ||
+                  (file.isBaseUrl &&
+                    normalizeUrl(doc.base_url) === normalizeUrl(file.url)),
               )
 
               if (file.isBaseUrl && allChildrenDone && isInCompletedDocs) {
@@ -258,37 +593,54 @@ export default function WebsiteIngestForm({
         })
       }
 
-      // Helper function to create new file entries for additional URLs
+      // Helper function to create new file entries for additional URLs.
+      // Includes both in-progress and already-completed docs so that URLs
+      // which finished crawling between polls still show up in the toast.
       const createAdditionalFileEntries = (
-        baseUrlMap: Map<string, Set<string>>,
+        inProgressBaseUrlMap: Map<string, Set<string>>,
+        successBaseUrlMap: Map<string, Set<string>>,
         currentFiles: FileUpload[],
-        docsInProgress: Array<{ base_url: string; readable_filename: string }>,
       ) => {
         const newFiles: FileUpload[] = []
+        const seenUrls = new Set<string>()
 
-        baseUrlMap.forEach((urls, baseUrl) => {
-          // Only process if we have this base URL in our current files
-          if (currentFiles.some((file) => file.name === baseUrl)) {
-            const matchingDoc = docsInProgress.find(
-              (doc) => doc.base_url === baseUrl,
-            )
+        const hasMatchingBaseUrl = (baseUrl: string) =>
+          currentFiles.some((file) => baseUrlMatchesFile(baseUrl, file))
 
-            const isStillIngesting = matchingDoc !== undefined
+        const alreadyTracked = (url: string) =>
+          seenUrls.has(url) ||
+          currentFiles.some(
+            (file) =>
+              normalizeUrl(file.url) === normalizeUrl(url) ||
+              normalizeUrl(file.name) === normalizeUrl(url),
+          )
 
-            urls.forEach((url) => {
-              if (
-                !currentFiles.some((file) => file.url === url) &&
-                matchingDoc
-              ) {
-                newFiles.push({
-                  name: url,
-                  status: isStillIngesting ? 'ingesting' : 'complete',
-                  type: 'webscrape',
-                  url: url,
-                })
-              }
+        inProgressBaseUrlMap.forEach((urls, baseUrl) => {
+          if (!hasMatchingBaseUrl(baseUrl)) return
+          urls.forEach((url) => {
+            if (alreadyTracked(url)) return
+            seenUrls.add(url)
+            newFiles.push({
+              name: url,
+              status: 'ingesting',
+              type: 'webscrape',
+              url: url,
             })
-          }
+          })
+        })
+
+        successBaseUrlMap.forEach((urls, baseUrl) => {
+          if (!hasMatchingBaseUrl(baseUrl)) return
+          urls.forEach((url) => {
+            if (alreadyTracked(url)) return
+            seenUrls.add(url)
+            newFiles.push({
+              name: url,
+              status: 'complete',
+              type: 'webscrape',
+              url: url,
+            })
+          })
         })
 
         return newFiles
@@ -297,15 +649,23 @@ export default function WebsiteIngestForm({
       setUploadFiles((prev) => {
         const matchingDocsInProgress =
           data?.documents?.filter((doc: { base_url: string }) =>
-            prev.some((file) => file.name === doc.base_url),
+            prev.some((file) => baseUrlMatchesFile(doc.base_url, file)),
           ) || []
 
-        const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress)
+        const matchingSuccessDocs =
+          docsData?.documents?.filter((doc: { base_url: string }) =>
+            prev.some((file) => baseUrlMatchesFile(doc.base_url, file)),
+          ) || []
+
+        const inProgressBaseUrlMap = organizeDocsByBaseUrl(
+          matchingDocsInProgress,
+        )
+        const successBaseUrlMap = organizeDocsByBaseUrl(matchingSuccessDocs)
 
         const additionalFiles = createAdditionalFileEntries(
-          baseUrlMap,
+          inProgressBaseUrlMap,
+          successBaseUrlMap,
           prev,
-          matchingDocsInProgress,
         )
 
         const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress)
@@ -329,6 +689,11 @@ export default function WebsiteIngestForm({
     courseName: string | null,
     maxUrls: number,
     scrapeStrategy: string,
+    reingestOptions?: {
+      deleteMissing: boolean
+      updateExisting: boolean
+      addNew: boolean
+    },
   ) => {
     try {
       if (!url || !courseName) return null
@@ -339,6 +704,9 @@ export default function WebsiteIngestForm({
         courseName,
         maxUrls,
         scrapeStrategy,
+        // Only sent on an unchanged-reuse re-ingest; the backend wires these up
+        // separately. Harmless for a normal/new ingest (omitted).
+        ...(reingestOptions ?? {}),
       })
 
       console.log(
@@ -393,6 +761,12 @@ export default function WebsiteIngestForm({
             setIsUrlValid(false)
             setIsUrlUpdated(false)
             setMaxUrls('50')
+            setUrlDropdownOpened(false)
+            setUrlBrowseAll(false)
+            setUrlBrowseHighlightSuppressed(false)
+            setDeleteMissing(false)
+            setUpdateExisting(true)
+            setAddNew(true)
             setInputErrors((prev) => ({
               ...prev,
               maxUrls: { error: false, message: '' },
@@ -458,11 +832,80 @@ export default function WebsiteIngestForm({
                     event.preventDefault()
                   }}
                 >
-                  <Input
+                  <Autocomplete
+                    ref={urlInputRef}
                     icon={icon}
+                    rightSection={
+                      hasScrapeHistory ? (
+                        <button
+                          type="button"
+                          aria-label={
+                            urlDropdownOpened
+                              ? 'Hide saved scrapes'
+                              : 'Show saved scrapes'
+                          }
+                          aria-expanded={urlDropdownOpened}
+                          tabIndex={-1}
+                          className="flex h-full items-center justify-center border-0 bg-transparent p-0 text-[--foreground] hover:text-[--illinois-orange]"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            if (urlDropdownOpened) {
+                              urlInputRef.current?.blur()
+                            } else {
+                              openUrlBrowseDropdown()
+                            }
+                          }}
+                        >
+                          {urlDropdownOpened ? (
+                            <IconChevronUp
+                              size={18}
+                              stroke={2}
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <IconChevronDown
+                              size={18}
+                              stroke={2}
+                              aria-hidden="true"
+                            />
+                          )}
+                        </button>
+                      ) : null
+                    }
+                    rightSectionWidth={hasScrapeHistory ? rem(40) : undefined}
+                    onDropdownOpen={() => setUrlDropdownOpened(true)}
+                    onDropdownClose={() => {
+                      setUrlDropdownOpened(false)
+                      setUrlBrowseAll(false)
+                      setUrlBrowseHighlightSuppressed(false)
+                    }}
+                    onFocus={() => {
+                      if (hasScrapeHistory) enterUrlBrowseMode()
+                    }}
+                    onClick={() => {
+                      if (hasScrapeHistory) enterUrlBrowseMode()
+                    }}
                     aria-label="Website URL"
                     className="w-full rounded-full"
-                    styles={{
+                    data={scrapeRunAutocompleteData}
+                    itemComponent={ScrapeRunAutocompleteOption}
+                    onItemSubmit={handleSuggestionSubmit}
+                    limit={50}
+                    maxDropdownHeight={280}
+                    // Suggest by URL match (and the summary), not the unique value.
+                    filter={(query, item) => {
+                      const it = item as ScrapeRunAutocompleteItem
+                      if (urlBrowseAll) return true
+                      const q = query.toLowerCase().trim()
+                      return (
+                        it.url.toLowerCase().includes(q) ||
+                        it.summary.toLowerCase().includes(q)
+                      )
+                    }}
+                    nothingFound={null}
+                    // Dropdown colors + hover match the default-model Select on
+                    // the LLMs admin page (see api-inputs/LLMsApiKeyInputForm.tsx).
+                    styles={(theme) => ({
                       input: {
                         color: 'var(--foreground)',
                         backgroundColor: 'var(--background-faded)',
@@ -477,14 +920,46 @@ export default function WebsiteIngestForm({
                       wrapper: {
                         width: '100%',
                       },
-                    }}
+                      rightSection: {
+                        pointerEvents: 'auto',
+                        color: 'var(--foreground)',
+                      },
+                      dropdown: {
+                        backgroundColor: 'var(--background)',
+                        border: '1px solid var(--background-dark)',
+                        borderRadius: theme.radius.md,
+                        marginTop: '2px',
+                        boxShadow: theme.shadows.xs,
+                      },
+                      item: {
+                        color: 'var(--foreground)',
+                        backgroundColor: 'var(--background)',
+                        borderRadius: theme.radius.md,
+                        margin: '2px',
+                        overflow: 'hidden',
+                        '&[data-hovered]': {
+                          color: 'var(--foreground)',
+                          backgroundColor: 'var(--foreground-faded)',
+                        },
+                        '&[data-selected]': {
+                          '&': {
+                            color: 'var(--foreground)',
+                            backgroundColor: 'transparent',
+                          },
+                          '&:hover': {
+                            color: 'var(--foreground)',
+                            backgroundColor: 'var(--foreground-faded)',
+                          },
+                        },
+                      },
+                    })}
                     placeholder="Enter URL..."
                     radius="md"
-                    type="url"
                     value={url}
                     size="lg"
-                    onChange={(e) => {
-                      handleUrlChange(e)
+                    onChange={(value) => {
+                      setUrlBrowseAll(false)
+                      setUrlValue(value)
                     }}
                   />
                   <div className="pb-2 pt-2">
@@ -557,14 +1032,39 @@ export default function WebsiteIngestForm({
                     </p>
                   )}
 
-                  <Text
-                    style={{ fontSize: '16px' }}
-                    className={`${montserrat_heading.variable} mt-4 font-montserratHeading`}
-                  >
-                    Limit web crawl
-                  </Text>
-                  <div className="mt-2 pl-3">
-                    <List className="text-[--modal-text]">
+                  <div className="mt-4 flex items-center gap-2">
+                    <Text
+                      style={{ fontSize: '16px' }}
+                      className={`${montserrat_heading.variable} font-montserratHeading`}
+                    >
+                      Limit web crawl
+                    </Text>
+                    <ActionIcon
+                      variant="subtle"
+                      color="var(--foreground-faded)"
+                      onClick={() => setCrawlInfoOpened(!crawlInfoOpened)}
+                      className="hover:bg-[--background]"
+                      title="What does each crawl limit mean?"
+                    >
+                      <IconInfoCircle
+                        className="text-[--foreground-faded] hover:text-[--foreground]"
+                        aria-hidden="true"
+                      />
+                    </ActionIcon>
+                  </div>
+                  <AnimatePresence>
+                    {crawlInfoOpened && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <div className="flex bg-[--background-faded]">
+                          <div className="w-1 bg-[--illinois-orange]" />
+                          <div className="flex-1 p-4">
+                            <List className="text-[--modal-text]">
                       <List.Item>
                         <strong>Equal and Below:</strong> Only scrape content
                         that starts will the given URL. E.g. nasa.gov/blogs will
@@ -599,13 +1099,18 @@ export default function WebsiteIngestForm({
                           </Text>
                         </span>
                       </List.Item>
-                    </List>
-                  </div>
-
-                  <Text className="mt-4">
-                    <strong>I suggest starting with Equal and Below</strong>,
-                    then just re-run this if you need more later.
-                  </Text>
+                            </List>
+                            <Text className="mt-4 text-[--modal-text]">
+                              <strong>
+                                I suggest starting with Equal and Below
+                              </strong>
+                              , then just re-run this if you need more later.
+                            </Text>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <SegmentedControl
                     fullWidth
@@ -684,14 +1189,119 @@ export default function WebsiteIngestForm({
             </div>
           </div>
           <div className="mt-4">
+            {/* Re-ingest options: only when the form exactly matches a saved
+                scrape (unchanged reuse). Editing any field hides these. */}
+            {isReingest && (
+              <div className="mb-3 rounded-xl border border-[--background-dark] bg-[--background-faded] p-3">
+                <Text
+                  style={{ fontSize: '14px' }}
+                  className={`${montserrat_heading.variable} mb-2 font-montserratHeading text-[--modal-text]`}
+                >
+                  Re-ingest options
+                </Text>
+                <div className="flex flex-col gap-2">
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Add newly found pages"
+                    checked={addNew}
+                    onCheckedChange={(checked) => setAddNew(checked)}
+                  />
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Update pages that changed"
+                    checked={updateExisting}
+                    onCheckedChange={(checked) => setUpdateExisting(checked)}
+                  />
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label="Delete pages no longer found"
+                    checked={deleteMissing}
+                    onCheckedChange={(checked) => setDeleteMissing(checked)}
+                  />
+                </div>
+              </div>
+            )}
             <Button
               onClick={handleIngest}
               disabled={!isUrlValid}
               className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
             >
-              Ingest the Website
+              {isReingest ? 'Re-ingest the Website' : 'Ingest the Website'}
             </Button>
           </div>
+
+          {/* Confirm deleting a saved scrape. Rendered INSIDE the ingest dialog
+              (a DOM descendant) so confirming/cancelling never closes the
+              ingest window. Also the seam for a future "also delete the scraped
+              pages" option. */}
+          {runPendingDelete && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/60"
+                onClick={() => setRunPendingDelete(null)}
+                aria-hidden="true"
+              />
+              <div className="relative z-10 w-full max-w-md rounded-md bg-[--modal] p-6 text-[--modal-text] shadow-xl">
+                <Text
+                  className={`${montserrat_heading.variable} mb-3 font-montserratHeading`}
+                  style={{ fontSize: '18px', fontWeight: 700 }}
+                >
+                  Delete this saved scrape?
+                </Text>
+                <Text size="sm" truncate>
+                  {runPendingDelete.url}
+                </Text>
+                <Text size="xs" opacity={0.6}>
+                  {scrapeRunSummary(runPendingDelete)}
+                </Text>
+                <Text size="sm" className="mt-4">
+                  {deleteFilesWithRun
+                    ? 'This removes the saved parameters and permanently deletes the pages this scrape created from your project.'
+                    : 'This removes the saved parameters from your suggestions. It does not delete any pages already scraped from this URL.'}
+                </Text>
+                <div className="mt-4">
+                  <Switch
+                    variant="labeled"
+                    showLabels
+                    showThumbIcon
+                    size="sm"
+                    label={`Also delete the ${fileCountLabel(
+                      runPendingDelete.document_count ?? 0,
+                    )} this scrape created`}
+                    checked={deleteFilesWithRun}
+                    onCheckedChange={(checked) =>
+                      setDeleteFilesWithRun(checked)
+                    }
+                  />
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <Button
+                    onClick={() => setRunPendingDelete(null)}
+                    disabled={deleteScrapeRun.isPending}
+                    className="mr-[7px] min-w-[3rem] rounded-s-md bg-[--background-faded] text-[--foreground] hover:bg-[--dashboard-button-hover] hover:text-[--dashboard-button-foreground] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmDelete}
+                    loading={deleteScrapeRun.isPending}
+                    className="min-w-[3rem] rounded-s-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </motion.div>

@@ -6,9 +6,11 @@ import {
   boolean,
   date,
   doublePrecision,
+  index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -220,6 +222,61 @@ export const courseNames = pgTable('course_names', {
   id: serial('id').primaryKey(),
   course_name: text('course_name'),
 })
+
+// Stored web-scrape parameters per project, so users can reuse them on future
+// scrapes. One row per distinct (course_name, url, max_urls, scrape_strategy);
+// re-running an identical scrape bumps last_run_at (see /api/scrapeWeb upsert).
+export const scrapeMetadataRun = pgTable(
+  'scraping_metadata_run',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    course_name: text('course_name').notNull(),
+    url: text('url').notNull(),
+    max_urls: integer('max_urls').default(50),
+    scrape_strategy: text('scrape_strategy').default('equal-and-below'),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    last_run_at: timestamp('last_run_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    uniqueRun: uniqueIndex('scraping_metadata_run_course_url_params_key').on(
+      table.course_name,
+      table.url,
+      table.max_urls,
+      table.scrape_strategy,
+    ),
+  }),
+)
+
+// Junction: which documents a saved scrape produced. Lets a re-crawl tell, per
+// URL, whether a doc already belongs to the scrape (existing) vs is new vs is
+// now missing — driving delete-missing / update-existing / add-new. Both FKs
+// cascade, so deleting a scrape run or a document removes only the link row.
+export const scrapeMetadataDocuments = pgTable(
+  'scraping_metadata_documents',
+  {
+    scrape_metadata_run_id: uuid('scrape_metadata_run_id')
+      .notNull()
+      .references(() => scrapeMetadataRun.id, { onDelete: 'cascade' }),
+    document_id: bigint('document_id', { mode: 'number' })
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.scrape_metadata_run_id, table.document_id],
+    }),
+    documentIdx: index('scraping_metadata_documents_document_id_idx').on(
+      table.document_id,
+    ),
+  }),
+)
 
 // DocGroups table
 export const docGroups = pgTable(

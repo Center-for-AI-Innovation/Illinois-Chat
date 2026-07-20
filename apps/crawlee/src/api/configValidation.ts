@@ -65,6 +65,15 @@ export const configSchema = z.object({
      * @default ""
      */
     courseName: z.string(),
+    /**
+     * Saved-scrape run this crawl belongs to. Threaded into each page's /ingest
+     * body so the worker links the resulting document to the scrape run.
+     */
+    scrapeMetadataRunId: z.string().optional(),
+    /** Re-ingest flags (only meaningful on an unchanged-reuse re-ingest). */
+    deleteMissing: z.boolean().optional(),
+    updateExisting: z.boolean().optional(),
+    addNew: z.boolean().optional(),
     /** Optional cookie to be set. E.g. for Cookie Consent */
     cookie: z
         .union([
