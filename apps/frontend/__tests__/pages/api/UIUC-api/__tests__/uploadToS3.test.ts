@@ -14,6 +14,8 @@ vi.mock('@aws-sdk/s3-presigned-post', () => ({
 vi.mock('~/utils/s3Client', () => ({
   s3Client: {},
   vyriadMinioClient: {},
+  getPresignedUrlClient: () => ({}),
+  getPresignedUrlVyriadClient: () => ({}),
 }))
 
 vi.mock('~/pages/api/authorization', () => ({

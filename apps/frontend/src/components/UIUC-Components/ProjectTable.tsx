@@ -116,20 +116,20 @@ const ListProjectTable: React.FC = () => {
       return (
         <IconSelector
           size={14}
-          color="var(--illinois-blue)"
+          color="var(--foreground)"
           aria-hidden="true"
         />
       )
     return sortDirection === 'asc' ? (
       <IconChevronUp
         size={14}
-        color="var(--illinois-blue)"
+        color="var(--foreground)"
         aria-hidden="true"
       />
     ) : (
       <IconChevronDown
         size={14}
-        color="var(--illinois-blue)"
+        color="var(--foreground)"
         aria-hidden="true"
       />
     )
@@ -218,7 +218,7 @@ const ListProjectTable: React.FC = () => {
                 }
               }
             }}
-            style={{ cursor: 'pointer', color: 'var(--illinois-blue)' }}
+            style={{ cursor: 'pointer', color: 'var(--foreground)' }}
           >
             <td>{courseName}</td>
             <td>
@@ -323,7 +323,7 @@ const ListProjectTable: React.FC = () => {
               style={{
                 backgroundColor: 'transparent',
                 textAlign: 'center',
-                color: 'var(--illinois-blue)',
+                color: 'var(--foreground)',
               }}
             >
               You haven&apos;t created any projects yet. Let&apos;s{' '}

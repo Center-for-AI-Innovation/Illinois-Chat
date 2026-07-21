@@ -23,6 +23,8 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 vi.mock('~/utils/s3Client', () => ({
   s3Client: {},
   vyriadMinioClient: null,
+  getPresignedUrlClient: () => ({}),
+  getPresignedUrlVyriadClient: () => null,
 }))
 
 import getPresignedUrlHandler from '~/pages/api/UIUC-api/getPresignedUrl'
