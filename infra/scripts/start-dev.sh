@@ -60,6 +60,30 @@ EOF
 	fi
 }
 
+# ENCRYPTION_MASTER_KEY encrypts/decrypts project_external_connections configs.
+# The backend, worker, and frontend must all share the SAME value — a mismatch
+# makes decryption fail and per-project overrides silently fall back to defaults.
+# Generate once into the root .env, then sync into the app-local .env files.
+ensure_encryption_master_key() {
+	if [ -n "${ENCRYPTION_MASTER_KEY:-}" ]; then
+		return
+	fi
+	print_status "Generating ENCRYPTION_MASTER_KEY (shared by backend, worker, and frontend)..."
+	if command -v python3 >/dev/null 2>&1; then
+		ENCRYPTION_MASTER_KEY="$(python3 -c 'import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')"
+	else
+		ENCRYPTION_MASTER_KEY="$(openssl rand -base64 32 | tr '+/' '-_')"
+	fi
+	export ENCRYPTION_MASTER_KEY
+	if grep -q '^ENCRYPTION_MASTER_KEY=' .env; then
+		sed -i.bak "s|^ENCRYPTION_MASTER_KEY=.*|ENCRYPTION_MASTER_KEY=\"${ENCRYPTION_MASTER_KEY}\"|" .env
+		rm -f .env.bak
+	else
+		printf 'ENCRYPTION_MASTER_KEY="%s"\n' "$ENCRYPTION_MASTER_KEY" >>.env
+	fi
+	print_success "ENCRYPTION_MASTER_KEY written to .env"
+}
+
 ensure_local_app_envs() {
 	print_status "Ensuring app-local .env files exist..."
 
@@ -77,6 +101,8 @@ ensure_local_app_envs() {
 	local aws_region="${AWS_REGION:-us-east-1}"
 	local keycloak_admin="${KEYCLOAK_ADMIN_USERNAME:-admin}"
 	local keycloak_password="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
+	local encryption_master_key="${ENCRYPTION_MASTER_KEY:-}"
+	local allowed_embedding_providers="${ALLOWED_EMBEDDING_PROVIDERS:-openai,ollama}"
 
 	local backend_env="apps/backend/.env"
 	ensure_env_file "$backend_env" "Backend and worker local development env"
@@ -125,6 +151,8 @@ ensure_local_app_envs() {
 	append_env_if_missing "$backend_env" "POSTHOG_API_KEY" ""
 	append_env_if_missing "$backend_env" "NOMIC_API_KEY" ""
 	append_env_if_missing "$backend_env" "SENTRY_DSN" ""
+	append_env_if_missing "$backend_env" "ENCRYPTION_MASTER_KEY" "$encryption_master_key"
+	append_env_if_missing "$backend_env" "ALLOWED_EMBEDDING_PROVIDERS" "$allowed_embedding_providers"
 
 	local frontend_env="apps/frontend/.env"
 	ensure_env_file "$frontend_env" "Frontend local development env"
@@ -174,6 +202,8 @@ ensure_local_app_envs() {
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_POSTHOG_HOST" ""
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_POSTHOG_KEY" ""
 	append_env_if_missing "$frontend_env" "POSTHOG_API_KEY" ""
+	append_env_if_missing "$frontend_env" "ENCRYPTION_MASTER_KEY" "$encryption_master_key"
+	append_env_if_missing "$frontend_env" "ALLOWED_EMBEDDING_PROVIDERS" "$allowed_embedding_providers"
 
 	local crawlee_env="apps/crawlee/.env"
 	ensure_env_file "$crawlee_env" "Crawlee local development env"
@@ -319,6 +349,7 @@ else
 	print_warning "No .env file found"
 fi
 
+ensure_encryption_master_key
 ensure_local_app_envs
 
 # Start Docker Compose services
