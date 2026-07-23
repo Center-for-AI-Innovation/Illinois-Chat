@@ -192,6 +192,8 @@ ensure_local_app_envs() {
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" "illinois_chat"
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG" "True"
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_SIGNING_KEY" ""
+	append_env_if_missing "$frontend_env" "SUPER_ADMIN_EMAILS" ""
+	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_SUPER_ADMIN_EMAILS" ""
 	append_env_if_missing "$frontend_env" "EMBEDDING_MODEL" ""
 	append_env_if_missing "$frontend_env" "EMBEDDING_API_BASE" ""
 	append_env_if_missing "$frontend_env" "NCSA_HOSTED_API_KEY" ""
