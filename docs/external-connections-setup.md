@@ -35,8 +35,11 @@ Deeper reference material lives with the apps:
   super admins (`SUPER_ADMIN_EMAILS` / `src/utils/superAdmins.ts`).
 - The host database schema must include the external-connections tables.
   Fresh setups get them from `infra/db/init-schema.sql` (applied by the
-  setup scripts); existing databases created before this feature need to be
-  recreated from it (dev: `start-dev.sh --clean`).
+  setup scripts when run with `--create-schema`, or as part of a
+  `--clean`/`--wipe_data` reset); existing databases created before this
+  feature need to be recreated from it (dev: `start-dev.sh --clean`). The
+  bundled `postgres-illinois-chat` service runs the pgvector-enabled
+  `pgvector/pgvector:pg17` image, which the schema requires.
 
 ## Provisioning an external Postgres
 

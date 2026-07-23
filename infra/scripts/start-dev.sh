@@ -232,21 +232,30 @@ show_usage() {
 	echo "Usage: $0 [OPTIONS]"
 	echo ""
 	echo "Options:"
-	echo "  --clean    Clear existing containers, volumes, and data before startup"
-	echo "  --help     Show this help message"
+	echo "  --clean           Clear existing containers, volumes, and data before startup"
+	echo "                    (recreates the database schema as part of the reset)"
+	echo "  --create-schema   Create the database schema on an empty database"
+	echo "                    (required on first run; reruns never need it)"
+	echo "  --help            Show this help message"
 	echo ""
 	echo "Examples:"
-	echo "  $0              # Start development infrastructure"
-	echo "  $0 --clean      # Clear everything and start fresh"
+	echo "  $0                  # Start/restart dev infrastructure (schema untouched)"
+	echo "  $0 --create-schema  # First run: also create the database schema"
+	echo "  $0 --clean          # Clear everything and start fresh"
 }
 
 # Parse command line arguments
 CLEAN_MODE=false
+CREATE_SCHEMA=false
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
 	--clean)
 		CLEAN_MODE=true
+		shift
+		;;
+	--create-schema)
+		CREATE_SCHEMA=true
 		shift
 		;;
 	--help | -h)
@@ -260,6 +269,11 @@ while [[ $# -gt 0 ]]; do
 		;;
 	esac
 done
+
+if [ "$CLEAN_MODE" = true ] && [ "$CREATE_SCHEMA" = true ]; then
+	print_error "--clean and --create-schema cannot be used together (--clean already recreates the schema on the fresh database)."
+	exit 1
+fi
 
 echo "Starting UIUC.chat Development Environment"
 echo "=================================================="
@@ -410,13 +424,20 @@ if [ ! -f infra/db/init-schema.sql ]; then
 fi
 
 if [ "$(table_exists documents)" != "t" ]; then
-	print_status "Applying clean schema from infra/db/init-schema.sql..."
-	psql_main -v ON_ERROR_STOP=1 -f - <infra/db/init-schema.sql >/dev/null
-	print_success "Database schema created successfully"
+	if [ "$CLEAN_MODE" = true ] || [ "$CREATE_SCHEMA" = true ]; then
+		print_status "Applying clean schema from infra/db/init-schema.sql..."
+		psql_main -v ON_ERROR_STOP=1 -f - <infra/db/init-schema.sql >/dev/null
+		print_success "Database schema created successfully"
+	else
+		print_error "Database is empty. Re-run with --create-schema to create the schema from infra/db/init-schema.sql."
+		exit 1
+	fi
 elif [ "$(table_exists project_external_connections)" != "t" ]; then
 	print_warning "Existing database predates the external-connections schema."
 	print_warning "Re-run with --clean to recreate it from infra/db/init-schema.sql."
 	exit 1
+elif [ "$CREATE_SCHEMA" = true ]; then
+	print_success "Database schema already initialized; nothing to create"
 else
 	print_success "Database schema already initialized; skipping apply"
 fi
