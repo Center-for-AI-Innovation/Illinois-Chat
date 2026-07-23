@@ -113,16 +113,25 @@ table_exists() {
 }
 
 log "Initializing PostgreSQL schema"
+# init-schema.sql is derived from the frontend Drizzle schema and is only
+# safe on a fresh database — gate on the `documents` table before applying.
 if [ "$(table_exists documents)" = "t" ]; then
+	if [ "$(table_exists project_external_connections)" != "t" ]; then
+		echo "[ERROR] Existing database predates the external-connections schema."
+		echo "[ERROR] Recreate it from infra/db/init-schema.sql (e.g. drop the postgres volume) and retry."
+		exit 1
+	fi
 	success "PostgreSQL schema already exists"
-elif [ -f infra/db/migrations/20250328_remote_schema.sql ]; then
-	warn "Applying Supabase schema dump; some Supabase-specific errors may be non-critical"
-	psql_main -f - <infra/db/migrations/20250328_remote_schema.sql || warn "Schema migration completed with warnings"
+elif [ -f infra/db/init-schema.sql ]; then
+	log "Applying clean schema from infra/db/init-schema.sql"
+	psql_main -v ON_ERROR_STOP=1 -f - <infra/db/init-schema.sql >/dev/null
+	success "Database schema created successfully"
 else
-	warn "infra/db/migrations/20250328_remote_schema.sql not found; skipping schema import"
+	echo "[ERROR] infra/db/init-schema.sql not found; cannot initialize the database"
+	exit 1
 fi
 
-for table_name in documents conversations messages; do
+for table_name in documents conversations messages embeddings project_external_connections project_connection_audit_log; do
 	if [ "$(table_exists "$table_name")" != "t" ]; then
 		echo "[ERROR] Expected table '$table_name' is missing"
 		exit 1

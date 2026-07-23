@@ -17,6 +17,12 @@ layout:
 
 # External Connections
 
+{% hint style="info" %}
+**Operator setup guide:** for provisioning an external Postgres and
+registering a project's connections with the CLI, see the monorepo guide at
+[`docs/external-connections-setup.md`](../../../../docs/external-connections-setup.md).
+{% endhint %}
+
 ## Overview
 
 External connections let you point any project at **your own infrastructure** -- a private S3 bucket, a dedicated PostgreSQL database, or a self-hosted Qdrant instance -- instead of relying on the shared platform resources.

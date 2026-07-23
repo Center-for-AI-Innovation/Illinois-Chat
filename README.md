@@ -119,6 +119,10 @@ bash infra/scripts/start-all.sh --rebuild=frontend,backend
 
 See `DEV_SETUP.md` for local development details. Published docs are available at https://docs.uiuc.chat.
 
+Projects can bring their own S3, PostgreSQL/pgvector, Qdrant, and embedding
+provider — see [`docs/external-connections-setup.md`](docs/external-connections-setup.md)
+for provisioning an external database and registering per-project connections.
+
 ## License
 
 Illinois Chat is licensed under the Apache License, Version 2.0. See `LICENSE`.

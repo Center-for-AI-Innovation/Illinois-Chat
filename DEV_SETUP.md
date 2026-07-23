@@ -23,7 +23,7 @@ This script will:
 - Create a repository-root `.env` file from `.env.template` if needed
 - Create or update app-local env files for backend, frontend, and Crawlee without overwriting existing values
 - Start shared development infrastructure from `infra/docker/docker-compose.dev.yaml`
-- Apply the Postgres schema from `infra/db/migrations/20250328_remote_schema.sql`
+- Apply the Postgres schema from `infra/db/init-schema.sql` (fresh databases only; derived from the frontend Drizzle schema, includes pgvector and the external-connections tables)
 - Create the MinIO `uiuc-chat` bucket
 - Ensure the configured Qdrant collection exists with 4096-dimensional cosine vectors
 

@@ -395,15 +395,30 @@ psql_main() {
 	"${COMPOSE[@]}" exec -T postgres-illinois-chat psql -U "$DB_USER" -d "$DB_NAME" "$@"
 }
 
-print_status "Applying database schema from infra/db/migrations..."
-if [ -f infra/db/migrations/20250328_remote_schema.sql ]; then
-	print_status "Note: This Supabase schema dump will generate many non-critical errors for missing extensions/roles"
-	psql_main -f - <infra/db/migrations/20250328_remote_schema.sql 2>/dev/null || {
-		print_warning "Schema migration completed with some expected errors (Supabase-specific components)"
-	}
-	print_success "Core application tables created successfully"
+# init-schema.sql is derived from the frontend Drizzle schema
+# (apps/frontend/src/db/schema.ts) and is only safe on a fresh database —
+# gate on the `documents` table before applying.
+table_exists() {
+	psql_main -tAc \
+		"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='$1')" |
+		tr -d '[:space:]'
+}
+
+if [ ! -f infra/db/init-schema.sql ]; then
+	print_error "infra/db/init-schema.sql not found; cannot initialize the database"
+	exit 1
+fi
+
+if [ "$(table_exists documents)" != "t" ]; then
+	print_status "Applying clean schema from infra/db/init-schema.sql..."
+	psql_main -v ON_ERROR_STOP=1 -f - <infra/db/init-schema.sql >/dev/null
+	print_success "Database schema created successfully"
+elif [ "$(table_exists project_external_connections)" != "t" ]; then
+	print_warning "Existing database predates the external-connections schema."
+	print_warning "Re-run with --clean to recreate it from infra/db/init-schema.sql."
+	exit 1
 else
-	print_warning "infra/db/migrations/20250328_remote_schema.sql not found; skipping apply"
+	print_success "Database schema already initialized; skipping apply"
 fi
 
 print_status "Verifying PostgreSQL schema..."
@@ -441,6 +456,11 @@ check_table documents || verify_ok=false
 # Add more if desired; these are common in this project
 check_table conversations || verify_ok=false
 check_table messages || verify_ok=false
+# pgvector + external-connections schema
+check_table embeddings || verify_ok=false
+check_table project_external_connections || verify_ok=false
+check_table project_connection_audit_log || verify_ok=false
+check_function add_document_to_group || verify_ok=false
 
 if [ "$verify_ok" != true ]; then
 	print_error "Database schema verification failed. See errors above."

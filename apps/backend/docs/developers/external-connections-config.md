@@ -25,6 +25,9 @@ This page documents the exact JSON config format for each connection type. All c
 {% endhint %}
 
 For a higher-level overview, see [External Connections](../features/external-connections.md).
+For the operator setup walkthrough (provisioning an external Postgres,
+registering connections with the CLI), see the monorepo guide at
+[`docs/external-connections-setup.md`](../../../../docs/external-connections-setup.md).
 
 ## Bucket Storage Config (S3 / MinIO)
 
