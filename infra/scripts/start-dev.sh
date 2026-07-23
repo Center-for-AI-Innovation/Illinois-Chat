@@ -455,7 +455,7 @@ print_success "PostgreSQL schema initialized and verified."
 print_status "Creating Qdrant collection..."
 
 # Ensure QDRANT_URL is defined
-if [[ -z $QDRANT_URL ]]; then
+if [[ -z ${QDRANT_URL:-} ]]; then
 	QDRANT_URL="http://localhost:6333"
 	print_warning "QDRANT_URL not set, using default: $QDRANT_URL"
 fi
@@ -477,7 +477,7 @@ print_status "Creating Qdrant collection..."
 print_status "Checking if Qdrant collection exists..."
 # Build headers (optionally include API key if provided)
 CURL_HEADERS=("-H" "Content-Type: application/json")
-if [[ -n $QDRANT_API_KEY ]]; then
+if [[ -n ${QDRANT_API_KEY:-} ]]; then
 	CURL_HEADERS+=("-H" "api-key: $QDRANT_API_KEY")
 fi
 
@@ -541,12 +541,12 @@ print_success "Qdrant collection ready!"
 print_status "Setting up MinIO bucket..."
 
 # Ensure MinIO environment variables are set
-if [[ -z $AWS_ACCESS_KEY_ID ]]; then
+if [[ -z ${AWS_ACCESS_KEY_ID:-} ]]; then
 	AWS_ACCESS_KEY_ID="minioadmin"
 	print_warning "AWS_ACCESS_KEY_ID not set, using default: $AWS_ACCESS_KEY_ID"
 fi
 
-if [[ -z $AWS_SECRET_ACCESS_KEY ]]; then
+if [[ -z ${AWS_SECRET_ACCESS_KEY:-} ]]; then
 	AWS_SECRET_ACCESS_KEY="minioadmin"
 	print_warning "AWS_SECRET_ACCESS_KEY not set, using default: $AWS_SECRET_ACCESS_KEY"
 fi
