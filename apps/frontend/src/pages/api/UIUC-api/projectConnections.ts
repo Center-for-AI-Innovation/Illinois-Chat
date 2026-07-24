@@ -24,6 +24,7 @@ import {
   deleteQuerySchema,
   getQuerySchema,
   CONNECTION_KINDS,
+  supabasePoolerWarning,
   type ConnectionKind,
 } from '~/utils/projectConnections/validation'
 import {
@@ -162,11 +163,21 @@ async function handlePost(
       ...meta,
     })
 
+    // Non-blocking advisory (warn-don't-reject policy): flag Supabase URIs
+    // that aren't the transaction pooler so operators can fix them early.
+    const warning =
+      kind === 'database'
+        ? supabasePoolerWarning(
+            (body.config as { connection_uri: string }).connection_uri,
+          )
+        : null
+
     return res.status(200).json({
       success: true,
       project_name: projectName,
       project_id: projectId,
       kind,
+      ...(warning ? { warning } : {}),
     })
   } catch (e) {
     console.error('[projectConnections] upsert failed:', e)

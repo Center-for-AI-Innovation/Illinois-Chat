@@ -111,6 +111,11 @@ const CONFIG_TTL_MS = 5 * 60 * 1000
 const CLIENT_TTL_MS = 30 * 60 * 1000
 const REDIS_CONFIG_TTL_S = 5 * 60
 
+// Grace period before disposing a TTL-replaced pg pool. Requests that grabbed
+// the old drizzle handle just before the swap may still issue queries; 30s
+// exceeds any realistic request lifetime. Exported for tests.
+export const DISPOSE_GRACE_MS = 30_000
+
 // Sentinel cached when a project has no row / is inactive — avoids repeating
 // the DB lookup just to learn there's no override.
 const NO_OVERRIDES: ResolvedRow = {
@@ -494,31 +499,52 @@ class ConnectionManager {
 
     const promise = (async () => {
       const config = await this.resolveConfig(projectName)
+      let entry: PgCacheEntry
       if (!config.database) {
         // Wrap the host db so callers always get a fresh expiresAt; we don't
         // own its lifecycle so `raw` is a no-op end().
-        const entry: PgCacheEntry = {
+        entry = {
           value: hostDb,
           raw: { end: async () => {} } as unknown as ReturnType<
             typeof postgres
           >,
           expiresAt: Date.now() + CLIENT_TTL_MS,
         }
-        this.pgClients.set(projectName, entry)
-        return entry
-      }
-      const raw = postgres(config.database.connection_uri, {
-        max: 5,
-        idle_timeout: 1800,
-        connect_timeout: 10,
-      })
-      const value = drizzle(raw, { schema })
-      const entry: PgCacheEntry = {
-        value,
-        raw,
-        expiresAt: Date.now() + CLIENT_TTL_MS,
+      } else {
+        const raw = postgres(config.database.connection_uri, {
+          // Small budget: shared with the backend's pool against the same
+          // external DB (Supabase session-mode poolers cap at ~15 total).
+          max: 3,
+          // Seconds. Short so idle connections release pooler sessions
+          // quickly instead of pinning them for 30 min.
+          idle_timeout: 20,
+          connect_timeout: 10,
+          // Named prepared statements break Supavisor/PgBouncer transaction
+          // mode (statements don't survive backend rotation).
+          prepare: false,
+        })
+        entry = {
+          value: drizzle(raw, { schema }),
+          raw,
+          expiresAt: Date.now() + CLIENT_TTL_MS,
+        }
       }
       this.pgClients.set(projectName, entry)
+      if (cached && cached.raw !== entry.raw) {
+        // TTL-expired predecessor: dispose after a grace period so requests
+        // still holding the old drizzle handle can finish. invalidate() stays
+        // immediate — config changes should tear down promptly.
+        const stale = cached.raw
+        const timer = setTimeout(() => {
+          stale.end({ timeout: 5 }).catch((e) => {
+            console.warn(
+              `[ConnectionManager] failed to dispose expired pg pool for ${projectName}:`,
+              e,
+            )
+          })
+        }, DISPOSE_GRACE_MS)
+        ;(timer as unknown as { unref?: () => void }).unref?.()
+      }
       return entry
     })().finally(() => {
       this.pgLocks.delete(projectName)
@@ -657,7 +683,21 @@ function logRedisOnce(op: 'read' | 'write', e: unknown): void {
 }
 
 // ---------------------------------------------------------------------------
-// Singleton — module-scoped so every server-side import shares one cache.
+// Singleton — cached on globalThis. With the pages router each API route is
+// bundled with its own copy of this module, so a plain module-scope singleton
+// would be per-route (one pg pool per route, in prod and dev alike) and dev
+// HMR would leak pools on every recompile. globalThis is shared across all
+// bundles in the Node process, so every route resolves the same instance and
+// invalidate() disposes the pools every route actually uses.
+// Trade-off: in dev, edits to this file need a dev-server restart to take
+// effect (the cached instance keeps running the old code).
 // ---------------------------------------------------------------------------
 
-export const connectionManager = new ConnectionManager()
+const globalForConnectionManager = globalThis as unknown as {
+  __illinoisChatConnectionManager?: ConnectionManager
+}
+
+export const connectionManager: ConnectionManager =
+  globalForConnectionManager.__illinoisChatConnectionManager ??
+  new ConnectionManager()
+globalForConnectionManager.__illinoisChatConnectionManager = connectionManager

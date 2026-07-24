@@ -42,6 +42,34 @@ _CONFIG_TTL = 300  # 5 minutes for decrypted configs
 _CONNECTION_TTL = 1800  # 30 minutes for live connections
 
 
+class DisposingTTLCache(TTLCache):
+    """TTLCache that disposes SQLAlchemy engines on TTL expiry / size eviction.
+
+    A plain TTLCache silently drops evicted engines, leaking their pooled
+    connections until GC. dispose() is idempotent and safe with checked-out
+    connections (they keep working and are discarded on return), so explicit
+    invalidate() double-dispose is harmless.
+    """
+
+    def popitem(self):
+        key, engine = super().popitem()
+        self._dispose(engine)
+        return key, engine
+
+    def expire(self, time=None):
+        expired = super().expire(time)
+        for _, engine in expired:
+            self._dispose(engine)
+        return expired
+
+    @staticmethod
+    def _dispose(engine):
+        try:
+            engine.dispose()
+        except Exception:
+            logger.warning("Engine dispose on cache eviction failed", exc_info=True)
+
+
 class ConnectionManager:
     """Resolves per-project infrastructure connections with caching."""
 
@@ -54,7 +82,7 @@ class ConnectionManager:
         # Caches: project_name -> value. Each resource has its own cache so
         # eviction of one (e.g. an S3 client) never affects another type.
         self._config_cache = TTLCache(maxsize=256, ttl=_CONFIG_TTL)
-        self._engine_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
+        self._engine_cache = DisposingTTLCache(maxsize=64, ttl=_CONNECTION_TTL)
         self._sql_db_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
         self._qdrant_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
         self._vdb_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
@@ -173,10 +201,12 @@ class ConnectionManager:
 
             connection_uri = db_config["connection_uri"]
             logger.info(f"Creating external DB engine for project: {project_name}")
+            # Small pool: the budget is shared with the frontend's pool against
+            # the same external DB (Supabase session-mode poolers cap at ~15).
             engine = create_engine(
                 connection_uri,
-                pool_size=5,
-                max_overflow=10,
+                pool_size=3,
+                max_overflow=2,
                 pool_recycle=1800,
                 pool_pre_ping=True,
             )

@@ -207,6 +207,11 @@ def _maybe_json(s: str) -> Any:
 
 
 def _print_result(status: int, body: Any) -> int:
+    # Surface server advisories (e.g. "Supabase session-mode URI — use the
+    # transaction pooler on port 6543") prominently on stderr in addition to
+    # the raw JSON body.
+    if isinstance(body, dict) and body.get("warning"):
+        print(f"WARNING: {body['warning']}", file=sys.stderr)
     print(json.dumps({"status": status, "body": body}, indent=2, default=str))
     return 0 if 200 <= status < 300 else 1
 
@@ -283,6 +288,16 @@ def cmd_set_active(args) -> int:
 
 
 def cmd_test(args) -> int:
+    if args.stored:
+        # Probe the config already saved for the project (decrypted
+        # server-side) instead of building one from env/args.
+        project = _require_project(args.project or PROJECT_NAME)
+        status, body = _request(
+            "POST",
+            ENDPOINT_TEST,
+            body={"kind": args.kind, "project_name": project},
+        )
+        return _print_result(status, body)
     config = _load_config_arg(args.config, args.kind)
     status, body = _request(
         "POST",
@@ -353,7 +368,18 @@ def main() -> int:
         nargs="?",
         default="env",
         help="`env` (default, built from .external.env), "
-        "a JSON object literal, or @path/to/file.json",
+        "a JSON object literal, or @path/to/file.json. Ignored with --stored.",
+    )
+    t.add_argument(
+        "--stored",
+        action="store_true",
+        help="Probe the config already saved for the project instead of a "
+        "supplied one (uses --project / EXT_PROJECT_NAME).",
+    )
+    t.add_argument(
+        "--project",
+        default=None,
+        help="Project name for --stored; defaults to EXT_PROJECT_NAME from .external.env.",
     )
 
     args = p.parse_args()

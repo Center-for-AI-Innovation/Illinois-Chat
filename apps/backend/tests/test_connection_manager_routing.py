@@ -126,6 +126,11 @@ def test_database_config_only_routes_to_pgvector():
             got = mgr.get_pgvector_store(PROJECT)
     assert got == "per-project-store"
     create_engine_mock.assert_called_once()
+    # Deliberate small pool: budget shared with the frontend pool against the
+    # same external DB (Supabase session-mode poolers cap at ~15 sessions).
+    engine_kwargs = create_engine_mock.call_args.kwargs
+    assert engine_kwargs["pool_size"] == 3
+    assert engine_kwargs["max_overflow"] == 2
     # The PgVectorStore should be constructed with the engine kwarg.
     _, kwargs = PgVecCtor.call_args
     assert kwargs.get("engine") is engine_sentinel
@@ -163,3 +168,33 @@ def test_no_vector_engine_env_branch():
         assert mgr.get_vector_engine_kind(PROJECT) == "pgvector"
     finally:
         os.environ.pop("VECTOR_ENGINE", None)
+
+
+class _FakeEngine:
+    def __init__(self):
+        self.disposed = 0
+
+    def dispose(self):
+        self.disposed += 1
+
+
+def test_disposing_ttl_cache_disposes_on_expiry():
+    now = [0.0]
+    cache = cm.DisposingTTLCache(maxsize=8, ttl=10, timer=lambda: now[0])
+    engine = _FakeEngine()
+    cache["p"] = engine
+
+    now[0] = 11.0  # past TTL
+    cache.expire()
+    assert engine.disposed == 1
+    assert "p" not in cache
+
+
+def test_disposing_ttl_cache_disposes_on_size_eviction():
+    cache = cm.DisposingTTLCache(maxsize=1, ttl=1000)
+    first = _FakeEngine()
+    second = _FakeEngine()
+    cache["a"] = first
+    cache["b"] = second  # evicts "a" via popitem()
+    assert first.disposed == 1
+    assert second.disposed == 0

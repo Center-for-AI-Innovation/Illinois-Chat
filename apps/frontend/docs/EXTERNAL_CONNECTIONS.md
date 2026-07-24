@@ -92,11 +92,21 @@ Toggles the `is_active` flag without losing stored configs. Body:
 
 ### `POST /api/UIUC-api/projectConnections/test`
 
-Probes a candidate config **without persisting**. The same shape as
-POST minus `project_name`. Returns:
+Probes a connection **without persisting**. Two request shapes:
+
+- **Supplied** — `{ "kind": ..., "config": ... }` (same shape as POST minus
+  `project_name`): probe a candidate config before saving it.
+- **Stored** — `{ "kind": ..., "project_name": ... }`: probe the config
+  already saved for a project. The config is decrypted server-side and never
+  echoed back; `ok: false, code: "not_found"` when the project has no stored
+  config of that kind.
+
+Returns:
 
 ```json
 { "ok": true }
+// or, non-fatal advisory (e.g. Supabase session-mode URI):
+{ "ok": true, "warning": "This looks like a Supabase session-mode pooler URI..." }
 // or
 { "ok": false, "code": "auth", "message": "Authentication rejected" }
 ```
@@ -233,6 +243,12 @@ type S3OverrideConfig = {
 }
 
 type DatabaseOverrideConfig = {
+  // postgres:// or postgresql:// only (schema-enforced on /test and upsert).
+  // The frontend opens the pool with `max: 3, idle_timeout: 20,
+  // prepare: false` — transaction-pooler compatible. For Supabase, register
+  // the transaction pooler URI (port 6543); session-mode (5432) and direct
+  // (db.<ref>.supabase.co) URIs are accepted but produce a `warning` in the
+  // /test and upsert responses.
   connection_uri: string
 }
 
@@ -263,7 +279,7 @@ Every mutation writes a row to `project_connection_audit_log`:
 | `occurred_at`    | timestamptz, defaults to `now()`                                                       |
 | `actor_email`    | from the verified JWT                                                                  |
 | `action`         | `upsert` \| `delete` \| `set_active` \| `test`                                         |
-| `project_name`   | target project, or NULL for `/test` probes (which happen before a project is selected) |
+| `project_name`   | target project; NULL for supplied-config `/test` probes (stored-config probes record the project) |
 | `kind`           | `s3` \| `database` \| `qdrant` \| NULL                                                 |
 | `outcome`        | `success` \| `failure`                                                                 |
 | `failure_reason` | short reason code; never an upstream error body                                        |

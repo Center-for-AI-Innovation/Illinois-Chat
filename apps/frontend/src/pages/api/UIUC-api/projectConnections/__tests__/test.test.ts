@@ -22,16 +22,25 @@ function mockTesterAndRepo(opts: {
   qdrant?: () => any
   s3?: () => any
   database?: () => any
+  // Stored-mode fixtures: the row returned by getConnectionByProject and the
+  // config decryptProjectConfig resolves for its encrypted column.
+  row?: any
+  decrypted?: any
 }) {
   vi.doMock('~/utils/projectConnections/tester', () => ({
     testQdrant: vi.fn(async () => opts.qdrant?.() ?? { ok: true }),
     testS3: vi.fn(async () => opts.s3?.() ?? { ok: true }),
     testDatabase: vi.fn(async () => opts.database?.() ?? { ok: true }),
+    testEmbedding: vi.fn(async () => ({ ok: true })),
   }))
   vi.doMock('~/db/projectConnectionsRepo', () => ({
     writeAuditEntry: vi.fn(async (e: any) => {
       auditEntries.push(e)
     }),
+    getConnectionByProject: vi.fn(async () => opts.row ?? null),
+  }))
+  vi.doMock('~/utils/crypto', () => ({
+    decryptProjectConfig: vi.fn(async () => opts.decrypted ?? null),
   }))
 }
 
@@ -43,6 +52,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.doUnmock('~/utils/projectConnections/tester')
   vi.doUnmock('~/db/projectConnectionsRepo')
+  vi.doUnmock('~/utils/crypto')
 })
 
 describe('projectConnections/test handler', () => {
@@ -150,6 +160,58 @@ describe('projectConnections/test handler', () => {
       outcome: 'failure',
       failure_reason: 'auth',
       project_name: null,
+    })
+  })
+
+  it('stored mode: probes the saved config and audits with project_name', async () => {
+    mockTesterAndRepo({
+      database: () => ({ ok: true }),
+      row: { database_config: { encrypted: 'blob' } },
+      decrypted: { connection_uri: 'postgres://u:p@h:5432/db' },
+    })
+    const { handler } = await import('../test')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { kind: 'database', project_name: 'demo' },
+        user: { email: 'admin@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    expect(auditEntries[0]).toMatchObject({
+      action: 'test',
+      kind: 'database',
+      outcome: 'success',
+      project_name: 'demo',
+    })
+  })
+
+  it('stored mode: no stored config → ok:false not_found, audited', async () => {
+    mockTesterAndRepo({ row: null })
+    const { handler } = await import('../test')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { kind: 'database', project_name: 'demo' },
+        user: { email: 'admin@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(200)
+    expect(res.body.ok).toBe(false)
+    expect(res.body.code).toBe('not_found')
+    expect(auditEntries[0]).toMatchObject({
+      action: 'test',
+      kind: 'database',
+      outcome: 'failure',
+      failure_reason: 'not_found',
+      project_name: 'demo',
     })
   })
 

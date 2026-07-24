@@ -283,6 +283,14 @@ class PgVectorStore:
         conn = self._conn()
         try:
             with conn.cursor() as cur:
+                # Match the frontend's search tuning (src/db/vectorSearch.ts):
+                # SET LOCAL is transaction-scoped (psycopg2 opens the implicit
+                # transaction on first execute), so this is safe under
+                # transaction-mode poolers and keeps recall identical across
+                # the two search paths. Requires pgvector >= 0.8, which the
+                # frontend path already assumes for the same databases.
+                cur.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+                cur.execute("SET LOCAL hnsw.ef_search = 100")
                 cur.execute(sql, tuple(params))
                 cols = [c[0] for c in cur.description]
                 return [dict(zip(cols, r)) for r in cur.fetchall()]

@@ -54,6 +54,11 @@ psql "postgresql://user:password@db-host:5432/dbname" \
   -f infra/db/provision_external_pgvector_store.sql
 ```
 
+> **Pooled providers:** run this provisioning step against a **direct or
+> session-mode connection** (e.g. Supabase port 5432) — it executes DDL and
+> `CREATE EXTENSION`, which belong on a real session. The transaction-pooler
+> URI recommended below is for the registered runtime `connection_uri` only.
+
 The script is idempotent and project-agnostic. It creates only the ingest +
 pgvector core the pipeline needs on the external side:
 
@@ -126,6 +131,39 @@ python3 external_connections_cli.py delete --kind qdrant
 
 Every command also accepts an explicit project name, a literal JSON config,
 or `@path/to/config.json` — run with `--help` for details.
+
+You can also probe the config **already stored** for a project (decrypted
+server-side, never echoed back):
+
+```bash
+python3 external_connections_cli.py test database --stored
+```
+
+### Supabase / pooled Postgres
+
+For the registered runtime `connection_uri`, use Supabase's **transaction
+pooler** (port **6543**):
+
+```
+postgresql://postgres.<ref>:password@<region>.pooler.supabase.com:6543/postgres
+```
+
+Why: the session-mode pooler (same host, port 5432) pins one database session
+per client connection and caps out around 15 sessions — the frontend and
+backend connection pools can exhaust that on their own, producing
+`EMAXCONNSESSION` / connect timeouts. Direct connections
+(`db.<ref>.supabase.co`) bypass the pooler entirely (IPv6-only, low
+`max_connections`). Transaction mode multiplexes idle clients and avoids both
+problems.
+
+The app is fully transaction-mode compatible: the frontend opens external
+pools with `prepare: false` (no named prepared statements) and scopes its
+pgvector tuning with `SET LOCAL` inside explicit transactions; the backend's
+psycopg2 driver needs no changes.
+
+Session-mode and direct Supabase URIs are still **accepted** — the `test`
+probe and `upsert` respond with a warning rather than rejecting them. The URI
+is stored verbatim; no automatic port rewriting is done.
 
 ### How routing behaves after registration
 

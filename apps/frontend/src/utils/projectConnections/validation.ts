@@ -28,8 +28,59 @@ export const s3ConfigSchema = z.object({
 }) satisfies z.ZodType
 
 export const databaseConfigSchema = z.object({
-  connection_uri: z.string().min(1),
+  // Postgres-only guard: enforced here (not just in the live probe) so both
+  // /test and upsert reject non-postgres URIs at the boundary.
+  connection_uri: z
+    .string()
+    .min(1)
+    .refine((uri) => /^postgres(ql)?:\/\//i.test(uri), {
+      message: 'connection_uri must be a postgres:// or postgresql:// URI',
+    }),
 }) satisfies z.ZodType
+
+/**
+ * Warn (never reject) when a Supabase URI is not the transaction pooler.
+ *
+ * Session-mode pooler connections (port 5432 on `*.pooler.supabase.com`) pin
+ * one server session per client connection and cap out around 15 sessions —
+ * easily exhausted by the frontend + backend pools. Direct connections
+ * (`db.<ref>.supabase.co`) bypass the pooler entirely (IPv6-only, low
+ * max_connections). Both work, but the transaction pooler (port 6543) is the
+ * right runtime choice; the app is transaction-mode compatible (frontend uses
+ * `prepare: false`, backend psycopg2 makes no named prepared statements).
+ *
+ * Returns a human-readable warning, or null for transaction-pooler /
+ * unrecognized hosts (we can't detect pooler mode for arbitrary hosts).
+ */
+export function supabasePoolerWarning(connectionUri: string): string | null {
+  let u: URL
+  try {
+    u = new URL(connectionUri)
+  } catch {
+    // Unparseable URIs are handled by the schema / probe, not here.
+    return null
+  }
+  const host = u.hostname.toLowerCase()
+  if (host === 'pooler.supabase.com' || host.endsWith('.pooler.supabase.com')) {
+    if (u.port === '' || u.port === '5432') {
+      return (
+        'This looks like a Supabase session-mode pooler URI (port 5432). ' +
+        'Session mode pins one database session per client connection and is ' +
+        'capped at ~15 sessions, which the app pools can exhaust. Use the ' +
+        'transaction pooler instead: same URI with port 6543.'
+      )
+    }
+    return null
+  }
+  if (/^db\.[a-z0-9-]+\.supabase\.co$/.test(host)) {
+    return (
+      'This looks like a Supabase direct-connection URI (db.<ref>.supabase.co). ' +
+      'Direct connections bypass the pooler (IPv6-only, low max_connections). ' +
+      "Use the project's transaction pooler URI on port 6543 instead."
+    )
+  }
+  return null
+}
 
 // Entry in `qdrant_config.collections` for read-side multi-collection fan-out.
 // Backend consumer: ai_ta_backend/database/vector.py `_multi_collection_search`.
@@ -143,11 +194,29 @@ export const setActiveBodySchema = z.object({
 })
 export type SetActiveBody = z.infer<typeof setActiveBodySchema>
 
-export const testBodySchema = z.discriminatedUnion('kind', [
+// Supplied mode: probe a config from the request body (pre-upsert check).
+export const testSuppliedBodySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('s3'), config: s3ConfigSchema }),
   z.object({ kind: z.literal('database'), config: databaseConfigSchema }),
   z.object({ kind: z.literal('qdrant'), config: qdrantConfigSchema }),
   z.object({ kind: z.literal('embedding'), config: embeddingConfigSchema }),
+])
+export type TestSuppliedBody = z.infer<typeof testSuppliedBodySchema>
+
+// Stored mode: probe the config already saved for a project. `.strict()` so a
+// body that also carries a (malformed) `config` fails loudly instead of
+// silently falling through to the stored config.
+export const testStoredBodySchema = z
+  .object({
+    kind: z.enum(CONNECTION_KINDS),
+    project_name: z.string().min(1),
+  })
+  .strict()
+export type TestStoredBody = z.infer<typeof testStoredBodySchema>
+
+export const testBodySchema = z.union([
+  testSuppliedBodySchema,
+  testStoredBodySchema,
 ])
 export type TestBody = z.infer<typeof testBodySchema>
 

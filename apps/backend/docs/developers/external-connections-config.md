@@ -81,7 +81,11 @@ The `s3_config` block supports either AWS S3 or any S3-compatible storage such a
 
 | Field            | Type   | Required | Description                                                                                                      |
 | ---------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| `connection_uri` | string | **Yes**  | Full PostgreSQL connection URI. The engine is created with `pool_size=5`, `max_overflow=10`, `pool_recycle=1800`. |
+| `connection_uri` | string | **Yes**  | Full PostgreSQL connection URI (`postgres://` or `postgresql://` only). The engine is created with `pool_size=3`, `max_overflow=2`, `pool_recycle=1800`. |
+
+{% hint style="info" %}
+**Supabase:** register the **transaction pooler** URI (port 6543, `<region>.pooler.supabase.com`). Session mode (port 5432) pins one server session per client connection and caps at ~15 sessions, which the frontend + backend pools can exhaust; direct connections (`db.<ref>.supabase.co`) bypass the pooler. Non-transaction Supabase URIs are accepted with a warning. The stack is transaction-mode compatible: psycopg2 issues no named prepared statements, and the frontend opens its pools with `prepare: false`.
+{% endhint %}
 
 ### Scope of the External SQL Connection
 

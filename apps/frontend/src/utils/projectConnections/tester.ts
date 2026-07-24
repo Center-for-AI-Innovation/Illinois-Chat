@@ -41,6 +41,7 @@ import {
 } from '~/utils/connectionManager'
 import {
   EMBEDDING_PROVIDERS,
+  supabasePoolerWarning,
   type EmbeddingOverrideConfig,
 } from '~/utils/projectConnections/validation'
 
@@ -58,6 +59,8 @@ export interface TestResult {
   ok: boolean
   code?: TestErrorCode
   message?: string
+  // Non-fatal advisory (e.g. Supabase session-mode URI) — probe still passed.
+  warning?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -456,7 +459,8 @@ export async function testDatabase(
     await withTimeout(queryPromise, PROBE_TIMEOUT_MS, () => {
       sql?.end({ timeout: 0 }).catch(() => {})
     })
-    return { ok: true }
+    const warning = supabasePoolerWarning(cfg.connection_uri)
+    return warning ? { ok: true, warning } : { ok: true }
   } catch (e) {
     return classifyUnknown(e)
   } finally {

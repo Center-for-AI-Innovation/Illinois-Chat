@@ -56,6 +56,11 @@ function setupRedisFake() {
 }
 
 beforeEach(() => {
+  // The manager is cached on globalThis (survives vi.resetModules()); drop it
+  // so every test gets a fresh instance wired to that test's mocks.
+  delete (
+    globalThis as { __illinoisChatConnectionManager?: unknown }
+  ).__illinoisChatConnectionManager
   vi.resetModules()
   vi.unstubAllEnvs()
   vi.stubEnv('ENCRYPTION_MASTER_KEY', MASTER_KEY)
@@ -318,7 +323,7 @@ describe('ConnectionManager — overrides', () => {
     const got = await connectionManager.getDocumentsDb('p')
     expect(pgFn).toHaveBeenCalledWith(
       'postgres://u:p@host:5432/db',
-      expect.objectContaining({ max: 5 }),
+      expect.objectContaining({ max: 3, idle_timeout: 20, prepare: false }),
     )
     expect(got).toEqual({ kind: 'external-drizzle' })
   })
@@ -385,6 +390,59 @@ describe('ConnectionManager — caching and invalidation', () => {
     // Next call hits the host DB again
     await connectionManager.getDocumentsDb('p')
     expect(hostStub.select).toHaveBeenCalledTimes(2)
+  })
+
+  it('disposes a TTL-expired external pool after the grace period', async () => {
+    const dbField = await encryptJson({
+      connection_uri: 'postgres://u:p@host:5432/db',
+    })
+    const hostStub = makeHostDbStub([
+      {
+        is_active: true,
+        s3_config: null,
+        database_config: dbField,
+        qdrant_config: null,
+      },
+    ])
+    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
+    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
+    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
+    setupRedisFake()
+
+    // Each postgres() call yields a distinct pool whose end() resolves (the
+    // disposal path chains .catch() on it).
+    const pools: Array<{ end: ReturnType<typeof vi.fn> }> = []
+    const pgFn = vi.fn(() => {
+      const pool = { end: vi.fn().mockResolvedValue(undefined) }
+      pools.push(pool)
+      return pool
+    })
+    vi.doMock('postgres', () => ({ default: pgFn }))
+    vi.doMock('drizzle-orm/postgres-js', () => ({
+      drizzle: vi.fn(() => ({ kind: 'external' })),
+    }))
+
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
+    try {
+      const { connectionManager, DISPOSE_GRACE_MS } = await import(
+        '../connectionManager'
+      )
+      await connectionManager.getDocumentsDb('p')
+      expect(pgFn).toHaveBeenCalledTimes(1)
+
+      // Past the 30-min client TTL (also expires the 5-min config cache).
+      vi.setSystemTime(Date.now() + 31 * 60 * 1000)
+      await connectionManager.getDocumentsDb('p')
+      expect(pgFn).toHaveBeenCalledTimes(2)
+
+      // The replaced pool is disposed only after the grace period elapses.
+      expect(pools[0]!.end).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(DISPOSE_GRACE_MS + 1)
+      expect(pools[0]!.end).toHaveBeenCalledWith({ timeout: 5 })
+      expect(pools[1]!.end).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

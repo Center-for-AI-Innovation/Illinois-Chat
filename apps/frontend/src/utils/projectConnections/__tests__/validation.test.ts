@@ -6,6 +6,7 @@ import {
   embeddingConfigSchema,
   upsertBodySchema,
   setActiveBodySchema,
+  supabasePoolerWarning,
   testBodySchema,
   deleteQuerySchema,
   EMBEDDING_PROVIDERS,
@@ -46,6 +47,69 @@ describe('projectConnections/validation — database', () => {
         connection_uri: 'postgres://u:p@host:5432/db',
       }).success,
     ).toBe(true)
+  })
+
+  it('accepts postgresql:// scheme too', () => {
+    expect(
+      databaseConfigSchema.safeParse({
+        connection_uri: 'postgresql://u:p@host:5432/db',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejects non-postgres URIs (postgres-only guard)', () => {
+    for (const uri of [
+      'mysql://u:p@host:3306/db',
+      'mongodb://host:27017/db',
+      'host:5432/db',
+      'not a uri',
+    ]) {
+      const parsed = databaseConfigSchema.safeParse({ connection_uri: uri })
+      expect(parsed.success).toBe(false)
+      if (!parsed.success) {
+        expect(parsed.error.issues[0]!.message).toMatch(
+          /postgres:\/\/ or postgresql:\/\//,
+        )
+      }
+    }
+  })
+})
+
+describe('projectConnections/validation — supabasePoolerWarning', () => {
+  it('warns on session-mode pooler URIs (port 5432 or default)', () => {
+    const explicitPort = supabasePoolerWarning(
+      'postgresql://u:p@aws-1-us-east-2.pooler.supabase.com:5432/postgres',
+    )
+    expect(explicitPort).toMatch(/session-mode/)
+    expect(explicitPort).toMatch(/6543/)
+    const defaultPort = supabasePoolerWarning(
+      'postgresql://u:p@aws-1-us-east-2.pooler.supabase.com/postgres',
+    )
+    expect(defaultPort).toMatch(/session-mode/)
+    expect(defaultPort).toMatch(/6543/)
+  })
+
+  it('is silent for the transaction pooler (port 6543)', () => {
+    expect(
+      supabasePoolerWarning(
+        'postgresql://u:p@aws-1-us-east-2.pooler.supabase.com:6543/postgres',
+      ),
+    ).toBeNull()
+  })
+
+  it('warns on direct db.<ref>.supabase.co connections', () => {
+    const warning = supabasePoolerWarning(
+      'postgresql://u:p@db.abcd1234.supabase.co:5432/postgres',
+    )
+    expect(warning).toMatch(/direct-connection/)
+    expect(warning).toMatch(/6543/)
+  })
+
+  it('is silent for unrecognized hosts and garbage input', () => {
+    expect(
+      supabasePoolerWarning('postgresql://u:p@my-own-host.example.com:5432/db'),
+    ).toBeNull()
+    expect(supabasePoolerWarning('not a uri at all')).toBeNull()
   })
 })
 
@@ -280,6 +344,29 @@ describe('projectConnections/validation — bodies', () => {
         config: { connection_uri: 'postgres://u:p@h:5432/db' },
       }).success,
     ).toBe(true)
+  })
+
+  it('testBodySchema accepts the stored-config variant', () => {
+    expect(
+      testBodySchema.safeParse({ kind: 'database', project_name: 'demo' })
+        .success,
+    ).toBe(true)
+    expect(
+      testBodySchema.safeParse({ kind: 's3', project_name: 'demo' }).success,
+    ).toBe(true)
+  })
+
+  it('testBodySchema rejects kind alone and stored+config hybrids', () => {
+    expect(testBodySchema.safeParse({ kind: 'database' }).success).toBe(false)
+    // A malformed config alongside project_name must NOT silently fall
+    // through to the stored config (stored variant is .strict()).
+    expect(
+      testBodySchema.safeParse({
+        kind: 'database',
+        project_name: 'demo',
+        config: { connection_uri: 'mysql://nope' },
+      }).success,
+    ).toBe(false)
   })
 
   it('upsertBodySchema accepts kind=embedding', () => {
