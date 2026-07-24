@@ -1,0 +1,590 @@
+global:
+  imageRegistry: docker-registry.osc.edu
+  imagePullSecret:
+    name: osc-registry
+    # -- OSC registry password
+    # @default -- **required**
+    password:
+  oscServiceAccount: oscchat
+  database:
+    allowIngress: true
+  security:
+    allowInsecureImages: true
+  storageClass: local-ess
+  pvcLabels:
+    osc.edu/service-account: oscchat
+  pvcAnnotations:
+    osc.edu/fileset: PZS0645
+  fileset: PZS0645
+  llm:
+    host: ""
+  embedding:
+    host: ""
+    model: ""
+    vectorLen: 4096
+  # @ignored
+  webservicesDeploy:
+    create: false
+  # @ignored
+  debugGroups:
+    - sappstf
+  # @ignored
+  maintenanceGroups:
+    - sappstf
+  # @ignored
+  auth:
+    enable: false
+    keycloakClient:
+      forceCreate: true
+      config:
+        publicClient: true
+        webOrigins:
+          - https://{{ .Values.global.ingress.host }}
+          - '{{ printf "https://%s" (.Values.global.ingress.hostAlias | default .Values.global.ingress.host) }}'
+  alert:
+    receiver: sciapps
+
+  ingress:
+    host: ""
+    hostAlias: ""
+  networkPolicy:
+    ingressAllowedPods:
+      - app.kubernetes.io/name: "osc-mcp"
+
+database:
+  # @ignored
+  oscCommon:
+    enable: false
+  postgresql:
+    schema:
+      enabled: true
+    enable: true
+    imagePullSecret:
+      enable: false
+    auth:
+      postgresPassword: secret
+      database: name
+      username: name
+      password: secret
+    primary:
+      persistence:
+        annotations:
+          osc.edu/fileset: '{{ .Values.global.fileset }}'
+      # @ignored
+      initdb:
+        scripts:
+          extra-grants.sql: |
+            GRANT EXECUTE ON FUNCTION pg_ls_waldir() TO {{ .Values.auth.username }};
+
+  redis:
+    enable: true
+    auth:
+      password: secret
+    master:
+      persistence:
+        annotations:
+          osc.edu/fileset: PZS0645
+
+minio:
+  enable: true
+  image:
+    repository: kubernetes/bitnami/minio
+    tag: 2025.7.23-debian-12-r5
+    pullSecrets:
+      - osc-registry
+  defaultBuckets: "osc-chat"
+  commonLabels:
+    receiver: '{{ index .Values.global.alert.receiver }}'
+  clientImage:
+    repository: kubernetes/bitnami/minio-client
+    tag: 2025.7.21-debian-12-r3
+    pullSecrets:
+      - osc-registry
+  console:
+    image:
+      repository: kubernetes/bitnami/minio-object-browser
+      tag: 2.0.2-debian-12-r3
+      pullSecrets:
+        - osc-registry
+  imagePullSecret:
+    enable: false
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 60s
+      relabelings:
+      - sourceLabels: [__meta_kubernetes_service_label_receiver]
+        targetLabel: receiver
+  persistence:
+    annotations:
+      osc.edu/fileset: PZS0645
+  auth:
+    rootUser: "minioadmin"
+    rootPassword: "minioadmin"
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    hostname: ""
+    tls: true
+    path: /
+    pathType: Prefix
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 16k
+
+
+qdrant:
+  enable: true
+  resources:
+    limits:
+      cpu: 4
+      memory: 8Gi
+    requests:
+      cpu: 4
+      memory: 8Gi
+  storageClass:
+  additionalLabels:
+    receiver: sciapps
+  metrics:
+    serviceMonitor:
+      enabled: true
+      scrapeInterval: 60s
+      relabelings:
+      - sourceLabels: [__meta_kubernetes_service_label_receiver]
+        targetLabel: receiver
+  image:
+    repository: docker-registry.osc.edu/kubernetes/qdrant/qdrant
+    tag: v1.16.3
+    useUnprivilegedImage: true
+  persistence:
+    storageClassName: local-path
+  snapshotPersistence:
+    enabled: true
+#    storageClassName: webservices-nfs-client
+    storageClassName: local-ess
+    annotations:
+      osc.edu/fileset: PZS0645
+    additionalLabels:
+      osc.edu/service-account: oscchat
+#  snapshotRestoration:
+#    enabled: true
+  # @ignored
+  snapshot:
+    cronjob:
+      enabled: true
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: 1
+          memory: 512Mi
+      schedule: "0 0 * * *"
+  imagePullSecrets:
+    - name: osc-registry
+  apiKey: true
+
+rabbitmq:
+  enable: true
+  image:
+    repository: kubernetes/bitnami/rabbitmq
+    tag: 4.1.3-debian-12-r1
+    pullSecrets:
+      - osc-registry
+  imagePullSecret:
+    enable: false
+  resources:
+    limits:
+      cpu: 750m
+      memory: 768Mi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  commonLabels:
+    receiver: '{{ index .Values.global.alert.receiver }}'
+  metrics:
+    enabled: true
+    podAnnotations:
+      prometheus.io/scrape: "false"
+    serviceMonitor:
+      default:
+        enabled: true
+        interval: 60s
+      targetLabels:
+        - receiver
+  auth:
+    username: guest
+    password: guest
+  persistence:
+    annotations:
+      osc.edu/fileset: PZS0645
+  rbac:
+    create: false
+
+backend:
+  enabled: true
+  ingress:
+    enabled: false
+  image:
+    repository: kubernetes/hpcgpt/backend
+    tag: v0.1.1
+    pullPolicy: Always
+  imagePullSecret:
+    enable: false
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8001
+  env:
+    FLASK_ENV: production
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  enabled: true
+  image:
+    repository: kubernetes/hpcgpt/backend
+    tag: v0.1.1
+    pullPolicy: Always
+  replicaCount: 1
+  env:
+    QDRANT_COLLECTION_NAME: '{{ include "osc-chat.name" . }}'
+    S3_BUCKET_NAME: '{{ include "osc-chat.name" . }}'
+  resources:
+    limits:
+      cpu: 4
+      memory: 2Gi
+    requests:
+      cpu: 2
+      memory: 512Mi
+
+osc-mcp:
+  enabled: false
+  extraInitContainers:
+    - name: wait-for-frontend
+      image: '{{ .Values.global.imageRegistry }}/kubernetes/portainer/kubectl-shell:2.39.0'
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: 1
+          memory: 512Mi
+      command:
+        - timeout
+        - 300s
+        - /bin/bash
+        - -c
+        - |
+          until curl -sf http://{{ .Release.Name }}-frontend:3000/api/healthcheck | jq -e '.healthy == true' >/dev/null
+          do
+            sleep 5
+          done
+  osc_chat:
+    chatEndpoint: http://{{ .Release.Name }}-frontend:3000/api/chat-api/chat
+
+ollama:
+  enabled: false
+
+huggingfaceCache:
+  enabled: true
+  mountPath: "/var/cache/huggingface"
+  sizeLimit: "5Gi"
+  storageClassName: '{{ .Values.global.storageClass }}'
+
+secrets:
+  # Internal secrets - created by the chart
+  create: true
+  api:
+    openaiKey: "your_strong_key"
+
+crawlee:
+  enabled: true
+  image:
+    repository: kubernetes/hpcgpt/crawlee
+    tag: v0.1.1
+    pullPolicy: Always
+  imagePullSecret:
+    enable: false
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 3000
+  env:
+    NO_CRAWL: FALSE
+    S3_BUCKET_NAME: osc-chat
+    AWS_REGION: us-east-1
+  probes:
+    liveness:
+      enabled: true
+    readiness:
+      enabled: true
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+
+keycloak:
+  enabled: false
+
+frontend:
+  enabled: true
+  image:
+    repository: kubernetes/hpcgpt/frontend
+    tag: v0.1.7
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      prometheus.io/probe_path: /api/healthcheck
+      prometheus.io/probe_scheme: 'https'
+      cert-manager.io/cluster-issuer: letsencrypt
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 16k
+      nginx.ingress.kubernetes.io/server-alias: '{{ .Values.global.ingress.hostAlias }}'
+    host: '{{ required "Ingress host must be defined in the global settings" .Values.global.ingress.host }}'
+    tls:
+      - hosts:
+        - '{{ required "Ingress host must be defined in the global settings" .Values.global.ingress.host }}'
+        - '{{ required "Ingress hostAlias must be defined in the global settings" .Values.global.ingress.hostAlias }}'
+        secretName: osc-chat-frontend
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+networkPolicies:
+  enabled: false
+
+vllm-stack:
+  enabled: false
+  servingEngineSpec:
+    labels:
+      release: osc-chat
+    runtimeClassName: ""
+    modelSpec:
+    # Qwen Model
+    - name: "qwen3"
+      repository: "docker-registry.osc.edu/kubernetes/vllm/vllm-openai"
+      tag: "v0.21.0"
+      imagePullSecret: osc-registry
+      modelURL: "Qwen/Qwen3-8B"
+      replicaCount: 1
+      enableLoRA: false
+
+      requestCPU: 4
+      requestMemory: "32Gi"
+      requestGPU: 1
+      limitCPU: 4
+      limitMemory: "32Gi"
+      limitGPU: 1
+
+      podAnnotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path: /metrics
+        prometheus.io/port: '8000'
+      pvcStorage: "50Gi"
+      pvcAccessMode:
+        - ReadWriteMany
+      storageClass: local-ess
+      pvcLabels:
+        osc.edu/service-account: oscchat
+      pvcAnnotations:
+        osc.edu/fileset: PZS0645
+
+      vllmConfig:
+#        enableChunkedPrefill: false
+#        enablePrefixCaching: false
+        maxModelLen: 40960
+        dtype: "half"
+#        extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.50"]
+#        extraArgs: ["--enforce-eager", "--quantization", "awq", "--gpu-memory-utilization", "0.85"]
+        extraArgs:
+          - "--disable-access-log-for-endpoints"
+          - "/health,/metrics,/ping"
+#          - "--enforce-eager"
+          - "--gpu-memory-utilization"
+          - "0.90"
+          - "--served-model-name"
+          - "Qwen/Qwen3-8B"
+          - "--safetensors-load-strategy"
+          - "eager"
+          - "--max-num-seqs"
+          - "128"
+#          - '--distributed-executor-backend=ray'
+#        extraArgs: ["--enforce-eager", "--quantization", "bitsandbytes", "--gpu-memory-utilization", "0.85"]
+#        tensorParallelSize: 2
+      enableTool: true
+      toolCallParser: hermes
+
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: nvidia.com/gpu.product
+          operator: In
+          values:
+#          - NVIDIA-A100-PCIE-40GB-MIG-3g.20gb
+          - NVIDIA-A100-PCIE-40GB-MIG-7g.40gb
+#          - NVIDIA-A100-PCIE-40GB-MIG-1g.5gb
+#        - key: kubernetes.io/hostname
+#          operator: In
+#          values:
+#          - kubeworker27
+
+#      keda:
+#        enabled: false
+#      lmcacheConfig:
+#        enabled: false
+
+#      hf_token: ""
+    - name: "qwen3-embedding"
+      repository: "docker-registry.osc.edu/kubernetes/vllm/vllm-openai"
+      tag: "v0.21.0"
+      imagePullSecret: osc-registry
+      modelURL: "Qwen/Qwen3-Embedding-8B"
+      replicaCount: 1
+      enableLoRA: false
+
+      requestCPU: 4
+      requestMemory: "32Gi"
+      requestGPU: 1
+      limitCPU: 4
+      limitMemory: "32Gi"
+      limitGPU: 1
+
+      podAnnotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path: /metrics
+        prometheus.io/port: '8000'
+      pvcStorage: "50Gi"
+      pvcAccessMode:
+        - ReadWriteMany
+      storageClass: local-ess
+      pvcLabels:
+        osc.edu/service-account: oscchat
+      pvcAnnotations:
+        osc.edu/fileset: PZS0645
+
+      vllmConfig:
+#        enableChunkedPrefill: false
+#        enablePrefixCaching: false
+        maxModelLen: 40960
+        dtype: "half"
+#        extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.50"]
+#        extraArgs: ["--enforce-eager", "--quantization", "awq", "--gpu-memory-utilization", "0.85"]
+        extraArgs:
+          - "--disable-access-log-for-endpoints"
+          - "/health,/metrics,/ping"
+#          - "--enforce-eager"
+          - "--gpu-memory-utilization"
+          - "0.90"
+          - "--served-model-name"
+          - "Qwen/Qwen3-Embedding-8B"
+          - "--safetensors-load-strategy"
+          - "eager"
+          - "--max-num-seqs"
+          - "128"
+#          - '--distributed-executor-backend=ray'
+#        extraArgs: ["--enforce-eager", "--quantization", "bitsandbytes", "--gpu-memory-utilization", "0.85"]
+#        tensorParallelSize: 2
+      enableTool: true
+      toolCallParser: qwen3_coder
+
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: nvidia.com/gpu.product
+          operator: In
+          values:
+          - NVIDIA-A100-PCIE-40GB-MIG-7g.40gb
+    vllmApiKey:
+      secretName: osc-chat-app-secrets
+      secretKey: "OPENAI_API_KEY"
+    containerSecurityContext:
+      runAsNonRoot: true
+    env:
+      - name: USER
+        value: skhuvis
+      - name: LOGNAME
+        value: skhuvis
+      - name: VLLM_CACHE_ROOT
+        value: /data/vllm_cache
+      - name: FLASHINFER_WORKSPACE_BASE
+        value: /data/flashinfer
+      - name: TRITON_CACHE_DIR
+        value: /data/triton
+      - name: VLLM_NO_USAGE_STATS
+        value: '1'
+      - name: DO_NOT_TRACK
+        value: '1'
+      - name: OMP_NUM_THREADS
+        value: '2'
+#      - name: NVIDIA_VISIBLE_DEVICES
+#        value: all
+#      - name: CUDA_VISIBLE_DEVICES
+#        value: '0,1'
+#      - name: NCCL_DEBUG
+#        value: WARN
+
+  routerSpec:
+    enableRouter: true
+    repository: docker-registry.osc.edu/kubernetes/lmcache/lmstack-router
+    tag: v0.1.11
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets:
+    - name: osc-registry
+    env:
+    - name: USER
+      value: osc-chat
+    - name: LOGNAME
+      value: osc-chat
+    servicePort: 80
+    labels:
+      environment: ~
+      release: osc-chat
+      osc.edu/service-account: oscchat
+    serviceAnnotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/path: /metrics
+      prometheus.io/port: '80'
+    resources:
+      requests:
+        cpu: 4
+        memory: 1500Mi
+      limits:
+        cpu: 4
+        memory: 4000Mi
+    ingress:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/proxy-buffer-size: 16k
+        nginx.ingress.kubernetes.io/whitelist-source-range: '131.187.45.7,192.148.247.0/24,10.0.0.0/8'
+      hosts:
+        - host: oscchat-test-vllm.k8.osc.edu
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: osc-chat-vllm
+          hosts:
+            - oscchat-test-vllm.k8.osc.edu

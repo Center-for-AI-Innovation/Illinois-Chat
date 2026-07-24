@@ -1,0 +1,18 @@
+{{ if and .Values.huggingfaceCache.enabled .Values.huggingfaceCache.storageClassName }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "osc-chat.fullname" . }}-hfcache-claim
+  labels:
+    {{- include "osc-chat.labels" . | nindent 4 }}
+    {{- include "osc-chat.pvcLabels" . | nindent 4 }}
+  annotations:
+    {{- include "osc-chat.pvcAnnotations" . | nindent 4 }}
+spec:
+  storageClassName: {{ tpl .Values.huggingfaceCache.storageClassName . }}
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.huggingfaceCache.sizeLimit }}
+{{ end }}

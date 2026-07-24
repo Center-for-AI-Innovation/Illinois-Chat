@@ -1,0 +1,170 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "osc-chat.fullname" . }}-worker
+  labels:
+    {{- include "osc-chat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    receiver: '{{ index .Values.global.alert.receiver }}'
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "osc-chat.worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "osc-chat.worker.selectorLabels" . | nindent 8 }}
+        receiver: '{{ index .Values.global.alert.receiver }}'
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      imagePullSecrets:
+        - name: {{ include "osc.common.imagePullSecret.name" . }}
+      serviceAccountName: {{ include "osc-chat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-rabbitmq
+          image: {{ .Values.global.imageRegistry }}/kubernetes/portainer/kubectl-shell:2.39.0
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 512Mi
+          command:
+            - timeout
+            - 300s
+            - /bin/bash
+            - -c
+            - |
+              until curl http://${{ .Values.rabbitmq.auth.username }}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:15672/api/health/checks/ready-to-serve-clients; do
+                echo waiting
+                sleep 2
+              done
+          env:
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: RABBITMQ_HOST
+      containers:
+        - name: worker
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "osc-chat.image" (dict "imageRoot" .Values.worker.image "global" .Values.global) }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command: ["python", "ai_ta_backend/rabbitmq/worker.py"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "osc-chat.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "osc-chat.fullname" . }}-app-secrets
+          env:
+            - name: RABBITMQ_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: RABBITMQ_QUEUE
+            - name: QDRANT_COLLECTION_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: QDRANT_COLLECTION_NAME
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: S3_BUCKET_NAME
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: RABBITMQ_URL
+            - name: KV_REST_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: REDIS_PASSWORD
+            {{- if and .Values.ollama.enabled (eq .Values.environment "dev") }}
+            - name: OLLAMA_BASE_URL
+              value: "http://{{ include "osc-chat.fullname" . }}-ollama:11434"
+            {{- end }}
+            {{- if .Values.huggingfaceCache.enabled }}
+            - name: TRANSFORMERS_CACHE
+              value: {{ printf "%s/transformers" .Values.huggingfaceCache.mountPath | quote }}
+            - name: HF_HOME
+              value: {{ .Values.huggingfaceCache.mountPath | quote }}
+            {{- end }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: MINIO_SECRET_KEY
+            - name: OSC_HOSTED_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: OPENAI_API_KEY
+            - name: EMBEDDING_API_BASE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: EMBEDDING_URL
+            - name: EMBEDDING_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: EMBEDDING_MODEL
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-qdrant-apikey
+                  key: api-key
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          {{- if .Values.huggingfaceCache.enabled }}
+          volumeMounts:
+            - name: huggingface-cache
+              mountPath: {{ .Values.huggingfaceCache.mountPath | quote }}
+          {{- end }}
+      {{- if .Values.huggingfaceCache.enabled }}
+      volumes:
+        - name: huggingface-cache
+          {{- if .Values.huggingfaceCache.storageClassName }}
+          persistentVolumeClaim:
+            claimName: {{include "osc-chat.fullname" . }}-hfcache-claim
+          {{- else }}
+          emptyDir:
+            {{- if .Values.huggingfaceCache.sizeLimit }}
+            sizeLimit: {{ .Values.huggingfaceCache.sizeLimit | quote }}
+            {{- end }}
+          {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

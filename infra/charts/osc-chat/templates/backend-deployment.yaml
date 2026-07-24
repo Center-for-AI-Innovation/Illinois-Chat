@@ -1,0 +1,154 @@
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "osc-chat.fullname" . }}-backend
+  labels:
+    {{- include "osc-chat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+    receiver: '{{ index .Values.global.alert.receiver }}'
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "osc-chat.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "osc-chat.backend.selectorLabels" . | nindent 8 }}
+        receiver: '{{ index .Values.global.alert.receiver }}'
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+    spec:
+      imagePullSecrets:
+        - name: {{ include "osc.common.imagePullSecret.name" . }}
+      serviceAccountName: {{ include "osc-chat.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: backend
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "osc-chat.image" (dict "imageRoot" .Values.backend.image "global" .Values.global) }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "osc-chat.fullname" . }}-app-config
+            - secretRef:
+                name: {{ include "osc-chat.fullname" . }}-app-secrets
+          env:
+            - name: FLASK_ENV
+              value: {{ .Values.backend.env.FLASK_ENV | quote }}
+            # Prevent crashes in test when Ollama is disabled
+            - name: OLLAMA_SERVER_URL
+              value: {{ default "http://localhost:11434" .Values.backend.env.OLLAMA_SERVER_URL | quote }}
+            - name: OSC_HOSTED_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: OPENAI_API_KEY
+            - name: EMBEDDING_API_BASE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: EMBEDDING_URL
+            - name: EMBEDDING_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: EMBEDDING_MODEL
+            - name: RABBITMQ_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-config
+                  key: RABBITMQ_QUEUE
+            - name: S3_ENDPOINT
+              value: "http://{{ include "osc-chat.fullname" . }}-minio:9000"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: MINIO_SECRET_KEY
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: RABBITMQ_URL
+            - name: KV_REST_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-app-secrets
+                  key: REDIS_PASSWORD
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "osc-chat.fullname" . }}-qdrant-apikey
+                  key: api-key
+            {{- if .Values.huggingfaceCache.enabled }}
+            - name: TRANSFORMERS_CACHE
+              value: {{ printf "%s/transformers" .Values.huggingfaceCache.mountPath | quote }}
+            - name: HF_HOME
+              value: {{ .Values.huggingfaceCache.mountPath | quote }}
+            {{- end }}
+            # The rest of the envs are provided via envFrom ConfigMap/Secret
+          {{- with .Values.backend.command }}
+          command: {{ toJson . }}
+          {{- end }}
+          {{- with .Values.backend.args }}
+          args: {{ toJson . }}
+          {{- end }}
+          #livenessProbe:
+          #  httpGet:
+          #    path: /health
+          #    port: http
+          #  initialDelaySeconds: 30
+          #  periodSeconds: 10
+          #readinessProbe:
+          #  httpGet:
+          #    path: /health
+          #    port: http
+          #  initialDelaySeconds: 5
+          #  periodSeconds: 5
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          {{- if .Values.huggingfaceCache.enabled }}
+          volumeMounts:
+            - name: huggingface-cache
+              mountPath: {{ .Values.huggingfaceCache.mountPath | quote }}
+          {{- end }}
+      {{- if .Values.huggingfaceCache.enabled }}
+      volumes:
+        - name: huggingface-cache
+          {{- if .Values.huggingfaceCache.storageClassName }}
+          persistentVolumeClaim:
+            claimName: {{include "osc-chat.fullname" . }}-hfcache-claim
+          {{- else }}
+          emptyDir:
+            {{- if .Values.huggingfaceCache.sizeLimit }}
+            sizeLimit: {{ .Values.huggingfaceCache.sizeLimit | quote }}
+            {{- end }}
+          {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

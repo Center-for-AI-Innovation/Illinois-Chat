@@ -1,0 +1,88 @@
+{{- if .Values.qdrant.snapshot.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "osc-chat.fullname" . }}-qdrant-snapshot-cron
+  labels:
+    {{- include "osc-chat.labels" . | nindent 4 }}
+    receiver: '{{ index .Values.global.alert.receiver }}'
+spec:
+  schedule: {{ .Values.qdrant.snapshot.cronjob.schedule | quote }}
+  concurrencyPolicy: {{ .Values.qdrant.snapshot.cronjob.concurrencyPolicy | default "Forbid" }}
+  failedJobsHistoryLimit: {{ .Values.qdrant.snapshot.cronjob.failedJobsHistoryLimit | default 1 }}
+  successfulJobsHistoryLimit: {{ .Values.qdrant.snapshot.cronjob.successfulJobsHistoryLimit | default 3 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "osc-chat.qdrant.selectorLabels" . | nindent 12 }}
+            receiver: '{{ index .Values.global.alert.receiver }}'
+        spec:
+          imagePullSecrets:
+            - name: {{ include "osc.common.imagePullSecret.name" . }}
+          restartPolicy: {{ .Values.qdrant.snapshot.cronjob.restartPolicy | default "OnFailure" }}
+          containers:
+            - name: {{ .Release.Name }}-qdrant-cronjob
+              image: {{ .Values.global.imageRegistry }}/kubernetes/portainer/kubectl-shell:2.39.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  curl -X POST --header "api-key: ${QDRANT_API_KEY}" -sf "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}/snapshots"
+                  SNAPSHOTS_RESP=$(curl -X GET --header "api-key: ${QDRANT_API_KEY}" -sf "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}/snapshots")
+                  if [[ $(echo "$SNAPSHOTS_RESP" | jq -r '.status') != "ok" ]]; then
+                    echo "Error: Failed to fetch snapshot list."
+                    exit 1
+                  fi
+                  export MAX_SNAPSHOTS={{ .Values.qdrant.snapshot.maxsnapshots | default 5 }}
+                  SNAPSHOTS=$(echo "$SNAPSHOTS_RESP" | \
+                    grep -o '"name":"[^"]*"' | \
+                    cut -d'"' -f4 | \
+                    sed 's/.*\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]\)\.snapshot/\1 &/' | \
+                    sort | \
+                    awk '{print $2}')
+                  if [ -z "$SNAPSHOTS" ]; then
+                    TOTAL_COUNT=0
+                  else
+                    TOTAL_COUNT=$(echo "$SNAPSHOTS" | wc -l)
+                  fi
+                  echo "Total snapshots currently stored: ${TOTAL_COUNT} (Limit: ${MAX_SNAPSHOTS})"
+                  if [ "$TOTAL_COUNT" -gt "$MAX_SNAPSHOTS" ]; then
+                      DELETE_COUNT=$((TOTAL_COUNT - MAX_SNAPSHOTS))
+                      echo "Limit exceeded. Identifying the ${DELETE_COUNT} oldest snapshot(s) for removal..."
+                      TO_DELETE=$(echo "$SNAPSHOTS" | head -n "$DELETE_COUNT")
+                      for SNAPSHOT in $TO_DELETE; do
+                          echo "Deleting old snapshot: ${SNAPSHOT}..."
+                          DELETE_RESP=$(curl -X DELETE --header "api-key: ${QDRANT_API_KEY}" -sf "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}/snapshots/${SNAPSHOT}")
+                          if [[ $(echo "$DELETE_RESP" | jq -r '.status') != "ok" ]]; then
+                              echo "Warning: Failed to delete snapshot ${SNAPSHOT}"
+                              echo "Response: $DELETE_RESP"
+                          else
+                              echo "Snapshot ${SNAPSHOT} deleted successfully."
+                          fi
+                      done
+                  else
+                      echo "No cleanup required. Snapshots are within the allowed limit."
+                  fi
+              {{- if .Values.qdrant.snapshot.cronjob.resources }}
+              resources:
+                {{- toYaml .Values.qdrant.snapshot.cronjob.resources | nindent 16 }}
+              {{- end }}
+              env:
+              - name: QDRANT_URL
+                valueFrom:
+                  configMapKeyRef:
+                    name: {{ include "osc-chat.fullname" . }}-app-config
+                    key: QDRANT_URL
+              - name: QDRANT_COLLECTION_NAME
+                valueFrom:
+                  configMapKeyRef:
+                    name: {{ include "osc-chat.fullname" . }}-app-config
+                    key: QDRANT_COLLECTION_NAME
+              - name: QDRANT_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ include "osc-chat.fullname" . }}-qdrant-apikey
+                    key: api-key
+{{- end }}

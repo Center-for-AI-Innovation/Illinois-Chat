@@ -1,0 +1,20 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "osc-chat.fullname" . }}-frontend
+  labels:
+    {{- include "osc-chat.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+    receiver: '{{ index .Values.global.alert.receiver }}'
+spec:
+  type: {{ .Values.frontend.service.type }}
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "osc-chat.frontend.selectorLabels" . | nindent 4 }}
+{{- end }}
+

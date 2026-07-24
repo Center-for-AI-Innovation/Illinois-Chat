@@ -1,0 +1,82 @@
+{{- if .Values.qdrant.enable }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "osc-chat.fullname" . }}-qdrant-setup
+  labels:
+    {{- include "osc-chat.labels" . | nindent 4 }}
+    receiver: '{{ index .Values.global.alert.receiver }}'
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"  # Run before other services
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "osc-chat.qdrant.selectorLabels" . | nindent 8 }}
+        receiver: '{{ index .Values.global.alert.receiver }}'
+    spec:
+      imagePullSecrets:
+        - name: {{ include "osc.common.imagePullSecret.name" . }}
+      restartPolicy: OnFailure
+      containers:
+      - name: qdrant-setup
+        image: {{ .Values.global.imageRegistry }}/kubernetes/portainer/kubectl-shell:2.39.0
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 512Mi
+        command:
+          - /bin/sh
+          - -c
+          - |
+            if curl --header "api-key: ${QDRANT_API_KEY}" -sf "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}" > /dev/null; then
+              echo "Collection ${QDRANT_COLLECTION_NAME} already exists."
+              exit 0
+            fi
+            curl --header "api-key: ${QDRANT_API_KEY}" -X PUT "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "vectors": {
+                "size": {{ .Values.global.embedding.vectorLen }},
+                "distance": "Cosine"
+              }
+            }'
+            SNAPSHOTS_RESP=$(curl -X GET --header "api-key: ${QDRANT_API_KEY}" -sf "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}/snapshots")
+            LATEST_SNAPSHOT=$(echo "$SNAPSHOTS_RESP" | \
+              grep -o '"name":"[^"]*"' | \
+              cut -d'"' -f4 | \
+              sed 's/.*\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9]\)\.snapshot/\1 &/' | \
+              sort -r | \
+              head -n 1 | \
+              awk '{print $2}')
+            if [ -n "$LATEST_SNAPSHOT" ]; then
+              echo "Snapshot found: $LATEST_SNAPSHOT. Initiating recovery..."
+              curl -X PUT "${QDRANT_URL}/collections/${QDRANT_COLLECTION_NAME}/snapshots/recover" \
+                --header "api-key: ${QDRANT_API_KEY}" \
+                --header "Content-Type: application/json" \
+                -d "{
+                  \"location\": \"file:///qdrant/snapshots/${QDRANT_COLLECTION_NAME}/${LATEST_SNAPSHOT}\"
+                }"
+            fi
+        env:
+        - name: QDRANT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "osc-chat.fullname" . }}-app-config
+              key: QDRANT_URL
+        - name: QDRANT_COLLECTION_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "osc-chat.fullname" . }}-app-config
+              key: QDRANT_COLLECTION_NAME
+        - name: QDRANT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "osc-chat.fullname" . }}-qdrant-apikey
+              key: api-key
+{{ end }}
