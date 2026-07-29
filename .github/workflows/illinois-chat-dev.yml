@@ -3,7 +3,7 @@ name: Illinois Chat Dev Deploy
 on:
   push:
     branches:
-      - illinois-chat
+      - main
     paths:
       - 'apps/**'
       - 'infra/**'
