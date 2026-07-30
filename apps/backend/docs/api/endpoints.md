@@ -100,6 +100,8 @@ print(response.contexts)
 Note: This API response is free of cost provided by UIUC chat and will NOT invoke LLM and ONLY return relevant contexts
 {% endhint %}
 
+Use the optional `top_n` field to limit the response to the highest-ranked contexts. It accepts positive integers and defaults to 100.
+
 ```python
 import requests
 
@@ -122,7 +124,8 @@ data = {
     "openai_key": "YOUR-OPENAI-KEY-HERE",
     "temperature": 0.1,
     "course_name": "your-course-name",
-    "retrieval_only": true
+    "retrieval_only": true,
+    "top_n": 8
 }
 
 response = requests.post(url, headers=headers, json=data)

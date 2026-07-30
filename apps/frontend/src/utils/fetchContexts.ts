@@ -13,6 +13,7 @@ export default async function fetchContextsFromBackend(
   token_limit = 4000,
   doc_groups: string[] = [],
   conversation_id?: string,
+  top_n = 100,
   signal?: AbortSignal,
 ): Promise<ContextWithMetadata[]> {
   const backendUrl = getBackendUrl()
@@ -23,6 +24,7 @@ export default async function fetchContextsFromBackend(
     token_limit: token_limit,
     doc_groups: doc_groups,
     conversation_id: conversation_id,
+    top_n: top_n,
   }
 
   const response = await fetch(`${backendUrl}/getTopContexts`, {
@@ -65,6 +67,7 @@ export async function fetchContextsByVectorEngine(
       token_limit,
       doc_groups,
       conversation_id,
+      top_n,
       signal,
     )
   }
@@ -88,6 +91,7 @@ export const fetchContexts = async (
   token_limit = 4000,
   doc_groups: string[] = [],
   conversation_id?: string,
+  top_n = 100,
 ): Promise<ContextWithMetadata[]> => {
   // Check if we're running on client-side (browser) or server-side
   const isClientSide = typeof window !== 'undefined'
@@ -108,6 +112,7 @@ export const fetchContexts = async (
             token_limit,
             doc_groups,
             conversation_id,
+            top_n,
           }),
         },
       )
@@ -127,6 +132,7 @@ export const fetchContexts = async (
         token_limit,
         doc_groups,
         conversation_id,
+        top_n,
       )
     }
   } catch (error) {
