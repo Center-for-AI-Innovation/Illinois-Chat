@@ -26,7 +26,7 @@ jobs:
       - name: Install Trunk
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: pull_request
+          check-mode: none
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
