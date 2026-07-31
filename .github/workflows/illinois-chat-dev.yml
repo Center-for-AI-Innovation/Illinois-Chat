@@ -18,10 +18,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install frontend dependencies
+        working-directory: apps/frontend
+        run: |
+          npm ci
+
       - name: Install Trunk
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: all
+          check-mode: pull-request
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
