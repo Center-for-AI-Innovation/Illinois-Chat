@@ -13,11 +13,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Trunk
-        uses: trunk-io/trunk-action@v1
-        with:
-          check-mode: all
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

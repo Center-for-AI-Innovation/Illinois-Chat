@@ -7,26 +7,44 @@ on:
       - illinois-chat
       - main
 
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write # trunk-action posts lint results as check-run annotations
+
 jobs:
   trunk-and-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Trunk
+      # check-mode is auto-detected from the event (pull_request)
+      - name: Trunk check
         uses: trunk-io/trunk-action@v1
-        with:
-          check-mode: all
 
       # Backend tests placeholder
       - name: Backend tests
         run: |
           echo "TODO: add backend tests (e.g., pytest) here"
 
-      # Frontend tests placeholder
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: apps/frontend
+        run: npm ci
+
       - name: Frontend tests
-        run: |
-          echo "TODO: add frontend tests (e.g., npm test) here"
+        working-directory: apps/frontend
+        run: npm run test:coverage:check
