@@ -3,7 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { connectionManager } from '~/utils/connectionManager'
-import { getPresignedUrlClient } from '~/utils/s3Client'
+import { getPresignedUrlClient, normalizeS3Key } from '~/utils/s3Client'
 import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 
 export async function generatePresignedUrl(
@@ -32,7 +32,7 @@ export async function generatePresignedUrl(
 
   const command = new GetObjectCommand({
     Bucket: bucket,
-    Key: filePath,
+    Key: normalizeS3Key(filePath, bucket),
     ResponseContentDisposition: fileName
       ? `attachment; filename="${fileName}"`
       : 'inline',

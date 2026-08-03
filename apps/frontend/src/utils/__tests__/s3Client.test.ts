@@ -79,3 +79,36 @@ describe('s3Client', () => {
     expect(ctor).toHaveBeenCalledWith({ region: 'us-east-1' })
   })
 })
+
+describe('normalizeS3Key', () => {
+  it('strips a leading bucket segment (path-style MinIO / legacy AWS)', async () => {
+    vi.resetModules()
+    const { normalizeS3Key } = await import('../s3Client')
+    expect(normalizeS3Key('uiuc-chat/courses/cs101/out.png', 'uiuc-chat')).toBe(
+      'courses/cs101/out.png',
+    )
+  })
+
+  it('leaves a virtual-hosted-style key untouched', async () => {
+    vi.resetModules()
+    const { normalizeS3Key } = await import('../s3Client')
+    expect(normalizeS3Key('courses/cs101/out.png', 'uiuc-chat')).toBe(
+      'courses/cs101/out.png',
+    )
+  })
+
+  it('only strips the bucket as a whole leading segment', async () => {
+    vi.resetModules()
+    const { normalizeS3Key } = await import('../s3Client')
+    // A key beginning with the bucket name but not the bucket path must survive.
+    expect(normalizeS3Key('uiuc-chat-archive/out.png', 'uiuc-chat')).toBe(
+      'uiuc-chat-archive/out.png',
+    )
+  })
+
+  it('strips only the first occurrence', async () => {
+    vi.resetModules()
+    const { normalizeS3Key } = await import('../s3Client')
+    expect(normalizeS3Key('bkt/bkt/out.png', 'bkt')).toBe('bkt/out.png')
+  })
+})

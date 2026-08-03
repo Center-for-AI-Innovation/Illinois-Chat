@@ -55,4 +55,16 @@ function getPresignedUrlClient(): S3Client | null {
   return new S3Client({ region })
 }
 
-export { s3Client, getPresignedUrlClient }
+// Keys reaching the presign routes are often recovered from a URL pathname by the
+// client. Path-style S3/MinIO URLs are `<endpoint>/<bucket>/<key>`, so that pathname
+// carries the bucket and signing it verbatim yields a valid signature for an object
+// that does not exist. Presigning never touches the bucket, so the error surfaces as
+// a silent 404 on the image rather than an API failure. No-op for virtual-hosted AWS.
+// A key that genuinely begins with the bucket name would be mis-stripped; no current
+// key layout does.
+function normalizeS3Key(key: string, bucket: string): string {
+  const prefix = `${bucket}/`
+  return key.startsWith(prefix) ? key.slice(prefix.length) : key
+}
+
+export { s3Client, getPresignedUrlClient, normalizeS3Key }

@@ -4,7 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { connectionManager } from '~/utils/connectionManager'
-import { getPresignedUrlClient } from '~/utils/s3Client'
+import { getPresignedUrlClient, normalizeS3Key } from '~/utils/s3Client'
 import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -32,7 +32,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const signingClient = isOverride
       ? client
       : getPresignedUrlClient() ?? client
-    const command = new GetObjectCommand({ Bucket: bucket, Key: s3_path })
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: normalizeS3Key(s3_path, bucket),
+    })
     const presignedUrl = await getSignedUrl(signingClient, command, {
       expiresIn: 3600,
     })
