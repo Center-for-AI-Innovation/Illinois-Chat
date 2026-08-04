@@ -23,7 +23,14 @@ describe('fetchContexts (browser/jsdom)', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
 
-    await fetchContexts('CS225', 'binary trees', 2000, ['lectures'], 'conv-1')
+    await fetchContexts(
+      'CS225',
+      'binary trees',
+      2000,
+      ['lectures'],
+      'conv-1',
+      8,
+    )
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [, init] = fetchSpy.mock.calls[0] ?? []
@@ -37,6 +44,7 @@ describe('fetchContexts (browser/jsdom)', () => {
       token_limit: 2000,
       doc_groups: ['lectures'],
       conversation_id: 'conv-1',
+      top_n: 8,
     })
   })
 
@@ -52,6 +60,7 @@ describe('fetchContexts (browser/jsdom)', () => {
     )
     expect(body.token_limit).toBe(4000)
     expect(body.doc_groups).toEqual([])
+    expect(body.top_n).toBe(100)
   })
 
   it('returns [] when /api/getContexts responds not ok', async () => {

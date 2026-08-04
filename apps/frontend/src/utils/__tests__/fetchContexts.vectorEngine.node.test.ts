@@ -93,6 +93,10 @@ describe('fetchContextsByVectorEngine / VECTOR_ENGINE routing', () => {
       'https://backend.example/getTopContexts',
       expect.objectContaining({ method: 'POST' }),
     )
+    const body = JSON.parse(
+      (fetchSpy.mock.calls[0]?.[1] as RequestInit)?.body as string,
+    )
+    expect(body.top_n).toBe(50)
     expect(result).toEqual(data)
   })
 

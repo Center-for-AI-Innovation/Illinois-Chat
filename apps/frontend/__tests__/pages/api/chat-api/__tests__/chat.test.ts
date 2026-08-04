@@ -238,12 +238,21 @@ describe('chat-api/chat', () => {
           stream: false,
           api_key: 'k',
           retrieval_only: true,
+          top_n: 8,
         },
         socket: { remoteAddress: '127.0.0.1' } as any,
       }) as any,
       res as any,
     )
     expect(res.status).toHaveBeenCalledWith(200)
+    expect(hoisted.handleContextSearch).toHaveBeenCalledWith(
+      expect.any(Object),
+      'CS101',
+      expect.any(Object),
+      expect.any(String),
+      ['All Documents'],
+      8,
+    )
     expect(hoisted.routeModelRequest).not.toHaveBeenCalled()
   })
 
@@ -360,6 +369,7 @@ describe('chat-api/chat', () => {
       expect.any(Object),
       expect.any(String),
       ['All Documents'],
+      100,
     )
   })
 
@@ -389,6 +399,7 @@ describe('chat-api/chat', () => {
       expect.any(Object),
       expect.any(String),
       ['Group A'],
+      100,
     )
   })
 
