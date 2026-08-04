@@ -21,7 +21,7 @@ const makeTool = (overrides: Partial<UIUCTool>): UIUCTool =>
     readableName: 'My Tool',
     description: 'a test tool',
     ...overrides,
-  }) as UIUCTool
+  } as UIUCTool)
 
 const makeConversation = (message: Partial<Message>): Conversation =>
   ({
@@ -33,7 +33,7 @@ const makeConversation = (message: Partial<Message>): Conversation =>
         ...message,
       },
     ],
-  }) as unknown as Conversation
+  } as unknown as Conversation)
 
 const lastContent = (conversation: Conversation): string | Content[] =>
   conversation.messages[conversation.messages.length - 1]!.content
@@ -139,9 +139,7 @@ describe('_buildToolsOutputResults', () => {
   it('ignores an empty imageUrls array', () => {
     const conversation = makeConversation({
       content: [{ type: 'text', text: 'hi' }],
-      tools: [
-        makeTool({ output: { data: { ok: true }, imageUrls: [] } }),
-      ],
+      tools: [makeTool({ output: { data: { ok: true }, imageUrls: [] } })],
     })
 
     const result = _buildToolsOutputResults({ conversation })
