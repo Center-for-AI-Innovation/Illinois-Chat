@@ -40,7 +40,7 @@ describe('UIUC-api/createProject', () => {
   it('returns 400 for invalid names without touching Redis or the backend', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
 
-    for (const badName of ['my.bot', 'a'.repeat(65)]) {
+    for (const badName of ['my bot', '.hidden', 'a'.repeat(65)]) {
       hoisted.checkCourseExists.mockClear()
       const res = createMockRes()
       await handler(

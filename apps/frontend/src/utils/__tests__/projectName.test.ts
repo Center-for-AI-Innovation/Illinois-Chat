@@ -11,17 +11,24 @@ describe('isValidProjectName', () => {
   it('accepts URL-safe names', () => {
     expect(isValidProjectName('my-bot_2')).toBe(true)
     expect(isValidProjectName('CropWizard')).toBe(true)
+    expect(isValidProjectName('cropwizard-1.5')).toBe(true)
     expect(isValidProjectName('a')).toBe(true)
     expect(isValidProjectName('a'.repeat(PROJECT_NAME_MAX_LENGTH))).toBe(true)
   })
 
-  it('rejects names with characters outside [a-zA-Z0-9_-]', () => {
-    expect(isValidProjectName('cropwizard-1.5')).toBe(false)
+  it('rejects names with characters outside [a-zA-Z0-9._-]', () => {
     expect(isValidProjectName('héllo')).toBe(false)
     expect(isValidProjectName('has space')).toBe(false)
     expect(isValidProjectName('emoji🐛')).toBe(false)
     expect(isValidProjectName('a/b')).toBe(false)
     expect(isValidProjectName('name\n')).toBe(false)
+  })
+
+  it('rejects names starting with a dot', () => {
+    expect(isValidProjectName('.hidden')).toBe(false)
+    expect(isValidProjectName('.')).toBe(false)
+    expect(isValidProjectName('..')).toBe(false)
+    expect(isValidProjectName('trailing.')).toBe(true)
   })
 
   it('rejects empty and over-length names', () => {
@@ -39,8 +46,11 @@ describe('getProjectNameError', () => {
   })
 
   it('describes invalid characters', () => {
-    expect(getProjectNameError('cropwizard-1.5')).toMatch(
-      /letters, numbers, dashes, and underscores/,
+    expect(getProjectNameError('has space')).toMatch(
+      /letters, numbers, dashes, underscores, and dots/,
+    )
+    expect(getProjectNameError('.hidden')).toMatch(
+      /letters, numbers, dashes, underscores, and dots/,
     )
   })
 

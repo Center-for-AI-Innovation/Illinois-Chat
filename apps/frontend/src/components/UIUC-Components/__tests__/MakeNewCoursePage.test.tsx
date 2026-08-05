@@ -404,7 +404,7 @@ describe('MakeNewCoursePage', () => {
 
       renderWithProviders(
         <MakeNewCoursePage
-          project_name="my.bot"
+          project_name="my bot"
           current_user_email="owner@example.com"
           is_new_course={true}
         />,

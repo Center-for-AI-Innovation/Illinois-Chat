@@ -839,7 +839,7 @@ def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> 
   if not is_valid_project_name(project_name):
     abort(400,
           description="Invalid 'project_name': names may only contain letters, numbers, "
-          "dashes, and underscores (max 64 characters).")
+          "dashes, underscores, and dots — a dot cannot be the first character (max 64 characters).")
   print(f"In /createProject for: {project_name}")
   try:
     service.create_project(project_name, project_description, project_owner_email, is_private, allow_logged_in_users)

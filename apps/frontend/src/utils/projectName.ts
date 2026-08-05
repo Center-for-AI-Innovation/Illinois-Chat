@@ -8,7 +8,11 @@
  * runs on creation, and buildProjectChatPath encodes rather than mangles.
  */
 
-export const PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
+// Dots are allowed except as the first character: buildProjectChatPath
+// strips leading dots for traversal safety, so a leading-dot name would
+// diverge from its URL segment (the exact bug name validation exists to
+// prevent).
+export const PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/
 
 export const PROJECT_NAME_MAX_LENGTH = 64
 
@@ -28,7 +32,7 @@ export function getProjectNameError(name: string): string | null {
     return `Name must be ${PROJECT_NAME_MAX_LENGTH} characters or fewer.`
   }
   if (!PROJECT_NAME_PATTERN.test(name)) {
-    return 'Names can only use letters, numbers, dashes, and underscores.'
+    return 'Names can only use letters, numbers, dashes, underscores, and dots (a dot cannot be the first character).'
   }
   return null
 }

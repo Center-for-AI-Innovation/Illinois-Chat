@@ -46,7 +46,10 @@ def make_service() -> ProjectService:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["my-bot_2", "CropWizard", "a", "a" * 64])
+@pytest.mark.parametrize(
+    "name",
+    ["my-bot_2", "CropWizard", "cropwizard-1.5", "trailing.", "a", "a" * 64],
+)
 def test_valid_project_names(name):
     assert is_valid_project_name(name)
 
@@ -55,12 +58,14 @@ def test_valid_project_names(name):
     "name",
     [
         "",
-        "cropwizard-1.5",
         "has space",
         "héllo",
         "a/b",
         "a" * 65,
         "my-bot\n",  # Python's '$' would match before the newline; fullmatch must not
+        ".hidden",  # leading dot diverges from the URL segment (stripped by buildProjectChatPath)
+        ".",
+        "..",
     ],
 )
 def test_invalid_project_names(name):

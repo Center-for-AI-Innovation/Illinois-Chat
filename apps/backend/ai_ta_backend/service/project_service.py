@@ -17,7 +17,10 @@ from ai_ta_backend.utils.schema_generation import (
 # with PROJECT_NAME_PATTERN in apps/frontend/src/utils/projectName.ts.
 # fullmatch (not match with '$') — Python's '$' also matches before a trailing
 # newline, which would let names like "my-bot\n" through.
-PROJECT_NAME_PATTERN = re.compile(r'[a-zA-Z0-9_-]{1,64}')
+# Dots are allowed except as the first character: the frontend's
+# buildProjectChatPath strips leading dots, so a leading-dot name would
+# diverge from its URL segment.
+PROJECT_NAME_PATTERN = re.compile(r'[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,63}')
 
 
 def is_valid_project_name(project_name: str) -> bool:

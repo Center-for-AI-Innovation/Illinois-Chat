@@ -23,7 +23,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       error: 'Invalid project name',
       message:
         getProjectNameError(project_name) ??
-        'Project names can only use letters, numbers, dashes, and underscores.',
+        'Project names can only use letters, numbers, dashes, underscores, and dots (a dot cannot be the first character).',
     })
   }
 
