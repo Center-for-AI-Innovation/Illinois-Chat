@@ -142,11 +142,17 @@ function defaultProps(overrides: Record<string, any> = {}) {
     isDisabled: false,
     courseMetadata: { course_owner: 'me@example.com' } as any,
     is_new_course: false,
-    redirect_to_gpt_4: true,
+    uploadFiles: [] as FileUpload[],
     setUploadFiles: vi.fn() as any,
+    queryClient: { invalidateQueries: vi.fn() } as any,
     auth: { isAuthenticated: true } as any,
     ...overrides,
   }
+}
+
+/** An active document upload that arms the gated poller. */
+function activeDocument(name: string, status: FileUpload['status'] = 'uploading') {
+  return { name, status, type: 'document' as const }
 }
 
 describe('LargeDropzone', () => {
@@ -231,6 +237,7 @@ describe('LargeDropzone', () => {
       <LargeDropzone
         {...defaultProps({
           is_new_course: true,
+          uploadFiles: [activeDocument('My-File.pdf')],
           setUploadFiles,
         })}
       />,
@@ -444,7 +451,6 @@ describe('LargeDropzone', () => {
       <LargeDropzone
         {...defaultProps({
           is_new_course: false,
-          redirect_to_gpt_4: true,
         })}
       />,
     )
@@ -543,7 +549,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('report.pdf')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     // Simulate having a file in uploading state
     uploads = [{ name: 'report.pdf', status: 'uploading', type: 'document' }]
@@ -585,7 +598,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('quick.pdf')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     const intervalCallback = getIntervalCb()
     if (intervalCallback) await intervalCallback()
@@ -618,7 +638,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('done.pdf', 'ingesting')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     const intervalCallback = getIntervalCb()
     if (intervalCallback) await intervalCallback()
@@ -649,7 +676,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('failed.pdf', 'ingesting')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     const intervalCallback = getIntervalCb()
     if (intervalCallback) await intervalCallback()
@@ -679,7 +713,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('other.pdf')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     const intervalCallback = getIntervalCb()
     if (intervalCallback) await intervalCallback()
@@ -716,7 +757,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('still-going.pdf', 'ingesting')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     const intervalCallback = getIntervalCb()
     if (intervalCallback) await intervalCallback()
@@ -748,7 +796,14 @@ describe('LargeDropzone', () => {
       }),
     )
 
-    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('pending.pdf')],
+          setUploadFiles,
+        })}
+      />,
+    )
 
     const intervalCallback = getIntervalCb()
     if (intervalCallback) await intervalCallback()
@@ -764,6 +819,250 @@ describe('LargeDropzone', () => {
       // Should stay 'uploading' because it's not visible in either API yet
       expect(result[0].status).toBe('uploading')
     }
+  })
+
+  // -----------------------------------------------------------------------
+  // Gated polling
+  // -----------------------------------------------------------------------
+
+  it('does not arm the polling interval when no document uploads are active', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const getIntervalCb = mockTimers()
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(buildFetchMock({}))
+
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [
+            { name: 'done.pdf', status: 'complete', type: 'document' },
+            { name: 'https://a.com', status: 'uploading', type: 'webscrape' },
+          ],
+        })}
+      />,
+    )
+
+    expect(getIntervalCb()).toBeUndefined()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('POSTs the tracked filenames to both status endpoints', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const getIntervalCb = mockTimers()
+    const calls: { url: string; body: any }[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (async (input: any, init?: any) => {
+        const url = String(input?.url ?? input)
+        if (url.includes('/api/materialsTable/')) {
+          calls.push({ url, body: JSON.parse(init?.body ?? '{}') })
+        }
+        return new Response(JSON.stringify({ documents: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }) as any,
+    )
+
+    render(
+      <LargeDropzone
+        {...defaultProps({ uploadFiles: [activeDocument('report.pdf')] })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
+    if (intervalCallback) await intervalCallback()
+
+    expect(calls).toHaveLength(2)
+    expect(calls.map((c) => c.url).sort()).toEqual([
+      '/api/materialsTable/docsInProgress',
+      '/api/materialsTable/successDocs',
+    ])
+    for (const call of calls) {
+      expect(call.body).toEqual({
+        course_name: 'CS101',
+        filenames: ['report.pdf'],
+      })
+    }
+  })
+
+  it('skips the status update when a status endpoint fails', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const setUploadFiles = vi.fn()
+    const getIntervalCb = mockTimers()
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (async (input: any) => {
+        const url = String(input?.url ?? input)
+        if (url.includes('/api/materialsTable/successDocs')) {
+          return new Response(JSON.stringify({ error: 'boom' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        return new Response(JSON.stringify({ documents: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }) as any,
+    )
+
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('flaky.pdf', 'ingesting')],
+          setUploadFiles,
+        })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    if (intervalCallback) await intervalCallback()
+
+    // The file must NOT be flipped to 'error' just because a request failed.
+    expect(setUploadFiles).not.toHaveBeenCalled()
+  })
+
+  it('invalidates documents on complete-transition and both keys on gate close', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const invalidateQueries = vi.fn()
+    const getIntervalCb = mockTimers()
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      buildFetchMock({
+        docsInProgress: () => ({ documents: [] }),
+        successDocs: () => ({
+          documents: [{ readable_filename: 'done.pdf' }],
+        }),
+      }),
+    )
+
+    const props = defaultProps({
+      uploadFiles: [activeDocument('done.pdf', 'ingesting')],
+      queryClient: { invalidateQueries } as any,
+    })
+    const { rerender } = render(<LargeDropzone {...props} />)
+
+    const intervalCallback = getIntervalCb()
+    if (intervalCallback) await intervalCallback()
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['documents', 'CS101'],
+    })
+
+    invalidateQueries.mockClear()
+
+    // Gate closes: the tracked file went terminal.
+    rerender(
+      <LargeDropzone
+        {...props}
+        uploadFiles={[
+          { name: 'done.pdf', status: 'complete', type: 'document' },
+        ]}
+      />,
+    )
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['documents', 'CS101'],
+    })
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['failedDocuments', 'CS101'],
+    })
+  })
+
+  it('chunks filter POSTs above the server cap and merges results', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    let uploads: FileUpload[] = []
+    const setUploadFiles = vi.fn((updater: any) => {
+      uploads = typeof updater === 'function' ? updater(uploads) : updater
+    })
+    const getIntervalCb = mockTimers()
+
+    const manyFiles: FileUpload[] = Array.from({ length: 1001 }, (_, i) =>
+      activeDocument(`doc-${i}.pdf`, 'ingesting'),
+    )
+    uploads = manyFiles
+
+    const bodies: any[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (async (input: any, init?: any) => {
+        const url = String(input?.url ?? input)
+        const body = JSON.parse(init?.body ?? '{}')
+        bodies.push({ url, count: body.filenames?.length ?? 0 })
+        // Every tracked file is completed.
+        return new Response(
+          JSON.stringify({
+            documents: url.includes('successDocs')
+              ? body.filenames.map((name: string) => ({
+                  readable_filename: name,
+                }))
+              : [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      }) as any,
+    )
+
+    render(
+      <LargeDropzone
+        {...defaultProps({ uploadFiles: manyFiles, setUploadFiles })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    if (intervalCallback) await intervalCallback()
+
+    // 2 chunks (1000 + 1) × 2 endpoints
+    expect(bodies).toHaveLength(4)
+    expect(bodies.map((b) => b.count).sort()).toEqual([1, 1, 1000, 1000])
+    // Merged results complete every file, including the one in the second chunk.
+    expect(uploads.every((f) => f.status === 'complete')).toBe(true)
+  })
+
+  it('skips the whole tick when one chunk fails', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const setUploadFiles = vi.fn()
+    const getIntervalCb = mockTimers()
+
+    const manyFiles: FileUpload[] = Array.from({ length: 1001 }, (_, i) =>
+      activeDocument(`doc-${i}.pdf`, 'ingesting'),
+    )
+
+    let requestCount = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (async () => {
+        requestCount++
+        if (requestCount > 2) {
+          return new Response(JSON.stringify({ error: 'boom' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        return new Response(JSON.stringify({ documents: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }) as any,
+    )
+
+    render(
+      <LargeDropzone
+        {...defaultProps({ uploadFiles: manyFiles, setUploadFiles })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    if (intervalCallback) await intervalCallback()
+
+    // No partial merge: statuses untouched when any chunk request failed.
+    expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
   // -----------------------------------------------------------------------

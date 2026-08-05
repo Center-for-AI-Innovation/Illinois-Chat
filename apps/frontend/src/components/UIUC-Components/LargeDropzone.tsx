@@ -1,107 +1,57 @@
 // LargeDropzone.tsx
 import React, { useRef, useState, useEffect } from 'react'
-import {
-  createStyles,
-  Group,
-  rem,
-  Text,
-  Title,
-  Paper,
-  Progress,
-  // useMantineTheme,
-} from '@mantine/core'
+import { createStyles, Group, rem, Text } from '@mantine/core'
 
-import {
-  IconAlertCircle,
-  IconCheck,
-  IconCloudUpload,
-  IconDownload,
-  IconFileUpload,
-  IconX,
-} from '@tabler/icons-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react'
+import { type QueryClient } from '@tanstack/react-query'
 import { Dropzone } from '@mantine/dropzone'
 import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import SupportedFileUploadTypes from './SupportedFileUploadTypes'
 import { useMediaQuery } from '@mantine/hooks'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
+import { fetchIngestStatus } from '~/utils/ingestStatusClient'
 import { v4 as uuidv4 } from 'uuid'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
-const useStyles = createStyles((theme) => ({
+const POLL_INTERVAL_MS = 5000
+
+const useStyles = createStyles(() => ({
   wrapper: {
     position: 'relative',
     // marginBottom: rem(10),
-  },
-
-  icon: {
-    color:
-      theme.colorScheme === 'dark'
-        ? theme.colors.dark[3]
-        : theme.colors.gray[4],
-  },
-
-  control: {
-    position: 'absolute',
-    width: rem(250),
-    left: `calc(50% - ${rem(125)})`,
-    bottom: rem(-20),
-  },
-  dropzone: {
-    backgroundPosition: '0% 0%',
-    '&:hover': {
-      backgroundPosition: '100% 100%',
-      background: 'linear-gradient(135deg, #2a2a40 0%, #1c1c2e 100%)',
-    },
   },
 }))
 
 export function LargeDropzone({
   courseName,
   current_user_email,
-  redirect_to_gpt_4 = true,
   isDisabled = false,
   courseMetadata,
   is_new_course,
+  uploadFiles,
   setUploadFiles,
+  queryClient,
   auth,
 }: {
   courseName: string
   current_user_email: string
-  redirect_to_gpt_4?: boolean
   isDisabled?: boolean
   courseMetadata: CourseMetadata
   is_new_course: boolean
+  uploadFiles: FileUpload[]
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
+  queryClient: QueryClient
   auth: AuthContextProps
 }) {
   // upload-in-progress spinner control
   const [uploadInProgress, setUploadInProgress] = useState(false)
-  const [uploadComplete, setUploadComplete] = useState(false)
-  const [successfulUploads, setSuccessfulUploads] = useState(0)
   const router = useRouter()
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
-  const { classes, theme } = useStyles()
+  const { classes } = useStyles()
   const openRef = useRef<() => void>(null)
-  const [files, setFiles] = useState<File[]>([])
 
-  const refreshOrRedirect = async (redirect_to_gpt_4: boolean) => {
-    if (is_new_course) {
-      // refresh current page
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      await router.push(`/${courseName}/dashboard`)
-      return
-    }
-
-    if (redirect_to_gpt_4) {
-      await router.push(`/${courseName}/chat`)
-    }
-    // refresh current page
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    await router.reload()
-  }
   const uploadToS3 = async (file: File | null, uniqueFileName: string) => {
     if (!file) return
 
@@ -159,10 +109,7 @@ export function LargeDropzone({
     if (!files) return
     files = files.filter((file) => file !== null)
 
-    setFiles(files)
-    setSuccessfulUploads(0)
     setUploadInProgress(true)
-    setUploadComplete(false)
 
     // Initialize file upload status
     const initialFileUploads = files.map((file) => {
@@ -195,7 +142,7 @@ export function LargeDropzone({
     }
 
     // Process files in parallel
-    const allSuccessOrFail = await Promise.all(
+    await Promise.all(
       files.map(async (file) => {
         const extension = file.name.slice(file.name.lastIndexOf('.'))
         const nameWithoutExtension = file.name
@@ -206,7 +153,6 @@ export function LargeDropzone({
 
         try {
           await uploadToS3(file, uniqueFileName)
-          setSuccessfulUploads((prev) => prev + 1)
 
           const response = await fetch(`/api/UIUC-api/ingest`, {
             method: 'POST',
@@ -235,104 +181,129 @@ export function LargeDropzone({
       }),
     )
 
-    setSuccessfulUploads(files.length)
-    setUploadComplete(true)
-
-    // Process results
-    const resultSummary = allSuccessOrFail.reduce(
-      (acc: { success_ingest: any[]; failure_ingest: any[] }, curr) => {
-        if (curr.ok) acc.success_ingest.push(curr)
-        else acc.failure_ingest.push(curr)
-        return acc
-      },
-      { success_ingest: [], failure_ingest: [] },
-    )
-
     setUploadInProgress(false)
 
     if (is_new_course) {
-      await refreshOrRedirect(redirect_to_gpt_4)
+      // refresh current page
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      await router.push(`/${courseName}/dashboard`)
     }
   }
+
+  // Poll ingest status only while this component has document uploads in
+  // flight. The tracked filenames are sent as a server-side filter so the
+  // endpoints never return the whole documents table.
+  const isPollingActive = uploadFiles.some(
+    (file) =>
+      file.type === 'document' &&
+      (file.status === 'uploading' || file.status === 'ingesting'),
+  )
+  const uploadFilesRef = useRef(uploadFiles)
+  uploadFilesRef.current = uploadFiles
+  const wasPollingActiveRef = useRef(false)
+
   useEffect(() => {
-    let pollInterval = 9000 // Start with a slower interval
-    const MIN_INTERVAL = 1000 // Fast polling when active
-    const MAX_INTERVAL = 20000 // Slow polling when inactive
-    let consecutiveEmptyPolls = 0
+    if (!isPollingActive) {
+      if (wasPollingActiveRef.current) {
+        // Gate just closed — final refresh as a backstop for any invalidation
+        // missed by per-tick diffs (e.g. errors set outside the poller).
+        wasPollingActiveRef.current = false
+        void queryClient.invalidateQueries({
+          queryKey: ['documents', courseName],
+        })
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', courseName],
+        })
+      }
+      return
+    }
+    wasPollingActiveRef.current = true
+    let inFlight = false
 
     const checkIngestStatus = async () => {
-      const response = await fetch(
-        `/api/materialsTable/docsInProgress?course_name=${courseName}`,
-      )
-      const data = await response.json()
+      if (inFlight) return
+      inFlight = true
+      try {
+        const trackedNames = uploadFilesRef.current
+          .filter(
+            (file) =>
+              file.type === 'document' &&
+              (file.status === 'uploading' || file.status === 'ingesting'),
+          )
+          .map((file) => file.name)
+        if (trackedNames.length === 0) return
 
-      const docsResponse = await fetch(
-        `/api/materialsTable/successDocs?course_name=${courseName}`,
-      )
-      const docsData = await docsResponse.json()
-      // Adjust polling interval based on activity
-      if (data.documents.length > 0) {
-        pollInterval = MIN_INTERVAL
-        consecutiveEmptyPolls = 0
-      } else {
-        consecutiveEmptyPolls++
-        if (consecutiveEmptyPolls >= 3) {
-          // After 3 empty polls, slow down
-          pollInterval = Math.min(pollInterval * 1.5, MAX_INTERVAL)
-        }
-      }
+        const status = await fetchIngestStatus(courseName, {
+          filenames: trackedNames,
+        })
+        // A failed request must not be read as "file vanished" — skip the tick.
+        if (!status) return
 
-      setUploadFiles((prev) => {
-        return prev.map((file) => {
+        const inProgressNames = new Set(
+          status.inProgress.map((doc) => doc.readable_filename),
+        )
+        const completedNames = new Set(
+          status.completed.map((doc) => doc.readable_filename),
+        )
+
+        const mapFile = (file: FileUpload): FileUpload => {
           if (file.type !== 'document') return file
 
           if (file.status === 'uploading') {
-            const isIngesting = data?.documents?.some(
-              (doc: { readable_filename: string }) =>
-                doc.readable_filename === file.name,
-            )
-            if (isIngesting) {
+            if (inProgressNames.has(file.name)) {
               return { ...file, status: 'ingesting' }
-            } else {
-              // Ingest can happen very quickly, check if completed also
-              const isInCompletedDocs = docsData?.documents?.some(
-                (doc: { readable_filename: string }) =>
-                  doc.readable_filename === file.name,
-              )
-              if (isInCompletedDocs) {
-                return { ...file, status: 'complete' }
-              }
+            }
+            // Ingest can happen very quickly, check if completed also
+            if (completedNames.has(file.name)) {
+              return { ...file, status: 'complete' }
             }
           } else if (file.status === 'ingesting') {
-            const isStillIngesting = data?.documents?.some(
-              (doc: { readable_filename: string }) =>
-                doc.readable_filename === file.name,
-            )
-
-            if (!isStillIngesting) {
-              const isInCompletedDocs = docsData?.documents?.some(
-                (doc: { readable_filename: string }) =>
-                  doc.readable_filename === file.name,
-              )
+            if (!inProgressNames.has(file.name)) {
               return {
                 ...file,
-                status: isInCompletedDocs
+                status: completedNames.has(file.name)
                   ? ('complete' as const)
                   : ('error' as const),
               }
             }
           }
           return file
-        })
-      })
+        }
+
+        const snapshot = uploadFilesRef.current
+        const mapped = snapshot.map(mapFile)
+        const hasCompleteTransition = mapped.some(
+          (file, i) => file !== snapshot[i] && file.status === 'complete',
+        )
+        const hasErrorTransition = mapped.some(
+          (file, i) => file !== snapshot[i] && file.status === 'error',
+        )
+
+        setUploadFiles((prev) => prev.map(mapFile))
+
+        if (hasCompleteTransition) {
+          void queryClient.invalidateQueries({
+            queryKey: ['documents', courseName],
+          })
+        }
+        if (hasErrorTransition) {
+          void queryClient.invalidateQueries({
+            queryKey: ['failedDocuments', courseName],
+          })
+        }
+      } catch (error) {
+        console.error('Error checking ingest status:', error)
+      } finally {
+        inFlight = false
+      }
     }
 
-    const intervalId = setInterval(checkIngestStatus, pollInterval)
+    const intervalId = setInterval(checkIngestStatus, POLL_INTERVAL_MS)
 
     return () => {
       clearInterval(intervalId)
     }
-  }, [courseName])
+  }, [isPollingActive, courseName])
 
   return (
     <>
@@ -494,23 +465,6 @@ export function LargeDropzone({
               </div>
             </div>
           </Dropzone>
-          {/* {uploadInProgress && (
-            <div className="flex flex-col items-center justify-center px-4 text-center">
-              <Title
-                order={4}
-                style={{
-                  marginTop: 10,
-                  color: '#B22222',
-                  fontSize: isSmallScreen ? '0.9rem' : '1rem',
-                  lineHeight: '1.4',
-                }}
-              >
-                Remain on this page until upload is complete
-                <br />
-                or ingest will fail.
-              </Title>
-            </div>
-          )} */}
         </div>
       </div>
     </>
