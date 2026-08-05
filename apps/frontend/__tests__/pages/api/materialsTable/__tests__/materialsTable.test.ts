@@ -67,6 +67,8 @@ vi.mock('drizzle-orm', () => {
     relations: () => ({}),
     eq: () => ({}),
     and: () => ({}),
+    or: () => ({}),
+    inArray: () => ({}),
     gte: () => ({}),
     asc: () => ({}),
     desc: () => ({}),
@@ -86,10 +88,13 @@ describe('materialsTable API handlers', () => {
     hoisted.posthogCapture.mockReset()
   })
 
-  it('docsInProgress returns 405 for non-GET', async () => {
+  it('docsInProgress returns 405 for non-POST', async () => {
     const res = createMockRes()
     await docsInProgressHandler(
-      createMockReq({ method: 'POST' }) as any,
+      createMockReq({
+        method: 'GET',
+        query: { course_name: 'CS101' },
+      }) as any,
       res as any,
     )
     expect(res.status).toHaveBeenCalledWith(405)
@@ -104,7 +109,10 @@ describe('materialsTable API handlers', () => {
 
     const res1 = createMockRes()
     await docsInProgressHandler(
-      createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
+      createMockReq({
+        method: 'POST',
+        body: { course_name: 'CS101', filenames: ['Doc A'] },
+      }) as any,
       res1 as any,
     )
     expect(res1.status).toHaveBeenCalledWith(200)
@@ -123,7 +131,10 @@ describe('materialsTable API handlers', () => {
 
     const res2 = createMockRes()
     await docsInProgressHandler(
-      createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
+      createMockReq({
+        method: 'POST',
+        body: { course_name: 'CS101', filenames: ['Doc A'] },
+      }) as any,
       res2 as any,
     )
     expect(res2.status).toHaveBeenCalledWith(200)
@@ -134,6 +145,69 @@ describe('materialsTable API handlers', () => {
       ],
     })
   })
+
+  it('docsInProgress accepts base_urls filters (normalized)', async () => {
+    hoisted.select.mockImplementationOnce(() => ({
+      from: () => ({
+        where: vi.fn().mockResolvedValueOnce([
+          {
+            readable_filename: 'page',
+            base_url: 'https://a.com',
+            url: 'https://a.com/x',
+          },
+        ]),
+      }),
+    }))
+
+    const res = createMockRes()
+    await docsInProgressHandler(
+      createMockReq({
+        method: 'POST',
+        body: { course_name: 'CS101', base_urls: ['https://a.com/'] },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(res.json).toHaveBeenCalledWith({
+      documents: [
+        {
+          readable_filename: 'page',
+          base_url: 'https://a.com',
+          url: 'https://a.com/x',
+        },
+      ],
+    })
+  })
+
+  it.each([
+    ['missing course_name', { filenames: ['a.pdf'] }],
+    ['missing filters', { course_name: 'CS101' }],
+    ['empty filter arrays', { course_name: 'CS101', filenames: [], base_urls: [] }],
+    [
+      'malformed filenames',
+      { course_name: 'CS101', filenames: ['ok', 42] },
+    ],
+    [
+      'malformed base_urls',
+      { course_name: 'CS101', base_urls: [null] },
+    ],
+    [
+      'over the item cap',
+      {
+        course_name: 'CS101',
+        filenames: Array.from({ length: 1001 }, (_, i) => `f${i}.pdf`),
+      },
+    ],
+  ])(
+    'docsInProgress and successDocs return 400 for %s',
+    async (_label, body) => {
+      for (const handler of [docsInProgressHandler, successDocsHandler]) {
+        const res = createMockRes()
+        await handler(createMockReq({ method: 'POST', body }) as any, res as any)
+        expect(res.status).toHaveBeenCalledWith(400)
+      }
+    },
+  )
 
   it('fetchIfDocumentExists validates method and course_name', async () => {
     const badMethodRes = createMockRes()
@@ -220,13 +294,20 @@ describe('materialsTable API handlers', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'db down' })
   })
 
-  it('successDocs returns mapped documents (or empty) and 405 for non-GET', async () => {
+  it('successDocs returns mapped documents (or empty) and 405 for non-POST', async () => {
     const res0 = createMockRes()
     await successDocsHandler(
       createMockReq({ method: 'PUT' }) as any,
       res0 as any,
     )
     expect(res0.status).toHaveBeenCalledWith(405)
+
+    const resGet = createMockRes()
+    await successDocsHandler(
+      createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
+      resGet as any,
+    )
+    expect(resGet.status).toHaveBeenCalledWith(405)
 
     hoisted.select.mockImplementationOnce(() => ({
       from: () => ({
@@ -236,7 +317,10 @@ describe('materialsTable API handlers', () => {
 
     const res1 = createMockRes()
     await successDocsHandler(
-      createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
+      createMockReq({
+        method: 'POST',
+        body: { course_name: 'CS101', filenames: ['Doc'] },
+      }) as any,
       res1 as any,
     )
     expect(res1.status).toHaveBeenCalledWith(200)
@@ -253,7 +337,14 @@ describe('materialsTable API handlers', () => {
 
     const res2 = createMockRes()
     await successDocsHandler(
-      createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
+      createMockReq({
+        method: 'POST',
+        body: {
+          course_name: 'CS101',
+          filenames: ['Doc'],
+          base_urls: ['b'],
+        },
+      }) as any,
       res2 as any,
     )
     expect(res2.status).toHaveBeenCalledWith(200)
