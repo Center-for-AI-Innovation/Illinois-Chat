@@ -254,11 +254,10 @@ describe('WebsiteIngestForm', () => {
   it('does not poll when no webscrape uploads are active', async () => {
     const setIntervalSpy = vi
       .spyOn(globalThis, 'setInterval')
-      .mockImplementation((fn: any) => {
+      .mockImplementation(((fn: any) => {
         fn()
-        // @ts-expect-error - minimal timer handle for tests
         return 0
-      })
+      }) as any)
 
     const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
     const queryClient = createTestQueryClient()
@@ -283,11 +282,10 @@ describe('WebsiteIngestForm', () => {
   })
 
   it('does not invalidate queries on a no-change tick', async () => {
-    vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
+    vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: any) => {
       fn()
-      // @ts-expect-error - minimal timer handle for tests
       return 0
-    })
+    }) as any)
 
     server.use(
       // The tracked file is still in progress: nothing changes this tick.
@@ -333,11 +331,10 @@ describe('WebsiteIngestForm', () => {
   })
 
   it('keeps filtering on the base URL while children resolve after the base entry went terminal', async () => {
-    vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
+    vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: any) => {
       fn()
-      // @ts-expect-error - minimal timer handle for tests
       return 0
-    })
+    }) as any)
 
     const requestBodies: any[] = []
     server.use(

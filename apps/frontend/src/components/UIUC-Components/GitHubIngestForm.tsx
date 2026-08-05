@@ -455,7 +455,6 @@ export default function GitHubIngestForm({
           if (!isOpen) {
             setUrl('')
             setIsUrlValid(false)
-            setIsUrlUpdated(false)
             setMaxUrls('50')
           }
         }}
