@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Text,
   Card,
@@ -37,21 +37,29 @@ import axios from 'axios'
 import { Montserrat } from 'next/font/google'
 import { type FileUpload } from './UploadNotification'
 import { type QueryClient } from '@tanstack/react-query'
+import { fetchIngestStatus } from '~/utils/ingestStatusClient'
 
 const montserrat_med = Montserrat({
   weight: '500',
   subsets: ['latin'],
 })
+
+// Strip trailing slashes so the user-entered URL and the backend-stored
+// base_url compare equal even when one has a trailing slash and the
+// other doesn't.
+const normalizeUrl = (url: string | undefined | null) =>
+  (url ?? '').replace(/\/+$/, '')
 export default function WebsiteIngestForm({
   project_name,
+  uploadFiles,
   setUploadFiles,
   queryClient,
 }: {
   project_name: string
+  uploadFiles: FileUpload[]
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }): JSX.Element {
-  const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [isUrlValid, setIsUrlValid] = useState(false)
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
@@ -151,12 +159,6 @@ export default function WebsiteIngestForm({
             file.name === url ? { ...file, status: 'ingesting' } : file,
           ),
         )
-        // Transition to 'ingesting' status after API call succeeds
-        setUploadFiles((prevFiles) =>
-          prevFiles.map((file) =>
-            file.name === url ? { ...file, status: 'ingesting' } : file,
-          ),
-        )
       } catch (error: unknown) {
         console.error('Error while scraping web:', error)
         setUploadFiles((prevFiles) =>
@@ -173,31 +175,76 @@ export default function WebsiteIngestForm({
     await new Promise((resolve) => setTimeout(resolve, 8000))
   }
 
+  // Poll ingest status only while webscrape uploads are tracked and active.
+  // The tracked base URLs are sent as a server-side filter so the endpoints
+  // never return the whole documents table.
+  const isPollingActive = uploadFiles.some(
+    (file) =>
+      file.type === 'webscrape' &&
+      (file.status === 'uploading' || file.status === 'ingesting'),
+  )
+  const uploadFilesRef = useRef(uploadFiles)
+  uploadFilesRef.current = uploadFiles
+  const wasPollingActiveRef = useRef(false)
+
   useEffect(() => {
-    if (url && url.length > 0 && validateUrl(url)) {
-      setIsUrlUpdated(true)
-    } else {
-      setIsUrlUpdated(false)
+    if (!isPollingActive) {
+      if (wasPollingActiveRef.current) {
+        // Gate just closed — final refresh as a backstop for any invalidation
+        // missed by per-tick diffs.
+        wasPollingActiveRef.current = false
+        void queryClient.invalidateQueries({
+          queryKey: ['documents', project_name],
+        })
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', project_name],
+        })
+      }
+      return
     }
-  }, [url])
+    wasPollingActiveRef.current = true
+    let inFlight = false
 
-  useEffect(() => {
     const checkIngestStatus = async () => {
-      const response = await fetch(
-        `/api/materialsTable/docsInProgress?course_name=${project_name}`,
-      )
-      const data = await response.json()
-      const docsResponse = await fetch(
-        `/api/materialsTable/successDocs?course_name=${project_name}`,
-      )
-      const docsData = await docsResponse.json()
+      if (inFlight) return
+      inFlight = true
+      try {
+        // Filter on the base URLs of ALL tracked base entries regardless of
+        // their status: child rows carry the base's base_url, so this returns
+        // every row the matching below needs — including children that are
+        // still resolving after the base entry itself went terminal.
+        const trackedBaseUrls = uploadFilesRef.current
+          .filter((file) => file.type === 'webscrape' && file.isBaseUrl)
+          .map((file) => normalizeUrl(file.url ?? file.name))
+          .filter((baseUrl) => baseUrl.length > 0)
 
-      // Strip trailing slashes so the user-entered URL and the backend-stored
-      // base_url compare equal even when one has a trailing slash and the
-      // other doesn't.
-      const normalizeUrl = (url: string | undefined | null) =>
-        (url ?? '').replace(/\/+$/, '')
+        const status = await fetchIngestStatus(project_name, {
+          base_urls: trackedBaseUrls,
+        })
+        // A failed request must not be read as "doc vanished" — skip the tick.
+        if (!status) return
 
+        const data = { documents: status.inProgress }
+        const docsData = { documents: status.completed }
+
+        applyIngestStatus(data, docsData)
+      } catch (error) {
+        console.error('Error checking ingest status:', error)
+      } finally {
+        inFlight = false
+      }
+    }
+
+    const interval = setInterval(checkIngestStatus, 3000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [isPollingActive, project_name])
+
+  const applyIngestStatus = (
+    data: { documents: Array<{ base_url: string; url: string }> },
+    docsData: { documents: Array<{ base_url: string; url: string }> },
+  ) => {
       const baseUrlMatchesFile = (
         docBaseUrl: string,
         file: FileUpload,
@@ -329,15 +376,19 @@ export default function WebsiteIngestForm({
         return newFiles
       }
 
-      setUploadFiles((prev) => {
+      const computeNextFiles = (currentFiles: FileUpload[]) => {
         const matchingDocsInProgress =
           data?.documents?.filter((doc: { base_url: string }) =>
-            prev.some((file) => baseUrlMatchesFile(doc.base_url, file)),
+            currentFiles.some((file) =>
+              baseUrlMatchesFile(doc.base_url, file),
+            ),
           ) || []
 
         const matchingSuccessDocs =
           docsData?.documents?.filter((doc: { base_url: string }) =>
-            prev.some((file) => baseUrlMatchesFile(doc.base_url, file)),
+            currentFiles.some((file) =>
+              baseUrlMatchesFile(doc.base_url, file),
+            ),
           ) || []
 
         const inProgressBaseUrlMap = organizeDocsByBaseUrl(
@@ -348,24 +399,41 @@ export default function WebsiteIngestForm({
         const additionalFiles = createAdditionalFileEntries(
           inProgressBaseUrlMap,
           successBaseUrlMap,
-          prev,
+          currentFiles,
         )
 
-        const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress)
+        const updatedFiles = updateExistingFiles(
+          currentFiles,
+          matchingDocsInProgress,
+        )
 
         return [...updatedFiles, ...additionalFiles]
-      })
+      }
 
-      await queryClient.invalidateQueries({
-        queryKey: ['documents', project_name],
-      })
-    }
+      // Diff against a snapshot so the table is only refreshed when this tick
+      // actually changed something (statuses or new entries).
+      const snapshot = uploadFilesRef.current
+      const nextFiles = computeNextFiles(snapshot)
+      const changed =
+        nextFiles.length !== snapshot.length ||
+        nextFiles.some((file, i) => file !== snapshot[i])
+      const hasErrorTransition = nextFiles.some(
+        (file, i) => file !== snapshot[i] && file.status === 'error',
+      )
 
-    const interval = setInterval(checkIngestStatus, 3000)
-    return () => {
-      clearInterval(interval)
-    }
-  }, [project_name])
+      setUploadFiles((prev) => computeNextFiles(prev))
+
+      if (changed) {
+        void queryClient.invalidateQueries({
+          queryKey: ['documents', project_name],
+        })
+      }
+      if (hasErrorTransition) {
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', project_name],
+        })
+      }
+  }
 
   const scrapeWeb = async (
     url: string | null,
@@ -434,7 +502,6 @@ export default function WebsiteIngestForm({
           if (!isOpen) {
             setUrl('')
             setIsUrlValid(false)
-            setIsUrlUpdated(false)
             setMaxUrls('50')
             setInputErrors((prev) => ({
               ...prev,

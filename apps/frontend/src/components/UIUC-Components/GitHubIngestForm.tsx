@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Text, Card, Button, Input, createStyles } from '@mantine/core'
 import {
   IconAlertCircle,
@@ -23,16 +23,19 @@ import { Montserrat } from 'next/font/google'
 import { type FileUpload } from './UploadNotification'
 import Link from 'next/link'
 import { type QueryClient } from '@tanstack/react-query'
+import { fetchIngestStatus } from '~/utils/ingestStatusClient'
 const montserrat_med = Montserrat({
   weight: '500',
   subsets: ['latin'],
 })
 export default function GitHubIngestForm({
   project_name,
+  uploadFiles,
   setUploadFiles,
   queryClient,
 }: {
   project_name: string
+  uploadFiles: FileUpload[]
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }): JSX.Element {
@@ -115,7 +118,6 @@ export default function GitHubIngestForm({
       },
     },
   }))
-  const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [isUrlValid, setIsUrlValid] = useState(false)
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
@@ -182,25 +184,79 @@ export default function GitHubIngestForm({
     await new Promise((resolve) => setTimeout(resolve, 8000))
   }
 
+  // Poll ingest status only while GitHub ingests are tracked and active. The
+  // tracked repo URLs are sent as a server-side filter so the endpoints never
+  // return the whole documents table.
+  const isPollingActive = uploadFiles.some(
+    (file) =>
+      file.type === 'github' &&
+      (file.status === 'uploading' || file.status === 'ingesting'),
+  )
+  const uploadFilesRef = useRef(uploadFiles)
+  uploadFilesRef.current = uploadFiles
+  const wasPollingActiveRef = useRef(false)
+
   useEffect(() => {
-    if (url && url.length > 0 && validateUrl(url)) {
-      setIsUrlUpdated(true)
-    } else {
-      setIsUrlUpdated(false)
+    if (!isPollingActive) {
+      if (wasPollingActiveRef.current) {
+        // Gate just closed — final refresh as a backstop for any invalidation
+        // missed by per-tick diffs.
+        wasPollingActiveRef.current = false
+        void queryClient.invalidateQueries({
+          queryKey: ['documents', project_name],
+        })
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', project_name],
+        })
+      }
+      return
     }
-  }, [url])
+    wasPollingActiveRef.current = true
+    let inFlight = false
 
-  useEffect(() => {
     const checkIngestStatus = async () => {
-      const response = await fetch(
-        `/api/materialsTable/docsInProgress?course_name=${project_name}`,
-      )
-      const data = await response.json()
-      const docsResponse = await fetch(
-        `/api/materialsTable/successDocs?course_name=${project_name}`,
-      )
-      const docsData = await docsResponse.json()
+      if (inFlight) return
+      inFlight = true
+      try {
+        // Filter on the repo URLs of ALL tracked base entries regardless of
+        // their status (base entries are the ones without a `url` field):
+        // child rows carry the base's base_url, so this returns every row the
+        // matching below needs — including children that are still resolving
+        // after the base entry itself went terminal.
+        const trackedBaseUrls = uploadFilesRef.current
+          .filter((file) => file.type === 'github' && !file.url)
+          .map((file) => file.name)
+          .filter((baseUrl) => baseUrl.length > 0)
 
+        const status = await fetchIngestStatus(project_name, {
+          base_urls: trackedBaseUrls,
+        })
+        // A failed request must not be read as "doc vanished" — skip the tick.
+        if (!status) return
+
+        const data = { documents: status.inProgress }
+        const docsData = { documents: status.completed }
+
+        applyIngestStatus(data, docsData)
+      } catch (error) {
+        console.error('Error checking ingest status:', error)
+      } finally {
+        inFlight = false
+      }
+    }
+
+    const interval = setInterval(checkIngestStatus, 3000)
+    return () => {
+      clearInterval(interval)
+    }
+  }, [isPollingActive, project_name])
+
+  const applyIngestStatus = (
+    data: {
+      documents: Array<{ base_url: string; url: string; readable_filename: string }>
+    },
+    docsData: { documents: Array<{ base_url: string; url: string }> },
+  ) => {
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (
         docs: Array<{ base_url: string; url: string }>,
@@ -285,35 +341,52 @@ export default function GitHubIngestForm({
         return newFiles
       }
 
-      setUploadFiles((prev) => {
+      const computeNextFiles = (currentFiles: FileUpload[]) => {
         const matchingDocsInProgress =
           data?.documents?.filter((doc: { base_url: string }) =>
-            prev.some((file) => file.name === doc.base_url),
+            currentFiles.some((file) => file.name === doc.base_url),
           ) || []
 
         const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress)
 
         const additionalFiles = createAdditionalFileEntries(
           baseUrlMap,
-          prev,
+          currentFiles,
           matchingDocsInProgress,
         )
 
-        const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress)
+        const updatedFiles = updateExistingFiles(
+          currentFiles,
+          matchingDocsInProgress,
+        )
 
         return [...updatedFiles, ...additionalFiles]
-      })
+      }
 
-      await queryClient.invalidateQueries({
-        queryKey: ['documents', project_name],
-      })
-    }
+      // Diff against a snapshot so the table is only refreshed when this tick
+      // actually changed something (statuses or new entries).
+      const snapshot = uploadFilesRef.current
+      const nextFiles = computeNextFiles(snapshot)
+      const changed =
+        nextFiles.length !== snapshot.length ||
+        nextFiles.some((file, i) => file !== snapshot[i])
+      const hasErrorTransition = nextFiles.some(
+        (file, i) => file !== snapshot[i] && file.status === 'error',
+      )
 
-    const interval = setInterval(checkIngestStatus, 3000)
-    return () => {
-      clearInterval(interval)
-    }
-  }, [project_name])
+      setUploadFiles((prev) => computeNextFiles(prev))
+
+      if (changed) {
+        void queryClient.invalidateQueries({
+          queryKey: ['documents', project_name],
+        })
+      }
+      if (hasErrorTransition) {
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', project_name],
+        })
+      }
+  }
 
   // if (isLoading) {
   //   return <Skeleton height={200} width={330} radius={'lg'} />

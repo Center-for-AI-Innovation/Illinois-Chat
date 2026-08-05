@@ -32,6 +32,7 @@ function Harness(props: any) {
       <div data-testid="files">{JSON.stringify(files)}</div>
       <props.Component
         project_name="CS101"
+        uploadFiles={files}
         setUploadFiles={setFiles}
         queryClient={props.queryClient}
       />
@@ -50,7 +51,7 @@ describe('WebsiteIngestForm', () => {
       })
 
     server.use(
-      http.get('*/api/materialsTable/docsInProgress*', async () => {
+      http.post('*/api/materialsTable/docsInProgress*', async () => {
         return HttpResponse.json({
           documents: [
             {
@@ -66,7 +67,7 @@ describe('WebsiteIngestForm', () => {
           ],
         })
       }),
-      http.get('*/api/materialsTable/successDocs*', async () => {
+      http.post('*/api/materialsTable/successDocs*', async () => {
         return HttpResponse.json({ documents: [] })
       }),
     )
@@ -107,10 +108,10 @@ describe('WebsiteIngestForm', () => {
     })
 
     server.use(
-      http.get('*/api/materialsTable/docsInProgress*', async () => {
+      http.post('*/api/materialsTable/docsInProgress*', async () => {
         return HttpResponse.json({ documents: [] })
       }),
-      http.get('*/api/materialsTable/successDocs*', async () => {
+      http.post('*/api/materialsTable/successDocs*', async () => {
         return HttpResponse.json({
           documents: [
             {
@@ -163,7 +164,7 @@ describe('WebsiteIngestForm', () => {
     })
 
     server.use(
-      http.get('*/api/materialsTable/docsInProgress*', async () => {
+      http.post('*/api/materialsTable/docsInProgress*', async () => {
         return HttpResponse.json({
           documents: [
             {
@@ -175,7 +176,7 @@ describe('WebsiteIngestForm', () => {
           ],
         })
       }),
-      http.get('*/api/materialsTable/successDocs*', async () => {
+      http.post('*/api/materialsTable/successDocs*', async () => {
         return HttpResponse.json({ documents: [] })
       }),
     )
@@ -215,10 +216,10 @@ describe('WebsiteIngestForm', () => {
     })
 
     server.use(
-      http.get('*/api/materialsTable/docsInProgress*', async () => {
+      http.post('*/api/materialsTable/docsInProgress*', async () => {
         return HttpResponse.json({ documents: [] })
       }),
-      http.get('*/api/materialsTable/successDocs*', async () => {
+      http.post('*/api/materialsTable/successDocs*', async () => {
         return HttpResponse.json({
           documents: [{ url: 'https://example.com' }],
         })
@@ -250,6 +251,164 @@ describe('WebsiteIngestForm', () => {
     })
   })
 
+  it('does not poll when no webscrape uploads are active', async () => {
+    const setIntervalSpy = vi
+      .spyOn(globalThis, 'setInterval')
+      .mockImplementation((fn: any) => {
+        fn()
+        // @ts-expect-error - minimal timer handle for tests
+        return 0
+      })
+
+    const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
+    const queryClient = createTestQueryClient()
+    renderWithProviders(
+      <Harness
+        Component={WebsiteIngestForm}
+        queryClient={queryClient}
+        initialFiles={[
+          {
+            name: 'https://example.com',
+            status: 'complete',
+            type: 'webscrape',
+            url: 'https://example.com',
+            isBaseUrl: true,
+          },
+        ]}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    expect(setIntervalSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not invalidate queries on a no-change tick', async () => {
+    vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
+      fn()
+      // @ts-expect-error - minimal timer handle for tests
+      return 0
+    })
+
+    server.use(
+      // The tracked file is still in progress: nothing changes this tick.
+      http.post('*/api/materialsTable/docsInProgress*', async () => {
+        return HttpResponse.json({
+          documents: [
+            {
+              base_url: 'https://example.com',
+              url: 'https://example.com',
+              readable_filename: 'base',
+            },
+          ],
+        })
+      }),
+      http.post('*/api/materialsTable/successDocs*', async () => {
+        return HttpResponse.json({ documents: [] })
+      }),
+    )
+
+    const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    renderWithProviders(
+      <Harness
+        Component={WebsiteIngestForm}
+        queryClient={queryClient}
+        initialFiles={[
+          {
+            name: 'https://example.com',
+            status: 'ingesting',
+            type: 'webscrape',
+            url: 'https://example.com',
+            isBaseUrl: true,
+          },
+        ]}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    // Give the async tick a chance to finish.
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 50))
+    expect(invalidateSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps filtering on the base URL while children resolve after the base entry went terminal', async () => {
+    vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
+      fn()
+      // @ts-expect-error - minimal timer handle for tests
+      return 0
+    })
+
+    const requestBodies: any[] = []
+    server.use(
+      http.post(
+        '*/api/materialsTable/docsInProgress*',
+        async ({ request }) => {
+          requestBodies.push(await request.json())
+          return HttpResponse.json({ documents: [] })
+        },
+      ),
+      http.post('*/api/materialsTable/successDocs*', async ({ request }) => {
+        requestBodies.push(await request.json())
+        return HttpResponse.json({
+          documents: [
+            {
+              base_url: 'https://example.com',
+              url: 'https://example.com/child1',
+              readable_filename: 'child1',
+            },
+          ],
+        })
+      }),
+    )
+
+    const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
+    const queryClient = createTestQueryClient()
+    renderWithProviders(
+      <Harness
+        Component={WebsiteIngestForm}
+        queryClient={queryClient}
+        initialFiles={[
+          {
+            // Base entry already terminal…
+            name: 'https://example.com',
+            status: 'complete',
+            type: 'webscrape',
+            url: 'https://example.com',
+            isBaseUrl: true,
+          },
+          {
+            // …while a child is still resolving (keeps the gate open).
+            name: 'https://example.com/child1',
+            status: 'ingesting',
+            type: 'webscrape',
+            url: 'https://example.com/child1',
+          },
+        ]}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    await waitFor(() => {
+      const filesJson = screen.getByTestId('files').textContent ?? ''
+      expect(filesJson).toContain('"status":"complete"')
+      expect(requestBodies.length).toBeGreaterThan(0)
+    })
+
+    // The filter must be keyed on the BASE entry's URL (children's rows carry
+    // it as base_url), not on the child URLs.
+    for (const body of requestBodies) {
+      expect(body).toEqual({
+        course_name: 'CS101',
+        base_urls: ['https://example.com'],
+      })
+    }
+
+    // And the child must have completed via the base_url-filtered results.
+    const filesJson = screen.getByTestId('files').textContent ?? ''
+    expect(filesJson).not.toContain('"status":"ingesting"')
+  })
+
   it('opens the dialog and starts ingestion via /api/scrapeWeb', async () => {
     const user = userEvent.setup()
     const axiosMod = await import('axios')
@@ -271,6 +430,7 @@ describe('WebsiteIngestForm', () => {
     renderWithProviders(
       <WebsiteIngestForm
         project_name="CS101"
+        uploadFiles={[]}
         setUploadFiles={vi.fn() as any}
         queryClient={queryClient}
       />,
@@ -318,6 +478,7 @@ describe('WebsiteIngestForm', () => {
     renderWithProviders(
       <WebsiteIngestForm
         project_name="CS101"
+        uploadFiles={[]}
         setUploadFiles={vi.fn() as any}
         queryClient={queryClient}
       />,
