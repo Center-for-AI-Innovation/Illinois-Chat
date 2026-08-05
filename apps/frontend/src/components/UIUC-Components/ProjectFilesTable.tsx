@@ -25,6 +25,7 @@ import {
   IconCheck,
   IconCopy,
   IconEye,
+  IconRefresh,
   IconTrash,
   IconX,
 } from '@tabler/icons-react'
@@ -65,6 +66,11 @@ const GlobalStyle = createGlobalStyle`
 `
 
 const PAGE_SIZE = 100
+
+// The table refreshes on a slow timer (plus window-focus refetch and the
+// event-driven invalidations fired by the upload pollers); the refresh button
+// refetches immediately and restarts this countdown.
+const TABLE_REFRESH_INTERVAL_MS = 5 * 60_000
 
 const dataTableTitleStyles = {
   color: 'var(--table-header)',
@@ -169,9 +175,9 @@ export function ProjectFilesTable({
     isLoading: isLoadingDocuments,
     isError: isErrorDocuments,
     error: documentsError,
+    isFetching: isFetchingDocuments,
     refetch: refetchDocuments,
   } = useQuery({
-    refetchInterval: 12_000,
     queryKey: [
       'documents',
       course_name,
@@ -203,8 +209,9 @@ export function ProjectFilesTable({
     isLoading: isLoadingFailedDocuments,
     isError: isErrorFailedDocuments,
     error: failedDocumentsError,
+    isFetching: isFetchingFailedDocuments,
+    refetch: refetchFailedDocuments,
   } = useQuery({
-    refetchInterval: 20_000,
     queryKey: [
       'failedDocuments',
       course_name,
@@ -235,6 +242,23 @@ export function ProjectFilesTable({
     isError: isErrorDocumentGroups,
     refetch: refetchDocumentGroups,
   } = useFetchDocumentGroups(course_name)
+
+  // Slow auto-refresh timer. Bumping refreshResetKey clears and re-arms the
+  // interval so a manual refresh restarts the countdown.
+  const [refreshResetKey, setRefreshResetKey] = useState(0)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      void refetchDocuments()
+      void refetchFailedDocuments()
+    }, TABLE_REFRESH_INTERVAL_MS)
+    return () => clearInterval(intervalId)
+  }, [refreshResetKey, course_name])
+
+  const handleManualRefresh = () => {
+    void refetchDocuments()
+    void refetchFailedDocuments()
+    setRefreshResetKey((key) => key + 1)
+  }
 
   useEffect(() => {
     if (tabValue === 'failed') {
@@ -569,6 +593,28 @@ export function ProjectFilesTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Tooltip
+              label="Table auto-refreshes every 5 minutes (and when you return to this tab). Click to refresh now."
+              position="top"
+              withArrow
+              multiline
+              width={260}
+              style={{
+                color: 'var(--tooltip)',
+                backgroundColor: 'var(--tooltip-background)',
+              }}
+            >
+              <ActionIcon
+                onClick={handleManualRefresh}
+                aria-label="Refresh documents table"
+                size="lg"
+                variant="subtle"
+                loading={isFetchingDocuments || isFetchingFailedDocuments}
+                className="text-[--foreground] transition-colors duration-300 hover:bg-[--dashboard-background-faded] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+              >
+                <IconRefresh size={20} />
+              </ActionIcon>
+            </Tooltip>
             {tabValue !== 'failed' && (
               <Button
                 onClick={() => setExportModalOpened(true)}
