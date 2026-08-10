@@ -4,7 +4,6 @@ import {
   Card,
   Flex,
   Group,
-  Modal,
   Select,
   Stack,
   Text,
@@ -60,6 +59,7 @@ import {
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
 import { Skeleton } from '@/components/shadcn/ui/skeleton'
 import { GetCurrentPageName } from '../CanViewOnlyCourse'
+import { CountryOfConcernModal } from './CountryOfConcernModal'
 import GlobalFooter from '../GlobalFooter'
 import AnthropicProviderInput from './providers/AnthropicProviderInput'
 import AzureProviderInput from './providers/AzureProviderInput'
@@ -405,42 +405,25 @@ const NewModelDropdown: React.FC<{
         zIndex={40}
       />
 
-      <Modal
+      <CountryOfConcernModal
         opened={pendingDefault !== null}
         onClose={closePendingModal}
+        onConfirm={confirmPendingDefault}
         title="Default Model — Country of Concern Warning"
-        centered
-        zIndex={1000}
+        confirmLabel="Set as default anyway"
       >
         {pendingDefault && (
           <>
-            <Group spacing="sm" align="flex-start" noWrap>
-              <IconAlertTriangleFilled
-                size="1.5rem"
-                style={{ marginTop: 4, flexShrink: 0, color: '#eab308' }}
-                aria-hidden="true"
-              />
-              <Text size="sm">
-                Setting <strong>{pendingDefault.model.name}</strong> as the
-                default model is discouraged because it originates from a
-                country of concern.{' '}
-                {getCountryOfConcernLongMessage(
-                  pendingDefault.model.name,
-                  pendingDefault.country,
-                )}
-              </Text>
-            </Group>
-            <Group position="right" mt="lg" spacing="sm">
-              <Button variant="default" onClick={closePendingModal}>
-                Cancel
-              </Button>
-              <Button color="yellow" onClick={confirmPendingDefault}>
-                Set as default anyway
-              </Button>
-            </Group>
+            Setting <strong>{pendingDefault.model.name}</strong> as the default
+            model is discouraged because it originates from a country of
+            concern.{' '}
+            {getCountryOfConcernLongMessage(
+              pendingDefault.model.name,
+              pendingDefault.country,
+            )}
           </>
         )}
-      </Modal>
+      </CountryOfConcernModal>
     </>
   )
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Button, Group, Modal, Text, Tooltip } from '@mantine/core'
+import { Tooltip } from '@mantine/core'
 import { IconAlertTriangleFilled } from '@tabler/icons-react'
+import { CountryOfConcernModal } from './CountryOfConcernModal'
 import { Switch } from '@/components/shadcn/ui/switch'
 import { type LLMProvider } from '~/utils/modelProviders/LLMProvider'
 import {
@@ -116,39 +117,19 @@ export function ModelToggles({
         },
       )}
 
-      <Modal
+      <CountryOfConcernModal
         opened={pendingModel !== null}
         onClose={closeModal}
+        onConfirm={confirmEnable}
         title="Country of Concern Warning"
-        centered
-        zIndex={1000}
+        confirmLabel="Enable anyway"
       >
-        {pendingModel && (
-          <>
-            <Group spacing="sm" align="flex-start" noWrap>
-              <IconAlertTriangleFilled
-                size="1.5rem"
-                className="mt-1 shrink-0 text-yellow-500"
-                aria-hidden="true"
-              />
-              <Text size="sm">
-                {getCountryOfConcernLongMessage(
-                  pendingModel.modelName,
-                  pendingModel.country,
-                )}
-              </Text>
-            </Group>
-            <Group position="right" mt="lg" spacing="sm">
-              <Button variant="default" onClick={closeModal}>
-                Cancel
-              </Button>
-              <Button color="yellow" onClick={confirmEnable}>
-                Enable anyway
-              </Button>
-            </Group>
-          </>
-        )}
-      </Modal>
+        {pendingModel &&
+          getCountryOfConcernLongMessage(
+            pendingModel.modelName,
+            pendingModel.country,
+          )}
+      </CountryOfConcernModal>
     </div>
   )
 }
