@@ -14,7 +14,7 @@ import {
 } from '~/types/chat'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { runN8nFlowBackend } from '~/pages/api/UIUC-api/runN8nFlow'
-import fetchContextsFromBackend from '~/pages/util/fetchContexts'
+import { fetchContextsByVectorEngine } from '~/utils/fetchContexts'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { generatePresignedUrl } from '~/pages/api/download'
 // Reuse existing functions instead of duplicating
@@ -319,6 +319,13 @@ export async function executeToolServer(
       }
     }
 
+    // Raw object keys, re-signed from scratch each render. Prefer these over
+    // image_urls for anything that must outlive the 1h presign: recovering a key
+    // from an expired URL depends on the URL style, but a key needs no parsing.
+    if (Array.isArray(jsonData['s3_paths'])) {
+      toolOutput = { ...toolOutput, s3Paths: jsonData['s3_paths'] }
+    }
+
     toolCopy.output = toolOutput
     return toolCopy
   } catch (error: unknown) {
@@ -393,12 +400,13 @@ export async function fetchContextsServer(
         return []
       }
 
-      const contexts = await fetchContextsFromBackend(
+      const contexts = await fetchContextsByVectorEngine(
         courseName,
         searchQuery,
         tokenLimit,
         docGroups,
         conversationId,
+        100,
         signal,
       )
 

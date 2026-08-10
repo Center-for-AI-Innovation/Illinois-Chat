@@ -1,13 +1,16 @@
 // File copy-pasted from dbUtils. This has modifications from supabase.rpc to psql functions.
 import { eq, and, sql, asc } from 'drizzle-orm'
-import { db } from './dbClient'
+import { connectionManager } from '~/utils/connectionManager'
 import { docGroups } from './schema'
 import { CourseDocument } from '~/types/courseMaterials'
 
-// Db queries
+// Db queries — document-scoped helpers route through ConnectionManager so a
+// project with an external Postgres override hits its own DB. Conversation,
+// project, and analytics tables stay on the host (see backend's @_host_only).
 
 export async function fetchEnabledDocGroups(courseName: string) {
   try {
+    const db = await connectionManager.getDocumentsDb(courseName)
     const documentGroups = await db.query.docGroups.findMany({
       where: eq(docGroups.course_name, courseName),
       with: {
@@ -26,6 +29,7 @@ export async function fetchEnabledDocGroups(courseName: string) {
 
 export async function fetchDocumentGroups(courseName: string) {
   try {
+    const db = await connectionManager.getDocumentsDb(courseName)
     const documentGroups = await db.query.docGroups.findMany({
       orderBy: [asc(docGroups.name)],
       where: eq(docGroups.course_name, courseName),
@@ -43,12 +47,40 @@ export async function fetchDocumentGroups(courseName: string) {
   }
 }
 
+/** Shape expected by vectorSearchWithDrizzle for doc-group filtering. */
+export interface DocGroupsForVectorSearch {
+  disabled_doc_groups: string[]
+  public_doc_groups: { course_name: string; name: string; enabled: boolean }[]
+}
+
+/**
+ * Get disabled and public doc groups for a course for use in vector search.
+ * Replaces backend getDisabledDocGroups / getPublicDocGroups.
+ */
+export async function getDocGroupsForVectorSearch(
+  courseName: string,
+): Promise<DocGroupsForVectorSearch> {
+  const rows = await fetchDocumentGroups(courseName)
+  const disabled_doc_groups = rows
+    .filter((r) => r.enabled === false)
+    .map((r) => r.name ?? '')
+  const public_doc_groups = rows.map((r) => ({
+    course_name: courseName,
+    name: r.name ?? '',
+    enabled: r.enabled ?? true,
+  }))
+  return { disabled_doc_groups, public_doc_groups }
+}
+
 export async function addDocumentsToDocGroup(
   courseName: string,
   doc: CourseDocument,
 ) {
   try {
-    // Call the Postgres function directly using db.execute and sql
+    const db = await connectionManager.getDocumentsDb(courseName)
+    // Call the Postgres function directly using db.execute and sql.
+    // External-DB customers must install add_document_to_group{,_url}() and
+    // remove_document_from_group() (same contract as the host DB).
     const groupArray = `{${doc.doc_groups.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(',')}}`
     if (doc.url) {
       const result = await db.execute(sql`
@@ -103,6 +135,7 @@ export async function removeDocGroup(
   docGroup: string,
 ) {
   try {
+    const db = await connectionManager.getDocumentsDb(courseName)
     await db.execute(sql`
       select remove_document_from_group(
         ${courseName},
@@ -123,6 +156,7 @@ export async function updateDocGroupStatus(
   enabled: boolean,
 ) {
   try {
+    const db = await connectionManager.getDocumentsDb(courseName)
     await db
       .update(docGroups)
       .set({ enabled })

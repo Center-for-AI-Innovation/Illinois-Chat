@@ -4,6 +4,12 @@ import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 const hoisted = vi.hoisted(() => {
   return {
     createPresignedPost: vi.fn(async () => ({ url: 'u', fields: {} })),
+    getS3Client: vi.fn(async () => ({
+      client: {},
+      bucket: 'b',
+      endpoint: null,
+      region: 'us-east-1',
+    })),
   }
 })
 
@@ -16,6 +22,10 @@ vi.mock('~/utils/s3Client', () => ({
   vyriadMinioClient: {},
   getPresignedUrlClient: () => ({}),
   getPresignedUrlVyriadClient: () => ({}),
+}))
+
+vi.mock('~/utils/connectionManager', () => ({
+  connectionManager: { getS3Client: hoisted.getS3Client },
 }))
 
 vi.mock('~/pages/api/authorization', () => ({
