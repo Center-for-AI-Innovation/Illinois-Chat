@@ -382,6 +382,7 @@ export interface Props {
   contentRenderer?: (message: Message) => JSX.Element
   onImageUrlsUpdate?: (message: Message, messageIndex: number) => void
   courseName: string
+  disableCitations: boolean
 }
 
 // Add this helper function before the ChatMessage component
@@ -485,6 +486,7 @@ export const ChatMessage = memo(
     onFeedback,
     onImageUrlsUpdate,
     courseName,
+    disableCitations = false,
   }: Props) => {
     const { t } = useTranslation('chat')
     const { activeSidebarMessageId, setActiveSidebarMessageId } =
@@ -919,13 +921,30 @@ export const ChatMessage = memo(
         if (path.startsWith('/')) {
           path = path.substring(1)
         }
+        // pathname is percent-encoded; the S3 key is not. Decode per segment so a
+        // literal '/' inside a segment stays encoded rather than splitting the key.
+        // Path-style URLs also leave the bucket in here — the presign routes strip it,
+        // since only the server knows which bucket the project resolved to.
         return path
+          .split('/')
+          .map((segment) => {
+            try {
+              return decodeURIComponent(segment)
+            } catch {
+              return segment
+            }
+          })
+          .join('/')
       } catch (error) {
         console.error('Failed to extract path from URL:', url, error)
         // Fallback: try to extract path manually
         if (url.includes('/')) {
-          const parts = url.split('/')
-          return parts.slice(-1)[0] || url // Return the last part or the original URL
+          const withoutQuery = url.split('?')[0] || url
+          const parts = withoutQuery.split('/')
+          // Drop scheme and host when present; keep the full remaining prefix, since
+          // the last segment alone loses the key's directories.
+          const start = withoutQuery.startsWith('http') ? 3 : 0
+          return parts.slice(start).filter(Boolean).join('/') || url
         }
         return url
       }
@@ -936,14 +955,21 @@ export const ChatMessage = memo(
         if (message.tools && message.tools.length > 0) {
           for (const tool of message.tools) {
             if (tool.output && tool.output.s3Paths) {
-              const imageUrls = await Promise.all(
+              const signedKeys = new Set(tool.output.s3Paths)
+              const freshUrls = await Promise.all(
                 tool.output.s3Paths.map(async (s3Path) => {
                   return getPresignedUrl(s3Path, courseName)
                 }),
               )
-              tool.output.imageUrls = tool.output.imageUrls
-                ? [...tool.output.imageUrls, ...imageUrls]
-                : imageUrls
+              // This effect re-runs whenever message.tools changes, so appending
+              // would duplicate every image. Drop the URLs already pointing at
+              // these keys, then add the freshly signed ones.
+              tool.output.imageUrls = [
+                ...(tool.output.imageUrls ?? []).filter(
+                  (url) => !signedKeys.has(extractPathFromUrl(url)),
+                ),
+                ...freshUrls,
+              ]
             }
             if (
               tool.aiGeneratedArgumentValues &&
@@ -987,6 +1013,8 @@ export const ChatMessage = memo(
 
     // Add this useEffect for loading thumbnails
     useEffect(() => {
+      if (disableCitations) return
+
       let isMounted = true
 
       const loadThumbnails = async () => {
@@ -1048,7 +1076,7 @@ export const ChatMessage = memo(
       return () => {
         isMounted = false
       }
-    }, [displayContexts, courseName])
+    }, [displayContexts, courseName, disableCitations])
 
     // Add new function to replace expired links in text
     async function replaceExpiredLinksInText(
@@ -1277,7 +1305,7 @@ export const ChatMessage = memo(
                   ? `${thoughtsContent} ▍`
                   : thoughtsContent
               }
-              isStreaming={
+              isReasoningStreaming={
                 messageIsStreaming &&
                 messageIndex ===
                   (selectedConversation?.messages.length ?? 0) - 1 &&
@@ -1604,6 +1632,8 @@ export const ChatMessage = memo(
       }
 
       if (isValidCitation) {
+        if (disableCitations) return null
+
         // Determine tooltip class based on streaming state
         const tooltipClass = `citation-tooltip-container ${
           tooltipAlignment === 'left'
@@ -1776,7 +1806,10 @@ export const ChatMessage = memo(
       messageIndex === (selectedConversation?.messages.length ?? 0) - 1
 
     const shouldShowSources =
-      condHasContexts && !condIsStreamingAndLastMsg && !condLoadingAndLastMsg
+      !disableCitations &&
+      condHasContexts &&
+      !condIsStreamingAndLastMsg &&
+      !condLoadingAndLastMsg
 
     return (
       <>
@@ -1871,40 +1904,41 @@ export const ChatMessage = memo(
                                   }
                                 }
                               })}
-                              {/* File cards for all messages */}
-                              {message.content.some(
-                                (item) => item.type === 'file',
-                              ) && (
-                                <div className="-m-1 flex w-full flex-wrap justify-start">
-                                  {message.content
-                                    .filter((item) => item.type === 'file')
-                                    .map((content, index) => {
-                                      const fileName =
-                                        content.fileName || 'Unknown file'
-                                      const isPreviewable = isFilePreviewable(
-                                        fileName,
-                                        content.fileType,
-                                      )
-                                      return (
-                                        <div key={index} className="mb-2">
-                                          <FileCard
-                                            fileName={fileName}
-                                            fileType={content.fileType}
-                                            fileUrl={content.fileUrl}
-                                            isPreviewable={isPreviewable}
-                                            onClick={() =>
-                                              handleFileAction(
-                                                fileName,
-                                                content.fileUrl,
-                                                content.fileType,
-                                              )
-                                            }
-                                          />
-                                        </div>
-                                      )
-                                    })}
-                                </div>
-                              )}
+                              {/* File cards for all messages if citations enabled else only for user messages */}
+                              {(!disableCitations || message.role === 'user') &&
+                                message.content.some(
+                                  (item) => item.type === 'file',
+                                ) && (
+                                  <div className="-m-1 flex w-full flex-wrap justify-start">
+                                    {message.content
+                                      .filter((item) => item.type === 'file')
+                                      .map((content, index) => {
+                                        const fileName =
+                                          content.fileName || 'Unknown file'
+                                        const isPreviewable = isFilePreviewable(
+                                          fileName,
+                                          content.fileType,
+                                        )
+                                        return (
+                                          <div key={index} className="mb-2">
+                                            <FileCard
+                                              fileName={fileName}
+                                              fileType={content.fileType}
+                                              fileUrl={content.fileUrl}
+                                              isPreviewable={isPreviewable}
+                                              onClick={() =>
+                                                handleFileAction(
+                                                  fileName,
+                                                  content.fileUrl,
+                                                  content.fileType,
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        )
+                                      })}
+                                  </div>
+                                )}
 
                               {/* Image previews for all messages */}
                               {message.content.some(
