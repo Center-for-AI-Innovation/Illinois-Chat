@@ -30,6 +30,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -73,8 +74,10 @@ import { modelSupportsTools } from '~/utils/modelProviders/capabilities'
 import {
   COUNTRY_OF_CONCERN_INFO_URL,
   getCountryOfConcern,
+  getCountryOfConcernBannerLede,
   getCountryOfConcernShortMessage,
   isCocBannerDismissed,
+  isLocallyHostedProvider,
   markCocBannerDismissed,
 } from '~/utils/modelProviders/countriesOfConcern'
 import posthog from 'posthog-js'
@@ -275,8 +278,6 @@ export const ChatInput = ({
   const [showPluginSelect, setShowPluginSelect] = useState(false)
   const [plugin, setPlugin] = useState<Plugin | null>(null)
   const [isDragging, setIsDragging] = useState<boolean>(false)
-  // Re-render trigger when the user clicks "I Understand" (storage value changes)
-  const [, setCocDismissTick] = useState(0)
   const promptListRef = useRef<HTMLUListElement | null>(null)
   const chatInputContainerRef = useRef<HTMLDivElement>(null)
   const chatInputParentContainerRef = useRef<HTMLDivElement>(null)
@@ -885,6 +886,40 @@ export const ChatInput = ({
     }
   }, [handleResize])
 
+  // Country-of-concern banner.
+  //
+  // Dismissal state lives in localStorage, which is not available during a
+  // server render. Reading it inline in the JSX also made visibility
+  // non-reactive, which is why a `setCocDismissTick` counter was needed to
+  // force a re-render after dismissal. Resolving it into state via an effect
+  // covers both: no storage access during render, and dismissal updates
+  // visibility directly.
+  const cocActiveModelId =
+    selectedConversation?.model?.id ?? selectBestModel(llmProviders)?.id
+  const cocCountry = getCountryOfConcern(cocActiveModelId)
+  const [cocBannerVisible, setCocBannerVisible] = useState(false)
+
+  useEffect(() => {
+    if (!cocCountry || !cocActiveModelId || !courseName) {
+      setCocBannerVisible(false)
+      return
+    }
+    setCocBannerVisible(!isCocBannerDismissed(courseName, cocActiveModelId))
+  }, [cocCountry, cocActiveModelId, courseName])
+
+  // The locality claim in the banner is only true for models we host. Resolve
+  // which provider actually serves the active model so the copy can't promise
+  // that data stays on university infrastructure for a third-party-served
+  // model.
+  const cocLocallyHosted = useMemo(() => {
+    if (!cocActiveModelId) return false
+    const providerName = Object.entries(llmProviders ?? {}).find(
+      ([, provider]: [string, any]) =>
+        provider?.models?.some((m: any) => m?.id === cocActiveModelId),
+    )?.[0]
+    return isLocallyHostedProvider(providerName)
+  }, [llmProviders, cocActiveModelId])
+
   return (
     <div
       className={`w-full border-transparent bg-transparent pt-6 md:pt-2`}
@@ -892,14 +927,9 @@ export const ChatInput = ({
     >
       {/* Country-of-concern banner — card sitting above the chat input. */}
       {(() => {
-        const activeModelId =
-          selectedConversation?.model?.id ?? selectBestModel(llmProviders)?.id
-        const country = getCountryOfConcern(activeModelId)
-        const showBanner =
-          !!country &&
-          !!activeModelId &&
-          !!courseName &&
-          !isCocBannerDismissed(courseName, activeModelId)
+        const activeModelId = cocActiveModelId
+        const country = cocCountry
+        const showBanner = cocBannerVisible && !!country && !!activeModelId
         return (
           <AnimatePresence initial={false}>
             {showBanner && (
@@ -936,10 +966,7 @@ export const ChatInput = ({
                     LLM from Country of Concern
                   </div>
                   <p className="text-sm leading-snug">
-                    While this model is locally hosted here at the U of I, and
-                    Illinois Chat never sends information to foreign servers,
-                    users should be aware that the LLM was initially developed
-                    in a country deemed worthy of extra caution in the AI space.
+                    {getCountryOfConcernBannerLede(country, cocLocallyHosted)}{' '}
                     Users may click{' '}
                     <a
                       href={COUNTRY_OF_CONCERN_INFO_URL}
@@ -957,7 +984,7 @@ export const ChatInput = ({
                       onClick={() => {
                         if (courseName && activeModelId) {
                           markCocBannerDismissed(courseName, activeModelId)
-                          setCocDismissTick((t) => t + 1)
+                          setCocBannerVisible(false)
                         }
                       }}
                       className="rounded-md border border-[#2A1B3D]/20 bg-white px-3 py-1.5 text-sm font-medium text-[#2A1B3D] transition hover:bg-[#2A1B3D]/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"

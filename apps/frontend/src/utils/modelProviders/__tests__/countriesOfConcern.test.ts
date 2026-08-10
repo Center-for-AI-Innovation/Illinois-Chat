@@ -3,10 +3,12 @@ import {
   COUNTRY_OF_CONCERN_INFO_URL,
   CountryOfConcern,
   getCountryOfConcern,
+  getCountryOfConcernBannerLede,
   getCountryOfConcernLongMessage,
   getCountryOfConcernShortMessage,
   isCocBannerDismissed,
   isCountryOfConcern,
+  isLocallyHostedProvider,
   isChatbotCocAcknowledged,
   markChatbotCocAcknowledged,
   markCocBannerDismissed,
@@ -33,6 +35,100 @@ describe('getCountryOfConcern / isCountryOfConcern', () => {
       CountryOfConcern.China,
     )
     expect(isCountryOfConcern('deepseek/deepseek-chat-v3-0324')).toBe(true)
+  })
+
+  it('matches registered ids case-insensitively', () => {
+    // Upstream catalogs disagree on casing for the same model; a casing
+    // difference must not unflag it (and thus re-enable it by default).
+    expect(getCountryOfConcern('DEEPSEEK/DeepSeek-Chat-V3-0324')).toBe(
+      CountryOfConcern.China,
+    )
+    expect(getCountryOfConcern('qwen/qwen2.5-vl-72b-instruct')).toBe(
+      CountryOfConcern.China,
+    )
+    expect(getCountryOfConcern('Qwen/Qwen2.5-VL-72B-Instruct')).toBe(
+      CountryOfConcern.China,
+    )
+  })
+
+  it('ignores surrounding whitespace', () => {
+    expect(getCountryOfConcern('  deepseek/deepseek-chat-v3-0324  ')).toBe(
+      CountryOfConcern.China,
+    )
+    expect(getCountryOfConcern('   ')).toBeNull()
+  })
+
+  it('flags unregistered models by vendor family (fails closed)', () => {
+    // None of these ids are in the explicit registry. A future release or a
+    // varying Ollama tag must still be flagged rather than silently exempt.
+    expect(getCountryOfConcern('deepseek/deepseek-v4-preview')).toBe(
+      CountryOfConcern.China,
+    )
+    expect(getCountryOfConcern('deepseek-r1:8b')).toBe(CountryOfConcern.China)
+    expect(getCountryOfConcern('qwen3:14b')).toBe(CountryOfConcern.China)
+    expect(getCountryOfConcern('z-ai/glm-4.7')).toBe(CountryOfConcern.China)
+    expect(getCountryOfConcern('moonshotai/kimi-k3')).toBe(
+      CountryOfConcern.China,
+    )
+    expect(getCountryOfConcern('minimax/minimax-m3')).toBe(
+      CountryOfConcern.China,
+    )
+  })
+
+  it('does not flag models from unaffected vendors', () => {
+    for (const id of [
+      'gpt-5.5',
+      'claude-opus-4-20250514',
+      'anthropic/claude-sonnet-4',
+      'openai/gpt-4o',
+      'gemini-2.5-pro',
+      'meta-llama/llama-3.3-70b-instruct',
+      'mistralai/mistral-large',
+    ]) {
+      expect(getCountryOfConcern(id)).toBeNull()
+    }
+  })
+})
+
+describe('isLocallyHostedProvider', () => {
+  it('treats university-controlled and in-browser providers as local', () => {
+    expect(isLocallyHostedProvider('NCSAHosted')).toBe(true)
+    expect(isLocallyHostedProvider('NCSAHostedVLM')).toBe(true)
+    expect(isLocallyHostedProvider('Ollama')).toBe(true)
+    expect(isLocallyHostedProvider('WebLLM')).toBe(true)
+  })
+
+  it('treats third-party providers as not local', () => {
+    expect(isLocallyHostedProvider('OpenAICompatible')).toBe(false)
+    expect(isLocallyHostedProvider('OpenAI')).toBe(false)
+    expect(isLocallyHostedProvider('Anthropic')).toBe(false)
+  })
+
+  it('treats unknown or missing provider as not local', () => {
+    // Fail closed: if we cannot resolve the provider we must not promise
+    // that data stays on university infrastructure.
+    expect(isLocallyHostedProvider(undefined)).toBe(false)
+    expect(isLocallyHostedProvider(null)).toBe(false)
+    expect(isLocallyHostedProvider('')).toBe(false)
+    expect(isLocallyHostedProvider('SomeNewProvider')).toBe(false)
+  })
+})
+
+describe('getCountryOfConcernBannerLede', () => {
+  it('only claims local hosting when the model is locally hosted', () => {
+    const local = getCountryOfConcernBannerLede(CountryOfConcern.China, true)
+    expect(local).toContain('hosted locally at the U of I')
+    expect(local).toContain('China')
+  })
+
+  it('warns that data leaves the university for third-party-served models', () => {
+    const remote = getCountryOfConcernBannerLede(CountryOfConcern.China, false)
+    expect(remote).toContain('leaves university infrastructure')
+    expect(remote).toContain('China')
+    expect(remote).toContain('rather than hosted locally')
+    // Must never reassure the user that their data stays put on a model
+    // served by a third party — that was the original bug.
+    expect(remote).not.toContain('does not send your conversation')
   })
 })
 

@@ -301,7 +301,9 @@ const NewModelDropdown: React.FC<{
           <ModelItem {...props} setLoadingModelId={() => {}} />
         )}
         maxDropdownHeight={520}
-        rightSectionWidth="auto"
+        // Reserve a fixed gutter when the warning icon is present so the
+        // absolutely-positioned rightSection never paints over the model name.
+        rightSectionWidth={selectedModelCountry ? 32 : 'auto'}
         icon={
           selectedModel ? (
             <Image
@@ -329,7 +331,6 @@ const NewModelDropdown: React.FC<{
                   display: 'inline-flex',
                   alignItems: 'center',
                   pointerEvents: 'auto',
-                  marginRight: '8px',
                 }}
               >
                 <IconAlertTriangleFilled
@@ -358,6 +359,9 @@ const NewModelDropdown: React.FC<{
             color: 'var(--foreground)',
             backgroundColor: 'var(--background)',
             borderColor: 'var(--button)',
+            // Long model names ellipsis rather than running under the
+            // warning icon in the rightSection.
+            textOverflow: 'ellipsis',
             // color: theme.white,
             // borderRadius: theme.radius.md,
             // width: '24rem',
