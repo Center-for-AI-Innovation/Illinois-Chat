@@ -418,7 +418,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="hover:bg-[--illinois-blue]/10 border-[--illinois-blue] text-[--illinois-blue] hover:text-[--illinois-blue]"
+              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
               onClick={goToPreviousStep}
               disabled={isFirstStep || shouldBlockNavigation}
               aria-label="Go to previous step"
@@ -440,7 +440,7 @@ const MakeNewCoursePage = ({
                     stepNames[index]
                   }${currentStep === index ? ' (current)' : ''}`}
                   aria-current={currentStep === index ? 'step' : undefined}
-                  className={`rounded-full bg-[--illinois-blue] transition-all duration-200 ${currentStep === index ? 'h-2.5 w-2.5 opacity-100' : 'h-2 w-2 opacity-25'}`}
+                  className={`rounded-full bg-[--foreground] transition-all duration-200 ${currentStep === index ? 'h-2.5 w-2.5 opacity-100' : 'h-2 w-2 opacity-25'}`}
                 />
               ))}
             </div>
@@ -448,7 +448,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="hover:bg-[--illinois-blue]/10 border-[--illinois-blue] text-[--illinois-blue] hover:text-[--illinois-blue]"
+              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
               aria-label={
                 isLastStep
                   ? 'Start chatting with your new chatbot'
