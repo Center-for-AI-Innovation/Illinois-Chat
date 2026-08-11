@@ -23,6 +23,7 @@ export default function MITIngestForm({
   queryClient: QueryClient
 }): JSX.Element {
   const [isUrlValid, setIsUrlValid] = useState(false)
+  const delayedInvalidateRef = useRef<ReturnType<typeof setTimeout>>()
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
   const [open, setOpen] = useState(false)
@@ -123,7 +124,6 @@ export default function MITIngestForm({
     maxDepth: { error: false, message: '' },
   })
 
-  const delayedInvalidateRef = useRef<ReturnType<typeof setTimeout>>()
   useEffect(() => {
     return () => {
       if (delayedInvalidateRef.current) {

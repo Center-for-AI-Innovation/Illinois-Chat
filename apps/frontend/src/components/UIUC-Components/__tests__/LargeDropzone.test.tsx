@@ -1131,6 +1131,57 @@ describe('LargeDropzone', () => {
     expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
+  it('keeps files added while a tick was in flight', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    // Real state, so the tick's updater runs against a list that changed
+    // after the request was sent.
+    let committed: FileUpload[] = [activeDocument('early.pdf', 'ingesting')]
+    const setUploadFiles = vi.fn((updater: any) => {
+      committed = typeof updater === 'function' ? updater(committed) : updater
+    })
+    const getIntervalCb = mockTimers()
+
+    let releaseRequests: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => {
+      releaseRequests = resolve
+    })
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (input: any) => {
+      await pending
+      const url = String(input?.url ?? input)
+      return new Response(
+        JSON.stringify({
+          documents: url.includes('successDocs')
+            ? [{ readable_filename: 'early.pdf' }]
+            : [],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    }) as any)
+
+    render(
+      <LargeDropzone
+        {...defaultProps({ uploadFiles: committed, setUploadFiles })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
+    const tick = intervalCallback ? intervalCallback() : Promise.resolve()
+
+    // A second drop lands before the status response comes back.
+    committed = [...committed, activeDocument('late.pdf')]
+
+    releaseRequests?.()
+    await tick
+
+    // The tick's result is applied without discarding the newer entry.
+    expect(committed.map((file) => [file.name, file.status])).toEqual([
+      ['early.pdf', 'complete'],
+      ['late.pdf', 'uploading'],
+    ])
+  })
+
   it('discards a tick that was still in flight when the gate closed', async () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
 

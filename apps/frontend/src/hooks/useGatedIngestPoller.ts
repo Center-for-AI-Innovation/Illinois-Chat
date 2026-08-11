@@ -137,5 +137,10 @@ export function useGatedIngestPoller({
       cancelled = true
       clearInterval(intervalId)
     }
+    // `queryClient` and `setUploadFiles` are deliberately omitted: both are
+    // stable, and depending on them would tear down and re-arm the interval on
+    // every parent render, which is exactly the polling churn this hook exists
+    // to prevent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, courseName, intervalMs])
 }

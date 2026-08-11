@@ -149,7 +149,7 @@ export default function WebsiteIngestForm({
       setUploadFiles((prevFiles) => [...prevFiles, newFile])
 
       try {
-        const response = await scrapeWeb(
+        await scrapeWeb(
           ingestUrl,
           project_name,
           maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
