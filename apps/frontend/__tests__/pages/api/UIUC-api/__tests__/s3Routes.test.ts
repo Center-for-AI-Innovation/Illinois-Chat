@@ -20,6 +20,13 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: hoisted.getSignedUrl,
 }))
 
+vi.mock('~/utils/s3Client', () => ({
+  s3Client: {},
+  vyriadMinioClient: null,
+  getPresignedUrlClient: () => ({}),
+  getPresignedUrlVyriadClient: () => null,
+ }))
+
 const cmHoisted = vi.hoisted(() => ({
   getS3Client: vi.fn(async () => ({
     client: {},

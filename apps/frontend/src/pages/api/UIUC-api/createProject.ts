@@ -3,6 +3,9 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { getProjectNameError, isValidProjectName } from '~/utils/projectName'
 import { checkCourseExists } from './getCourseExists'
+import { getCourseMetadata } from './getCourseMetadata'
+import { writeCourseMetadata } from '~/utils/courseMetadataStore'
+import type { CourseMetadata } from '~/types/courseMetadata'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -81,6 +84,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           `Failed to create the project. Status: ${response.status}`,
         ...(backendBody?.message ? { message: backendBody.message } : {}),
       })
+    }
+
+    // Backend has written the seed metadata to Redis. Mirror it to Postgres
+    // so server-side search sees the new project. Drift here is tolerable —
+    // the backfill script reconciles — so we log and continue rather than
+    // 5xx; the project already exists in Redis and the user can use it.
+    try {
+      const seeded = (await getCourseMetadata(project_name)) as CourseMetadata
+      if (seeded) {
+        await writeCourseMetadata(project_name, seeded)
+      } else {
+        console.warn(
+          `createProject: Redis metadata missing for ${project_name} after backend create; Postgres not mirrored`,
+        )
+      }
+    } catch (pgErr) {
+      console.error(
+        `createProject: failed to mirror ${project_name} to Postgres; search index may lag until backfill runs`,
+        pgErr,
+      )
     }
 
     return res.status(200).json({ success: true })

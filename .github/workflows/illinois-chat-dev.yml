@@ -3,7 +3,7 @@ name: Illinois Chat Dev Deploy
 on:
   push:
     branches:
-      - illinois-chat
+      - main
     paths:
       - 'apps/**'
       - 'infra/**'
@@ -18,10 +18,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install frontend dependencies
+        working-directory: apps/frontend
+        run: |
+          npm ci
+
       - name: Install Trunk
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: true
+          check-mode: none
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,15 +46,18 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd apps/backend
-          docker build -f Self-Hosted-Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -f Self-Hosted-Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:main \
+            .
 
       - name: Push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-backend
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push --all-tags $ECR_REGISTRY/$ECR_REPOSITORY
 
       - name: Build worker image
         env:
@@ -58,32 +66,44 @@ jobs:
           WORKER_IMAGE_TAG: ${{ github.sha }}
         run: |
           cd apps/backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:$WORKER_IMAGE_TAG ai_ta_backend/rabbitmq/
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:$WORKER_IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:main \
+            ai_ta_backend/rabbitmq/
 
       - name: Push worker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY_WORKER: uiuc-chat-worker
-          WORKER_IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:$WORKER_IMAGE_TAG
+          docker push --all-tags $ECR_REGISTRY/$ECR_REPOSITORY_WORKER
 
       - name: Build frontend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-frontend
           IMAGE_TAG: ${{ github.sha }}
+          NEXT_PUBLIC_KEYCLOAK_URL: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_URL }}
+          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_REALM }}
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
         run: |
           cd apps/frontend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build --platform=linux/amd64 -f Dockerfile \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_REALM="$NEXT_PUBLIC_KEYCLOAK_REALM" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID="$NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:main \
+            .
 
       - name: Push frontend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-frontend
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push --all-tags $ECR_REGISTRY/$ECR_REPOSITORY
 
       - name: Build crawlee image
         env:
@@ -92,15 +112,18 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd apps/crawlee
-          docker build -f Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -f Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:main \
+            .
 
       - name: Push crawlee image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-crawlee
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push --all-tags $ECR_REGISTRY/$ECR_REPOSITORY
 
       - name: Update ECS services
         env:

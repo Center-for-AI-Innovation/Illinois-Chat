@@ -8,10 +8,14 @@ import { LoaderCircle } from 'lucide-react'
 import { useDebouncedValue } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createProject } from '~/utils/apiUtils'
-import { fetchCourseMetadata } from '~/utils/apiUtils'
+import {
+  callSetCourseMetadata,
+  createProject,
+  fetchCourseMetadata,
+} from '~/utils/apiUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import Navbar from './navbars/Navbar'
+import { type ChatbotProjectType, type ChatbotTag } from '~/types/chatbotTags'
+import { ChatbotsGlobalNav } from './chatbots-hub/ChatbotsGlobalNav'
 import UploadNotification, { type FileUpload } from './UploadNotification'
 
 import StepCreate from './MakeNewCoursePageSteps/StepCreate'
@@ -47,6 +51,12 @@ const MakeNewCoursePage = ({
   const [projectName, setProjectName] = useState(project_name || '')
   const [projectDescription, setProjectDescription] = useState(
     project_description || '',
+  )
+  const [projectType, setProjectType] = useState<
+    ChatbotProjectType | undefined
+  >(undefined)
+  const [organization, setOrganization] = useState<string | undefined>(
+    undefined,
   )
   const [isLoading, setIsLoading] = useState(false)
   const [hasCreatedProject, setHasCreatedProject] = useState(false)
@@ -124,11 +134,15 @@ const MakeNewCoursePage = ({
       key="create"
       project_name={projectName}
       project_description={projectDescription}
+      project_type={projectType}
+      organization={organization}
       is_new_course={!hasCreatedProject}
       isCourseAvailable={isCourseAvailable}
       isCheckingAvailability={isWaitingForAvailabilityCheck}
       onUpdateName={setProjectName}
       onUpdateDescription={setProjectDescription}
+      onUpdateProjectType={setProjectType}
+      onUpdateOrganization={setOrganization}
     />,
     <StepSuccess
       key="success"
@@ -195,6 +209,8 @@ const MakeNewCoursePage = ({
     project_description: string | undefined,
     current_user_email: string,
     is_private = false,
+    initial_project_type?: ChatbotProjectType,
+    initial_organization?: string,
   ): Promise<boolean> => {
     setIsLoading(true)
     try {
@@ -208,11 +224,28 @@ const MakeNewCoursePage = ({
         return false
       }
 
+      const initialTags: ChatbotTag[] = []
+      if (initial_project_type) {
+        initialTags.push({
+          category: 'projectType',
+          value: initial_project_type,
+        })
+      }
+      if (initial_organization) {
+        initialTags.push({
+          category: 'organization',
+          value: initial_organization,
+        })
+      }
+
       if (is_new_course) {
         try {
           const metadata = (await fetchCourseMetadata(
             project_name,
           )) as CourseMetadata
+          if (initialTags.length > 0) {
+            metadata.tags = initialTags
+          }
           queryClient.setQueryData(['courseMetadata', project_name], metadata)
         } catch (metadataError) {
           console.error(
@@ -228,6 +261,14 @@ const MakeNewCoursePage = ({
           })
         }
       }
+
+      // Persist the wizard-set projectType/organization tags. Fire-and-forget:
+      // a registry/tag failure should not block the wizard. The cache was
+      // already updated above so the user sees them immediately.
+      if (initialTags.length > 0) {
+        void callSetCourseMetadata(project_name, { tags: initialTags } as never)
+      }
+
       return true
     } catch (error) {
       console.error('Error creating project:', error)
@@ -265,7 +306,6 @@ const MakeNewCoursePage = ({
     }
   }
 
-  // If Illinois Chat config is NOT enabled, disable UI-based project creation
   // if (!useIllinoisChatConfig) {
   // {
   //   return (
@@ -334,7 +374,7 @@ const MakeNewCoursePage = ({
 
   return (
     <>
-      <Navbar isPlain={false} />
+      <ChatbotsGlobalNav />
       <Head>
         <title>{project_name || 'New Project'} — Illinois Chat</title>
         <meta name="description" content="Create a new project on UIUC.chat." />
@@ -382,7 +422,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="hover:bg-[--illinois-blue]/10 border-[--illinois-blue] text-[--illinois-blue] hover:text-[--illinois-blue]"
+              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
               onClick={goToPreviousStep}
               disabled={isFirstStep || shouldBlockNavigation}
               aria-label="Go to previous step"
@@ -404,7 +444,7 @@ const MakeNewCoursePage = ({
                     stepNames[index]
                   }${currentStep === index ? ' (current)' : ''}`}
                   aria-current={currentStep === index ? 'step' : undefined}
-                  className={`rounded-full bg-[--illinois-blue] transition-all duration-200 ${currentStep === index ? 'h-2.5 w-2.5 opacity-100' : 'h-2 w-2 opacity-25'}`}
+                  className={`rounded-full bg-[--foreground] transition-all duration-200 ${currentStep === index ? 'h-2.5 w-2.5 opacity-100' : 'h-2 w-2 opacity-25'}`}
                 />
               ))}
             </div>
@@ -412,7 +452,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="hover:bg-[--illinois-blue]/10 border-[--illinois-blue] text-[--illinois-blue] hover:text-[--illinois-blue]"
+              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
               aria-label={
                 isLastStep
                   ? 'Start chatting with your new chatbot'
@@ -436,6 +476,8 @@ const MakeNewCoursePage = ({
                       projectDescription,
                       current_user_email,
                       useIllinoisChatConfig,
+                      projectType,
+                      organization,
                     )
 
                     if (!isCreated) {
