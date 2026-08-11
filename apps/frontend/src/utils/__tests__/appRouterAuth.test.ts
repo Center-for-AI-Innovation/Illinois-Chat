@@ -11,7 +11,7 @@ describe('withAppRouterAuth', () => {
     }))
     vi.doMock('~/utils/authHelpers', () => ({
       getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
-      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://issuer/'),
     }))
 
     vi.resetModules()
@@ -34,7 +34,7 @@ describe('withAppRouterAuth', () => {
     vi.doMock('../keycloakClient', () => ({ verifyTokenAsync }))
     vi.doMock('~/utils/authHelpers', () => ({
       getKeycloakBaseFromHost,
-      getKeycloakIssuerUrl,
+      getKeycloakIssuerUrl: vi.fn(() => 'https://issuer/'),
     }))
 
     vi.resetModules()
@@ -52,12 +52,7 @@ describe('withAppRouterAuth', () => {
 
     const res = await wrapped(req)
     expect(getKeycloakBaseFromHost).toHaveBeenCalledWith('example.com')
-    expect(getKeycloakIssuerUrl).toHaveBeenCalledWith('example.com')
-    expect(verifyTokenAsync).toHaveBeenCalledWith(
-      't',
-      'https://kc/',
-      'https://kc/realms/test',
-    )
+    expect(verifyTokenAsync).toHaveBeenCalledWith('t', 'https://kc/', 'https://issuer/')
     await expect(res.json()).resolves.toMatchObject({ user: { sub: 'u1' } })
   })
 
@@ -71,7 +66,7 @@ describe('withAppRouterAuth', () => {
     vi.doMock('../keycloakClient', () => ({ verifyTokenAsync }))
     vi.doMock('~/utils/authHelpers', () => ({
       getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
-      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://issuer/'),
     }))
 
     vi.resetModules()
@@ -95,7 +90,7 @@ describe('withAppRouterAuth', () => {
     vi.doMock('../keycloakClient', () => ({ verifyTokenAsync }))
     vi.doMock('~/utils/authHelpers', () => ({
       getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
-      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://issuer/'),
     }))
 
     vi.resetModules()
@@ -117,7 +112,7 @@ describe('withAppRouterAuth', () => {
     vi.doMock('../keycloakClient', () => ({ verifyTokenAsync }))
     vi.doMock('~/utils/authHelpers', () => ({
       getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
-      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://issuer/'),
     }))
 
     vi.resetModules()

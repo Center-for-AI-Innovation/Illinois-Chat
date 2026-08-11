@@ -6,6 +6,10 @@ import logging
 from typing import List
 
 from dotenv import load_dotenv
+
+# Load .env before local imports so module-level code can access env vars
+load_dotenv()
+
 from flask import (
   Flask,
   Response,
@@ -20,6 +24,7 @@ from flask_injector import FlaskInjector, RequestScope
 from injector import Binder, SingletonScope
 
 from ai_ta_backend.database.aws import AWSStorage
+from ai_ta_backend.database.connection_manager import ConnectionManager
 from ai_ta_backend.database.graph import GraphDatabase
 from ai_ta_backend.database.sql import SQLDatabase
 from ai_ta_backend.database.vector import VectorDatabase
@@ -53,8 +58,6 @@ executor = Executor(app)
 # app.config['EXECUTOR_MAX_WORKERS'] = 5 nothing == picks defaults for me
 #app.config['SERVER_TIMEOUT'] = 1000  # seconds
 
-# load API keys from globally-availabe .env file
-load_dotenv()
 
 
 @app.route('/')
@@ -92,7 +95,7 @@ def health() -> Response:
 @app.route('/getTopContexts', methods=['POST'])
 def getTopContexts(service: RetrievalService) -> Response:
   """Get most relevant contexts for a given search query.
-  
+
   Return value
 
   ## POST body
@@ -101,7 +104,7 @@ def getTopContexts(service: RetrievalService) -> Response:
   search_query
   token_limit
   doc_groups
-  
+
   Example Request Body:
   ```json
   {
@@ -120,15 +123,15 @@ def getTopContexts(service: RetrievalService) -> Response:
   * pagenumber_or_timestamp
   * readable_filename
   * s3_pdf_path
-  
-  Example: 
+
+  Example:
   [
     {
-      'readable_filename': 'Lumetta_notes', 
-      'pagenumber_or_timestamp': 'pg. 19', 
-      's3_pdf_path': '/courses/<course>/Lumetta_notes.pdf', 
+      'readable_filename': 'Lumetta_notes',
+      'pagenumber_or_timestamp': 'pg. 19',
+      's3_pdf_path': '/courses/<course>/Lumetta_notes.pdf',
       'text': 'In FSM, we do this...'
-    }, 
+    },
   ]
 
   Raises
@@ -147,9 +150,9 @@ def getTopContexts(service: RetrievalService) -> Response:
   if search_query == '' or course_name == '':
     # proper web error "400 Bad request"
     abort(
-        400,
-        description=
-        f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
+      400,
+      description=
+      f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
     )
 
   found_documents = asyncio.run(service.getTopContexts(search_query, course_name, doc_groups, top_n, conversation_id))
@@ -157,7 +160,6 @@ def getTopContexts(service: RetrievalService) -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   print(f"⏰ Runtime of getTopContexts in main.py: {(time.monotonic() - start_time):.2f} seconds")
   return response
-
 
 @app.route('/llm-monitor-message', methods=['POST'])
 def llm_monitor_message_main(service: RetrievalService, flaskExecutor: ExecutorInterface) -> Response:
@@ -210,7 +212,7 @@ def getAll(service: RetrievalService) -> Response:
 @app.route('/delete', methods=['DELETE'])
 def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
   """
-  Delete a single file from all our database: S3, Qdrant, and Supabase (for now).
+  Delete a single file from all our database: S3, vector store (pgvector), and Supabase (for now).
   Note, of course, we still have parts of that file in our logs.
   """
   course_name: str = request.args.get('course_name', default='', type=str)
@@ -234,6 +236,7 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
   response = jsonify({"outcome": 'success'})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
+
 
 @app.route('/process-chat-file', methods=['POST'])
 def process_chat_file_sync(service: RetrievalService):
@@ -970,6 +973,12 @@ def getPrimeKGContexts(graph_db: GraphDatabase) -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
+# External-connection CRUD lives in the Next.js frontend (see
+# uiuc-chat-frontend `src/pages/api/UIUC-api/projectConnections*`). The
+# backend only **reads** these rows via `ConnectionManager` for runtime
+# dispatch — there are no project-connections HTTP endpoints here.
+
+
 def configure(binder: Binder) -> None:
   binder.bind(ThreadPoolExecutorInterface, to=ThreadPoolExecutorAdapter(max_workers=10), scope=SingletonScope)
   binder.bind(ProcessPoolExecutorInterface, to=ProcessPoolExecutorAdapter(max_workers=10), scope=SingletonScope)
@@ -982,6 +991,7 @@ def configure(binder: Binder) -> None:
   binder.bind(VectorDatabase, to=VectorDatabase, scope=SingletonScope)
   binder.bind(SQLDatabase, to=SQLDatabase, scope=SingletonScope)
   binder.bind(AWSStorage, to=AWSStorage, scope=SingletonScope)
+  binder.bind(ConnectionManager, to=ConnectionManager, scope=SingletonScope)
   binder.bind(ExecutorInterface, to=FlaskExecutorAdapter(executor), scope=SingletonScope)
   binder.bind(GraphDatabase, to=GraphDatabase, scope=SingletonScope)
 

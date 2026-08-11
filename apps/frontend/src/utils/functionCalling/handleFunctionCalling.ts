@@ -496,6 +496,21 @@ const callN8nFunction = async (
     }
   }
 
+  // Raw object keys, re-signed from scratch each render. Prefer these over
+  // image_urls for anything that must outlive the 1h presign: recovering a key
+  // from an expired URL depends on the URL style, but a key needs no parsing.
+  if (
+    Array.isArray(
+      resultData.runData[finalNodeType][0].data.main[0][0].json['s3_paths'],
+    )
+  ) {
+    toolOutput = {
+      ...toolOutput,
+      s3Paths:
+        resultData.runData[finalNodeType][0].data.main[0][0].json['s3_paths'],
+    }
+  }
+
   posthog.capture('tool_invoked', {
     course_name: projectName,
     readableToolName: tool.readableName,

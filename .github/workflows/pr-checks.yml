@@ -28,6 +28,8 @@ jobs:
       # check-mode is auto-detected from the event (pull_request)
       - name: Trunk check
         uses: trunk-io/trunk-action@v1
+        with:
+          check-mode: all
 
       # Backend tests placeholder
       - name: Backend tests

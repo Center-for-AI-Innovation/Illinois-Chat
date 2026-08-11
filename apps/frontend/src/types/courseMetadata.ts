@@ -20,6 +20,7 @@ export interface CourseMetadata {
   disabled_models: string[] | undefined // TODO: remove
   project_description: string | undefined
   documentsOnly: boolean | undefined
+  disableCitations: boolean | undefined
   guidedLearning: boolean | undefined
   systemPromptOnly: boolean | undefined
   vector_search_rewrite_disabled: boolean | undefined
@@ -55,6 +56,7 @@ export interface CourseMetadataOptionalForUpsert {
   disabled_models: string[] | undefined
   project_description: string | undefined
   documentsOnly: boolean | undefined
+  disableCitations: boolean | undefined
   guidedLearning: boolean | undefined
   systemPromptOnly: boolean | undefined
   vector_search_rewrite_disabled: boolean | undefined
