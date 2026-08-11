@@ -143,7 +143,6 @@ describe('normalizeS3Key', () => {
     expect(mod.getPresignedUrlVyriadClient()).toBe(mod.vyriadMinioClient)
     expect(ctor).not.toHaveBeenCalled()
   })
-})
 
   it('leaves a virtual-hosted-style key untouched', async () => {
     vi.resetModules()
