@@ -62,7 +62,6 @@ export function useGatedIngestPoller({
   })
 
   const wasActiveRef = useRef(false)
-  const invalidatedDocumentsRef = useRef(false)
 
   useEffect(() => {
     const invalidate = (key: 'documents' | 'failedDocuments') =>
@@ -71,17 +70,16 @@ export function useGatedIngestPoller({
     if (!isActive) {
       if (wasActiveRef.current) {
         // Gate just closed — final refresh, a backstop for anything the
-        // per-tick diffs missed (e.g. errors set outside the poller).
+        // per-tick diffs missed (e.g. a row that lands just after the file
+        // went terminal, or an error set outside the poller). Worth one
+        // possibly-redundant refetch per batch.
         wasActiveRef.current = false
-        // Skip if a tick already refreshed the table for this batch, so
-        // finishing an upload doesn't cancel and re-issue that refetch.
-        if (!invalidatedDocumentsRef.current) invalidate('documents')
+        invalidate('documents')
         invalidate('failedDocuments')
       }
       return
     }
     wasActiveRef.current = true
-    invalidatedDocumentsRef.current = false
 
     let inFlight = false
     // Results of a tick that was still in flight when the gate closed (or the
@@ -104,21 +102,20 @@ export function useGatedIngestPoller({
 
         const snapshot = filesRef.current
         const next = applyStatusRef.current(status, snapshot)
+        // Appended entries compare against `undefined`, so they are `changed`
+        // too — one signal covers both re-classified and newly-found files.
         const changed = next.filter((file, i) => file !== snapshot[i])
-        const added = next.length !== snapshot.length
 
         // A steady tick changes nothing; re-rendering the upload toast anyway
         // would defeat the point of this hook.
-        if (!added && changed.length === 0) return
+        if (changed.length === 0) return
 
         setUploadFiles((prev) => applyStatusRef.current(status, prev))
 
-        // Only completions can change the documents table. Appended entries
-        // are already in `changed` (they compare against `undefined`), so a
-        // tick that merely discovers more in-progress URLs — every tick of a
-        // live crawl — must not trigger the expensive table refetch.
+        // Only completions can change the documents table, so a tick that
+        // merely discovers more in-progress URLs — every tick of a live crawl
+        // — must not trigger the expensive table refetch.
         if (changed.some((file) => file.status === 'complete')) {
-          invalidatedDocumentsRef.current = true
           invalidate('documents')
         }
         if (changed.some((file) => file.status === 'error')) {

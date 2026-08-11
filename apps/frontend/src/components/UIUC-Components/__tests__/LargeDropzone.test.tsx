@@ -919,7 +919,7 @@ describe('LargeDropzone', () => {
     expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
-  it('invalidates documents once per batch, not again on gate close', async () => {
+  it('invalidates documents on complete-transition and both keys on gate close', async () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
 
     const invalidateQueries = vi.fn()
@@ -959,13 +959,53 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    // The tick above already refreshed the table, so re-issuing it here would
-    // only cancel that request and start another.
-    expect(invalidateQueries).not.toHaveBeenCalledWith({
+    // Rows can land just after a file goes terminal, so the close always
+    // refreshes — one possibly-redundant refetch per batch.
+    expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['documents', 'CS101'],
     })
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['failedDocuments', 'CS101'],
+    })
+  })
+
+  it('refreshes again when a second batch starts and finishes', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const invalidateQueries = vi.fn()
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    const props = defaultProps({
+      uploadFiles: [activeDocument('first.pdf')],
+      queryClient: { invalidateQueries } as any,
+    })
+    const done = (name: string) => ({
+      name,
+      status: 'complete' as const,
+      type: 'document' as const,
+    })
+    const { rerender } = render(<LargeDropzone {...props} />)
+
+    rerender(<LargeDropzone {...props} uploadFiles={[done('first.pdf')]} />)
+    invalidateQueries.mockClear()
+
+    // A second upload starts and finishes: its rows must be picked up too.
+    rerender(
+      <LargeDropzone
+        {...props}
+        uploadFiles={[done('first.pdf'), activeDocument('second.pdf')]}
+      />,
+    )
+    rerender(
+      <LargeDropzone
+        {...props}
+        uploadFiles={[done('first.pdf'), done('second.pdf')]}
+      />,
+    )
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['documents', 'CS101'],
     })
   })
 
