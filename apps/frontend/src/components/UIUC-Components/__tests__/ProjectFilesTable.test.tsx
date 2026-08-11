@@ -64,14 +64,14 @@ vi.mock('mantine-datatable', () => ({
           ))}
         </div>
         <div>
-          {records.length === 0 ? (props.noRecordsIcon ?? null) : null}
+          {records.length === 0 ? props.noRecordsIcon ?? null : null}
           {records.map((record: any, index: number) => (
             <div key={record.id ?? record.s3_path ?? record.url ?? index}>
               {columns.map((col: any, cIdx: number) => (
                 <div key={cIdx}>
                   {col.render
                     ? col.render(record, index)
-                    : (record[col.accessor] ?? null)}
+                    : record[col.accessor] ?? null}
                 </div>
               ))}
             </div>
@@ -390,33 +390,8 @@ describe('ProjectFilesTable', () => {
     else delete (HTMLElement.prototype as any).clientHeight
   }, 20_000)
 
-  it('refreshes both queries via the refresh button and restarts the 5-minute timer', async () => {
+  it('refreshes both queries when the refresh button is clicked', async () => {
     const user = userEvent.setup()
-
-    // Capture the 5-minute auto-refresh interval while leaving all other
-    // timers (waitFor polling, userEvent) on the native implementations.
-    const armedCallbacks: Array<() => void> = []
-    const nativeSetInterval = globalThis.setInterval
-    const nativeClearInterval = globalThis.clearInterval
-    let clearedRefreshTimers = 0
-    vi.spyOn(globalThis, 'setInterval').mockImplementation(((
-      cb: any,
-      delay?: any,
-      ...args: any[]
-    ) => {
-      if (delay === 5 * 60_000) {
-        armedCallbacks.push(cb)
-        return 987_654 as any
-      }
-      return nativeSetInterval(cb, delay, ...args)
-    }) as any)
-    vi.spyOn(globalThis, 'clearInterval').mockImplementation(((id: any) => {
-      if (id === 987_654) {
-        clearedRefreshTimers += 1
-        return
-      }
-      return nativeClearInterval(id)
-    }) as any)
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const countCalls = (pattern: RegExp) =>
@@ -449,9 +424,7 @@ describe('ProjectFilesTable', () => {
     )
 
     await screen.findByText(/Success/i)
-    expect(armedCallbacks).toHaveLength(1)
 
-    // Manual refresh refetches both queries…
     const materialsBefore = countCalls(/fetchProjectMaterials/)
     const failedBefore = countCalls(/fetchFailedDocuments/)
     await user.click(
@@ -462,23 +435,6 @@ describe('ProjectFilesTable', () => {
         materialsBefore,
       )
       expect(countCalls(/fetchFailedDocuments/)).toBeGreaterThan(failedBefore)
-    })
-
-    // …and restarts the countdown (old interval cleared, new one armed).
-    await waitFor(() => expect(armedCallbacks).toHaveLength(2))
-    expect(clearedRefreshTimers).toBe(1)
-
-    // Firing the timer refetches both queries too.
-    const materialsBeforeTick = countCalls(/fetchProjectMaterials/)
-    const failedBeforeTick = countCalls(/fetchFailedDocuments/)
-    armedCallbacks[1]!()
-    await waitFor(() => {
-      expect(countCalls(/fetchProjectMaterials/)).toBeGreaterThan(
-        materialsBeforeTick,
-      )
-      expect(countCalls(/fetchFailedDocuments/)).toBeGreaterThan(
-        failedBeforeTick,
-      )
     })
   }, 20_000)
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useState } from 'react'
 import {
   Text,
   Card,
@@ -37,12 +37,14 @@ import axios from 'axios'
 import { Montserrat } from 'next/font/google'
 import { type FileUpload } from './UploadNotification'
 import { type QueryClient } from '@tanstack/react-query'
-import { fetchIngestStatus } from '~/utils/ingestStatusClient'
+import { useGatedIngestPoller } from '~/hooks/useGatedIngestPoller'
 
 const montserrat_med = Montserrat({
   weight: '500',
   subsets: ['latin'],
 })
+
+const POLL_INTERVAL_MS = 3000
 
 // Strip trailing slashes so the user-entered URL and the backend-stored
 // base_url compare equal even when one has a trailing slash and the
@@ -175,76 +177,27 @@ export default function WebsiteIngestForm({
     await new Promise((resolve) => setTimeout(resolve, 8000))
   }
 
-  // Poll ingest status only while webscrape uploads are tracked and active.
-  // The tracked base URLs are sent as a server-side filter so the endpoints
-  // never return the whole documents table.
-  const isPollingActive = uploadFiles.some(
-    (file) =>
-      file.type === 'webscrape' &&
-      (file.status === 'uploading' || file.status === 'ingesting'),
-  )
-  const uploadFilesRef = useRef(uploadFiles)
-  uploadFilesRef.current = uploadFiles
-  const wasPollingActiveRef = useRef(false)
-
-  useEffect(() => {
-    if (!isPollingActive) {
-      if (wasPollingActiveRef.current) {
-        // Gate just closed — final refresh as a backstop for any invalidation
-        // missed by per-tick diffs.
-        wasPollingActiveRef.current = false
-        void queryClient.invalidateQueries({
-          queryKey: ['documents', project_name],
-        })
-        void queryClient.invalidateQueries({
-          queryKey: ['failedDocuments', project_name],
-        })
-      }
-      return
-    }
-    wasPollingActiveRef.current = true
-    let inFlight = false
-
-    const checkIngestStatus = async () => {
-      if (inFlight) return
-      inFlight = true
-      try {
-        // Filter on the base URLs of ALL tracked base entries regardless of
-        // their status: child rows carry the base's base_url, so this returns
-        // every row the matching below needs — including children that are
-        // still resolving after the base entry itself went terminal.
-        const trackedBaseUrls = uploadFilesRef.current
-          .filter((file) => file.type === 'webscrape' && file.isBaseUrl)
-          .map((file) => normalizeUrl(file.url ?? file.name))
-          .filter((baseUrl) => baseUrl.length > 0)
-
-        const status = await fetchIngestStatus(project_name, {
-          base_urls: trackedBaseUrls,
-        })
-        // A failed request must not be read as "doc vanished" — skip the tick.
-        if (!status) return
-
-        const data = { documents: status.inProgress }
-        const docsData = { documents: status.completed }
-
-        applyIngestStatus(data, docsData)
-      } catch (error) {
-        console.error('Error checking ingest status:', error)
-      } finally {
-        inFlight = false
-      }
-    }
-
-    const interval = setInterval(checkIngestStatus, 3000)
-    return () => {
-      clearInterval(interval)
-    }
-  }, [isPollingActive, project_name])
-
-  const applyIngestStatus = (
-    data: { documents: Array<{ base_url: string; url: string }> },
-    docsData: { documents: Array<{ base_url: string; url: string }> },
-  ) => {
+  // Poll ingest status only while webscrape uploads are in flight, sending
+  // the tracked base URLs as a server-side filter so the endpoints never
+  // return the whole documents table.
+  useGatedIngestPoller({
+    courseName: project_name,
+    uploadFiles,
+    setUploadFiles,
+    queryClient,
+    type: 'webscrape',
+    intervalMs: POLL_INTERVAL_MS,
+    // Filter on the base URLs of ALL tracked base entries regardless of their
+    // status: child rows carry the base's base_url, so this returns every row
+    // the matching below needs — including children that are still resolving
+    // after the base entry itself went terminal.
+    buildFilter: (files) => ({
+      base_urls: files
+        .filter((file) => file.type === 'webscrape' && file.isBaseUrl)
+        .map((file) => normalizeUrl(file.url ?? file.name))
+        .filter((baseUrl) => baseUrl.length > 0),
+    }),
+    applyStatus: (status, currentFiles) => {
       const baseUrlMatchesFile = (
         docBaseUrl: string,
         file: FileUpload,
@@ -300,8 +253,8 @@ export default function WebsiteIngestForm({
                   (f) => f.status === 'complete' || f.status === 'error',
                 )
 
-              const isInCompletedDocs = docsData?.documents?.some(
-                (doc: { url: string; base_url?: string }) =>
+              const isInCompletedDocs = status.completed.some(
+                (doc) =>
                   normalizeUrl(doc.url) === normalizeUrl(file.url) ||
                   (file.isBaseUrl &&
                     normalizeUrl(doc.base_url) === normalizeUrl(file.url)),
@@ -376,64 +329,28 @@ export default function WebsiteIngestForm({
         return newFiles
       }
 
-      const computeNextFiles = (currentFiles: FileUpload[]) => {
-        const matchingDocsInProgress =
-          data?.documents?.filter((doc: { base_url: string }) =>
-            currentFiles.some((file) =>
-              baseUrlMatchesFile(doc.base_url, file),
-            ),
-          ) || []
-
-        const matchingSuccessDocs =
-          docsData?.documents?.filter((doc: { base_url: string }) =>
-            currentFiles.some((file) =>
-              baseUrlMatchesFile(doc.base_url, file),
-            ),
-          ) || []
-
-        const inProgressBaseUrlMap = organizeDocsByBaseUrl(
-          matchingDocsInProgress,
-        )
-        const successBaseUrlMap = organizeDocsByBaseUrl(matchingSuccessDocs)
-
-        const additionalFiles = createAdditionalFileEntries(
-          inProgressBaseUrlMap,
-          successBaseUrlMap,
-          currentFiles,
-        )
-
-        const updatedFiles = updateExistingFiles(
-          currentFiles,
-          matchingDocsInProgress,
-        )
-
-        return [...updatedFiles, ...additionalFiles]
-      }
-
-      // Diff against a snapshot so the table is only refreshed when this tick
-      // actually changed something (statuses or new entries).
-      const snapshot = uploadFilesRef.current
-      const nextFiles = computeNextFiles(snapshot)
-      const changed =
-        nextFiles.length !== snapshot.length ||
-        nextFiles.some((file, i) => file !== snapshot[i])
-      const hasErrorTransition = nextFiles.some(
-        (file, i) => file !== snapshot[i] && file.status === 'error',
+      const matchingDocsInProgress = status.inProgress.filter((doc) =>
+        currentFiles.some((file) => baseUrlMatchesFile(doc.base_url, file)),
       )
 
-      setUploadFiles((prev) => computeNextFiles(prev))
+      const matchingSuccessDocs = status.completed.filter((doc) =>
+        currentFiles.some((file) => baseUrlMatchesFile(doc.base_url, file)),
+      )
 
-      if (changed) {
-        void queryClient.invalidateQueries({
-          queryKey: ['documents', project_name],
-        })
-      }
-      if (hasErrorTransition) {
-        void queryClient.invalidateQueries({
-          queryKey: ['failedDocuments', project_name],
-        })
-      }
-  }
+      const additionalFiles = createAdditionalFileEntries(
+        organizeDocsByBaseUrl(matchingDocsInProgress),
+        organizeDocsByBaseUrl(matchingSuccessDocs),
+        currentFiles,
+      )
+
+      const updatedFiles = updateExistingFiles(
+        currentFiles,
+        matchingDocsInProgress,
+      )
+
+      return [...updatedFiles, ...additionalFiles]
+    },
+  })
 
   const scrapeWeb = async (
     url: string | null,

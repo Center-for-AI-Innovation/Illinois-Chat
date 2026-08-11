@@ -99,6 +99,9 @@ export default function MITIngestForm({
               file.name === url ? { ...file, status: 'error' } : file,
             ),
           )
+          void queryClient.invalidateQueries({
+            queryKey: ['failedDocuments', project_name],
+          })
         }
       } catch (error) {
         console.error('Error during MIT course import:', error)
@@ -107,6 +110,9 @@ export default function MITIngestForm({
             file.name === url ? { ...file, status: 'error' } : file,
           ),
         )
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', project_name],
+        })
       }
     } else {
       alert('Invalid URL (please include https://)')

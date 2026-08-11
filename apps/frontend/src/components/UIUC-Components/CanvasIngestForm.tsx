@@ -113,6 +113,10 @@ export default function CanvasIngestForm({
         })
 
         await new Promise((resolve) => setTimeout(resolve, 8000)) // wait a moment before redirecting
+        // Ingestion is queued, so rows usually land after the request returns.
+        queryClient.invalidateQueries({
+          queryKey: ['documents', project_name],
+        })
         console.log('Canvas content ingestion was successful!')
         console.log('Ingesting:', url, 'with options:', selectedOptions)
       } catch (error) {

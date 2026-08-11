@@ -146,6 +146,30 @@ describe('materialsTable API handlers', () => {
     })
   })
 
+  it('docsInProgress drops unusable filter entries instead of failing', async () => {
+    hoisted.select.mockImplementationOnce(() => ({
+      from: () => ({
+        where: vi.fn().mockResolvedValueOnce([]),
+      }),
+    }))
+
+    const res = createMockRes()
+    await docsInProgressHandler(
+      createMockReq({
+        method: 'POST',
+        // '' and '/' can't match anything; 'Doc A' still can, so the request
+        // must succeed rather than 400 and freeze the caller's statuses.
+        body: {
+          course_name: 'CS101',
+          filenames: ['', 'Doc A'],
+          base_urls: ['/'],
+        },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+  })
+
   it('docsInProgress accepts base_urls filters (normalized)', async () => {
     hoisted.select.mockImplementationOnce(() => ({
       from: () => ({
@@ -182,15 +206,12 @@ describe('materialsTable API handlers', () => {
   it.each([
     ['missing course_name', { filenames: ['a.pdf'] }],
     ['missing filters', { course_name: 'CS101' }],
-    ['empty filter arrays', { course_name: 'CS101', filenames: [], base_urls: [] }],
     [
-      'malformed filenames',
-      { course_name: 'CS101', filenames: ['ok', 42] },
+      'empty filter arrays',
+      { course_name: 'CS101', filenames: [], base_urls: [] },
     ],
-    [
-      'malformed base_urls',
-      { course_name: 'CS101', base_urls: [null] },
-    ],
+    ['malformed filenames', { course_name: 'CS101', filenames: ['ok', 42] }],
+    ['malformed base_urls', { course_name: 'CS101', base_urls: [null] }],
     [
       'over the item cap',
       {
@@ -203,7 +224,10 @@ describe('materialsTable API handlers', () => {
     async (_label, body) => {
       for (const handler of [docsInProgressHandler, successDocsHandler]) {
         const res = createMockRes()
-        await handler(createMockReq({ method: 'POST', body }) as any, res as any)
+        await handler(
+          createMockReq({ method: 'POST', body }) as any,
+          res as any,
+        )
         expect(res.status).toHaveBeenCalledWith(400)
       }
     },

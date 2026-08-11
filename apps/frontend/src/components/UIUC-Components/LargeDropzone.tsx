@@ -1,5 +1,5 @@
 // LargeDropzone.tsx
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState } from 'react'
 import { createStyles, Group, rem, Text } from '@mantine/core'
 
 import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react'
@@ -10,12 +10,17 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import SupportedFileUploadTypes from './SupportedFileUploadTypes'
 import { useMediaQuery } from '@mantine/hooks'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
-import { fetchIngestStatus } from '~/utils/ingestStatusClient'
+import { useGatedIngestPoller } from '~/hooks/useGatedIngestPoller'
 import { v4 as uuidv4 } from 'uuid'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
 const POLL_INTERVAL_MS = 5000
+
+/** A document upload this component is still waiting on. */
+const isActiveDocument = (file: FileUpload) =>
+  file.type === 'document' &&
+  (file.status === 'uploading' || file.status === 'ingesting')
 
 const useStyles = createStyles(() => ({
   wrapper: {
@@ -190,120 +195,54 @@ export function LargeDropzone({
     }
   }
 
-  // Poll ingest status only while this component has document uploads in
-  // flight. The tracked filenames are sent as a server-side filter so the
-  // endpoints never return the whole documents table.
-  const isPollingActive = uploadFiles.some(
-    (file) =>
-      file.type === 'document' &&
-      (file.status === 'uploading' || file.status === 'ingesting'),
-  )
-  const uploadFilesRef = useRef(uploadFiles)
-  uploadFilesRef.current = uploadFiles
-  const wasPollingActiveRef = useRef(false)
+  // Poll ingest status only while document uploads are in flight, sending the
+  // tracked filenames as a server-side filter so the endpoints never return
+  // the whole documents table.
+  useGatedIngestPoller({
+    courseName,
+    uploadFiles,
+    setUploadFiles,
+    queryClient,
+    type: 'document',
+    intervalMs: POLL_INTERVAL_MS,
+    buildFilter: (files) => ({
+      filenames: files
+        .filter((file) => isActiveDocument(file))
+        .map((file) => file.name),
+    }),
+    applyStatus: (status, files) => {
+      const inProgressNames = new Set(
+        status.inProgress.map((doc) => doc.readable_filename),
+      )
+      const completedNames = new Set(
+        status.completed.map((doc) => doc.readable_filename),
+      )
 
-  useEffect(() => {
-    if (!isPollingActive) {
-      if (wasPollingActiveRef.current) {
-        // Gate just closed — final refresh as a backstop for any invalidation
-        // missed by per-tick diffs (e.g. errors set outside the poller).
-        wasPollingActiveRef.current = false
-        void queryClient.invalidateQueries({
-          queryKey: ['documents', courseName],
-        })
-        void queryClient.invalidateQueries({
-          queryKey: ['failedDocuments', courseName],
-        })
-      }
-      return
-    }
-    wasPollingActiveRef.current = true
-    let inFlight = false
+      return files.map((file) => {
+        // Only files the tick actually asked about may be re-classified;
+        // anything else is absent from the results for a benign reason.
+        if (!isActiveDocument(file)) return file
 
-    const checkIngestStatus = async () => {
-      if (inFlight) return
-      inFlight = true
-      try {
-        const trackedNames = uploadFilesRef.current
-          .filter(
-            (file) =>
-              file.type === 'document' &&
-              (file.status === 'uploading' || file.status === 'ingesting'),
-          )
-          .map((file) => file.name)
-        if (trackedNames.length === 0) return
-
-        const status = await fetchIngestStatus(courseName, {
-          filenames: trackedNames,
-        })
-        // A failed request must not be read as "file vanished" — skip the tick.
-        if (!status) return
-
-        const inProgressNames = new Set(
-          status.inProgress.map((doc) => doc.readable_filename),
-        )
-        const completedNames = new Set(
-          status.completed.map((doc) => doc.readable_filename),
-        )
-
-        const mapFile = (file: FileUpload): FileUpload => {
-          if (file.type !== 'document') return file
-
-          if (file.status === 'uploading') {
-            if (inProgressNames.has(file.name)) {
-              return { ...file, status: 'ingesting' }
-            }
-            // Ingest can happen very quickly, check if completed also
-            if (completedNames.has(file.name)) {
-              return { ...file, status: 'complete' }
-            }
-          } else if (file.status === 'ingesting') {
-            if (!inProgressNames.has(file.name)) {
-              return {
-                ...file,
-                status: completedNames.has(file.name)
-                  ? ('complete' as const)
-                  : ('error' as const),
-              }
-            }
+        if (file.status === 'uploading') {
+          if (inProgressNames.has(file.name)) {
+            return { ...file, status: 'ingesting' }
           }
-          return file
+          // Ingest can happen very quickly, check if completed also
+          if (completedNames.has(file.name)) {
+            return { ...file, status: 'complete' }
+          }
+        } else if (!inProgressNames.has(file.name)) {
+          return {
+            ...file,
+            status: completedNames.has(file.name)
+              ? ('complete' as const)
+              : ('error' as const),
+          }
         }
-
-        const snapshot = uploadFilesRef.current
-        const mapped = snapshot.map(mapFile)
-        const hasCompleteTransition = mapped.some(
-          (file, i) => file !== snapshot[i] && file.status === 'complete',
-        )
-        const hasErrorTransition = mapped.some(
-          (file, i) => file !== snapshot[i] && file.status === 'error',
-        )
-
-        setUploadFiles((prev) => prev.map(mapFile))
-
-        if (hasCompleteTransition) {
-          void queryClient.invalidateQueries({
-            queryKey: ['documents', courseName],
-          })
-        }
-        if (hasErrorTransition) {
-          void queryClient.invalidateQueries({
-            queryKey: ['failedDocuments', courseName],
-          })
-        }
-      } catch (error) {
-        console.error('Error checking ingest status:', error)
-      } finally {
-        inFlight = false
-      }
-    }
-
-    const intervalId = setInterval(checkIngestStatus, POLL_INTERVAL_MS)
-
-    return () => {
-      clearInterval(intervalId)
-    }
-  }, [isPollingActive, courseName])
+        return file
+      })
+    },
+  })
 
   return (
     <>

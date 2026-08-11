@@ -67,9 +67,9 @@ const GlobalStyle = createGlobalStyle`
 
 const PAGE_SIZE = 100
 
-// The table refreshes on a slow timer (plus window-focus refetch and the
+// The table refreshes on a slow interval (plus window-focus refetch and the
 // event-driven invalidations fired by the upload pollers); the refresh button
-// refetches immediately and restarts this countdown.
+// refetches immediately, which also restarts this countdown.
 const TABLE_REFRESH_INTERVAL_MS = 5 * 60_000
 
 const dataTableTitleStyles = {
@@ -175,9 +175,9 @@ export function ProjectFilesTable({
     isLoading: isLoadingDocuments,
     isError: isErrorDocuments,
     error: documentsError,
-    isFetching: isFetchingDocuments,
     refetch: refetchDocuments,
   } = useQuery({
+    refetchInterval: TABLE_REFRESH_INTERVAL_MS,
     queryKey: [
       'documents',
       course_name,
@@ -209,9 +209,9 @@ export function ProjectFilesTable({
     isLoading: isLoadingFailedDocuments,
     isError: isErrorFailedDocuments,
     error: failedDocumentsError,
-    isFetching: isFetchingFailedDocuments,
     refetch: refetchFailedDocuments,
   } = useQuery({
+    refetchInterval: TABLE_REFRESH_INTERVAL_MS,
     queryKey: [
       'failedDocuments',
       course_name,
@@ -243,21 +243,15 @@ export function ProjectFilesTable({
     refetch: refetchDocumentGroups,
   } = useFetchDocumentGroups(course_name)
 
-  // Slow auto-refresh timer. Bumping refreshResetKey clears and re-arms the
-  // interval so a manual refresh restarts the countdown.
-  const [refreshResetKey, setRefreshResetKey] = useState(0)
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      void refetchDocuments()
-      void refetchFailedDocuments()
-    }, TABLE_REFRESH_INTERVAL_MS)
-    return () => clearInterval(intervalId)
-  }, [refreshResetKey, course_name])
-
+  // react-query re-arms refetchInterval after every successful fetch, so a
+  // manual refresh also restarts the countdown.
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false)
   const handleManualRefresh = () => {
-    void refetchDocuments()
-    void refetchFailedDocuments()
-    setRefreshResetKey((key) => key + 1)
+    setIsManualRefreshing(true)
+    void Promise.allSettled([
+      refetchDocuments(),
+      refetchFailedDocuments(),
+    ]).finally(() => setIsManualRefreshing(false))
   }
 
   useEffect(() => {
@@ -609,7 +603,7 @@ export function ProjectFilesTable({
                 aria-label="Refresh documents table"
                 size="lg"
                 variant="subtle"
-                loading={isFetchingDocuments || isFetchingFailedDocuments}
+                loading={isManualRefreshing}
                 className="text-[--foreground] transition-colors duration-300 hover:bg-[--dashboard-background-faded] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
               >
                 <IconRefresh size={20} />
@@ -1111,8 +1105,8 @@ export function ProjectFilesTable({
               width: isBetweenSmallAndMediumScreen
                 ? 80
                 : isSmallScreen
-                  ? 60
-                  : 130,
+                ? 60
+                : 130,
               sortable: true,
               // TODO: Think about how to allow filtering on date... need different UI to select date range
               // filter: (

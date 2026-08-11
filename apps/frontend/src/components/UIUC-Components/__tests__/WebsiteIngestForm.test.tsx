@@ -308,6 +308,7 @@ describe('WebsiteIngestForm', () => {
     const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
     const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
     renderWithProviders(
       <Harness
         Component={WebsiteIngestForm}
@@ -325,8 +326,14 @@ describe('WebsiteIngestForm', () => {
       { homeContext: { dispatch: vi.fn() }, queryClient },
     )
 
-    // Give the async tick a chance to finish.
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 50))
+    // Wait until the tick has actually round-tripped both endpoints, so the
+    // assertion can't pass merely because nothing had run yet.
+    await waitFor(() => {
+      const statusCalls = fetchSpy.mock.calls.filter(([url]) =>
+        /materialsTable\/(docsInProgress|successDocs)/.test(String(url)),
+      )
+      expect(statusCalls.length).toBeGreaterThanOrEqual(2)
+    })
     expect(invalidateSpy).not.toHaveBeenCalled()
   })
 
@@ -338,13 +345,10 @@ describe('WebsiteIngestForm', () => {
 
     const requestBodies: any[] = []
     server.use(
-      http.post(
-        '*/api/materialsTable/docsInProgress*',
-        async ({ request }) => {
-          requestBodies.push(await request.json())
-          return HttpResponse.json({ documents: [] })
-        },
-      ),
+      http.post('*/api/materialsTable/docsInProgress*', async ({ request }) => {
+        requestBodies.push(await request.json())
+        return HttpResponse.json({ documents: [] })
+      }),
       http.post('*/api/materialsTable/successDocs*', async ({ request }) => {
         requestBodies.push(await request.json())
         return HttpResponse.json({

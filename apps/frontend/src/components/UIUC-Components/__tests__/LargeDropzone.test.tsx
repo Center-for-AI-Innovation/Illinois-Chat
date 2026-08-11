@@ -151,7 +151,10 @@ function defaultProps(overrides: Record<string, any> = {}) {
 }
 
 /** An active document upload that arms the gated poller. */
-function activeDocument(name: string, status: FileUpload['status'] = 'uploading') {
+function activeDocument(
+  name: string,
+  status: FileUpload['status'] = 'uploading',
+) {
   return { name, status, type: 'document' as const }
 }
 
@@ -436,7 +439,7 @@ describe('LargeDropzone', () => {
   // Non-new-course redirects
   // -----------------------------------------------------------------------
 
-  it('redirects to chat when redirect_to_gpt_4 is true and not a new course', async () => {
+  it('does not navigate away after uploading to an existing course', async () => {
     const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
 
@@ -716,7 +719,9 @@ describe('LargeDropzone', () => {
     render(
       <LargeDropzone
         {...defaultProps({
-          uploadFiles: [activeDocument('other.pdf')],
+          // A document completing makes the tick apply an update, so the
+          // webscrape entry below is exercised rather than skipped.
+          uploadFiles: [activeDocument('other.pdf', 'ingesting')],
           setUploadFiles,
         })}
       />,
@@ -736,6 +741,7 @@ describe('LargeDropzone', () => {
         type: 'webscrape',
       }
       const result = updater[0]([webscrapeFile])
+      expect(result[0]).toBe(webscrapeFile)
       expect(result[0].status).toBe('uploading')
       expect(result[0].type).toBe('webscrape')
     }
@@ -767,19 +773,12 @@ describe('LargeDropzone', () => {
     )
 
     const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
     if (intervalCallback) await intervalCallback()
 
-    const updater = setUploadFiles.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'function',
-    )
-    expect(updater).toBeDefined()
-    if (updater) {
-      const result = updater[0]([
-        { name: 'still-going.pdf', status: 'ingesting', type: 'document' },
-      ])
-      // Should remain 'ingesting' since it's still in docsInProgress
-      expect(result[0].status).toBe('ingesting')
-    }
+    // Still in docsInProgress means nothing changed, so the tick must not
+    // touch state at all (which is what keeps the file 'ingesting').
+    expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
   it('leaves uploading file unchanged when not in docsInProgress or successDocs yet', async () => {
@@ -806,19 +805,12 @@ describe('LargeDropzone', () => {
     )
 
     const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
     if (intervalCallback) await intervalCallback()
 
-    const updater = setUploadFiles.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'function',
-    )
-    expect(updater).toBeDefined()
-    if (updater) {
-      const result = updater[0]([
-        { name: 'pending.pdf', status: 'uploading', type: 'document' },
-      ])
-      // Should stay 'uploading' because it's not visible in either API yet
-      expect(result[0].status).toBe('uploading')
-    }
+    // Not visible in either API yet, so the file stays 'uploading' and the
+    // tick makes no state update.
+    expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
   // -----------------------------------------------------------------------
@@ -853,18 +845,19 @@ describe('LargeDropzone', () => {
 
     const getIntervalCb = mockTimers()
     const calls: { url: string; body: any }[] = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      (async (input: any, init?: any) => {
-        const url = String(input?.url ?? input)
-        if (url.includes('/api/materialsTable/')) {
-          calls.push({ url, body: JSON.parse(init?.body ?? '{}') })
-        }
-        return new Response(JSON.stringify({ documents: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      }) as any,
-    )
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (
+      input: any,
+      init?: any,
+    ) => {
+      const url = String(input?.url ?? input)
+      if (url.includes('/api/materialsTable/')) {
+        calls.push({ url, body: JSON.parse(init?.body ?? '{}') })
+      }
+      return new Response(JSON.stringify({ documents: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as any)
 
     render(
       <LargeDropzone
@@ -895,21 +888,19 @@ describe('LargeDropzone', () => {
     const setUploadFiles = vi.fn()
     const getIntervalCb = mockTimers()
 
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      (async (input: any) => {
-        const url = String(input?.url ?? input)
-        if (url.includes('/api/materialsTable/successDocs')) {
-          return new Response(JSON.stringify({ error: 'boom' }), {
-            status: 500,
-            headers: { 'content-type': 'application/json' },
-          })
-        }
-        return new Response(JSON.stringify({ documents: [] }), {
-          status: 200,
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (input: any) => {
+      const url = String(input?.url ?? input)
+      if (url.includes('/api/materialsTable/successDocs')) {
+        return new Response(JSON.stringify({ error: 'boom' }), {
+          status: 500,
           headers: { 'content-type': 'application/json' },
         })
-      }) as any,
-    )
+      }
+      return new Response(JSON.stringify({ documents: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as any)
 
     render(
       <LargeDropzone
@@ -921,6 +912,7 @@ describe('LargeDropzone', () => {
     )
 
     const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
     if (intervalCallback) await intervalCallback()
 
     // The file must NOT be flipped to 'error' just because a request failed.
@@ -990,24 +982,25 @@ describe('LargeDropzone', () => {
     uploads = manyFiles
 
     const bodies: any[] = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      (async (input: any, init?: any) => {
-        const url = String(input?.url ?? input)
-        const body = JSON.parse(init?.body ?? '{}')
-        bodies.push({ url, count: body.filenames?.length ?? 0 })
-        // Every tracked file is completed.
-        return new Response(
-          JSON.stringify({
-            documents: url.includes('successDocs')
-              ? body.filenames.map((name: string) => ({
-                  readable_filename: name,
-                }))
-              : [],
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        )
-      }) as any,
-    )
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (
+      input: any,
+      init?: any,
+    ) => {
+      const url = String(input?.url ?? input)
+      const body = JSON.parse(init?.body ?? '{}')
+      bodies.push({ url, count: body.filenames?.length ?? 0 })
+      // Every tracked file is completed.
+      return new Response(
+        JSON.stringify({
+          documents: url.includes('successDocs')
+            ? body.filenames.map((name: string) => ({
+                readable_filename: name,
+              }))
+            : [],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    }) as any)
 
     render(
       <LargeDropzone
@@ -1036,21 +1029,19 @@ describe('LargeDropzone', () => {
     )
 
     let requestCount = 0
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      (async () => {
-        requestCount++
-        if (requestCount > 2) {
-          return new Response(JSON.stringify({ error: 'boom' }), {
-            status: 500,
-            headers: { 'content-type': 'application/json' },
-          })
-        }
-        return new Response(JSON.stringify({ documents: [] }), {
-          status: 200,
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async () => {
+      requestCount++
+      if (requestCount > 2) {
+        return new Response(JSON.stringify({ error: 'boom' }), {
+          status: 500,
           headers: { 'content-type': 'application/json' },
         })
-      }) as any,
-    )
+      }
+      return new Response(JSON.stringify({ documents: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as any)
 
     render(
       <LargeDropzone
@@ -1059,9 +1050,69 @@ describe('LargeDropzone', () => {
     )
 
     const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
     if (intervalCallback) await intervalCallback()
 
     // No partial merge: statuses untouched when any chunk request failed.
+    expect(requestCount).toBeGreaterThan(2)
+    expect(setUploadFiles).not.toHaveBeenCalled()
+  })
+
+  it('discards a tick that was still in flight when the gate closed', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const setUploadFiles = vi.fn()
+    const getIntervalCb = mockTimers()
+
+    // Hold the status requests open so the tick for 'first.pdf' is still
+    // pending while the queue drains and a different upload starts.
+    let releaseRequests: (() => void) | undefined
+    const pending = new Promise<void>((resolve) => {
+      releaseRequests = resolve
+    })
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async () => {
+      await pending
+      return new Response(JSON.stringify({ documents: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as any)
+
+    const props = defaultProps({
+      uploadFiles: [activeDocument('first.pdf', 'ingesting')],
+      setUploadFiles,
+    })
+    const { rerender } = render(<LargeDropzone {...props} />)
+
+    const staleTickCallback = getIntervalCb()
+    expect(staleTickCallback).toBeDefined()
+    const staleTick = staleTickCallback
+      ? staleTickCallback()
+      : Promise.resolve()
+
+    // Queue drains (gate closes), then a NEW upload starts (gate reopens).
+    rerender(
+      <LargeDropzone
+        {...props}
+        uploadFiles={[{ name: 'first.pdf', status: 'error', type: 'document' }]}
+      />,
+    )
+    rerender(
+      <LargeDropzone
+        {...props}
+        uploadFiles={[
+          { name: 'first.pdf', status: 'error', type: 'document' },
+          activeDocument('second.pdf', 'ingesting'),
+        ]}
+      />,
+    )
+
+    releaseRequests?.()
+    await staleTick
+
+    // The stale response only ever described 'first.pdf'. Applying it would
+    // mark the healthy 'second.pdf' ingest as failed, since it is necessarily
+    // absent from those results.
     expect(setUploadFiles).not.toHaveBeenCalled()
   })
 

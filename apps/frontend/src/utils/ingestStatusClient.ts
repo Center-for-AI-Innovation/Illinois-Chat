@@ -16,6 +16,11 @@ export type IngestStatus = {
   completed: IngestStatusDoc[]
 }
 
+export type IngestStatusFilter = {
+  filenames?: string[]
+  base_urls?: string[]
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = []
   for (let i = 0; i < items.length; i += size) {
@@ -24,18 +29,25 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks
 }
 
+/** Returns null on any failure — never throws, so concurrent calls can't
+ * leave an unobserved rejection behind. */
 async function postStatus(
   endpoint: 'docsInProgress' | 'successDocs',
   body: Record<string, unknown>,
 ): Promise<IngestStatusDoc[] | null> {
-  const response = await fetch(`/api/materialsTable/${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) return null
-  const data = await response.json()
-  return data?.documents ?? []
+  try {
+    const response = await fetch(`/api/materialsTable/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) return null
+    const data = await response.json()
+    return data?.documents ?? []
+  } catch (error) {
+    console.error(`Failed to fetch ${endpoint}:`, error)
+    return null
+  }
 }
 
 /**
@@ -45,7 +57,7 @@ async function postStatus(
  */
 export async function fetchIngestStatus(
   course_name: string,
-  filter: { filenames?: string[]; base_urls?: string[] },
+  filter: IngestStatusFilter,
 ): Promise<IngestStatus | null> {
   const filenames = (filter.filenames ?? []).filter((name) => name.length > 0)
   const base_urls = (filter.base_urls ?? []).filter((url) => url.length > 0)

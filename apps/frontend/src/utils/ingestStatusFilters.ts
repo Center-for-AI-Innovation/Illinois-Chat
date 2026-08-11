@@ -8,14 +8,11 @@ export const MAX_FILTER_ITEMS = 1000
 const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, '')
 
 function toStringArray(value: unknown): string[] | null {
-  if (value === undefined || value === null) return []
+  if (value == null) return []
   if (!Array.isArray(value)) return null
-  const items: string[] = []
-  for (const item of value) {
-    if (typeof item !== 'string' || item.length === 0) return null
-    items.push(item)
-  }
-  return items
+  return value.every((item) => typeof item === 'string')
+    ? (value as string[])
+    : null
 }
 
 export type IngestStatusFilters = {
@@ -39,25 +36,31 @@ export function parseIngestStatusFilters(
 
   const parsedFilenames = toStringArray(filenames)
   if (parsedFilenames === null) {
-    return { error: 'filenames must be an array of non-empty strings' }
+    return { error: 'filenames must be an array of strings' }
   }
 
   const parsedBaseUrls = toStringArray(base_urls)
   if (parsedBaseUrls === null) {
-    return { error: 'base_urls must be an array of non-empty strings' }
+    return { error: 'base_urls must be an array of strings' }
   }
 
+  // Entries that are empty (or empty once normalized) can't match anything, so
+  // drop them rather than failing the whole request — a 400 would freeze the
+  // caller's upload statuses.
+  const nonEmptyFilenames = parsedFilenames.filter((name) => name.length > 0)
   const normalizedBaseUrls = parsedBaseUrls
     .map(stripTrailingSlashes)
     .filter((url) => url.length > 0)
 
-  if (parsedFilenames.length === 0 && normalizedBaseUrls.length === 0) {
+  if (nonEmptyFilenames.length === 0 && normalizedBaseUrls.length === 0) {
     return {
       error: 'At least one filter (filenames or base_urls) is required',
     }
   }
 
-  if (parsedFilenames.length + normalizedBaseUrls.length > MAX_FILTER_ITEMS) {
+  // Combined cap. The client chunks each kind separately and never mixes both
+  // in one body, so a well-behaved caller can't trip this.
+  if (nonEmptyFilenames.length + normalizedBaseUrls.length > MAX_FILTER_ITEMS) {
     return {
       error: `Too many filter items (max ${MAX_FILTER_ITEMS} combined)`,
     }
@@ -65,7 +68,7 @@ export function parseIngestStatusFilters(
 
   return {
     course_name,
-    filenames: parsedFilenames,
+    filenames: nonEmptyFilenames,
     base_urls: normalizedBaseUrls,
   }
 }
