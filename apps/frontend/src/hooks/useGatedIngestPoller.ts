@@ -9,6 +9,15 @@ import {
 } from '~/utils/ingestStatusClient'
 
 /**
+ * An upload of `type` this component is still waiting on. The gate, the
+ * server-side filter and the status mapping must all agree on this, or a file
+ * the tick never asked about could be reclassified from its results.
+ */
+export const isActiveUpload = (file: FileUpload, type: FileUpload['type']) =>
+  file.type === type &&
+  (file.status === 'uploading' || file.status === 'ingesting')
+
+/**
  * Polls the ingest-status endpoints ONLY while uploads of `type` are in
  * flight, and refreshes the documents table when a tick actually changes
  * something. Idle dashboards issue no requests at all.
@@ -38,11 +47,7 @@ export function useGatedIngestPoller({
   buildFilter: (files: FileUpload[]) => IngestStatusFilter
   applyStatus: (status: IngestStatus, files: FileUpload[]) => FileUpload[]
 }) {
-  const isActive = uploadFiles.some(
-    (file) =>
-      file.type === type &&
-      (file.status === 'uploading' || file.status === 'ingesting'),
-  )
+  const isActive = uploadFiles.some((file) => isActiveUpload(file, type))
 
   // Latest-value refs: the effect re-runs only when the gate flips, so
   // everything it reads per tick must come through a ref rather than the
@@ -57,6 +62,7 @@ export function useGatedIngestPoller({
   })
 
   const wasActiveRef = useRef(false)
+  const invalidatedDocumentsRef = useRef(false)
 
   useEffect(() => {
     const invalidate = (key: 'documents' | 'failedDocuments') =>
@@ -67,12 +73,15 @@ export function useGatedIngestPoller({
         // Gate just closed — final refresh, a backstop for anything the
         // per-tick diffs missed (e.g. errors set outside the poller).
         wasActiveRef.current = false
-        invalidate('documents')
+        // Skip if a tick already refreshed the table for this batch, so
+        // finishing an upload doesn't cancel and re-issue that refetch.
+        if (!invalidatedDocumentsRef.current) invalidate('documents')
         invalidate('failedDocuments')
       }
       return
     }
     wasActiveRef.current = true
+    invalidatedDocumentsRef.current = false
 
     let inFlight = false
     // Results of a tick that was still in flight when the gate closed (or the
@@ -104,7 +113,12 @@ export function useGatedIngestPoller({
 
         setUploadFiles((prev) => applyStatusRef.current(status, prev))
 
-        if (added || changed.some((file) => file.status === 'complete')) {
+        // Only completions can change the documents table. Appended entries
+        // are already in `changed` (they compare against `undefined`), so a
+        // tick that merely discovers more in-progress URLs — every tick of a
+        // live crawl — must not trigger the expensive table refetch.
+        if (changed.some((file) => file.status === 'complete')) {
+          invalidatedDocumentsRef.current = true
           invalidate('documents')
         }
         if (changed.some((file) => file.status === 'error')) {

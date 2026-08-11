@@ -281,6 +281,67 @@ describe('WebsiteIngestForm', () => {
     expect(setIntervalSpy).not.toHaveBeenCalled()
   })
 
+  it('does not refetch the documents table when a tick only discovers more in-progress URLs', async () => {
+    vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: any) => {
+      fn()
+      return 0
+    }) as any)
+
+    server.use(
+      // A live crawl keeps adding in-progress rows. Those are not in the
+      // documents table, so refetching it every tick is pure waste — the
+      // exact load pattern issue #90 is about.
+      http.post('*/api/materialsTable/docsInProgress*', async () => {
+        return HttpResponse.json({
+          documents: [
+            {
+              base_url: 'https://example.com',
+              url: 'https://example.com/page1',
+              readable_filename: 'page1',
+            },
+          ],
+        })
+      }),
+      http.post('*/api/materialsTable/successDocs*', async () => {
+        return HttpResponse.json({ documents: [] })
+      }),
+    )
+
+    const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    renderWithProviders(
+      <Harness
+        Component={WebsiteIngestForm}
+        queryClient={queryClient}
+        initialFiles={[
+          {
+            name: 'https://example.com',
+            status: 'ingesting',
+            type: 'webscrape',
+            url: 'https://example.com',
+            isBaseUrl: true,
+          },
+        ]}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    // The new child entry must show up in the toast...
+    await waitFor(() => {
+      expect(screen.getByTestId('files').textContent ?? '').toContain(
+        'https://example.com/page1',
+      )
+    })
+
+    // ...without triggering the expensive documents refetch.
+    expect(
+      invalidateSpy.mock.calls.filter(([arg]: any[]) =>
+        String(arg?.queryKey?.[0]).startsWith('documents'),
+      ),
+    ).toHaveLength(0)
+  })
+
   it('does not invalidate queries on a no-change tick', async () => {
     vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: any) => {
       fn()

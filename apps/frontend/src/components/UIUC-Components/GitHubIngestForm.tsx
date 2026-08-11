@@ -270,16 +270,15 @@ export default function GitHubIngestForm({
               (doc) => doc.base_url === baseUrl,
             )
 
-            const isStillIngesting = matchingDoc !== undefined
-
             urls.forEach((url) => {
               if (
                 !currentFiles.some((file) => file.url === url) &&
                 matchingDoc
               ) {
+                // Only reached when the base URL is still in progress.
                 newFiles.push({
                   name: url,
-                  status: isStillIngesting ? 'ingesting' : 'complete',
+                  status: 'ingesting',
                   type: 'github',
                   url: url,
                 })

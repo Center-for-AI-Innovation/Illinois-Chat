@@ -76,6 +76,9 @@ export async function fetchIngestStatus(
 
   const inProgress: IngestStatusDoc[] = []
   const completed: IngestStatusDoc[] = []
+  // Chunks run sequentially on purpose: this endpoint hits a per-project
+  // Postgres whose connection pool is what issue #90 was exhausting, so a
+  // huge upload should take longer rather than fan out.
   for (const body of bodies) {
     const [progressDocs, completedDocs] = await Promise.all([
       postStatus('docsInProgress', body),

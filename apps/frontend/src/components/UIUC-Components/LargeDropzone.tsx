@@ -10,17 +10,17 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import SupportedFileUploadTypes from './SupportedFileUploadTypes'
 import { useMediaQuery } from '@mantine/hooks'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
-import { useGatedIngestPoller } from '~/hooks/useGatedIngestPoller'
+import {
+  isActiveUpload,
+  useGatedIngestPoller,
+} from '~/hooks/useGatedIngestPoller'
 import { v4 as uuidv4 } from 'uuid'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
 const POLL_INTERVAL_MS = 5000
 
-/** A document upload this component is still waiting on. */
-const isActiveDocument = (file: FileUpload) =>
-  file.type === 'document' &&
-  (file.status === 'uploading' || file.status === 'ingesting')
+const isActiveDocument = (file: FileUpload) => isActiveUpload(file, 'document')
 
 const useStyles = createStyles(() => ({
   wrapper: {

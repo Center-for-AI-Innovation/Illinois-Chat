@@ -251,6 +251,7 @@ export function ProjectFilesTable({
     void Promise.allSettled([
       refetchDocuments(),
       refetchFailedDocuments(),
+      refetchDocumentGroups(),
     ]).finally(() => setIsManualRefreshing(false))
   }
 

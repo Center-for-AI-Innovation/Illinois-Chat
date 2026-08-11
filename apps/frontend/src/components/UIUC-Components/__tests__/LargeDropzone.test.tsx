@@ -919,7 +919,7 @@ describe('LargeDropzone', () => {
     expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
-  it('invalidates documents on complete-transition and both keys on gate close', async () => {
+  it('invalidates documents once per batch, not again on gate close', async () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
 
     const invalidateQueries = vi.fn()
@@ -955,6 +955,39 @@ describe('LargeDropzone', () => {
         {...props}
         uploadFiles={[
           { name: 'done.pdf', status: 'complete', type: 'document' },
+        ]}
+      />,
+    )
+
+    // The tick above already refreshed the table, so re-issuing it here would
+    // only cancel that request and start another.
+    expect(invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: ['documents', 'CS101'],
+    })
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['failedDocuments', 'CS101'],
+    })
+  })
+
+  it('still refreshes the table on gate close when no tick did', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const invalidateQueries = vi.fn()
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    const props = defaultProps({
+      uploadFiles: [activeDocument('doomed.pdf')],
+      queryClient: { invalidateQueries } as any,
+    })
+    const { rerender } = render(<LargeDropzone {...props} />)
+
+    // Upload fails outside the poller, so no tick ever saw a transition.
+    rerender(
+      <LargeDropzone
+        {...props}
+        uploadFiles={[
+          { name: 'doomed.pdf', status: 'error', type: 'document' },
         ]}
       />,
     )
