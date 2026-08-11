@@ -85,6 +85,7 @@ function buildSpecs(userEmail: string): SeedSpec[] {
     system_prompt: undefined,
     openai_api_key: undefined,
     disabled_models: undefined,
+    disableCitations: undefined,
     project_description: undefined,
     documentsOnly: undefined,
     guidedLearning: undefined,
