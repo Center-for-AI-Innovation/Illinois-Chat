@@ -88,70 +88,68 @@ describe('GitHubIngestForm', () => {
     // Second poll: completed docs (marks additional entries complete)
     let pollStep = 0
     const requestBodies: any[] = []
-    vi.spyOn(globalThis, 'fetch').mockImplementation(
-      (async (input: any, init?: any) => {
-        const url = String(input?.url ?? input)
-        if (url.includes('/api/materialsTable/')) {
-          requestBodies.push(JSON.parse(init?.body ?? '{}'))
-        }
-        if (url.includes('/api/materialsTable/docsInProgress')) {
-          pollStep += 1
-          if (pollStep === 1) {
-            return new Response(
-              JSON.stringify({
-                documents: [
-                  {
-                    base_url: 'https://github.com/user/repo',
-                    url: 'https://github.com/user/repo/blob/main/README.md',
-                    readable_filename: 'README.md',
-                  },
-                  {
-                    base_url: 'https://github.com/user/repo',
-                    url: 'https://github.com/user/repo/blob/main/docs.md',
-                    readable_filename: 'docs.md',
-                  },
-                ],
-              }),
-              { status: 200, headers: { 'content-type': 'application/json' } },
-            )
-          }
-          return new Response(JSON.stringify({ documents: [] }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          })
-        }
-        if (url.includes('/api/materialsTable/successDocs')) {
-          if (pollStep <= 1) {
-            return new Response(JSON.stringify({ documents: [] }), {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            })
-          }
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (
+      input: any,
+      init?: any,
+    ) => {
+      const url = String(input?.url ?? input)
+      if (url.includes('/api/materialsTable/')) {
+        requestBodies.push(JSON.parse(init?.body ?? '{}'))
+      }
+      if (url.includes('/api/materialsTable/docsInProgress')) {
+        pollStep += 1
+        if (pollStep === 1) {
           return new Response(
             JSON.stringify({
               documents: [
-                { url: 'https://github.com/user/repo/blob/main/README.md' },
-                { url: 'https://github.com/user/repo/blob/main/docs.md' },
+                {
+                  base_url: 'https://github.com/user/repo',
+                  url: 'https://github.com/user/repo/blob/main/README.md',
+                  readable_filename: 'README.md',
+                },
+                {
+                  base_url: 'https://github.com/user/repo',
+                  url: 'https://github.com/user/repo/blob/main/docs.md',
+                  readable_filename: 'docs.md',
+                },
               ],
             }),
             { status: 200, headers: { 'content-type': 'application/json' } },
           )
         }
-        return new Response(JSON.stringify({}), {
+        return new Response(JSON.stringify({ documents: [] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
-      }) as any,
-    )
+      }
+      if (url.includes('/api/materialsTable/successDocs')) {
+        if (pollStep <= 1) {
+          return new Response(JSON.stringify({ documents: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        return new Response(
+          JSON.stringify({
+            documents: [
+              { url: 'https://github.com/user/repo/blob/main/README.md' },
+              { url: 'https://github.com/user/repo/blob/main/docs.md' },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      }
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as any)
 
     const GitHubIngestForm = (await import('../GitHubIngestForm')).default
     render(<Harness Component={GitHubIngestForm} queryClient={queryClient} />)
 
     // Gated poller: no interval while nothing is being ingested.
-    expect(setIntervalSpy).not.toHaveBeenCalledWith(
-      expect.any(Function),
-      3000,
-    )
+    expect(setIntervalSpy).not.toHaveBeenCalled()
 
     await user.click(screen.getByText(/^GitHub$/i))
     expect(

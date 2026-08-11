@@ -1,6 +1,6 @@
 // LargeDropzone.tsx
 import React, { useRef, useState } from 'react'
-import { createStyles, Group, rem, Text } from '@mantine/core'
+import { Group, rem, Text } from '@mantine/core'
 
 import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react'
 import { type QueryClient } from '@tanstack/react-query'
@@ -21,13 +21,6 @@ import { type AuthContextProps } from 'react-oidc-context'
 const POLL_INTERVAL_MS = 5000
 
 const isActiveDocument = (file: FileUpload) => isActiveUpload(file, 'document')
-
-const useStyles = createStyles(() => ({
-  wrapper: {
-    position: 'relative',
-    // marginBottom: rem(10),
-  },
-}))
 
 export function LargeDropzone({
   courseName,
@@ -54,7 +47,6 @@ export function LargeDropzone({
   const [uploadInProgress, setUploadInProgress] = useState(false)
   const router = useRouter()
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
-  const { classes } = useStyles()
   const openRef = useRef<() => void>(null)
 
   const uploadToS3 = async (file: File | null, uniqueFileName: string) => {
@@ -254,7 +246,7 @@ export function LargeDropzone({
       >
         {/* TODO: fix large dropzone display across all screens */}
         <div
-          className={classes.wrapper}
+          className="relative"
           style={{
             flex: 1,
             display: 'flex',

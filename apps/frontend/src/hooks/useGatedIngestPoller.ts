@@ -24,9 +24,8 @@ export const isActiveUpload = (file: FileUpload, type: FileUpload['type']) =>
  *
  * `buildFilter` names the rows this component cares about so the endpoints
  * can filter server-side instead of returning the whole documents table;
- * `applyStatus` must be a pure `files -> files` mapping (it runs twice per
- * tick: once on a snapshot to decide invalidation, once inside the state
- * updater so entries appended mid-tick survive).
+ * `applyStatus` must be a pure `files -> files` mapping, since it may be
+ * re-run inside the state updater when entries were appended mid-tick.
  */
 export function useGatedIngestPoller({
   courseName,
@@ -110,7 +109,12 @@ export function useGatedIngestPoller({
         // would defeat the point of this hook.
         if (changed.length === 0) return
 
-        setUploadFiles((prev) => applyStatusRef.current(status, prev))
+        // `next` already covers the common case; recompute only when entries
+        // were appended while the request was in flight, since applyStatus can
+        // be O(n·m) over a large crawl.
+        setUploadFiles((prev) =>
+          prev === snapshot ? next : applyStatusRef.current(status, prev),
+        )
 
         // Only completions can change the documents table, so a tick that
         // merely discovers more in-progress URLs — every tick of a live crawl
