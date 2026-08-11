@@ -9,6 +9,7 @@ const hoisted = vi.hoisted(() => {
     select,
     posthogCapture: vi.fn(),
     getDocumentsDb: vi.fn(async () => ({ select })),
+    inArray: vi.fn(() => ({})),
   }
 })
 
@@ -68,7 +69,7 @@ vi.mock('drizzle-orm', () => {
     eq: () => ({}),
     and: () => ({}),
     or: () => ({}),
-    inArray: () => ({}),
+    inArray: hoisted.inArray,
     gte: () => ({}),
     asc: () => ({}),
     desc: () => ({}),
@@ -86,6 +87,39 @@ describe('materialsTable API handlers', () => {
   beforeEach(() => {
     hoisted.select.mockReset()
     hoisted.posthogCapture.mockReset()
+    hoisted.inArray.mockClear()
+  })
+
+  // The whole point of issue #90: these routes must never read the table
+  // without narrowing it to what the caller is tracking.
+  it.each([
+    ['docsInProgress', () => docsInProgressHandler],
+    ['successDocs', () => successDocsHandler],
+  ])('%s narrows the query to the requested filters', async (_name, get) => {
+    hoisted.select.mockImplementationOnce(() => ({
+      from: () => ({ where: vi.fn().mockResolvedValueOnce([]) }),
+    }))
+
+    const res = createMockRes()
+    await get()(
+      createMockReq({
+        method: 'POST',
+        body: {
+          course_name: 'CS101',
+          filenames: ['a.pdf', 'b.pdf'],
+          base_urls: ['https://a.com/'],
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const filterValues = hoisted.inArray.mock.calls.map(
+      (call: any[]) => call[1],
+    )
+    expect(filterValues).toContainEqual(['a.pdf', 'b.pdf'])
+    // Normalized, so it matches rows stored without the trailing slash.
+    expect(filterValues).toContainEqual(['https://a.com'])
   })
 
   it('docsInProgress returns 405 for non-POST', async () => {

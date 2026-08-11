@@ -255,27 +255,20 @@ export default function GitHubIngestForm({
         })
       }
 
-      // Helper function to create new file entries for additional URLs
+      // Helper function to create new file entries for additional URLs.
+      // Every key of baseUrlMap comes from an in-progress doc, so anything it
+      // yields is by definition still ingesting.
       const createAdditionalFileEntries = (
         baseUrlMap: Map<string, Set<string>>,
         currentFiles: FileUpload[],
-        docsInProgress: Array<{ base_url: string; readable_filename: string }>,
       ) => {
         const newFiles: FileUpload[] = []
 
         baseUrlMap.forEach((urls, baseUrl) => {
           // Only process if we have this base URL in our current files
           if (currentFiles.some((file) => file.name === baseUrl)) {
-            const matchingDoc = docsInProgress.find(
-              (doc) => doc.base_url === baseUrl,
-            )
-
             urls.forEach((url) => {
-              if (
-                !currentFiles.some((file) => file.url === url) &&
-                matchingDoc
-              ) {
-                // Only reached when the base URL is still in progress.
+              if (!currentFiles.some((file) => file.url === url)) {
                 newFiles.push({
                   name: url,
                   status: 'ingesting',
@@ -297,7 +290,6 @@ export default function GitHubIngestForm({
       const additionalFiles = createAdditionalFileEntries(
         organizeDocsByBaseUrl(matchingDocsInProgress),
         currentFiles,
-        matchingDocsInProgress,
       )
 
       const updatedFiles = updateExistingFiles(

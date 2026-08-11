@@ -824,6 +824,7 @@ describe('LargeDropzone', () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(buildFetchMock({}))
+    const invalidateQueries = vi.fn()
 
     render(
       <LargeDropzone
@@ -832,12 +833,15 @@ describe('LargeDropzone', () => {
             { name: 'done.pdf', status: 'complete', type: 'document' },
             { name: 'https://a.com', status: 'uploading', type: 'webscrape' },
           ],
+          queryClient: { invalidateQueries } as any,
         })}
       />,
     )
 
     expect(getIntervalCb()).toBeUndefined()
     expect(fetchSpy).not.toHaveBeenCalled()
+    // An idle dashboard must also not refetch the documents table on mount.
+    expect(invalidateQueries).not.toHaveBeenCalled()
   })
 
   it('POSTs the tracked filenames to both status endpoints', async () => {

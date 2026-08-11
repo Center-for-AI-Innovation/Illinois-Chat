@@ -25,7 +25,10 @@ async function successDocs(
   if ('error' in parsed) {
     return res.status(400).json({ error: parsed.error })
   }
-  const { course_name, filenames, base_urls } = parsed
+  const { filenames, base_urls } = parsed
+  // Query the course the middleware actually authorized, which is not
+  // necessarily the one in the body (it also accepts query params/headers).
+  const course_name = req.courseName ?? parsed.course_name
 
   try {
     const db = await connectionManager.getDocumentsDb(course_name)
