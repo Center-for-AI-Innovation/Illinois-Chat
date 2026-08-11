@@ -164,7 +164,6 @@ export function LargeDropzone({
           })
           const res = await response.json()
           console.debug('Ingest submitted...', res)
-          return { ok: true, s3_path: file.name }
         } catch (error) {
           console.error('Error during file upload or ingest:', error)
           // Update file status to error so it doesn't block navigation
@@ -173,7 +172,6 @@ export function LargeDropzone({
               f.name === uniqueReadableFileName ? { ...f, status: 'error' } : f,
             ),
           )
-          return { ok: false, s3_path: file.name }
         }
       }),
     )
