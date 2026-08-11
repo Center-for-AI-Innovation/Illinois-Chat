@@ -88,6 +88,32 @@ describe('materialsTable API handlers', () => {
     hoisted.select.mockReset()
     hoisted.posthogCapture.mockReset()
     hoisted.inArray.mockClear()
+    hoisted.getDocumentsDb.mockClear()
+  })
+
+  // The auth wrapper resolves the course from query params, body or headers,
+  // so the body's course_name is not necessarily the one it authorized.
+  it.each([
+    ['docsInProgress', () => docsInProgressHandler],
+    ['successDocs', () => successDocsHandler],
+  ])('%s reads the authorized course, not the body', async (_name, get) => {
+    hoisted.select.mockImplementationOnce(() => ({
+      from: () => ({ where: vi.fn().mockResolvedValueOnce([]) }),
+    }))
+
+    const res = createMockRes()
+    await get()(
+      createMockReq({
+        method: 'POST',
+        courseName: 'authorized-project',
+        body: { course_name: 'other-project', filenames: ['a.pdf'] },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(hoisted.getDocumentsDb).toHaveBeenCalledWith('authorized-project')
+    expect(hoisted.getDocumentsDb).not.toHaveBeenCalledWith('other-project')
   })
 
   // The whole point of issue #90: these routes must never read the table

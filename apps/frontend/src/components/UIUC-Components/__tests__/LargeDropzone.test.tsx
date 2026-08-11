@@ -215,8 +215,7 @@ describe('LargeDropzone', () => {
     const { callSetCourseMetadata } = await import('~/utils/apiUtils')
 
     const push = vi.fn(async () => {})
-    const reload = vi.fn()
-    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard', push, reload }
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard', push }
 
     let uploads: FileUpload[] = []
     const setUploadFiles = vi.fn((updater: any) => {
@@ -444,8 +443,7 @@ describe('LargeDropzone', () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
 
     const push = vi.fn(async () => {})
-    const reload = vi.fn(async () => {})
-    globalThis.__TEST_ROUTER__ = { push, reload }
+    globalThis.__TEST_ROUTER__ = { push }
 
     mockTimers()
     vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
@@ -1368,8 +1366,7 @@ describe('LargeDropzone', () => {
     const { callSetCourseMetadata } = await import('~/utils/apiUtils')
 
     const push = vi.fn(async () => {})
-    const reload = vi.fn()
-    globalThis.__TEST_ROUTER__ = { push, reload }
+    globalThis.__TEST_ROUTER__ = { push }
 
     mockTimers()
     vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
