@@ -1131,6 +1131,84 @@ describe('LargeDropzone', () => {
     expect(setUploadFiles).not.toHaveBeenCalled()
   })
 
+  it('does not read successDocs until docsInProgress has answered', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const getIntervalCb = mockTimers()
+    // Ingest writes the document row and only then deletes the in-progress
+    // row. If both reads are in flight at once, successDocs can observe the
+    // database before the row is written while docsInProgress observes it
+    // after the delete — the doc is then missing from both and a healthy
+    // ingest gets reported as failed.
+    let inProgressAnswered = false
+    let readConcurrently = false
+    let releaseInProgress: (() => void) | undefined
+    const inProgressGate = new Promise<void>((resolve) => {
+      releaseInProgress = resolve
+    })
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((async (input: any) => {
+      const url = String(input?.url ?? input)
+      if (url.includes('/api/materialsTable/docsInProgress')) {
+        await inProgressGate
+        inProgressAnswered = true
+      }
+      if (url.includes('/api/materialsTable/successDocs')) {
+        if (!inProgressAnswered) readConcurrently = true
+      }
+      return new Response(JSON.stringify({ documents: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as any)
+
+    render(
+      <LargeDropzone
+        {...defaultProps({ uploadFiles: [activeDocument('a.pdf')] })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    expect(intervalCallback).toBeDefined()
+    const tick = intervalCallback ? intervalCallback() : Promise.resolve()
+    // Let anything that was going to run concurrently do so.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    releaseInProgress?.()
+    await tick
+
+    expect(readConcurrently).toBe(false)
+    expect(inProgressAnswered).toBe(true)
+  })
+
+  it('invalidates only failedDocuments when a tick just errors', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+
+    const invalidateQueries = vi.fn()
+    const getIntervalCb = mockTimers()
+
+    // Absent from both lists: the ingest failed.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    render(
+      <LargeDropzone
+        {...defaultProps({
+          uploadFiles: [activeDocument('gone.pdf', 'ingesting')],
+          queryClient: { invalidateQueries } as any,
+        })}
+      />,
+    )
+
+    const intervalCallback = getIntervalCb()
+    if (intervalCallback) await intervalCallback()
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['failedDocuments', 'CS101'],
+    })
+    expect(invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: ['documents', 'CS101'],
+    })
+  })
+
   it('keeps files added while a tick was in flight', async () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
 

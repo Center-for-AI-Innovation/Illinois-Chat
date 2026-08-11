@@ -76,15 +76,18 @@ export async function fetchIngestStatus(
 
   const inProgress: IngestStatusDoc[] = []
   const completed: IngestStatusDoc[] = []
-  // Chunks run sequentially on purpose: this endpoint hits a per-project
-  // Postgres whose connection pool is what issue #90 was exhausting, so a
-  // huge upload should take longer rather than fan out.
+  // Everything here is sequential on purpose. The endpoints hit a per-project
+  // Postgres whose connection pool is what issue #90 was exhausting, so a huge
+  // upload should take longer rather than fan out. More importantly, ingest
+  // writes the document row BEFORE deleting the in-progress row, so reading
+  // in-progress first is what guarantees a document that finishes mid-tick is
+  // seen in one list or the other. Reading them concurrently would let a
+  // completing document fall through both and be reported as failed.
   for (const body of bodies) {
-    const [progressDocs, completedDocs] = await Promise.all([
-      postStatus('docsInProgress', body),
-      postStatus('successDocs', body),
-    ])
-    if (progressDocs === null || completedDocs === null) return null
+    const progressDocs = await postStatus('docsInProgress', body)
+    if (progressDocs === null) return null
+    const completedDocs = await postStatus('successDocs', body)
+    if (completedDocs === null) return null
     inProgress.push(...progressDocs)
     completed.push(...completedDocs)
   }

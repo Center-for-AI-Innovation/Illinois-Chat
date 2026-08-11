@@ -343,8 +343,10 @@ describe('WebsiteIngestForm', () => {
   })
 
   it('does not invalidate queries on a no-change tick', async () => {
+    // Capture the tick so it can be awaited, rather than racing a waitFor.
+    let tick: (() => Promise<void>) | undefined
     vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: any) => {
-      fn()
+      tick = fn
       return 0
     }) as any)
 
@@ -369,7 +371,6 @@ describe('WebsiteIngestForm', () => {
     const { default: WebsiteIngestForm } = await import('../WebsiteIngestForm')
     const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
     renderWithProviders(
       <Harness
         Component={WebsiteIngestForm}
@@ -387,14 +388,17 @@ describe('WebsiteIngestForm', () => {
       { homeContext: { dispatch: vi.fn() }, queryClient },
     )
 
-    // Wait until the tick has actually round-tripped both endpoints, so the
-    // assertion can't pass merely because nothing had run yet.
-    await waitFor(() => {
-      const statusCalls = fetchSpy.mock.calls.filter(([url]) =>
+    // Run a full tick, so the assertion can't pass merely because nothing ran.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    expect(tick).toBeDefined()
+    if (tick) await tick()
+
+    // Both endpoints answered — the tick did not bail out early.
+    expect(
+      fetchSpy.mock.calls.filter(([url]) =>
         /materialsTable\/(docsInProgress|successDocs)/.test(String(url)),
-      )
-      expect(statusCalls.length).toBeGreaterThanOrEqual(2)
-    })
+      ),
+    ).toHaveLength(2)
     expect(invalidateSpy).not.toHaveBeenCalled()
   })
 
