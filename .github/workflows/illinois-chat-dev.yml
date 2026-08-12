@@ -87,12 +87,17 @@ jobs:
           NEXT_PUBLIC_KEYCLOAK_URL: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_URL }}
           NEXT_PUBLIC_KEYCLOAK_REALM: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_REALM }}
           NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
         run: |
           cd apps/frontend
           docker build --platform=linux/amd64 -f Dockerfile \
             --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \
             --build-arg NEXT_PUBLIC_KEYCLOAK_REALM="$NEXT_PUBLIC_KEYCLOAK_REALM" \
             --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID="$NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" \
+            --build-arg NEXT_PUBLIC_POSTHOG_KEY="$NEXT_PUBLIC_POSTHOG_KEY" \
+            --build-arg NEXT_PUBLIC_POSTHOG_HOST="$NEXT_PUBLIC_POSTHOG_HOST" \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:main \
