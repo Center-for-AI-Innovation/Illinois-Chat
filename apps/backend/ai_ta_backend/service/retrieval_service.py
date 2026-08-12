@@ -13,7 +13,7 @@ from typing import Dict, List, Union
 import openai
 import pytz
 from dateutil import parser
-from injector import inject
+from concurrent.futures import ThreadPoolExecutor
 from langchain.embeddings.ollama import OllamaEmbeddings
 
 # from langchain.chat_models import AzureChatOpenAI
@@ -27,8 +27,6 @@ from ai_ta_backend.database.sql import (
     ProjectStats,
     WeeklyMetric,
 )
-from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapter
-
 # from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
 from ai_ta_backend.service.sentry_service import SentryService
@@ -75,12 +73,11 @@ class RetrievalService:
     methods transparently route to the host pgvector store.
     """
 
-    @inject
     def __init__(
         self,
         posthog: PosthogService,
         sentry: SentryService,
-        thread_pool_executor: ThreadPoolExecutorAdapter,
+        thread_pool_executor: ThreadPoolExecutor,
         conn_manager: ConnectionManager,
     ):
         self.sentry = sentry
@@ -510,21 +507,6 @@ class RetrievalService:
             else:
                 print("Error in deleting file from vector store:", e)
                 self.sentry.capture_exception(e)
-
-    def getTopContextsWithMQR(
-        self, search_query: str, course_name: str, token_limit: int = 4_000
-    ) -> Union[List[Dict], str]:
-        """
-        New info-retrieval pipeline that uses multi-query retrieval + filtering + reciprocal rank fusion + context padding.
-        1. Generate multiple queries based on the input search query.
-        2. Retrieve relevant docs for each query.
-        3. Filter the relevant docs based on the user query and pass them to the rank fusion step.
-        4. [CANCELED BEC POINTLESS] Rank the docs based on the relevance score.
-        5. Parent-doc-retrieval: Pad just the top 5 docs with expanded context from the original document.
-        """
-        raise NotImplementedError(
-            "Method deprecated for performance reasons. Hope to bring back soon."
-        )
 
     def delete_from_nomic_and_database(
         self, course_name: str, identifier_key: str, identifier_value: str

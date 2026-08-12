@@ -12,7 +12,6 @@ import sentry_sdk
 from dotenv import load_dotenv
 from retry import retry
 
-import supabase
 from ai_ta_backend.types.types import ClerkUser
 
 load_dotenv(override=True)
@@ -71,9 +70,6 @@ def send_html_email(subject: str, html_text: str, sender: str, receipients: list
   :return: A string indicating the result of the email send operation
   """
 
-  supabase_client = supabase.create_client(supabase_url=os.environ['SUPABASE_URL'],
-                                           supabase_key=os.environ['SUPABASE_API_KEY'])
-
   emails = []
   if not receipients:
     users = get_all_users_from_clerk()
@@ -105,11 +101,8 @@ def send_html_email(subject: str, html_text: str, sender: str, receipients: list
     for r in emails:
       file.write(r + "\n")
 
-  # Get the list of unsubscribed emails
-  # TODO: Add EmailNewsletter model to sql and replace supabase
-  unsubscribed = supabase_client.table(table_name='email-newsletter').select("email").eq(
-      "unsubscribed-from-newsletter", "TRUE").execute()
-  unsubscribe_list = [row['email'] for row in unsubscribed.data]
+  # TODO: Add EmailNewsletter model to SQL and load unsubscribe list from the database.
+  unsubscribe_list: list[str] = []
   print("Unsubscribed emails: ", unsubscribe_list)
 
   # Remove any receipients that are in the unsubscribe list

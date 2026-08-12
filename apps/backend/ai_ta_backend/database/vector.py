@@ -25,7 +25,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
-from injector import inject
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import FieldCondition, MatchAny, MatchValue
 
@@ -185,7 +184,6 @@ class VectorDatabase:
         ``pgvector_store`` may target host or per-project Postgres.
     """
 
-    @inject
     def __init__(
         self,
         qdrant_client: QdrantClient = None,
