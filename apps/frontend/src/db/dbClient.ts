@@ -5,22 +5,6 @@ import * as schema from './schema'
 /** Max connections per pool. Keep low to avoid "too many clients" on Postgres. */
 const POOL_MAX = Number(process.env.POSTGRES_POOL_MAX) || 10
 
-function resolvePostgresSsl(ssl: string | undefined, endpoint: string) {
-  if (ssl === undefined) {
-    const isLoopback = endpoint === 'localhost' || endpoint === '127.0.0.1'
-    return isLoopback ? false : { rejectUnauthorized: false }
-  }
-
-  switch (ssl.trim().toLowerCase()) {
-    case 'false':
-      return false
-    case 'true':
-      return { rejectUnauthorized: false }
-    default:
-      throw new Error(`Invalid PostgreSQL SSL setting: ${ssl}`)
-  }
-}
-
 function createPostgresClient(
   username?: string,
   password?: string,
@@ -37,11 +21,12 @@ function createPostgresClient(
   }
 
   const connectionString = `postgres://${username}:${password}@${endpoint}:${port}/${database}`
+  const isLocal = endpoint === 'localhost' || endpoint === '127.0.0.1'
   return postgres(connectionString, {
     max: POOL_MAX,
     idle_timeout: 20,
     connect_timeout: 10,
-    ssl: resolvePostgresSsl(ssl, endpoint),
+    ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
   })
 }
 
