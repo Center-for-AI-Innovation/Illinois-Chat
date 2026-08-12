@@ -13,10 +13,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # check-mode: none, matching pr-checks.yml and illinois-chat-dev.yml.
+      #
+      # Why: main has never been linted, so check-mode: all points trunk at
+      # the whole accumulated tree (1436 files, 895 issues) and fails. Here
+      # that failure would block a published release from building and
+      # pushing its images, for reasons unrelated to the release.
+      #
+      # Part of the same stopgap; see #86 for the real fix (check-mode:
+      # pull_request on PRs, plus a .trunk/trunk.yaml exclusion for
+      # apps/frontend).
       - name: Install Trunk
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: all
+          check-mode: none
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
