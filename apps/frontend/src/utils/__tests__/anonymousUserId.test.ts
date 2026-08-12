@@ -47,4 +47,13 @@ describe('getOrCreateAnonymousUserId', () => {
 
     expect(getOrCreateAnonymousUserId()).toBe('anon-existing')
   })
+
+  it('generates an ID when local storage is unavailable', () => {
+    vi.spyOn(posthog, 'get_distinct_id').mockReturnValue('')
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Local storage unavailable')
+    })
+
+    expect(getOrCreateAnonymousUserId()).toMatch(/^anon_/)
+  })
 })
