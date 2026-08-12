@@ -118,7 +118,7 @@ describe('getCountryOfConcernBannerLede', () => {
   it('only claims local hosting when the model is locally hosted', () => {
     const local = getCountryOfConcernBannerLede(CountryOfConcern.China, true)
     expect(local).toContain('hosted locally at the U of I')
-    expect(local).toContain('China')
+    expect(local).toContain('does not send your conversation to external')
   })
 
   it('warns that data leaves the university for third-party-served models', () => {
