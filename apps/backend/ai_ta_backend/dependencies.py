@@ -2,6 +2,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from functools import lru_cache
 
 from ai_ta_backend.database.aws import AWSStorage
+from ai_ta_backend.database.connection_manager import ConnectionManager
 from ai_ta_backend.database.sql import SQLDatabase
 from ai_ta_backend.database.vector import VectorDatabase
 from ai_ta_backend.service.export_service import ExportService
@@ -42,14 +43,21 @@ def get_posthog_service() -> PosthogService:
 
 
 @lru_cache
+def get_connection_manager() -> ConnectionManager:
+  return ConnectionManager(
+      get_sql_database(),
+      get_vector_database(),
+      get_aws_storage(),
+  )
+
+
+@lru_cache
 def get_retrieval_service() -> RetrievalService:
   return RetrievalService(
-      get_vector_database(),
-      get_sql_database(),
-      get_aws_storage(),
       get_posthog_service(),
       get_sentry_service(),
       _thread_pool,
+      get_connection_manager(),
   )
 
 
@@ -61,10 +69,9 @@ def get_nomic_service() -> NomicService:
 @lru_cache
 def get_export_service() -> ExportService:
   return ExportService(
-      get_sql_database(),
-      get_aws_storage(),
       get_sentry_service(),
       _process_pool,
+      get_connection_manager(),
   )
 
 

@@ -45,6 +45,7 @@ import { AnthropicModelID } from '../modelProviders/types/anthropic'
 import { BedrockModelID } from '../modelProviders/types/bedrock'
 import { GeminiModelID } from '../modelProviders/types/gemini'
 import { SambaNovaModelID } from '../modelProviders/types/SambaNova'
+import { OllamaModelIDs } from '../modelProviders/ollama'
 
 import {
   State,
@@ -416,7 +417,7 @@ describe('validateRequestBody', () => {
   it('throws when image content is used with a non-vision model', async () => {
     await expect(
       validateRequestBody({
-        model: 'gpt-3.5-turbo',
+        model: OllamaModelIDs.LLAMA32_1b_fp16,
         messages: [
           {
             id: 'm1',
@@ -428,6 +429,23 @@ describe('validateRequestBody', () => {
         api_key: 'k',
       }),
     ).rejects.toThrow(/does not support vision/i)
+  })
+
+  it('allows image content for Qwen 3.5 27B', async () => {
+    await expect(
+      validateRequestBody({
+        model: NCSAHostedVLMModelID.QWEN3_5_27B,
+        messages: [
+          {
+            id: 'm1',
+            role: 'user',
+            content: [{ type: 'image_url', image_url: { url: 'x' } }],
+          } as any,
+        ],
+        course_name: 'CS101',
+        api_key: 'k',
+      }),
+    ).resolves.toBeUndefined()
   })
 
   it('throws when messages are missing or invalid', async () => {
@@ -1082,7 +1100,7 @@ describe('routeModelRequest', () => {
     expect(runOpenAICompatibleChat).toHaveBeenCalled()
   })
 
-  it('routes NCSAHostedVLM model IDs to runVLLM', async () => {
+  it('routes legacy NCSAHostedVLM model IDs to runVLLM', async () => {
     const conv = baseConversation(NCSAHostedVLMModelID.MOLMO_7B_D_0924)
     const llmProviders: any = { NCSAHostedVLM: { enabled: true, models: [] } }
 
@@ -1129,7 +1147,7 @@ describe('routeModelRequest', () => {
   })
 
   it('routes Bedrock model IDs to runBedrockChat', async () => {
-    const conv = baseConversation(BedrockModelID.Claude_3_5_Sonnet_Latest)
+    const conv = baseConversation(BedrockModelID.Nova_Pro)
     const llmProviders: any = { Bedrock: { enabled: true, models: [] } }
 
     await routeModelRequest({
@@ -1141,7 +1159,7 @@ describe('routeModelRequest', () => {
   })
 
   it('routes Gemini model IDs to runGeminiChat', async () => {
-    const conv = baseConversation(GeminiModelID.Gemini_2_0_Flash)
+    const conv = baseConversation(GeminiModelID.Gemini_3_1_Flash_Lite)
     const llmProviders: any = { Gemini: { enabled: true, models: [] } }
 
     await routeModelRequest({

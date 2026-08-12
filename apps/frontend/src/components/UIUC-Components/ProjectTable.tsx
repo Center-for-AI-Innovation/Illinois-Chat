@@ -2,6 +2,7 @@ import { useAuth } from 'react-oidc-context'
 import { Table, Text } from '@mantine/core'
 import { useMemo, useState } from 'react'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { isSuperAdmin } from '~/utils/superAdmins'
 import { useRouter } from 'next/router'
 import styled from 'styled-components'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
@@ -116,20 +117,20 @@ const ListProjectTable: React.FC = () => {
       return (
         <IconSelector
           size={14}
-          color="var(--illinois-blue)"
+          color="var(--foreground)"
           aria-hidden="true"
         />
       )
     return sortDirection === 'asc' ? (
       <IconChevronUp
         size={14}
-        color="var(--illinois-blue)"
+        color="var(--foreground)"
         aria-hidden="true"
       />
     ) : (
       <IconChevronDown
         size={14}
-        color="var(--illinois-blue)"
+        color="var(--foreground)"
         aria-hidden="true"
       />
     )
@@ -166,10 +167,10 @@ const ListProjectTable: React.FC = () => {
           break
         case 'admins':
           const adminsA = metadataA.course_admins
-            .filter((admin: string) => admin !== 'rohan13@illinois.edu')
+            .filter((admin: string) => !isSuperAdmin(admin))
             .join(', ')
           const adminsB = metadataB.course_admins
-            .filter((admin: string) => admin !== 'rohan13@illinois.edu')
+            .filter((admin: string) => !isSuperAdmin(admin))
             .join(', ')
           comparison = adminsA
             .toLowerCase()
@@ -189,7 +190,7 @@ const ListProjectTable: React.FC = () => {
         if (!courseMetadata) return null
 
         const filteredAdmins = courseMetadata.course_admins.filter(
-          (admin: string) => admin !== 'rohan13@illinois.edu',
+          (admin: string) => !isSuperAdmin(admin),
         )
 
         return (
@@ -218,7 +219,7 @@ const ListProjectTable: React.FC = () => {
                 }
               }
             }}
-            style={{ cursor: 'pointer', color: 'var(--illinois-blue)' }}
+            style={{ cursor: 'pointer', color: 'var(--foreground)' }}
           >
             <td>{courseName}</td>
             <td>
@@ -323,7 +324,7 @@ const ListProjectTable: React.FC = () => {
               style={{
                 backgroundColor: 'transparent',
                 textAlign: 'center',
-                color: 'var(--illinois-blue)',
+                color: 'var(--foreground)',
               }}
             >
               You haven&apos;t created any projects yet. Let&apos;s{' '}

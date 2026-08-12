@@ -4,6 +4,7 @@ import {
   type LLMProvider,
   type ProviderNames,
 } from '@/utils/modelProviders/LLMProvider'
+import { type ChatbotTag } from '~/types/chatbotTags'
 
 // courseMetadata.ts
 export interface CourseMetadata {
@@ -19,12 +20,19 @@ export interface CourseMetadata {
   disabled_models: string[] | undefined // TODO: remove
   project_description: string | undefined
   documentsOnly: boolean | undefined
+  disableCitations: boolean | undefined
   guidedLearning: boolean | undefined
   systemPromptOnly: boolean | undefined
   vector_search_rewrite_disabled: boolean | undefined
   agent_mode_enabled?: boolean
   allow_logged_in_users: boolean | undefined
   is_frozen: boolean | undefined
+  tags?: ChatbotTag[]
+  created_at?: string | null
+  // Derived from MAX(documents.created_at) in PostgreSQL — reflects the most
+  // recent document upload. Falls back to projects.created_at when no documents
+  // exist. Does NOT track metadata changes (e.g. settings, system prompt edits).
+  last_updated_at?: string | null
 }
 
 export type ProjectWideLLMProviders = {
@@ -48,10 +56,14 @@ export interface CourseMetadataOptionalForUpsert {
   disabled_models: string[] | undefined
   project_description: string | undefined
   documentsOnly: boolean | undefined
+  disableCitations: boolean | undefined
   guidedLearning: boolean | undefined
   systemPromptOnly: boolean | undefined
   vector_search_rewrite_disabled: boolean | undefined
   agent_mode_enabled?: boolean
   allow_logged_in_users: boolean | undefined
   is_frozen: boolean | undefined
+  tags?: ChatbotTag[]
+  created_at?: string
+  last_updated_at?: string
 }

@@ -6,6 +6,10 @@ import logging
 from typing import List
 
 from dotenv import load_dotenv
+
+# Load .env before local imports so module-level code can access env vars
+load_dotenv()
+
 from flask import (
   Flask,
   Response,
@@ -35,8 +39,6 @@ executor = Executor(app)
 # app.config['EXECUTOR_MAX_WORKERS'] = 5 nothing == picks defaults for me
 #app.config['SERVER_TIMEOUT'] = 1000  # seconds
 
-# load API keys from globally-availabe .env file
-load_dotenv()
 
 
 @app.route('/')
@@ -74,7 +76,7 @@ def health() -> Response:
 @app.route('/getTopContexts', methods=['POST'])
 def getTopContexts() -> Response:
   """Get most relevant contexts for a given search query.
-  
+
   Return value
 
   ## POST body
@@ -83,7 +85,7 @@ def getTopContexts() -> Response:
   search_query
   token_limit
   doc_groups
-  
+
   Example Request Body:
   ```json
   {
@@ -102,15 +104,15 @@ def getTopContexts() -> Response:
   * pagenumber_or_timestamp
   * readable_filename
   * s3_pdf_path
-  
-  Example: 
+
+  Example:
   [
     {
-      'readable_filename': 'Lumetta_notes', 
-      'pagenumber_or_timestamp': 'pg. 19', 
-      's3_pdf_path': '/courses/<course>/Lumetta_notes.pdf', 
+      'readable_filename': 'Lumetta_notes',
+      'pagenumber_or_timestamp': 'pg. 19',
+      's3_pdf_path': '/courses/<course>/Lumetta_notes.pdf',
       'text': 'In FSM, we do this...'
-    }, 
+    },
   ]
 
   Raises
@@ -130,9 +132,9 @@ def getTopContexts() -> Response:
   if search_query == '' or course_name == '':
     # proper web error "400 Bad request"
     abort(
-        400,
-        description=
-        f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
+      400,
+      description=
+      f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
     )
 
   found_documents = asyncio.run(service.getTopContexts(search_query, course_name, doc_groups, top_n, conversation_id))
@@ -140,7 +142,6 @@ def getTopContexts() -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   print(f"⏰ Runtime of getTopContexts in main.py: {(time.monotonic() - start_time):.2f} seconds")
   return response
-
 
 @app.route('/llm-monitor-message', methods=['POST'])
 def llm_monitor_message_main() -> Response:
@@ -195,7 +196,7 @@ def getAll() -> Response:
 @app.route('/delete', methods=['DELETE'])
 def delete():
   """
-  Delete a single file from all our database: S3, Qdrant, and Supabase (for now).
+  Delete a single file from all our database: S3, vector store (pgvector), and Supabase (for now).
   Note, of course, we still have parts of that file in our logs.
   """
   service = get_retrieval_service()
@@ -220,6 +221,7 @@ def delete():
   response = jsonify({"outcome": 'success'})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
+
 
 @app.route('/process-chat-file', methods=['POST'])
 def process_chat_file_sync():
@@ -802,6 +804,12 @@ def updateProjectDocuments() -> Response:
   response = jsonify({"message": "success"})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
+
+# External-connection CRUD lives in the Next.js frontend (see
+# uiuc-chat-frontend `src/pages/api/UIUC-api/projectConnections*`). The
+# backend only **reads** these rows via `ConnectionManager` for runtime
+# dispatch — there are no project-connections HTTP endpoints here.
+
 
 if __name__ == '__main__':
   app.run(debug=True, port=int(os.getenv("PORT", default=8000)))  # nosec -- reasonable bandit error suppression
