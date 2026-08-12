@@ -86,39 +86,31 @@ function normalizeModelId(modelId: string): string {
   return modelId.trim().toLowerCase()
 }
 
+/**
+ * One entry per country whose model IDs we track. Kept as data rather than
+ * four inlined `.map()` spreads so that adding a country is a one-line change
+ * and the ID-normalizing callback is shared (an empty list would otherwise
+ * leave its own copy of that callback unreachable).
+ */
+const COUNTRY_MODEL_ID_LISTS: ReadonlyArray<
+  readonly [ReadonlyArray<string>, CountryOfConcern]
+> = [
+  [CHINA_MODEL_IDS, CountryOfConcern.China],
+  [RUSSIA_MODEL_IDS, CountryOfConcern.Russia],
+  [IRAN_MODEL_IDS, CountryOfConcern.Iran],
+  [NORTH_KOREA_MODEL_IDS, CountryOfConcern.NorthKorea],
+]
+
 const MODEL_COUNTRY_MAP: ReadonlyMap<string, CountryOfConcern> = new Map<
   string,
   CountryOfConcern
->([
-  ...CHINA_MODEL_IDS.map(
-    (id) =>
-      [normalizeModelId(id), CountryOfConcern.China] as [
-        string,
-        CountryOfConcern,
-      ],
+>(
+  COUNTRY_MODEL_ID_LISTS.flatMap(([ids, country]) =>
+    ids.map(
+      (id) => [normalizeModelId(id), country] as [string, CountryOfConcern],
+    ),
   ),
-  ...RUSSIA_MODEL_IDS.map(
-    (id) =>
-      [normalizeModelId(id), CountryOfConcern.Russia] as [
-        string,
-        CountryOfConcern,
-      ],
-  ),
-  ...IRAN_MODEL_IDS.map(
-    (id) =>
-      [normalizeModelId(id), CountryOfConcern.Iran] as [
-        string,
-        CountryOfConcern,
-      ],
-  ),
-  ...NORTH_KOREA_MODEL_IDS.map(
-    (id) =>
-      [normalizeModelId(id), CountryOfConcern.NorthKorea] as [
-        string,
-        CountryOfConcern,
-      ],
-  ),
-])
+)
 
 /**
  * Vendor-family substrings, checked when an exact model ID isn't in the
