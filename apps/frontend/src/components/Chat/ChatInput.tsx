@@ -963,7 +963,7 @@ export const ChatInput = ({
                   </span>
                   <div className="mb-1 flex items-center gap-2 text-base font-semibold">
                     <span aria-hidden="true">🌐</span>
-                    LLM from Country of Concern
+                    LLM from Country of Concern ({country})
                   </div>
                   <p className="text-sm leading-snug">
                     {getCountryOfConcernBannerLede(country, cocLocallyHosted)}{' '}

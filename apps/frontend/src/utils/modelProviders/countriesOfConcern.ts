@@ -303,14 +303,14 @@ export function getCountryOfConcernBannerLede(
   if (locallyHosted) {
     return (
       `This model is hosted locally at the U of I, so Illinois Chat does not ` +
-      `send your conversation to servers in ${country}. Users should still be ` +
+      `send your conversation to external servers. Users should still be ` +
       `aware that the model itself was initially developed in a country deemed ` +
-      `worthy of extra caution in the AI space.`
+      `worthy of extra caution.`
     )
   }
   return (
     `This model was developed in ${country}, a country deemed worthy of extra ` +
-    `caution in the AI space, and it is served by a third-party provider rather ` +
+    `caution, and it is served by a third-party provider rather ` +
     `than hosted locally at the U of I. Your conversation leaves university ` +
     `infrastructure when you use this model, so please avoid sharing sensitive ` +
     `information.`
