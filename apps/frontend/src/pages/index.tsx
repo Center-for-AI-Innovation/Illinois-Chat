@@ -974,7 +974,7 @@ function FlagshipChatbots() {
         "Using all of Clowder's documentation, this bot will answer questions and point you to the right docs and YouTube videos about Clowder.",
     },
     {
-      course_slug: 'cropwizard-1.5',
+      course_slug: 'cropwizard-2.0',
       imageSrc: '/media/hero_courses_banners/aifarms_wide_logo.png',
       title: 'Crop Wizard',
       badge: 'AIFARMS',
