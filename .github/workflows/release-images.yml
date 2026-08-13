@@ -79,11 +79,17 @@ jobs:
           ECR_REPOSITORY: uiuc-chat-frontend
           IMAGE_TAG: ${{ github.event.release.tag_name }}
           POSTHOG_API_KEY: ${{ secrets.PROD_POSTHOG_API_KEY }}
+          NEXT_PUBLIC_KEYCLOAK_URL: ${{ secrets.PROD_NEXT_PUBLIC_KEYCLOAK_URL }}
+          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_REALM }}
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.PROD_POSTHOG_API_KEY }}
           NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.PROD_NEXT_PUBLIC_POSTHOG_HOST }}
         run: |
           cd apps/frontend
           docker build \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_REALM="$NEXT_PUBLIC_KEYCLOAK_REALM" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID="$NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" \
             --build-arg NEXT_PUBLIC_POSTHOG_KEY="$NEXT_PUBLIC_POSTHOG_KEY" \
             --build-arg NEXT_PUBLIC_POSTHOG_HOST="$NEXT_PUBLIC_POSTHOG_HOST" \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
@@ -93,5 +99,23 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-frontend
           IMAGE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Build crawlee image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: uiuc-chat-crawlee
+          IMAGE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd apps/crawlee
+          docker build -f Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            .
+
+      - name: Push crawlee image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: uiuc-chat-crawlee
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
