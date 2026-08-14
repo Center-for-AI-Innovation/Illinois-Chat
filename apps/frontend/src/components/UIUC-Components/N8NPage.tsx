@@ -59,7 +59,9 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
   const auth = useAuth()
 
   const useIllinoisChatConfig = useMemo(() => {
-    return process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG === 'True'
+    return (
+      process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
+    )
   }, [])
 
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
