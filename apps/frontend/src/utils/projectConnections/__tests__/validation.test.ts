@@ -178,6 +178,15 @@ describe('projectConnections/validation — Qdrant', () => {
       qdrantConfigSchema.safeParse({ ...base, parallel: false }).success,
     ).toBe(true)
   })
+
+  it('accepts optional sort_combined knob', () => {
+    const parsed = qdrantConfigSchema.safeParse({
+      ...base,
+      sort_combined: false,
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.sort_combined).toBe(false)
+  })
 })
 
 describe('projectConnections/validation — embedding', () => {

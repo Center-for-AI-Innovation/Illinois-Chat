@@ -190,6 +190,13 @@ def _build_config_from_env(kind: str) -> dict:
                 "yes",
                 "on",
             )
+        if _env("EXT_QDRANT_SORT_COMBINED") is not None:
+            config["sort_combined"] = _env("EXT_QDRANT_SORT_COMBINED").lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
         return config
 
     if kind == "embedding":

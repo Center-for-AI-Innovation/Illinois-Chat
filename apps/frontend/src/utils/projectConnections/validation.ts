@@ -109,6 +109,8 @@ export const qdrantConfigSchema = z.object({
   collections: z.array(qdrantCollectionEntrySchema).optional(),
   // Top-level parallelism knob also read by the backend's vector module.
   parallel: z.boolean().optional(),
+  // Re-sort merged fan-out results by score (backend default: true).
+  sort_combined: z.boolean().optional(),
 }) satisfies z.ZodType
 
 // Per-project embedding provider override. Consumed by the backend's
