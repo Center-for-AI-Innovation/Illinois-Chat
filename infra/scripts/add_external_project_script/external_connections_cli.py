@@ -98,6 +98,41 @@ def _env(name: str) -> str | None:
     return value or None
 
 
+def _parse_qdrant_collections(raw: str) -> list[dict]:
+    """Parse EXT_QDRANT_COLLECTIONS into `qdrant_config.collections` entries.
+
+    Accepts either:
+      - a comma-separated list of names: `pubmed-articles,us-patents`
+      - a JSON array of entry objects for per-collection configs:
+        `[{"name": "pubmed-articles", "top_n": 50, "use_filter": false,
+           "processor": "pubmed"}]`
+
+    The server-side schema requires each entry to be an object with a `name`
+    (bare strings are rejected), so the comma form is expanded here.
+    """
+    raw = raw.strip()
+    if raw.startswith("["):
+        try:
+            entries = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise SystemExit(f"[error] EXT_QDRANT_COLLECTIONS is not valid JSON: {e}")
+        if not isinstance(entries, list) or not all(
+            isinstance(entry, dict) for entry in entries
+        ):
+            raise SystemExit(
+                "[error] EXT_QDRANT_COLLECTIONS JSON must be an array of objects, "
+                'e.g. [{"name": "pubmed-articles", "top_n": 50}]'
+            )
+        for entry in entries:
+            if not str(entry.get("name", "")).strip():
+                raise SystemExit(
+                    "[error] every EXT_QDRANT_COLLECTIONS entry needs a "
+                    'non-empty "name"'
+                )
+        return entries
+    return [{"name": name.strip()} for name in raw.split(",") if name.strip()]
+
+
 def _build_config_from_env(kind: str) -> dict:
     def require(field: str, var: str) -> str:
         value = _env(var)
@@ -142,6 +177,26 @@ def _build_config_from_env(kind: str) -> dict:
             config["port"] = int(_env("EXT_QDRANT_PORT"))  # type: ignore[arg-type]
         if _env("EXT_QDRANT_DEFAULT_COLLECTION") is not None:
             config["default_collection"] = _env("EXT_QDRANT_DEFAULT_COLLECTION")
+        # Optional read-side fan-out across additional collections. Ingest
+        # writes still go only to default_collection.
+        if _env("EXT_QDRANT_COLLECTIONS") is not None:
+            collections = _parse_qdrant_collections(_env("EXT_QDRANT_COLLECTIONS"))
+            if collections:
+                config["collections"] = collections
+        if _env("EXT_QDRANT_PARALLEL") is not None:
+            config["parallel"] = _env("EXT_QDRANT_PARALLEL").lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
+        if _env("EXT_QDRANT_SORT_COMBINED") is not None:
+            config["sort_combined"] = _env("EXT_QDRANT_SORT_COMBINED").lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
         return config
 
     if kind == "embedding":
