@@ -1,6 +1,6 @@
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 
 import { Card, Flex, Title } from '@mantine/core'
 import { Button } from '@/components/shadcn/ui/button'
@@ -84,10 +84,6 @@ const MakeNewCoursePage = ({
   const [hasCreatedProject, setHasCreatedProject] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<FileUpload[]>([])
   const [currentStep, setStep] = useState(0)
-
-  const useIllinoisChatConfig = useMemo(() => {
-    return process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG === 'True'
-  }, [])
 
   // Debounce project name input to avoid excessive API calls
   const [debouncedProjectName] = useDebouncedValue(projectName, 1000)
@@ -228,7 +224,6 @@ const MakeNewCoursePage = ({
     project_name: string,
     project_description: string | undefined,
     current_user_email: string,
-    is_private = false,
     initial_project_type?: ChatbotProjectType,
     initial_organization?: string,
   ): Promise<boolean> => {
@@ -238,7 +233,7 @@ const MakeNewCoursePage = ({
         project_name,
         project_description,
         current_user_email,
-        is_private,
+        true,
       )
       if (!result) {
         return false
@@ -274,7 +269,7 @@ const MakeNewCoursePage = ({
           )
           const fallbackMetadata: CourseMetadata = {
             is_frozen: false,
-            is_private: Boolean(is_private),
+            is_private: true,
             course_owner: current_user_email,
             course_admins: [],
             approved_emails_list: [],
@@ -512,7 +507,6 @@ const MakeNewCoursePage = ({
                       projectName,
                       projectDescription,
                       current_user_email,
-                      useIllinoisChatConfig,
                       projectType,
                       organization,
                     )

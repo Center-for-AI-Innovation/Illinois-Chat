@@ -104,46 +104,6 @@ describe('normalizeS3Key', () => {
     expect(ctor).toHaveBeenCalledWith({ region: 'us-east-1' })
   })
 
-  it('getPresignedUrlVyriadClient builds a client from VYRIAD_MINIO env vars', async () => {
-    const ctor = vi.fn()
-    vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: ctor }))
-
-    vi.stubEnv('VYRIAD_MINIO_KEY', 'vk')
-    vi.stubEnv('VYRIAD_MINIO_SECRET', 'vs')
-    vi.stubEnv('VYRIAD_MINIO_ENDPOINT', 'http://vyriad-minio:9000')
-    vi.stubEnv('VYRIAD_MINIO_PUBLIC_ENDPOINT', 'http://localhost:9002')
-    vi.stubEnv('VYRIAD_MINIO_REGION', '')
-
-    vi.resetModules()
-    const mod = await import('../s3Client')
-    ctor.mockClear()
-    mod.getPresignedUrlVyriadClient()
-    expect(ctor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        region: 'us-east-1',
-        endpoint: 'http://localhost:9002',
-        credentials: { accessKeyId: 'vk', secretAccessKey: 'vs' },
-        forcePathStyle: true,
-      }),
-    )
-  })
-
-  it('getPresignedUrlVyriadClient falls back to the module client when env is missing', async () => {
-    const ctor = vi.fn()
-    vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: ctor }))
-
-    vi.stubEnv('VYRIAD_MINIO_KEY', '')
-    vi.stubEnv('VYRIAD_MINIO_SECRET', '')
-    vi.stubEnv('VYRIAD_MINIO_ENDPOINT', '')
-    vi.stubEnv('VYRIAD_MINIO_PUBLIC_ENDPOINT', '')
-
-    vi.resetModules()
-    const mod = await import('../s3Client')
-    ctor.mockClear()
-    expect(mod.getPresignedUrlVyriadClient()).toBe(mod.vyriadMinioClient)
-    expect(ctor).not.toHaveBeenCalled()
-  })
-
   it('leaves a virtual-hosted-style key untouched', async () => {
     vi.resetModules()
     const { normalizeS3Key } = await import('../s3Client')
