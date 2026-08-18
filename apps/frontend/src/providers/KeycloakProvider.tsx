@@ -74,7 +74,8 @@ export const KeycloakProvider = ({ children }: AuthProviderProps) => {
         // Extra logic: if root path and Illinois Chat config enabled → go to /chat
         if (
           redirectPath === '/' &&
-          process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG === 'True'
+          process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() ===
+            'true'
         ) {
           redirectPath = '/chat'
         }
@@ -92,7 +93,12 @@ export const KeycloakProvider = ({ children }: AuthProviderProps) => {
     if (typeof window !== 'undefined') {
       const baseUrl = getBaseUrl()
       const searchParams = new URLSearchParams(window.location.search)
-      setIsAuthCallback(searchParams.has('code') && searchParams.has('state'))
+      const isSilentRenewPath = window.location.pathname === '/silent-renew'
+      setIsAuthCallback(
+        !isSilentRenewPath &&
+          searchParams.has('code') &&
+          searchParams.has('state'),
+      )
       setIsMounted(true)
 
       // const cookieStore = new CookieStorage({
@@ -112,6 +118,7 @@ export const KeycloakProvider = ({ children }: AuthProviderProps) => {
           store: window.localStorage,
         }),
         automaticSilentRenew: true,
+        accessTokenExpiringNotificationTimeInSeconds: 60,
       }))
 
       // Only save the path when component mounts if we're not on the callback URL
