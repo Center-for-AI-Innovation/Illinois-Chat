@@ -53,7 +53,6 @@ interface Props {
 
 import { notifications } from '@mantine/notifications'
 import type * as webllm from '@mlc-ai/web-llm'
-import { MLCEngine } from '@mlc-ai/web-llm'
 import { useQueryClient } from '@tanstack/react-query'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { motion } from 'framer-motion'
@@ -83,6 +82,7 @@ import ChatUI, {
   type WebllmModel,
   webLLMModels,
 } from '~/utils/modelProviders/WebLLM'
+import { waitForWebLLMEngine } from '~/utils/modelProviders/waitForWebLLMEngine'
 import {
   State,
   getOpenAIKey,
@@ -129,7 +129,25 @@ export const Chat = memo(
       // /CS-125/dashboard --> CS-125
       return router.asPath.slice(1).split('/')[0] as string
     }
-    const [chat_ui] = useState(new ChatUI(new MLCEngine()))
+    const [chat_ui, setChatUi] = useState<ChatUI | null>(null)
+    // The send path can start while the dynamic import below is still in
+    // flight, holding a closure over a stale `null` chat_ui. This ref always
+    // points at the latest instance so waitForWebLLMEngine can see it resolve.
+    const chatUiRef = useRef<ChatUI | null>(null)
+
+    useEffect(() => {
+      let cancelled = false
+      import('@mlc-ai/web-llm').then(({ MLCEngine }) => {
+        if (!cancelled) {
+          const ui = new ChatUI(new MLCEngine())
+          chatUiRef.current = ui
+          setChatUi(ui)
+        }
+      })
+      return () => {
+        cancelled = true
+      }
+    }, [])
 
     const [inputContent, setInputContent] = useState<string>('')
 
@@ -193,6 +211,11 @@ export const Chat = memo(
 
     useEffect(() => {
       const loadModel = async () => {
+        // Wait for the dynamic import to construct chat_ui; this effect
+        // re-runs when it lands (chat_ui is a dependency). Without this guard
+        // the null instance dispatched a spurious loading-true/loading-false
+        // flash before the real load began.
+        if (!chat_ui) return
         if (selectedConversation?.model && !chat_ui.isModelLoading()) {
           homeDispatch({
             field: 'webLLMModelIdLoading',
@@ -742,23 +765,27 @@ export const Chat = memo(
                   (model) => model.name === selectedConversation.model.name,
                 )
               ) {
-                // WebLLM model handling remains the same
-                while (chat_ui.isModelLoading() === true) {
-                  await new Promise((resolve) => setTimeout(resolve, 10))
-                }
-                try {
-                  rewriteResponse = await chat_ui.runChatCompletion(
-                    queryRewriteBody,
-                    getCurrentPageName(),
-                    courseMetadata,
-                  )
-                } catch (error) {
-                  errorToast({
-                    title: 'Error running query rewrite',
-                    message:
-                      (error as Error).message ||
-                      'An unexpected error occurred',
-                  })
+                // Wait for the lazy import to construct the engine, then for
+                // model loading. On timeout, skip the rewrite — the send path
+                // below falls back to the original query.
+                const engine = await waitForWebLLMEngine(
+                  () => chatUiRef.current,
+                )
+                if (engine) {
+                  try {
+                    rewriteResponse = await engine.runChatCompletion(
+                      queryRewriteBody,
+                      getCurrentPageName(),
+                      courseMetadata,
+                    )
+                  } catch (error) {
+                    errorToast({
+                      title: 'Error running query rewrite',
+                      message:
+                        (error as Error).message ||
+                        'An unexpected error occurred',
+                    })
+                  }
                 }
               } else {
                 // Direct call to routeModelRequest instead of going through the API route
@@ -976,15 +1003,13 @@ export const Chat = memo(
               updatedConversation,
               getOpenAIKey(llmProviders, courseMetadata, apiKey),
               courseName,
-              undefined,
-              llmProviders,
             )
             homeDispatch({ field: 'isRouting', value: false })
 
             if (uiucToolsToRun.length > 0) {
               homeDispatch({ field: 'isRunningTool', value: true })
 
-              // Execute N8N tools
+              // Execute Sim tools
               await handleToolCall(
                 uiucToolsToRun,
                 updatedConversation,
@@ -1047,12 +1072,23 @@ export const Chat = memo(
             (model) => model.name === selectedConversation.model.name,
           )
         ) {
-          // Is WebLLM model
-          while (chat_ui.isModelLoading() == true) {
-            await new Promise((resolve) => setTimeout(resolve, 10))
+          // Is WebLLM model. Wait for the lazy import to construct the
+          // engine, then for model loading; without the engine there is
+          // nothing to run against, so surface that instead of letting an
+          // undefined response flow into the stream handler.
+          const engine = await waitForWebLLMEngine(() => chatUiRef.current)
+          if (!engine) {
+            homeDispatch({ field: 'loading', value: false })
+            homeDispatch({ field: 'messageIsStreaming', value: false })
+            errorToast({
+              title: 'Model still initializing',
+              message:
+                'The on-device WebLLM engine has not finished initializing. Please try again in a moment.',
+            })
+            return
           }
           try {
-            response = await chat_ui.runChatCompletion(
+            response = await engine.runChatCompletion(
               finalChatBody,
               getCurrentPageName(),
               courseMetadata,
@@ -2184,7 +2220,7 @@ export const Chat = memo(
                   return userId
                 })()}
                 courseName={courseName}
-                chat_ui={chat_ui}
+                chat_ui={chat_ui ?? undefined}
                 agentModeFeatureEnabled={
                   courseMetadata?.agent_mode_enabled === true
                 }
