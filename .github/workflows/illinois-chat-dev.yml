@@ -9,9 +9,11 @@ on:
       - 'infra/**'
       - '.github/workflows/**'
 
+# check-mode: push runs trunk without --github-annotate, so it needs no
+# write scope -- results surface via the step's exit code. Declaring the
+# block at all also drops every unlisted scope to none.
 permissions:
   contents: read
-  checks: write # trunk-action posts lint results as check-run annotations
 
 jobs:
   deploy-dev:

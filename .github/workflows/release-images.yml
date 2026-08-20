@@ -4,9 +4,11 @@ on:
   release:
     types: [published]
 
+# check-mode: all runs trunk without --github-annotate, so it needs no
+# write scope -- results surface via the step's exit code. Declaring the
+# block at all also drops every unlisted scope to none.
 permissions:
   contents: read
-  checks: write # trunk-action posts lint results as check-run annotations
 
 jobs:
   build-and-push-release:
