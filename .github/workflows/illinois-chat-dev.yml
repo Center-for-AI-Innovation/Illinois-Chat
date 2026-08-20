@@ -9,6 +9,10 @@ on:
       - 'infra/**'
       - '.github/workflows/**'
 
+permissions:
+  contents: read
+  checks: write # trunk-action posts lint results as check-run annotations
+
 jobs:
   deploy-dev:
     runs-on: ubuntu-latest
@@ -23,10 +27,15 @@ jobs:
         run: |
           npm ci
 
-      - name: Install Trunk
+      # Lint only the commits in this push (github.event.before..after), not
+      # the whole tree -- main carries ~895 pre-existing issues from before it
+      # was linted, and check-mode: all would fail on all of them forever.
+      # These commits already passed the same linters as a PR diff, so this is
+      # a cheap guard against anything that lands on main outside a PR.
+      - name: Trunk Check (pushed commits only)
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: none
+          check-mode: push
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
