@@ -5,8 +5,8 @@ Run twice a day.
 
 # Call /updateConversationMap and /updateDocumentMap endpoints in Nomic
 
-import requests
 from beam import schedule
+import requests
 
 
 @schedule(when="0 6 * * *", name="update-nomic-maps")

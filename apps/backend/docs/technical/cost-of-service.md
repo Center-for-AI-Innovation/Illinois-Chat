@@ -30,15 +30,11 @@ We host our Python backend and a few supporting services on Railway.&#x20;
 
 <figure><img src="../.gitbook/assets/CleanShot 2025-04-07 at 12.35.43 (1).png" alt=""><figcaption><p>History of Railway payments. Average: $67.59/mo.</p></figcaption></figure>
 
-
-
 #### Beam.cloud: $15/mo
 
 Beam.cloud runs our document ingest queue, and a few supporting functions for [AI Tool use](../features/tool-use-in-conversation.md#tools-demo).&#x20;
 
 <figure><img src="../.gitbook/assets/CleanShot 2025-04-07 at 13.01.06.png" alt=""><figcaption></figcaption></figure>
-
-
 
 ### Databases
 
@@ -76,15 +72,13 @@ A fantastic startup creating visualizations of embedding spaces. We use this to 
 
 ## Total costs
 
-| Service             | $/mo  | Notes                                                                        |
-| ------------------- | ----- | ---------------------------------------------------------------------------- |
-| Frontend            | $30   |                                                                              |
-| Backend             | $82   |                                                                              |
-| Databases           | $439  | $329 is Qdrant, which we're moving somewhere cheaper.                        |
-| Supporting services | $116  | Mailgun + Nomic Atlas.                                                       |
-| **Total**           | $667  | Soon to be $367 w/ cheaper Qdrant. Largest costs are covered by AWS credits. |
-
-
+| Service             | $/mo | Notes                                                                        |
+| ------------------- | ---- | ---------------------------------------------------------------------------- |
+| Frontend            | $30  |                                                                              |
+| Backend             | $82  |                                                                              |
+| Databases           | $439 | $329 is Qdrant, which we're moving somewhere cheaper.                        |
+| Supporting services | $116 | Mailgun + Nomic Atlas.                                                       |
+| **Total**           | $667 | Soon to be $367 w/ cheaper Qdrant. Largest costs are covered by AWS credits. |
 
 <details>
 
@@ -138,13 +132,11 @@ The frontend is React on Next.js, hosted on Vercel. We're still comfortably insi
 
 ### Services
 
-* [Sentry.io](https://sentry.io/) for error and latency monitoring. Free tier.&#x20;
-* [Posthog.com](https://posthog.com/) for usage monitoring and custom logs. Free tier... mostly.
-* [Nomic](https://www.nomic.ai/) for maps of embedding spaces. Educational free tier.
-  * As of August 2024 we started an Educational enterprise tier at $99/mo.
-* [GitBook](https://www.gitbook.com/) for public documentation. Free tier.
-
-
+- [Sentry.io](https://sentry.io/) for error and latency monitoring. Free tier.&#x20;
+- [Posthog.com](https://posthog.com/) for usage monitoring and custom logs. Free tier... mostly.
+- [Nomic](https://www.nomic.ai/) for maps of embedding spaces. Educational free tier.
+  - As of August 2024 we started an Educational enterprise tier at $99/mo.
+- [GitBook](https://www.gitbook.com/) for public documentation. Free tier.
 
 ## Total costs
 
@@ -156,11 +148,4 @@ The frontend is React on Next.js, hosted on Vercel. We're still comfortably insi
 | --------------------- | -------------  |
 | TOTAL                 | $359/mo        |
 
-
-
-
-
 </details>
-
-
-

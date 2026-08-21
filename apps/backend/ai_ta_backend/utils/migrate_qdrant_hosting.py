@@ -1,11 +1,9 @@
 import os
 
-from qdrant_client import QdrantClient, models
+from qdrant_client import models
+from qdrant_client import QdrantClient
 
-source_vector_db = QdrantClient(url=os.environ['QDRANT_URL'],
-                                port=6333,
-                                https=False,
-                                api_key=os.environ['QDRANT_API_KEY'])
+source_vector_db = QdrantClient(url=os.environ['QDRANT_URL'], port=6333, https=False, api_key=os.environ['QDRANT_API_KEY'])
 
 destination_vector_db = QdrantClient("http://localhost", port=6333, https=False, api_key=os.environ['QDRANT_API_KEY'])
 
@@ -15,12 +13,12 @@ vector_size = 1536
 
 destination_vector_db.recreate_collection(
     collection_name=destination_collection_name,
-    on_disk_payload=True, # ON DISK Payload (metadata)
+    on_disk_payload=True,  # ON DISK Payload (metadata)
     optimizers_config=models.OptimizersConfigDiff(indexing_threshold=100_000_000),
     vectors_config=models.VectorParams(
         size=vector_size,
         distance=models.Distance.COSINE,
-        on_disk=True, # ON DISK Vectors
+        on_disk=True,  # ON DISK Vectors
         hnsw_config=models.HnswConfigDiff(on_disk=False),  # In memory HNSW.
     ),
 )

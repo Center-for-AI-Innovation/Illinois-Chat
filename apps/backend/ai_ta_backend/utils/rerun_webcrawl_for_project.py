@@ -1,11 +1,12 @@
-import os
 from concurrent.futures import as_completed
+import os
 
-import requests
 from dotenv import load_dotenv
+import requests
 from supabase import create_client
 
-from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapter
+from ai_ta_backend.executors.thread_pool_executor import \
+    ThreadPoolExecutorAdapter
 
 load_dotenv()
 

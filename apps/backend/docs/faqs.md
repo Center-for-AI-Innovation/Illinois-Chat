@@ -31,6 +31,3 @@ Join our newsletter or keep an eye on our Discord server. We love staying connec
 ## Is it secure?
 
 Yes! All data is stored securely on AWS, but we do recommend being cautious as we don’t offer guarantees. Rest assured, your data is as safe as it gets!
-
-
-

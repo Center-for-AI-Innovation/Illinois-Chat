@@ -33,7 +33,13 @@ export async function crawl(rawConfig: Config) {
 
             // Use the requestHandler to process each of the crawled pages.
             // removed , pushData from params... weird try catch behavior
-            async requestHandler({ request, response, page, enqueueLinks, log }) {
+            async requestHandler({
+              request,
+              response,
+              page,
+              enqueueLinks,
+              log,
+            }) {
               console.log(`Crawling: ${request.loadedUrl}...`);
               const title = await page.title();
               pageCounter++;
@@ -67,7 +73,11 @@ export async function crawl(rawConfig: Config) {
                 // Skip error/empty pages (soft-404s, dead links, paywalls) so they never enter
                 // the corpus. The ingest POST is fire-and-forget, so we log every skip with a
                 // greppable SKIP-INGEST prefix to keep the pipeline monitorable from the logs.
-                const skipReason = shouldSkipIngest(title, html, response?.status());
+                const skipReason = shouldSkipIngest(
+                  title,
+                  html,
+                  response?.status(),
+                );
                 if (skipReason) {
                   console.warn(
                     `SKIP-INGEST (${skipReason}): status=${response?.status() ?? "n/a"} ` +

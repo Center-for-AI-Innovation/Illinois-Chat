@@ -26,10 +26,10 @@ Short and sweet introduction to UIUC.chat
 
 ## Why UIUC.chat?
 
-* **Control Over Your Information Sources:** Unlike vendor-driven sites like ChatGPT, all API interactions are contractually hidden and do not train on your data. You have full control over your information sources.&#x20;
-* **Source Citation:** Our chatbot provides source citations, allowing you to click through and trace back to the documents you uploaded.
-* **Robust Features:** Enjoy robust authentication, sharing, monitoring, and support for many different language models.
-* **User Analytics**: When you share your AI assistant as a learning tool, Illinois Chat provides analytics on how users interact with it. This helps you better understand your audience’s needs, allowing you to tailor your content and improve their learning experience.
+- **Control Over Your Information Sources:** Unlike vendor-driven sites like ChatGPT, all API interactions are contractually hidden and do not train on your data. You have full control over your information sources.&#x20;
+- **Source Citation:** Our chatbot provides source citations, allowing you to click through and trace back to the documents you uploaded.
+- **Robust Features:** Enjoy robust authentication, sharing, monitoring, and support for many different language models.
+- **User Analytics**: When you share your AI assistant as a learning tool, Illinois Chat provides analytics on how users interact with it. This helps you better understand your audience’s needs, allowing you to tailor your content and improve their learning experience.
 
 ### Top Use Cases
 
@@ -39,8 +39,6 @@ Short and sweet introduction to UIUC.chat
 4. **Advanced Search Tool**: Enhance your search capabilities by using Illinois Chat over your curated content, making information retrieval fast and reliable.
 
 ## Creating a new project
-
-
 
 {% embed url="https://www.loom.com/share/d89971aa285e4008939a6704528f3ab4?sid=d11803e1-1992-4fcb-a70d-c15f6462859e" %}
 
@@ -57,8 +55,6 @@ You must invite our bot for your course as a TA. The email address is `uiuc.chat
 ## Setting up OpenAI API key
 
 For a great experience bring your own OpenAI API key. We also support Azure OpenAI, and Anthropic.&#x20;
-
-
 
 {% embed url="https://www.loom.com/share/a94b76216672482ea6a3c9010bc2632a?sid=cbaea12b-e19b-4270-94b3-50accbea49b7" %}
 

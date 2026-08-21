@@ -24,7 +24,7 @@ Deeper reference material lives with the apps:
 
 ## Prerequisites
 
-- **`ENCRYPTION_MASTER_KEY`** must be set to the *same value* for the
+- **`ENCRYPTION_MASTER_KEY`** must be set to the _same value_ for the
   frontend, backend, and ingest worker — configs are stored AES-256-GCM
   encrypted, written by the frontend and decrypted by all three. The dev
   bootstrap (`infra/scripts/start-dev.sh`) generates one and syncs it into
@@ -78,7 +78,7 @@ it; the script runs `CREATE EXTENSION IF NOT EXISTS vector` itself.
 > already holds millions of embeddings, read the notes inside
 > `infra/db/provision_external_pgvector_store.sql` about
 > `maintenance_work_mem` and serial (non-parallel) `CREATE INDEX
-> CONCURRENTLY` builds first — getting this wrong turns a ~1 hour build into
+CONCURRENTLY` builds first — getting this wrong turns a ~1 hour build into
 > days.
 
 ## Registering connections with the CLI

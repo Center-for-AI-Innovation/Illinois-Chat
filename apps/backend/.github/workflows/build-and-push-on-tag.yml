@@ -3,7 +3,7 @@ name: Build and Push Backend Images on Tag
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 # Environment variables for ECR repositories
 env:

@@ -1,18 +1,18 @@
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import os
 import pprint
 import smtplib
 import time
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import List
 
+from dotenv import load_dotenv
 import pydantic
 import requests
-import sentry_sdk
-from dotenv import load_dotenv
 from retry import retry
-
+import sentry_sdk
 import supabase
+
 from ai_ta_backend.types.types import ClerkUser
 
 load_dotenv(override=True)
@@ -30,9 +30,7 @@ def get_all_users_from_clerk() -> List[ClerkUser]:
   # Get all users from Clerk
   headers = {'Authorization': f'Bearer {os.environ["CLERK_BEARER_TOKEN"]}'}
   while not done:
-    users = requests.get(f"https://api.clerk.com/v1/users?limit={limit}&offset={offset}&order_by=-created_at",
-                         headers=headers,
-                         timeout=12)
+    users = requests.get(f"https://api.clerk.com/v1/users?limit={limit}&offset={offset}&order_by=-created_at", headers=headers, timeout=12)
     all_users.extend(users.json())
     if len(users.json()) == 0:
       done = True
@@ -71,8 +69,7 @@ def send_html_email(subject: str, html_text: str, sender: str, receipients: list
   :return: A string indicating the result of the email send operation
   """
 
-  supabase_client = supabase.create_client(supabase_url=os.environ['SUPABASE_URL'],
-                                           supabase_key=os.environ['SUPABASE_API_KEY'])
+  supabase_client = supabase.create_client(supabase_url=os.environ['SUPABASE_URL'], supabase_key=os.environ['SUPABASE_API_KEY'])
 
   emails = []
   if not receipients:
@@ -107,8 +104,7 @@ def send_html_email(subject: str, html_text: str, sender: str, receipients: list
 
   # Get the list of unsubscribed emails
   # TODO: Add EmailNewsletter model to sql and replace supabase
-  unsubscribed = supabase_client.table(table_name='email-newsletter').select("email").eq(
-      "unsubscribed-from-newsletter", "TRUE").execute()
+  unsubscribed = supabase_client.table(table_name='email-newsletter').select("email").eq("unsubscribed-from-newsletter", "TRUE").execute()
   unsubscribe_list = [row['email'] for row in unsubscribed.data]
   print("Unsubscribed emails: ", unsubscribe_list)
 

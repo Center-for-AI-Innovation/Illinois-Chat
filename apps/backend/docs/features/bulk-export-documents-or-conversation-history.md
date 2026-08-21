@@ -14,9 +14,9 @@ Obtain _all_ conversations that anyone has had in your project, including any an
 
 ### Data format
 
-* If a user is authenticated when chatting, we include their email address. Otherwise `null`.&#x20;
-* The format mirrors OpenAI's Conversation spec, e.g. below. See OpenAI's docs for details [https://platform.openai.com/docs/api-reference/chat/create](https://platform.openai.com/docs/api-reference/chat/create).
-* In addition, each `assistant` message includes `contexts` that were (potentially) used to answer the question. We always include a maximum of 80 contexts per assitant response.&#x20;
+- If a user is authenticated when chatting, we include their email address. Otherwise `null`.&#x20;
+- The format mirrors OpenAI's Conversation spec, e.g. below. See OpenAI's docs for details [https://platform.openai.com/docs/api-reference/chat/create](https://platform.openai.com/docs/api-reference/chat/create).
+- In addition, each `assistant` message includes `contexts` that were (potentially) used to answer the question. We always include a maximum of 80 contexts per assitant response.&#x20;
 
 ```
 # Data format modeled after Chat API https://platform.openai.com/docs/api-reference/chat/create
@@ -47,8 +47,6 @@ with jsonlines.open(filename) as f:
 print(len(data))
 pprint.pprint(data[0])
 ```
-
-
 
 Example of a single row:&#x20;
 

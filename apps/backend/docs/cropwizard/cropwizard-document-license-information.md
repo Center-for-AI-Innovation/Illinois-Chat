@@ -12,8 +12,6 @@ Documents present in the database:
 2. Springer Journals
 3. Wiley Journals
 
-
-
 ## Springer Journals
 
 ### Springer Nature (Open Access)
