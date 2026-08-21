@@ -6,19 +6,19 @@ description: Thanks for contributing to UIUC.chat ❤️
 
 ## Start here
 
-* [ ] Send me (rohan13@illinois.edu) an email and request to be added to:
-  * [GitHub Organization](https://github.com/Center-for-AI-Innovation) & [Frontend repo](https://github.com/Center-for-AI-Innovation/uiuc-chat-frontend), <mark style="color:yellow;">include your GitHub username</mark>.
-  * [Secrets manager](https://env.uiuc.chat/), <mark style="color:yellow;">include your preferred email address</mark>.
-  * Supabase dashboard, <mark style="color:yellow;">include your GitHub's email address</mark>.
+- [ ] Send me (rohan13@illinois.edu) an email and request to be added to:
+  - [GitHub Organization](https://github.com/Center-for-AI-Innovation) & [Frontend repo](https://github.com/Center-for-AI-Innovation/uiuc-chat-frontend), <mark style="color:yellow;">include your GitHub username</mark>.
+  - [Secrets manager](https://env.uiuc.chat/), <mark style="color:yellow;">include your preferred email address</mark>.
+  - Supabase dashboard, <mark style="color:yellow;">include your GitHub's email address</mark>.
 
 <details>
 
 <summary>Background info on Key accounts</summary>
 
-* Google: `caiincsa@gmail.com`
-* Managed services: Vercel, Railway, Beam, Supabase, S3, Posthog, Sentry.
-* Self-hosted: pgvector (Postgres), Ollama.
-* Task management via [our Github Projects board](https://github.com/orgs/Center-for-AI-Innovation/projects?query=is:open).
+- Google: `caiincsa@gmail.com`
+- Managed services: Vercel, Railway, Beam, Supabase, S3, Posthog, Sentry.
+- Self-hosted: pgvector (Postgres), Ollama.
+- Task management via [our Github Projects board](https://github.com/orgs/Center-for-AI-Innovation/projects?query=is:open).
 
 </details>
 
@@ -35,13 +35,16 @@ See the [CLI install docs](https://infisical.com/docs/cli/overview) for Linux/Wi
 
 {% tabs %}
 {% tab title="brew" %}
+
 ```bash
 # install
 brew install infisical/get-cli/infisical
 ```
+
 {% endtab %}
 
 {% tab title="apt-get" %}
+
 ```bash
 # add the repository
 curl -1sLf \
@@ -51,6 +54,7 @@ curl -1sLf \
 # install
 sudo apt-get update && sudo apt-get install -y infisical
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -98,9 +102,9 @@ follow these instructions _**in order;**_ it's tested to work brilliantly.&#x20;
 Use Node version `18.xx` LTS
 
 ```bash
-# check that nvm is installed (any version). 
+# check that nvm is installed (any version).
 # easily install here: https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating
-nvm --version 
+nvm --version
 
 # use node version 18
 nvm install 18
@@ -114,8 +118,8 @@ Install dev dependencies
 # navigate to the root of the github
 cd uiuc-chat-frontend
 
-# install all necessary dependencies 
-npm i 
+# install all necessary dependencies
+npm i
 ```
 
 ### (2/2) Set up secrets
@@ -136,7 +140,7 @@ infisical login
 You will need to run the below command once for the initial setup
 
 ```bash
-# Use our linter, Trunk SuperLinter. 
+# Use our linter, Trunk SuperLinter.
 # Just run the commande below once to install it.
 # Now every `git commit` and `git push` will trigger linting.
 # We suggest accepting the auto-formatting suggestions.
@@ -161,7 +165,7 @@ INF Injecting 32 Infisical secrets into your application process
 
 `npm run dev` is the most important command you'll use every dev session.
 
-***
+---
 
 ## Backend Setup
 
@@ -196,7 +200,7 @@ Finally, attempt cloning the repo again.
 
 Use a python virtual environment, here I'll use `conda`.
 
-* [Fast and easy conda install](https://www.anaconda.com/docs/getting-started/anaconda/install#macos-linux-installation) (via CLI is easiest), if you don't have it yet.
+- [Fast and easy conda install](https://www.anaconda.com/docs/getting-started/anaconda/install#macos-linux-installation) (via CLI is easiest), if you don't have it yet.
 
 Use <mark style="color:yellow;">python 3.10</mark>.
 
@@ -243,7 +247,5 @@ infisical run --env=dev -- flask --app ai_ta_backend.main:app --debug run --port
 ```
 
 Now you can write new endpoints in `ai-ta-backend/main.py` and call them using [Postman](https://www.postman.com/).&#x20;
-
-
 
 Thanks! For any questions at all just email me (rohan13@illinois.edu).

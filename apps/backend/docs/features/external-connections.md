@@ -33,21 +33,21 @@ Projects without an external connection config require **zero setup**. They auto
 
 This is useful when you need:
 
-* **Data isolation** -- keep documents and embeddings in your own cloud accounts.
-* **Self-hosted vector search** -- run your own Qdrant cluster with custom collections.
-* **Multi-collection search** -- query multiple Qdrant collections (e.g., PubMed, Patents, NCBI Books) in parallel and merge results.
-* **Custom embedding models** -- use a different embedding provider (OpenAI-compatible or Ollama) per project.
+- **Data isolation** -- keep documents and embeddings in your own cloud accounts.
+- **Self-hosted vector search** -- run your own Qdrant cluster with custom collections.
+- **Multi-collection search** -- query multiple Qdrant collections (e.g., PubMed, Patents, NCBI Books) in parallel and merge results.
+- **Custom embedding models** -- use a different embedding provider (OpenAI-compatible or Ollama) per project.
 
 ## Where CRUD lives
 
 {% hint style="warning" %}
 **CRUD for external connections is owned by the Next.js frontend, not this backend.** The endpoints documented in earlier revisions of this page (`POST/GET/DELETE/PATCH /api/project-connections*`) have been removed. The frontend is the sole writer to the `project_external_connections` table; this backend is a **read-only consumer**.
 
-* Frontend repo: `uiuc-chat-frontend`
-* Source: `src/pages/api/UIUC-api/projectConnections*`
-* Operator docs: `uiuc-chat-frontend/docs/EXTERNAL_CONNECTIONS.md`
-* Authorization: super-admin-only (see frontend docs).
-{% endhint %}
+- Frontend repo: `uiuc-chat-frontend`
+- Source: `src/pages/api/UIUC-api/projectConnections*`
+- Operator docs: `uiuc-chat-frontend/docs/EXTERNAL_CONNECTIONS.md`
+- Authorization: super-admin-only (see frontend docs).
+  {% endhint %}
 
 ## Supported Connection Types
 
@@ -94,11 +94,11 @@ There is no `VECTOR_ENGINE` environment switch — the row alone decides.
 
 ## Security
 
-* All config values (API keys, access keys, connection URIs) are **encrypted at rest** with AES-256-GCM.
-* This backend requires the `ENCRYPTION_MASTER_KEY` environment variable to be set in order to decrypt configs at runtime.
-* The frontend GET endpoint returns **masked values** (`****MPLE`) so secrets are never exposed through any API.
+- All config values (API keys, access keys, connection URIs) are **encrypted at rest** with AES-256-GCM.
+- This backend requires the `ENCRYPTION_MASTER_KEY` environment variable to be set in order to decrypt configs at runtime.
+- The frontend GET endpoint returns **masked values** (`****MPLE`) so secrets are never exposed through any API.
 
 ## Next Steps
 
-* [Frontend API reference](../../../uiuc-chat-frontend/docs/EXTERNAL_CONNECTIONS.md) -- where to actually call CRUD.
-* [Configuration Reference](../developers/external-connections-config.md) -- complete field-by-field config schemas, post-processors, embedding providers, and environment variables.
+- [Frontend API reference](../../../uiuc-chat-frontend/docs/EXTERNAL_CONNECTIONS.md) -- where to actually call CRUD.
+- [Configuration Reference](../developers/external-connections-config.md) -- complete field-by-field config schemas, post-processors, embedding providers, and environment variables.

@@ -3,7 +3,7 @@ name: Build and Push Crawlee Images on Tag
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 env:
   AWS_REGION: us-east-2
@@ -61,7 +61,6 @@ jobs:
       - name: Output DEV image tag
         run: |
           echo "DEV Crawlee image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.DEV_IMAGE_TAG }}"
-
 
   build-and-push-prod:
     name: Build and Push PROD Crawlee Image

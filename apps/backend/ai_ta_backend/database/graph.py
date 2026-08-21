@@ -1,117 +1,120 @@
 import os
 import re
 
-from langchain_neo4j import GraphCypherQAChain, Neo4jGraph
-from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, START, END
-from typing_extensions import TypedDict
 from flask import current_app
+from langchain_neo4j import GraphCypherQAChain
+from langchain_neo4j import Neo4jGraph
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END
+from langgraph.graph import START
+from langgraph.graph import StateGraph
+from typing_extensions import TypedDict
 
 
 # Unified state for both PrimeKG and Clinical KG
 class KGQueryState(TypedDict):
-    user_query: str
-    attempt: int
-    queries_tried: list[str]
-    results: list[dict] | dict  # allow both for compatibility
-    max_attempts: int
+  user_query: str
+  attempt: int
+  queries_tried: list[str]
+  results: list[dict] | dict  # allow both for compatibility
+  max_attempts: int
+
 
 # Example strategies for generating Cypher queries (can be extended)
 def generate_primekg_cypher(user_query: str, attempt: int) -> str:
-    """
+  """
     Generate different Cypher queries for each attempt, aligned with the system prompt instructions.
     For queries mentioning two entities, retries after the first attempt will use CONTAINS for node names and match any relationship type between the nodes.
     """
-    general_terms = ["related to", "associated with", "connected to", "linked to", "connection", "relationship"]
-    lower_query = user_query.lower()
-    uses_general_term = any(term in lower_query for term in general_terms)
+  general_terms = ["related to", "associated with", "connected to", "linked to", "connection", "relationship"]
+  lower_query = user_query.lower()
+  uses_general_term = any(term in lower_query for term in general_terms)
 
-    # Simple heuristic: look for two quoted entities or two 'and'-separated terms
-    # e.g., "diabetes and heart disease"
-    entity_match = re.findall(r'([\w\- ]+) and ([\w\- ]+)', user_query, re.IGNORECASE)
-    if entity_match:
-        entity1, entity2 = entity_match[0]
-        entity1 = entity1.strip(' "')
-        entity2 = entity2.strip(' "')
-    else:
-        entity1 = entity2 = None
+  # Simple heuristic: look for two quoted entities or two 'and'-separated terms
+  # e.g., "diabetes and heart disease"
+  entity_match = re.findall(r'([\w\- ]+) and ([\w\- ]+)', user_query, re.IGNORECASE)
+  if entity_match:
+    entity1, entity2 = entity_match[0]
+    entity1 = entity1.strip(' "')
+    entity2 = entity2.strip(' "')
+  else:
+    entity1 = entity2 = None
 
-    if attempt == 0:
-        # First attempt: smart mapping and synonym use for node labels/relationships
-        return f"{user_query} (map user terms to closest schema node labels/relationships, use synonyms if needed)"
-    elif (attempt == 1 or attempt == 2) and entity1 and entity2:
-        # For retries, if two entities are detected, use CONTAINS and match any relationship type
-        return (
-            f"Find any connections between entities using partial matching and any relationship type: "
+  if attempt == 0:
+    # First attempt: smart mapping and synonym use for node labels/relationships
+    return f"{user_query} (map user terms to closest schema node labels/relationships, use synonyms if needed)"
+  elif (attempt == 1 or attempt == 2) and entity1 and entity2:
+    # For retries, if two entities are detected, use CONTAINS and match any relationship type
+    return (f"Find any connections between entities using partial matching and any relationship type: "
             f'MATCH (n1), (n2) '
             f'WHERE toLower(n1.node_name) CONTAINS "{entity1.lower()}" '
             f'AND toLower(n2.node_name) CONTAINS "{entity2.lower()}" '
             f'MATCH (n1)-[r]-(n2) '
-            f'RETURN n1.node_name AS Entity1, n2.node_name AS Entity2, type(r) AS RelationshipType, r'
-        )
-    elif attempt == 1 and uses_general_term:
-        # Second attempt: broaden to any plausible relationship if general terms are detected
-        return f"{user_query} (broaden: treat general terms like 'related to' as any plausible relationship, use -[]-> or multiple types)"
-    elif attempt == 2:
-        # Third attempt: try alternative node labels/relationships and synonyms
-        return f"{user_query} (try alternative node labels, relationship types, and synonyms from schema)"
-    else:
-        # Fallback: most general query
-        return f"{user_query} (fallback: use the most general relationship and node label patterns)"
+            f'RETURN n1.node_name AS Entity1, n2.node_name AS Entity2, type(r) AS RelationshipType, r')
+  elif attempt == 1 and uses_general_term:
+    # Second attempt: broaden to any plausible relationship if general terms are detected
+    return f"{user_query} (broaden: treat general terms like 'related to' as any plausible relationship, use -[]-> or multiple types)"
+  elif attempt == 2:
+    # Third attempt: try alternative node labels/relationships and synonyms
+    return f"{user_query} (try alternative node labels, relationship types, and synonyms from schema)"
+  else:
+    # Fallback: most general query
+    return f"{user_query} (fallback: use the most general relationship and node label patterns)"
+
 
 # Example strategies for generating Cypher queries for Clinical KG (can be extended)
 def generate_clinicalkg_cypher(user_query: str, attempt: int) -> str:
-    """
+  """
     Generate different Cypher queries for each attempt, aligned with the clinical KG system prompt instructions.
     """
-    general_terms = ["related to", "associated with", "connected to", "linked to", "connection", "relationship"]
-    lower_query = user_query.lower()
-    uses_general_term = any(term in lower_query for term in general_terms)
+  general_terms = ["related to", "associated with", "connected to", "linked to", "connection", "relationship"]
+  lower_query = user_query.lower()
+  uses_general_term = any(term in lower_query for term in general_terms)
 
-    # Simple heuristic: look for two quoted entities or two 'and'-separated terms
-    entity_match = re.findall(r'([\w\- ]+) and ([\w\- ]+)', user_query, re.IGNORECASE)
-    if entity_match:
-        entity1, entity2 = entity_match[0]
-        entity1 = entity1.strip(' "')
-        entity2 = entity2.strip(' "')
-    else:
-        entity1 = entity2 = None
+  # Simple heuristic: look for two quoted entities or two 'and'-separated terms
+  entity_match = re.findall(r'([\w\- ]+) and ([\w\- ]+)', user_query, re.IGNORECASE)
+  if entity_match:
+    entity1, entity2 = entity_match[0]
+    entity1 = entity1.strip(' "')
+    entity2 = entity2.strip(' "')
+  else:
+    entity1 = entity2 = None
 
-    if attempt == 0:
-        # First attempt: smart mapping and synonym use for node labels/relationships
-        return f"{user_query} (map user terms to closest schema node labels/relationships, use synonyms if needed)"
-    elif (attempt == 1 or attempt == 2) and entity1 and entity2:
-        # For retries, if two entities are detected, use CONTAINS and match any relationship type
-        return (
-            f"Find any connections between entities using partial matching and any relationship type: "
+  if attempt == 0:
+    # First attempt: smart mapping and synonym use for node labels/relationships
+    return f"{user_query} (map user terms to closest schema node labels/relationships, use synonyms if needed)"
+  elif (attempt == 1 or attempt == 2) and entity1 and entity2:
+    # For retries, if two entities are detected, use CONTAINS and match any relationship type
+    return (f"Find any connections between entities using partial matching and any relationship type: "
             f'MATCH (n1), (n2) '
             f'WHERE toLower(n1.name) CONTAINS "{entity1.lower()}" '
             f'AND toLower(n2.name) CONTAINS "{entity2.lower()}" '
             f'MATCH (n1)-[r]-(n2) '
-            f'RETURN n1.name AS Entity1, n2.name AS Entity2, type(r) AS RelationshipType, r'
-        )
-    elif attempt == 1 and uses_general_term:
-        # Second attempt: broaden to any plausible relationship if general terms are detected
-        return f"{user_query} (broaden: treat general terms like 'related to' as any plausible relationship, use -[]-> or multiple types)"
-    elif attempt == 2:
-        # Third attempt: try alternative node labels/relationships and synonyms
-        return f"{user_query} (try alternative node labels, relationship types, and synonyms from schema)"
-    else:
-        # Fallback: most general query
-        return f"{user_query} (fallback: use the most general relationship and node label patterns)"
+            f'RETURN n1.name AS Entity1, n2.name AS Entity2, type(r) AS RelationshipType, r')
+  elif attempt == 1 and uses_general_term:
+    # Second attempt: broaden to any plausible relationship if general terms are detected
+    return f"{user_query} (broaden: treat general terms like 'related to' as any plausible relationship, use -[]-> or multiple types)"
+  elif attempt == 2:
+    # Third attempt: try alternative node labels/relationships and synonyms
+    return f"{user_query} (try alternative node labels, relationship types, and synonyms from schema)"
+  else:
+    # Fallback: most general query
+    return f"{user_query} (fallback: use the most general relationship and node label patterns)"
+
 
 def run_primekg_chain(chain, cypher_query: str):
-    # This function should call the chain with the cypher_query
-    # For now, assume chain.invoke returns a dict with 'results' key
-    # In practice, you may need to adapt this to your chain's API
-    try:
-        result = chain.invoke({"query": cypher_query})
-        # Adapt this if your chain returns results differently
-        if isinstance(result, dict) and "results" in result:
-            return result["results"]
-        return result
-    except Exception as e:
-        return []
+  # This function should call the chain with the cypher_query
+  # For now, assume chain.invoke returns a dict with 'results' key
+  # In practice, you may need to adapt this to your chain's API
+  try:
+    result = chain.invoke({"query": cypher_query})
+    # Adapt this if your chain returns results differently
+    if isinstance(result, dict) and "results" in result:
+      return result["results"]
+    return result
+  except Exception as e:
+    return []
+
 
 class GraphDatabase:
 
@@ -304,7 +307,7 @@ class GraphDatabase:
       Always explain the alternative approaches being tried.
       """
     if current_app and current_app.debug:
-        print("SYSTEM PROMPT: ", system_prompt)
+      print("SYSTEM PROMPT: ", system_prompt)
     return self._create_chain(schema_info, system_prompt, self.clinical_kg_graph)
 
   def _create_prime_kg_chain(self):
@@ -445,8 +448,13 @@ class GraphDatabase:
     If no results, try alternative terms related to the query and explain your reasoning.
     """
     if current_app and current_app.debug:
-        print("SYSTEM PROMPT: ", system_prompt)
-    return self._create_chain(schema_info, system_prompt, self.prime_kg_graph, return_direct=True, return_intermediate_steps=True, verbose=True)
+      print("SYSTEM PROMPT: ", system_prompt)
+    return self._create_chain(schema_info,
+                              system_prompt,
+                              self.prime_kg_graph,
+                              return_direct=True,
+                              return_intermediate_steps=True,
+                              verbose=True)
 
   def create_chain_with_custom_prompt(self, additional_instructions=""):
     """
@@ -488,7 +496,7 @@ class GraphDatabase:
         {additional_instructions}
         """
     if current_app and current_app.debug:
-        print("SYSTEM PROMPT: ", system_prompt)
+      print("SYSTEM PROMPT: ", system_prompt)
     return self._create_chain(self.ckg_schema_info, system_prompt, self.clinical_kg_graph, verbose=False)
 
   def _extract_kg_result(self, response):
@@ -496,7 +504,7 @@ class GraphDatabase:
     Helper to extract the kg_result from a chain response dict.
     """
     if isinstance(response, dict):
-        return response.get("kg_result")
+      return response.get("kg_result")
     return None
 
   def run_kg_query_with_retries(self, user_query: str, chain, cypher_generator, max_attempts: int = 3, readable_filename: str = None):
@@ -516,64 +524,61 @@ class GraphDatabase:
     Note:
         This method is synchronous. If you want to use it in an async context, call it with asyncio.to_thread or refactor for async support.
     """
-    def query_node(state: KGQueryState):
-        cypher_query_prompt = cypher_generator(state["user_query"], state["attempt"])
-        if current_app and current_app.debug:
-            print(f"[DEBUG][KG] Attempt {state['attempt']} - Generated Cypher Query Prompt: {cypher_query_prompt}")
-        try:
-            result = chain.invoke({"query": cypher_query_prompt})
-            if current_app and current_app.debug:
-                print(f"[DEBUG][KG] Chain result (type: {type(result)}): {result}")
-            cypher_query_actual = cypher_query_prompt  # fallback
-            if isinstance(result, dict):
-                steps = result.get("intermediate_steps")
-                if steps and isinstance(steps, list):
-                    for step in steps:
-                        if isinstance(step, dict) and "query" in step and isinstance(step["query"], str):
-                            cypher_query_actual = step["query"].strip()
-                            # Remove 'cypher\n' prefix if present
-                            if cypher_query_actual.lower().startswith("cypher"):
-                                cypher_query_actual = cypher_query_actual.split("\n", 1)[-1].strip()
-                            break
-        except Exception as e:
-            if current_app and current_app.debug:
-                print(f"[ERROR][KG] Exception in chain.invoke: {e}")
-            import traceback
-            traceback.print_exc()
-            result = {}
-            cypher_query_actual = cypher_query_prompt
 
-        return {
-            "queries_tried": state["queries_tried"] + [cypher_query_actual],
-            "results": result,
-            "attempt": state["attempt"] + 1,
-        }
+    def query_node(state: KGQueryState):
+      cypher_query_prompt = cypher_generator(state["user_query"], state["attempt"])
+      if current_app and current_app.debug:
+        print(f"[DEBUG][KG] Attempt {state['attempt']} - Generated Cypher Query Prompt: {cypher_query_prompt}")
+      try:
+        result = chain.invoke({"query": cypher_query_prompt})
+        if current_app and current_app.debug:
+          print(f"[DEBUG][KG] Chain result (type: {type(result)}): {result}")
+        cypher_query_actual = cypher_query_prompt  # fallback
+        if isinstance(result, dict):
+          steps = result.get("intermediate_steps")
+          if steps and isinstance(steps, list):
+            for step in steps:
+              if isinstance(step, dict) and "query" in step and isinstance(step["query"], str):
+                cypher_query_actual = step["query"].strip()
+                # Remove 'cypher\n' prefix if present
+                if cypher_query_actual.lower().startswith("cypher"):
+                  cypher_query_actual = cypher_query_actual.split("\n", 1)[-1].strip()
+                break
+      except Exception as e:
+        if current_app and current_app.debug:
+          print(f"[ERROR][KG] Exception in chain.invoke: {e}")
+        import traceback
+        traceback.print_exc()
+        result = {}
+        cypher_query_actual = cypher_query_prompt
+
+      return {
+          "queries_tried": state["queries_tried"] + [cypher_query_actual],
+          "results": result,
+          "attempt": state["attempt"] + 1,
+      }
 
     def should_retry(state: KGQueryState):
-        results = state["results"]
+      results = state["results"]
+      if current_app and current_app.debug:
+        print(f"[DEBUG][KG] should_retry called. Attempt: {state['attempt']}, Results: {results}")
+      # Only return success if the 'result' field in the results dict is non-empty
+      if isinstance(results, dict) and results.get("result"):
         if current_app and current_app.debug:
-            print(f"[DEBUG][KG] should_retry called. Attempt: {state['attempt']}, Results: {results}")
-        # Only return success if the 'result' field in the results dict is non-empty
-        if isinstance(results, dict) and results.get("result"):
-            if current_app and current_app.debug:
-                print("[DEBUG][KG] should_retry: Success condition met.")
-            return "success"
-        elif state["attempt"] < state["max_attempts"]:
-            if current_app and current_app.debug:
-                print("[DEBUG][KG] should_retry: Retrying...")
-            return "query_node"
-        else:
-            if current_app and current_app.debug:
-                print("[DEBUG][KG] should_retry: Max attempts reached. Failing.")
-            return "fail"
+          print("[DEBUG][KG] should_retry: Success condition met.")
+        return "success"
+      elif state["attempt"] < state["max_attempts"]:
+        if current_app and current_app.debug:
+          print("[DEBUG][KG] should_retry: Retrying...")
+        return "query_node"
+      else:
+        if current_app and current_app.debug:
+          print("[DEBUG][KG] should_retry: Max attempts reached. Failing.")
+        return "fail"
 
     builder = StateGraph(KGQueryState)
     builder.add_node("query_node", query_node)
-    builder.add_conditional_edges("query_node", should_retry, {
-        "success": END,
-        "fail": END,
-        "query_node": "query_node"
-    })
+    builder.add_conditional_edges("query_node", should_retry, {"success": END, "fail": END, "query_node": "query_node"})
     builder.add_edge(START, "query_node")
     graph = builder.compile()
 
@@ -588,16 +593,13 @@ class GraphDatabase:
     # If after all attempts there are no results, return minimal structure
     results = result.get("results")
     if not results or (isinstance(results, dict) and not results.get("result")):
-        return {
-            "kg_result": None,
-            "text": ""
-        }
+      return {"kg_result": None, "text": ""}
     # If successful, extract the result and summary if possible
     if isinstance(results, dict) and "result" in results:
-        return {
-            "kg_result": results["result"],
-            "text": ""  # summary will be added in the service layer
-        }
+      return {
+          "kg_result": results["result"],
+          "text": ""  # summary will be added in the service layer
+      }
     return result
 
   def run_primekg_query_with_retries(self, user_query: str, max_attempts: int = 3):
@@ -647,15 +649,16 @@ class GraphDatabase:
     # Truncate or format kg_result for prompt if it's very large
     context_str = str(kg_result[:5])[:4000]  # use first 5 results, adjust as needed for token limits
 
-    prompt = (
-        f"User question: {user_query}\n"
-        f"Knowledge graph results: {context_str}\n"
-        "Please provide a concise, readable summary of the key findings that answer the user's question."
-    )
+    prompt = (f"User question: {user_query}\n"
+              f"Knowledge graph results: {context_str}\n"
+              "Please provide a concise, readable summary of the key findings that answer the user's question.")
 
     response = client.chat.completions.create(
         model="gpt-4o",  # or "gpt-3.5-turbo" if you want to save cost
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{
+            "role": "user",
+            "content": prompt
+        }],
         max_tokens=256,
         temperature=0.3,
     )
@@ -663,28 +666,28 @@ class GraphDatabase:
 
   def getPrimeKGContexts(self, user_query: str) -> dict:
     try:
-        response = self.run_primekg_query_with_retries(user_query)
-        kg_result = self._extract_kg_result(response)
-        if kg_result:
-            summary = self.generate_openai_summary(user_query, kg_result)
-            return {"kg_result": kg_result, "text": summary}
-        else:
-            return {"kg_result": None, "text": ""}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
+      response = self.run_primekg_query_with_retries(user_query)
+      kg_result = self._extract_kg_result(response)
+      if kg_result:
+        summary = self.generate_openai_summary(user_query, kg_result)
+        return {"kg_result": kg_result, "text": summary}
+      else:
         return {"kg_result": None, "text": ""}
+    except Exception as e:
+      import traceback
+      traceback.print_exc()
+      return {"kg_result": None, "text": ""}
 
   def getClinicalKGContexts(self, user_query: str) -> dict:
     try:
-        response = self.run_clinicalkg_query_with_retries(user_query)
-        kg_result = self._extract_kg_result(response)
-        if kg_result:
-            summary = self.generate_openai_summary(user_query, kg_result)
-            return {"kg_result": kg_result, "text": summary}
-        else:
-            return {"kg_result": None, "text": ""}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
+      response = self.run_clinicalkg_query_with_retries(user_query)
+      kg_result = self._extract_kg_result(response)
+      if kg_result:
+        summary = self.generate_openai_summary(user_query, kg_result)
+        return {"kg_result": kg_result, "text": summary}
+      else:
         return {"kg_result": None, "text": ""}
+    except Exception as e:
+      import traceback
+      traceback.print_exc()
+      return {"kg_result": None, "text": ""}

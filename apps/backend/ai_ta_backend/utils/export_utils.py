@@ -1,11 +1,11 @@
+from datetime import datetime
 import json
 import os
 import tempfile
-import zipfile
 from urllib.parse import urlparse
+import zipfile
 
 import xlsxwriter
-from datetime import datetime
 
 
 def _initialize_base_name(course_name):
@@ -13,24 +13,24 @@ def _initialize_base_name(course_name):
 
 
 def _initialize_file_paths(course_name: str):
-    base_name = _initialize_base_name(course_name)
+  base_name = _initialize_base_name(course_name)
 
-    # Create a unique temp directory for this course_name
-    temp_dir = tempfile.mkdtemp(prefix=f"{course_name}_", dir=tempfile.gettempdir())
+  # Create a unique temp directory for this course_name
+  temp_dir = tempfile.mkdtemp(prefix=f"{course_name}_", dir=tempfile.gettempdir())
 
-    file_paths = {
-        "zip": os.path.join(temp_dir, base_name + ".zip"),
-        "excel": os.path.join(temp_dir, base_name + ".xlsx"),
-        "jsonl": os.path.join(temp_dir, base_name + ".jsonl"),
-        "markdown_dir": os.path.join(temp_dir, "markdown_export"),
-        "media_dir": os.path.join(temp_dir, "media_files"),
-    }
+  file_paths = {
+      "zip": os.path.join(temp_dir, base_name + ".zip"),
+      "excel": os.path.join(temp_dir, base_name + ".xlsx"),
+      "jsonl": os.path.join(temp_dir, base_name + ".jsonl"),
+      "markdown_dir": os.path.join(temp_dir, "markdown_export"),
+      "media_dir": os.path.join(temp_dir, "media_files"),
+  }
 
-    os.makedirs(file_paths["markdown_dir"], exist_ok=True)
-    os.makedirs(file_paths["media_dir"], exist_ok=True)
+  os.makedirs(file_paths["markdown_dir"], exist_ok=True)
+  os.makedirs(file_paths["media_dir"], exist_ok=True)
 
-    print(f"Initialized directories: {file_paths['markdown_dir']}, {file_paths['media_dir']}")
-    return file_paths
+  print(f"Initialized directories: {file_paths['markdown_dir']}, {file_paths['media_dir']}")
+  return file_paths
 
 
 def _initialize_excel(excel_file_path):
@@ -45,8 +45,7 @@ def _initialize_excel(excel_file_path):
   worksheet.set_column('F:F', 10)
   worksheet.set_column('H:H', 15)
   headers = [
-      "Conversation ID", "User Email", "Course Name", "Message ID", "Timestamp", "User Role", "Message Content",
-      "Had Images(Yes/No)"
+      "Conversation ID", "User Email", "Course Name", "Message ID", "Timestamp", "User Role", "Message Content", "Had Images(Yes/No)"
   ]
   for col_num, header in enumerate(headers):
     worksheet.write(0, col_num, header)
@@ -67,8 +66,8 @@ def _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num
       convo_name = messages[0]['content'][:15]
     print(f"Processing conversation ID: {convo_id}, User email: {user_email}")
 
-    _create_markdown(s3, convo_id, messages, file_paths['markdown_dir'], file_paths['media_dir'], user_email, error_log,
-                     timestamp, convo_name, bucket_name)
+    _create_markdown(s3, convo_id, messages, file_paths['markdown_dir'], file_paths['media_dir'], user_email, error_log, timestamp,
+                     convo_name, bucket_name)
     # print(f"Created markdown for conversation ID: {convo_id}")
     _write_to_excel(convo_id, course_name, messages, worksheet, row_num, user_email, timestamp, error_log, wrap_format)
     # print(f"Wrote to Excel for conversation ID: {convo_id}")
@@ -80,8 +79,7 @@ def _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num
     error_log.append(f"Error processing conversation ID {convo['convo_id']}: {str(e)}")
 
 
-def _process_conversation_for_user_convo_export(s3, convo, project_name, markdown_dir, media_dir, error_log,
-                                                bucket_name):
+def _process_conversation_for_user_convo_export(s3, convo, project_name, markdown_dir, media_dir, error_log, bucket_name):
   try:
     messages = convo["messages"]
     convo_id = str(convo.get("id")) if convo else None
@@ -89,18 +87,15 @@ def _process_conversation_for_user_convo_export(s3, convo, project_name, markdow
     user_email = convo.get("user_email")
     timestamp = convo.get("created_at")
 
-    _create_markdown_for_user_convo_export(
-      s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log, timestamp, name, project_name,
-      bucket_name
-    )
+    _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log, timestamp, name,
+                                           project_name, bucket_name)
 
   except Exception as e:
     error_log.append(f"Error processing conversation {convo}: {e}")
     raise
 
 
-def _create_markdown(s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log, timestamp, convo_name,
-                     bucket_name):
+def _create_markdown(s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log, timestamp, convo_name, bucket_name):
   try:
     if isinstance(timestamp, datetime):
       timestamp = timestamp.isoformat()
@@ -124,8 +119,8 @@ def _create_markdown(s3, convo_id, messages, markdown_dir, media_dir, user_email
     error_log.append(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
 
 
-def _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log,
-                                           timestamp, name, project_name, bucket_name):
+def _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log, timestamp, name,
+                                           project_name, bucket_name):
   try:
     print(f"Creating markdown file for conversation ID {convo_id}")
     if isinstance(timestamp, datetime):
@@ -144,9 +139,8 @@ def _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir,
         role = "User" if message['role'] == 'user' else "Assistant" if message['role'] == 'assistant' else "System"
 
         # content = _process_message_content(s3, message['content'], convo_id, media_dir, error_log)
-        content = _process_message_content_for_user_convo_export(s3, message['content_text'],
-                                                                 message['content_image_url'], convo_id, media_dir,
-                                                                 error_log, project_name, bucket_name)
+        content = _process_message_content_for_user_convo_export(s3, message['content_text'], message['content_image_url'], convo_id,
+                                                                 media_dir, error_log, project_name, bucket_name)
         md_file.write(f"### {role}:\n")
         md_file.write(f"{content}\n\n")
         if img_desc:
@@ -187,9 +181,8 @@ def _process_message_content(s3, content, convo_id, media_dir, error_log, bucket
     return content
 
 
-def _process_message_content_for_user_convo_export(s3, content_text: str, content_image_url: list, convo_id: str,
-                                                   media_dir: str, error_log: list, project_name: str,
-                                                   bucket_name: str) -> str:
+def _process_message_content_for_user_convo_export(s3, content_text: str, content_image_url: list, convo_id: str, media_dir: str,
+                                                   error_log: list, project_name: str, bucket_name: str) -> str:
   try:
     content = content_text
     for url in content_image_url:
@@ -271,15 +264,12 @@ def _create_zip(file_paths, error_log):
   with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
     for root, _, files in os.walk(file_paths['markdown_dir']):
       for file in files:
-        zipf.write(
-            os.path.join(root, file),
-            os.path.join('markdown export', os.path.relpath(os.path.join(root, file), file_paths['markdown_dir'])))
+        zipf.write(os.path.join(root, file),
+                   os.path.join('markdown export', os.path.relpath(os.path.join(root, file), file_paths['markdown_dir'])))
     for root, _, files in os.walk(file_paths['media_dir']):
       for file in files:
-        zipf.write(
-            os.path.join(root, file),
-            os.path.join(file_paths['media_dir'].split('/')[-1],
-                         os.path.relpath(os.path.join(root, file), file_paths['media_dir'])))
+        zipf.write(os.path.join(root, file),
+                   os.path.join(file_paths['media_dir'].split('/')[-1], os.path.relpath(os.path.join(root, file), file_paths['media_dir'])))
     zipf.write(file_paths['excel'], os.path.basename(file_paths['excel']))
     zipf.write(file_paths['jsonl'], os.path.basename(file_paths['jsonl']))
     zipf.write(error_log_path, 'error.log')
@@ -300,12 +290,10 @@ def _create_zip_for_user_convo_export(markdown_dir, media_dir, error_log):
   with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
     for root, _, files in os.walk(markdown_dir):
       for file in files:
-        zipf.write(os.path.join(root, file),
-                   os.path.join('markdown export', os.path.relpath(os.path.join(root, file), markdown_dir)))
+        zipf.write(os.path.join(root, file), os.path.join('markdown export', os.path.relpath(os.path.join(root, file), markdown_dir)))
     for root, _, files in os.walk(media_dir):
       for file in files:
-        zipf.write(os.path.join(root, file),
-                   os.path.join(media_dir.split('/')[-1], os.path.relpath(os.path.join(root, file), media_dir)))
+        zipf.write(os.path.join(root, file), os.path.join(media_dir.split('/')[-1], os.path.relpath(os.path.join(root, file), media_dir)))
     zipf.write(error_log_path, 'error.log')
   print(f"Created zip file at path: {zip_file_path}")
   os.remove(error_log_path)

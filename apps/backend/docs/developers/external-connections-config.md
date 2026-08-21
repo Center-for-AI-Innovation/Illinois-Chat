@@ -55,13 +55,13 @@ The `s3_config` block supports either AWS S3 or any S3-compatible storage such a
 }
 ```
 
-| Field                    | Type   | Required | Description                                                                                         |
-| ------------------------ | ------ | -------- | --------------------------------------------------------------------------------------------------- |
-| `aws_access_key_id`     | string | **Yes**  | Access key ID (works for both AWS S3 and MinIO)                                                    |
-| `aws_secret_access_key` | string | **Yes**  | Secret access key (works for both AWS S3 and MinIO)                                                |
-| `bucket_name`            | string | No       | Bucket name. Falls back to the `S3_BUCKET_NAME` environment variable if omitted.                    |
-| `endpoint_url`           | string | No       | Custom S3-compatible endpoint URL. **Provide this for MinIO**; omit for AWS S3.                     |
-| `region`                 | string | No       | AWS region for the bucket (e.g., `us-east-1`). Required by clients that don't have an automatic region-resolution chain (notably the AWS SDK for JavaScript v3). When omitted, the Flask backend falls back to boto3's resolution chain (`AWS_DEFAULT_REGION`, instance metadata, etc.). |
+| Field                   | Type   | Required | Description                                                                                                                                                                                                                                                                              |
+| ----------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aws_access_key_id`     | string | **Yes**  | Access key ID (works for both AWS S3 and MinIO)                                                                                                                                                                                                                                          |
+| `aws_secret_access_key` | string | **Yes**  | Secret access key (works for both AWS S3 and MinIO)                                                                                                                                                                                                                                      |
+| `bucket_name`           | string | No       | Bucket name. Falls back to the `S3_BUCKET_NAME` environment variable if omitted.                                                                                                                                                                                                         |
+| `endpoint_url`          | string | No       | Custom S3-compatible endpoint URL. **Provide this for MinIO**; omit for AWS S3.                                                                                                                                                                                                          |
+| `region`                | string | No       | AWS region for the bucket (e.g., `us-east-1`). Required by clients that don't have an automatic region-resolution chain (notably the AWS SDK for JavaScript v3). When omitted, the Flask backend falls back to boto3's resolution chain (`AWS_DEFAULT_REGION`, instance metadata, etc.). |
 
 {% hint style="info" %}
 **MinIO users:** Set `endpoint_url` to your MinIO server address (e.g., `https://minio.example.com`). Path-style addressing is automatically enabled when `endpoint_url` is provided. `region` is generally not needed for MinIO but is accepted if your deployment requires it.
@@ -79,8 +79,8 @@ The `s3_config` block supports either AWS S3 or any S3-compatible storage such a
 }
 ```
 
-| Field            | Type   | Required | Description                                                                                                      |
-| ---------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| Field            | Type   | Required | Description                                                                                                                                              |
+| ---------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `connection_uri` | string | **Yes**  | Full PostgreSQL connection URI (`postgres://` or `postgresql://` only). The engine is created with `pool_size=3`, `max_overflow=2`, `pool_recycle=1800`. |
 
 {% hint style="info" %}
@@ -93,15 +93,15 @@ An external `database_config` is **document-scoped**. Only the tables that parti
 
 When `qdrant_config` is **not** set, embeddings also live on the external DB (the platform's pgvector path uses the documents engine). When `qdrant_config` **is** set, the external DB stores documents only; embeddings go to Qdrant.
 
-| Lives in external DB (when `database_config` is set) | Always lives on host main DB |
-| ---------------------------------------------------- | ---------------------------- |
-| `documents`                                          | `conversations`              |
-| `documents_in_progress`                              | `messages`                   |
-| `documents_failed`                                   | `projects`                   |
-| `doc_groups`                                         | `project_stats`              |
-| `documents_doc_groups`                               | `llm-convo-monitor`          |
-| `embeddings` *(when `qdrant_config` is not set)*     | `pre_authorized_api_keys`    |
-|                                                      | `n8n_workflows`              |
+| Lives in external DB (when `database_config` is set) | Always lives on host main DB                              |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| `documents`                                          | `conversations`                                           |
+| `documents_in_progress`                              | `messages`                                                |
+| `documents_failed`                                   | `projects`                                                |
+| `doc_groups`                                         | `project_stats`                                           |
+| `documents_doc_groups`                               | `llm-convo-monitor`                                       |
+| `embeddings` _(when `qdrant_config` is not set)_     | `pre_authorized_api_keys`                                 |
+|                                                      | `n8n_workflows`                                           |
 |                                                      | `project_external_connections` (the routing table itself) |
 
 The external DB schema must therefore provide the six document-side tables (five plus `embeddings` when running on pgvector). Conversation history, project metadata, stats dashboards, API key resolution, and workflow locks all read/write the host DB.
@@ -110,19 +110,19 @@ The external DB schema must therefore provide the six document-side tables (five
 
 Before activating a `database_config` row, the operator must apply the platform's migrations on the external Postgres. The required objects are:
 
-* `pgvector` extension (`CREATE EXTENSION IF NOT EXISTS vector;`)
-* Tables:
-  * `embeddings` — vectorized chunks (4096-dim by default; see migration 0007).
-  * `documents`, `documents_in_progress`, `documents_failed`
-  * `doc_groups`, `documents_doc_groups`
-* Stored procedures: `add_document_to_group`, `add_document_to_group_url` (frontend migrations `0001_custom_functions.sql` / `0007_embeddings_table.sql`).
+- `pgvector` extension (`CREATE EXTENSION IF NOT EXISTS vector;`)
+- Tables:
+  - `embeddings` — vectorized chunks (4096-dim by default; see migration 0007).
+  - `documents`, `documents_in_progress`, `documents_failed`
+  - `doc_groups`, `documents_doc_groups`
+- Stored procedures: `add_document_to_group`, `add_document_to_group_url` (frontend migrations `0001_custom_functions.sql` / `0007_embeddings_table.sql`).
 
 The frontend ships these as Drizzle migrations under `uiuc-chat-frontend/src/db/migrations/`. Apply migrations 0006 / 0007 (pgvector + embeddings) and the migrations that create the document tables on the external pg before flipping `is_active = true`.
 
 In code, the routing rule is enforced by two `ConnectionManager` accessors:
 
-* `get_documents_sql_db(project_name)` — returns the project's external DB if configured, else the host. Use for document-scoped queries only.
-* `get_sql_db()` — always returns the host main DB. Use for everything else.
+- `get_documents_sql_db(project_name)` — returns the project's external DB if configured, else the host. Use for document-scoped queries only.
+- `get_sql_db()` — always returns the host main DB. Use for everything else.
 
 ## Qdrant Config
 
@@ -143,16 +143,16 @@ Every Qdrant config has one required collection (`default_collection`). All inge
 }
 ```
 
-| Field                        | Type    | Required | Description                                                                                                     |
-| ---------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `url`                        | string  | **Yes**  | Qdrant server URL                                                                                               |
-| `api_key`                    | string  | **Yes**  | API key for Qdrant authentication                                                                               |
-| `port`                       | integer | **Yes**  | Qdrant port (e.g., `6333`)                                                                                      |
-| `default_collection`         | string  | **Yes**  | Primary Qdrant collection. All ingest writes and single-collection deletes target this collection. Always searched on read. |
-| `https`                      | boolean | No       | Whether to use HTTPS. Default: `false`.                                                                         |
-| `collections`                | array   | No       | Additional collections to fan out searches across. See [Optional `collections`](#optional-collections-fan-out-search) below. |
-| `skip_quantization_rescore`  | boolean | No       | Skip quantization rescore during search. Default: `true`.                                                       |
-| `embedding`                  | object  | No       | **Deprecated.** Use the top-level `embedding_config` column instead. Still honored as a fallback when no top-level config is present. See [Embedding Provider Config](#embedding-provider-config) below. |
+| Field                       | Type    | Required | Description                                                                                                                                                                                              |
+| --------------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                       | string  | **Yes**  | Qdrant server URL                                                                                                                                                                                        |
+| `api_key`                   | string  | **Yes**  | API key for Qdrant authentication                                                                                                                                                                        |
+| `port`                      | integer | **Yes**  | Qdrant port (e.g., `6333`)                                                                                                                                                                               |
+| `default_collection`        | string  | **Yes**  | Primary Qdrant collection. All ingest writes and single-collection deletes target this collection. Always searched on read.                                                                              |
+| `https`                     | boolean | No       | Whether to use HTTPS. Default: `false`.                                                                                                                                                                  |
+| `collections`               | array   | No       | Additional collections to fan out searches across. See [Optional `collections`](#optional-collections-fan-out-search) below.                                                                             |
+| `skip_quantization_rescore` | boolean | No       | Skip quantization rescore during search. Default: `true`.                                                                                                                                                |
+| `embedding`                 | object  | No       | **Deprecated.** Use the top-level `embedding_config` column instead. Still honored as a fallback when no top-level config is present. See [Embedding Provider Config](#embedding-provider-config) below. |
 
 ### Optional: `collections` (fan-out search)
 
@@ -197,19 +197,19 @@ Add `collections` when your project needs to search across multiple Qdrant colle
 
 #### Per-Collection Fields
 
-| Field        | Type    | Required | Description                                                                                                                                              |
-| ------------ | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`       | string  | **Yes**  | Qdrant collection name                                                                                                                                   |
-| `top_n`      | integer | No       | Maximum results to retrieve from this collection. Defaults to the request-level `top_n` (typically 100).                                                 |
-| `use_filter` | boolean | No       | Whether to apply the course-name filter to this collection. Default: `true`. Set to `false` for shared collections not partitioned by course/project.    |
+| Field        | Type    | Required | Description                                                                                                                                                                |
+| ------------ | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`       | string  | **Yes**  | Qdrant collection name                                                                                                                                                     |
+| `top_n`      | integer | No       | Maximum results to retrieve from this collection. Defaults to the request-level `top_n` (typically 100).                                                                   |
+| `use_filter` | boolean | No       | Whether to apply the course-name filter to this collection. Default: `true`. Set to `false` for shared collections not partitioned by course/project.                      |
 | `processor`  | string  | No       | Post-processor key for normalizing results. One of: `pubmed`, `patents`, `ncbi_books`, `clinical_trials`. See [Post-Processors](#post-processors-for-vector-search) below. |
 
 #### Top-Level Fan-Out Settings
 
-| Field            | Type    | Default | Description                                                             |
-| ---------------- | ------- | ------- | ----------------------------------------------------------------------- |
-| `parallel`       | boolean | `true`  | Search all collections in parallel using a thread pool.                 |
-| `sort_combined`  | boolean | `true`  | Sort the combined results from all collections by score (descending).   |
+| Field           | Type    | Default | Description                                                           |
+| --------------- | ------- | ------- | --------------------------------------------------------------------- |
+| `parallel`      | boolean | `true`  | Search all collections in parallel using a thread pool.               |
+| `sort_combined` | boolean | `true`  | Sort the combined results from all collections by score (descending). |
 
 ## Embedding Provider Config
 
@@ -241,14 +241,14 @@ The platform reads embedding overrides from the top-level **`embedding_config`**
 }
 ```
 
-| Field               | Type   | Required       | Description                                                                                                   |
-| ------------------- | ------ | -------------- | ------------------------------------------------------------------------------------------------------------- |
-| `provider`          | string | **Yes**        | `"openai"` or `"ollama"`. The Zod validator rejects other values.                                             |
-| `model`             | string | No             | Embedding model name. Falls back to env `EMBEDDING_MODEL`.                                                    |
-| `api_key`           | string | No             | OpenAI API key. Only for `openai` provider. Falls back to env `OPENAI_API_KEY`.                               |
-| `api_base`          | string | No             | OpenAI-compatible API base URL. Only for `openai` provider. Falls back to env `EMBEDDING_API_BASE`.           |
-| `base_url`          | string | Required (ollama) | Ollama server URL (e.g., `http://localhost:11434`). Required when `provider` is `"ollama"`.                  |
-| `query_instruction` | string | No             | Prefix instruction for Qwen embedding models. Applied as `Instruct: {instruction}\nQuery:{query}` at query time. |
+| Field               | Type   | Required          | Description                                                                                                      |
+| ------------------- | ------ | ----------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `provider`          | string | **Yes**           | `"openai"` or `"ollama"`. The Zod validator rejects other values.                                                |
+| `model`             | string | No                | Embedding model name. Falls back to env `EMBEDDING_MODEL`.                                                       |
+| `api_key`           | string | No                | OpenAI API key. Only for `openai` provider. Falls back to env `OPENAI_API_KEY`.                                  |
+| `api_base`          | string | No                | OpenAI-compatible API base URL. Only for `openai` provider. Falls back to env `EMBEDDING_API_BASE`.              |
+| `base_url`          | string | Required (ollama) | Ollama server URL (e.g., `http://localhost:11434`). Required when `provider` is `"ollama"`.                      |
+| `query_instruction` | string | No                | Prefix instruction for Qwen embedding models. Applied as `Instruct: {instruction}\nQuery:{query}` at query time. |
 
 {% hint style="info" %}
 The `query_instruction` is only applied during **query embedding** for Qwen models. Documents are embedded without the instruction prefix during ingest.
@@ -262,23 +262,23 @@ Post-processors normalize search results from specialized Qdrant collections int
 
 Every post-processor maps collection-specific fields to these standard fields:
 
-| Field               | Description                                              |
-| ------------------- | -------------------------------------------------------- |
-| `page_content`      | The main text content of the result                      |
-| `readable_filename` | Human-readable source name (prefixed by data source)     |
-| `s3_path`           | Normalized storage path                                  |
-| `course_name`       | Project/course name (set to the querying project)        |
-| `url`               | Link to the original source                              |
-| `pagenumber`        | Page or section number within the source document        |
+| Field               | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| `page_content`      | The main text content of the result                  |
+| `readable_filename` | Human-readable source name (prefixed by data source) |
+| `s3_path`           | Normalized storage path                              |
+| `course_name`       | Project/course name (set to the querying project)    |
+| `url`               | Link to the original source                          |
+| `pagenumber`        | Page or section number within the source document    |
 
 ### Available Post-Processors
 
-| Processor Key      | Source Data          | What It Does                                                                                                                           |
-| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `pubmed`           | PubMed articles      | Prefixes `"Pubmed: "` to `readable_filename`. Normalizes `s3_path` to `pubmed/` prefix. Maps `pagenumber` from payload.               |
-| `patents`          | USPTO patents        | Extracts `text` field as `page_content`. Uses `uspto_url` as `url`. Prefixes `"Patent: "` to filename. Normalizes `s3_path` to `patents/`. |
-| `ncbi_books`       | NCBI books           | Prefixes `"NCBI Book: "` to `readable_filename`. Maps `page_number` to `pagenumber`. Normalizes `s3_path` to `ncbi-output/` prefix.   |
-| `clinical_trials`  | ClinicalTrials.gov   | Extracts `text` as `page_content`. Prefixes `"Clinical Trial: "` to filename. Normalizes `s3_path` to `clinical-trials/` prefix.      |
+| Processor Key     | Source Data        | What It Does                                                                                                                               |
+| ----------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pubmed`          | PubMed articles    | Prefixes `"Pubmed: "` to `readable_filename`. Normalizes `s3_path` to `pubmed/` prefix. Maps `pagenumber` from payload.                    |
+| `patents`         | USPTO patents      | Extracts `text` field as `page_content`. Uses `uspto_url` as `url`. Prefixes `"Patent: "` to filename. Normalizes `s3_path` to `patents/`. |
+| `ncbi_books`      | NCBI books         | Prefixes `"NCBI Book: "` to `readable_filename`. Maps `page_number` to `pagenumber`. Normalizes `s3_path` to `ncbi-output/` prefix.        |
+| `clinical_trials` | ClinicalTrials.gov | Extracts `text` as `page_content`. Prefixes `"Clinical Trial: "` to filename. Normalizes `s3_path` to `clinical-trials/` prefix.           |
 
 {% hint style="info" %}
 Collections **without** a `processor` key return results as-is, with no field transformation. The processor only runs on collections that explicitly set the `processor` field in their multi-collection config entry.
@@ -288,24 +288,24 @@ Collections **without** a `processor` key return results as-is, with no field tr
 
 The platform caches connections to minimize overhead:
 
-| Cache                        | TTL         | What's Cached                                   |
-| ---------------------------- | ----------- | ------------------------------------------------ |
-| Decrypted config             | 5 minutes   | Decrypted external connection configs            |
-| Live connections             | 30 minutes  | SQLAlchemy engines, Qdrant clients, S3 clients   |
+| Cache            | TTL        | What's Cached                                  |
+| ---------------- | ---------- | ---------------------------------------------- |
+| Decrypted config | 5 minutes  | Decrypted external connection configs          |
+| Live connections | 30 minutes | SQLAlchemy engines, Qdrant clients, S3 clients |
 
-* **Creating, updating, or deleting** a connection config **immediately invalidates** all caches for that project.
-* DB engine disposal on invalidation releases pooled connections.
-* Per-project locking prevents duplicate connection creation during concurrent requests.
+- **Creating, updating, or deleting** a connection config **immediately invalidates** all caches for that project.
+- DB engine disposal on invalidation releases pooled connections.
+- Per-project locking prevents duplicate connection creation during concurrent requests.
 
 ## Environment Variables
 
 These environment variables must be set on the backend for external connections to work:
 
-| Variable                  | Description                                                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `ENCRYPTION_MASTER_KEY`   | Base64-encoded 32-byte key for AES-256-GCM encryption of connection configs. **Required.**               |
-| `QDRANT_COLLECTION_NAME`  | Platform-wide default Qdrant collection name. Used as the `default_collection` when a project has no `qdrant_config` (i.e., uses shared infrastructure). Per-project configs must set `default_collection` explicitly. |
-| `S3_BUCKET_NAME`          | Default S3 bucket. Used as fallback when `bucket_name` is not set in `s3_config`.                        |
+| Variable                 | Description                                                                                                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ENCRYPTION_MASTER_KEY`  | Base64-encoded 32-byte key for AES-256-GCM encryption of connection configs. **Required.**                                                                                                                             |
+| `QDRANT_COLLECTION_NAME` | Platform-wide default Qdrant collection name. Used as the `default_collection` when a project has no `qdrant_config` (i.e., uses shared infrastructure). Per-project configs must set `default_collection` explicitly. |
+| `S3_BUCKET_NAME`         | Default S3 bucket. Used as fallback when `bucket_name` is not set in `s3_config`.                                                                                                                                      |
 
 Generate an encryption key:
 

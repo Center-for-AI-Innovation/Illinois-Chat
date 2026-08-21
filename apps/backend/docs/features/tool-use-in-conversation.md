@@ -26,10 +26,10 @@ I'm happy to onboard anyone. No need to justify anything, no calls required.&#x2
 
 To make it as easy as possible for you to create your own tools, we self-host n8n a visual workflow builder. We chose n8n after an intense study of the market because of:&#x20;
 
-* n8n's [massive library of integrations](https://n8n.io/integrations/) (Slack, Jira, Google drive, Gmail, etc)
-* Library of [creative & helpful templates](https://n8n.io/workflows/)
-  * I like [Talk to your SQLite database with a LangChain AI Agent](https://n8n.io/workflows/2292-talk-to-your-sqlite-database-with-a-langchain-ai-agent/)
-* [Cool features](https://n8n.io/features/) (drag & drop, code running, LLM abilities)
+- n8n's [massive library of integrations](https://n8n.io/integrations/) (Slack, Jira, Google drive, Gmail, etc)
+- Library of [creative & helpful templates](https://n8n.io/workflows/)
+  - I like [Talk to your SQLite database with a LangChain AI Agent](https://n8n.io/workflows/2292-talk-to-your-sqlite-database-with-a-langchain-ai-agent/)
+- [Cool features](https://n8n.io/features/) (drag & drop, code running, LLM abilities)
 
 ## Usage - Write your own tool
 
@@ -45,8 +45,6 @@ All tools _**MUST**_ start with a `n8n Form Trigger`. Use this to define the inp
 
 The AI will use the `Form Title`, `Form Description` and the `Form Fields` to decide when to use your tool, so make those as descriptive as possible so the AI will know how to best use your tool.
 
-
-
 <figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.26.27.png" alt=""><figcaption><p>ALL tools must start with a <code>n8n Form Trigger</code></p></figcaption></figure>
 
 <figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.28.22.png" alt=""><figcaption><p>You can have both required and optional input parameters. You can have as many parameters as you like.</p></figcaption></figure>
@@ -61,8 +59,8 @@ Images are passed via an array of `image_urls` in a json object. They must be UR
 
 ```json
 {
-   "image_urls": ["url","url","https://bucket.r2.cloudflare.com/img-path"],
-   "other-useful-text": "These images depict the circle of life in the savanna."
+  "image_urls": ["url", "url", "https://bucket.r2.cloudflare.com/img-path"],
+  "other-useful-text": "These images depict the circle of life in the savanna."
 }
 ```
 
@@ -128,4 +126,3 @@ During beta, try using the feature branch here: [https://uiuc-chat-git-n8n-ui-ka
 1. Define tools in `uiuc.chat/<YOUR-PROJECT>/tools`
 2. Enable the tools you want active in your project
 3. Start chatting, tools will be invoked as needed.
-

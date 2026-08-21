@@ -5,11 +5,13 @@ This repository includes a complete CI/CD pipeline for deploying the AI TA Backe
 ## 🚀 Quick Start
 
 1. **Run the setup script** (one-time setup):
+
    ```bash
    ./scripts/setup-ecs-deployment.sh
    ```
 
 2. **Configure GitHub Secrets**:
+
    - Go to your GitHub repository → Settings → Secrets and variables → Actions
    - Add these secrets:
      - `AWS_ACCESS_KEY_ID`
@@ -29,21 +31,27 @@ This repository includes a complete CI/CD pipeline for deploying the AI TA Backe
 ## 🔧 Customization
 
 ### Environment Variables
+
 Edit the workflow file to customize:
+
 - AWS region
 - ECR repository name
 - ECS cluster and service names
 - CPU/memory allocation
 
 ### Task Definition
+
 Update `ai-ta-backend-task-definition.json` to:
+
 - Add environment variables
 - Configure secrets from AWS Secrets Manager
 - Adjust resource allocation
 - Add additional containers
 
 ### Health Check
+
 The application now includes a `/health` endpoint that returns:
+
 ```json
 {
   "status": "healthy",
@@ -74,11 +82,13 @@ GitHub → GitHub Actions → AWS ECR → AWS ECS Fargate
 ### Common Issues
 
 1. **Service won't start**:
+
    - Check CloudWatch logs
    - Verify task definition configuration
    - Ensure ECR image exists
 
 2. **Image pull errors**:
+
    - Verify IAM permissions for ECR
    - Check if repository exists
    - Ensure image was pushed successfully

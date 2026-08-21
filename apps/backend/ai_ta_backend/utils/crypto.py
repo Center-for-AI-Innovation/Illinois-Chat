@@ -5,7 +5,9 @@ import os
 import re
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers import algorithms
+from cryptography.hazmat.primitives.ciphers import Cipher
+from cryptography.hazmat.primitives.ciphers import modes
 
 
 def encrypt(text: str, key: str) -> str:
@@ -29,8 +31,7 @@ def decrypt(encrypted_text: str, key: str) -> str:
   if not encrypted_text or not key:
     print('Error decrypting because encryptedText or key is not available', encrypted_text, key)
     raise ValueError(
-        f'Invalid input: Error decrypting because encryptedText or key is not available. Encrypted text: {encrypted_text}, Key: {key}'
-    )
+        f'Invalid input: Error decrypting because encryptedText or key is not available. Encrypted text: {encrypted_text}, Key: {key}')
 
   try:
     version, encrypted_base64, iv_base64 = encrypted_text.split('.')

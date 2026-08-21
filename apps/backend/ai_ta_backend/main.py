@@ -1,8 +1,8 @@
 import asyncio
+import logging
 import os
 import re
 import time
-import logging
 from typing import List
 
 from dotenv import load_dotenv
@@ -10,36 +10,36 @@ from dotenv import load_dotenv
 # Load .env before local imports so module-level code can access env vars
 load_dotenv()
 
-from flask import (
-  Flask,
-  Response,
-  abort,
-  jsonify,
-  request,
-  send_file,
-)
+from flask import abort
+from flask import Flask
+from flask import jsonify
+from flask import request
+from flask import Response
+from flask import send_file
 from flask_cors import CORS
 from flask_executor import Executor
-from flask_injector import FlaskInjector, RequestScope
-from injector import Binder, SingletonScope
+from flask_injector import FlaskInjector
+from flask_injector import RequestScope
+from injector import Binder
+from injector import SingletonScope
 
 from ai_ta_backend.database.aws import AWSStorage
 from ai_ta_backend.database.connection_manager import ConnectionManager
 from ai_ta_backend.database.graph import GraphDatabase
 from ai_ta_backend.database.sql import SQLDatabase
 from ai_ta_backend.database.vector import VectorDatabase
-from ai_ta_backend.executors.flask_executor import (
-    ExecutorInterface,
-    FlaskExecutorAdapter,
-)
-from ai_ta_backend.executors.process_pool_executor import (
-    ProcessPoolExecutorAdapter,
-    ProcessPoolExecutorInterface,
-)
-from ai_ta_backend.executors.thread_pool_executor import (
-    ThreadPoolExecutorAdapter,
-    ThreadPoolExecutorInterface,
-)
+from ai_ta_backend.executors.flask_executor import ExecutorInterface
+from ai_ta_backend.executors.flask_executor import FlaskExecutorAdapter
+from ai_ta_backend.executors.process_pool_executor import \
+    ProcessPoolExecutorAdapter
+from ai_ta_backend.executors.process_pool_executor import \
+    ProcessPoolExecutorInterface
+from ai_ta_backend.executors.thread_pool_executor import \
+    ThreadPoolExecutorAdapter
+from ai_ta_backend.executors.thread_pool_executor import \
+    ThreadPoolExecutorInterface
+from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
+from ai_ta_backend.rabbitmq.rmqueue import Queue
 from ai_ta_backend.service.export_service import ExportService
 from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
@@ -49,15 +49,12 @@ from ai_ta_backend.service.workflow_service import WorkflowService
 from ai_ta_backend.utils.email.send_transactional_email import send_email
 from ai_ta_backend.utils.pubmed_extraction import extractPubmedData
 from ai_ta_backend.utils.rerun_webcrawl_for_project import webscrape_documents
-from ai_ta_backend.rabbitmq.rmqueue import Queue
-from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
 
 app = Flask(__name__)
 CORS(app)
 executor = Executor(app)
 # app.config['EXECUTOR_MAX_WORKERS'] = 5 nothing == picks defaults for me
 #app.config['SERVER_TIMEOUT'] = 1000  # seconds
-
 
 
 @app.route('/')
@@ -70,8 +67,7 @@ def index() -> Response:
   Returns:
       JSON: _description_
   """
-  response = jsonify(
-      {"hi there, this is a 404": "Welcome to UIUC.chat backend 🚅 Read the docs here: https://docs.uiuc.chat/ "})
+  response = jsonify({"hi there, this is a 404": "Welcome to UIUC.chat backend 🚅 Read the docs here: https://docs.uiuc.chat/ "})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
@@ -83,11 +79,7 @@ def health() -> Response:
   Returns:
       JSON: Health status response
   """
-  response = jsonify({
-    "status": "healthy",
-    "service": "ai-ta-backend",
-    "timestamp": time.time()
-  })
+  response = jsonify({"status": "healthy", "service": "ai-ta-backend", "timestamp": time.time()})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
@@ -150,9 +142,9 @@ def getTopContexts(service: RetrievalService) -> Response:
   if search_query == '' or course_name == '':
     # proper web error "400 Bad request"
     abort(
-      400,
-      description=
-      f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
+        400,
+        description=
+        f"Missing one or more required parameters: 'search_query' and 'course_name' must be provided. Search query: `{search_query}`, Course name: `{course_name}`"
     )
 
   found_documents = asyncio.run(service.getTopContexts(search_query, course_name, doc_groups, top_n, conversation_id))
@@ -160,6 +152,7 @@ def getTopContexts(service: RetrievalService) -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   print(f"⏰ Runtime of getTopContexts in main.py: {(time.monotonic() - start_time):.2f} seconds")
   return response
+
 
 @app.route('/llm-monitor-message', methods=['POST'])
 def llm_monitor_message_main(service: RetrievalService, flaskExecutor: ExecutorInterface) -> Response:
@@ -198,9 +191,7 @@ def getAll(service: RetrievalService) -> Response:
 
   if course_name == '':
     # proper web error "400 Bad request"
-    abort(
-        400,
-        description=f"Missing the one required parameter: 'course_name' must be provided. Course name: `{course_name}`")
+    abort(400, description=f"Missing the one required parameter: 'course_name' must be provided. Course name: `{course_name}`")
 
   distinct_dicts = service.getAll(course_name)
 
@@ -240,69 +231,58 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
 
 @app.route('/process-chat-file', methods=['POST'])
 def process_chat_file_sync(service: RetrievalService):
-    """
+  """
     Process files uploaded in chat conversations synchronously.
     """
-    
-    try:
-        data = request.get_json()
-        print(f"📋 Request data: {data}")
-        
-        # Extract required parameters
-        conversation_id = data.get('conversation_id')
-        s3_path = data.get('s3_path')
-        course_name = data.get('course_name', 'chat')
-        readable_filename = data.get('readable_filename', '')
-        user_id = data.get('user_id', '')
-        
-        if not conversation_id or not s3_path:
-            error_response = {
-                "success": False,
-                "status": "error",
-                "error": "Missing required parameters: conversation_id and s3_path"
-            }
-            
-            return jsonify(error_response), 400
-        
-        # Process file synchronously (wait for completion)
-        result = service.process_chat_file_sync(
-            conversation_id=conversation_id,
-            s3_path=s3_path,
-            course_name=course_name,
-            readable_filename=readable_filename,
-            user_id=user_id,
-            is_chat_upload=True
-        )
-        
-        if result['success']:
-            response_data = {
-                'success': True,
-                'chunks_created': result['chunks_created'],
-                'status': 'completed',
-                'message': 'File processed and ready for chat',
-            }
-            response = jsonify(response_data)
-        else:
-            response_data = {
-                'success': False,
-                'chunks_created': result.get('chunks_created', 0),
-                'status': 'failed',
-                'error': result.get('error', 'Unknown error occurred')
-            }
-            response = jsonify(response_data)
-            response.status_code = 500
-        
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
-        
-    except Exception as e:
-        error_response = {
-            'success': False,
-            'chunks_created': 0,
-            'status': 'failed',
-            'error': f'Server error: {str(e)}'
-        }
-        return jsonify(error_response), 500
+
+  try:
+    data = request.get_json()
+    print(f"📋 Request data: {data}")
+
+    # Extract required parameters
+    conversation_id = data.get('conversation_id')
+    s3_path = data.get('s3_path')
+    course_name = data.get('course_name', 'chat')
+    readable_filename = data.get('readable_filename', '')
+    user_id = data.get('user_id', '')
+
+    if not conversation_id or not s3_path:
+      error_response = {"success": False, "status": "error", "error": "Missing required parameters: conversation_id and s3_path"}
+
+      return jsonify(error_response), 400
+
+    # Process file synchronously (wait for completion)
+    result = service.process_chat_file_sync(conversation_id=conversation_id,
+                                            s3_path=s3_path,
+                                            course_name=course_name,
+                                            readable_filename=readable_filename,
+                                            user_id=user_id,
+                                            is_chat_upload=True)
+
+    if result['success']:
+      response_data = {
+          'success': True,
+          'chunks_created': result['chunks_created'],
+          'status': 'completed',
+          'message': 'File processed and ready for chat',
+      }
+      response = jsonify(response_data)
+    else:
+      response_data = {
+          'success': False,
+          'chunks_created': result.get('chunks_created', 0),
+          'status': 'failed',
+          'error': result.get('error', 'Unknown error occurred')
+      }
+      response = jsonify(response_data)
+      response.status_code = 500
+
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+  except Exception as e:
+    error_response = {'success': False, 'chunks_created': 0, 'status': 'failed', 'error': f'Server error: {str(e)}'}
+    return jsonify(error_response), 500
 
 
 @app.route('/getNomicMap', methods=['GET'])
@@ -421,12 +401,7 @@ def export_convo_history(service: ExportService):
     file_path = export_status['response']
     filename = os.path.basename(file_path)
 
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
+    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype="application/zip")
     response.headers.add('Access-Control-Allow-Origin', '*')
     os.remove(file_path)
 
@@ -463,12 +438,7 @@ def export_convo_history_v2(service: ExportService):
     file_path = export_status['response']
     filename = os.path.basename(file_path)
 
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
+    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype="application/zip")
     response.headers.add('Access-Control-Allow-Origin', '*')
     os.remove(file_path)
 
@@ -507,12 +477,7 @@ def export_convo_history_user(service: ExportService):
     file_path = export_status['response']
     filename = os.path.basename(file_path)
 
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
+    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype="application/zip")
     response.headers.add('Access-Control-Allow-Origin', '*')
     os.remove(file_path)
 
@@ -545,12 +510,7 @@ def export_conversations_custom(service: ExportService):
     file_path = export_status['response']
     filename = os.path.basename(file_path)
 
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
+    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype="application/zip")
     response.headers.add('Access-Control-Allow-Origin', '*')
     os.remove(file_path)
 
@@ -582,12 +542,7 @@ def exportDocuments(service: ExportService):
     file_path = export_status['response']
     filename = os.path.basename(file_path)
 
-    response = send_file(
-      file_path,
-      as_attachment=True,
-      download_name=filename,
-      mimetype="application/zip"
-    )
+    response = send_file(file_path, as_attachment=True, download_name=filename, mimetype="application/zip")
     response.headers.add('Access-Control-Allow-Origin', '*')
     os.remove(file_path)
 
@@ -739,6 +694,7 @@ def run_flow(service: WorkflowService) -> Response:
       response.headers.add('Access-Control-Allow-Origin', '*')
       return response
 
+
 @app.route('/ingest', methods=['POST'])
 def ingest() -> Response:
   active_queue = Queue()
@@ -750,14 +706,10 @@ def ingest() -> Response:
   job_id = active_queue.addJobToIngestQueue(data)
   logging.info("Result from addJobToIngestQueue:  %s", job_id)
 
-  response = jsonify(
-    {
-      "outcome": f'Queued Ingest task',
-      "task_id": job_id
-    }
-  )
+  response = jsonify({"outcome": f'Queued Ingest task', "task_id": job_id})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
+
 
 @app.route('/canvas_ingest', methods=['POST'])
 def canvas_ingest() -> Response:
@@ -773,12 +725,12 @@ def canvas_ingest() -> Response:
   assignments: bool = data.get('assignments', True)
   discussions: bool = data.get('discussions', True)
   options = {
-    'files': str(files).lower() == 'true',
-    'pages': str(pages).lower() == 'true',
-    'modules': str(modules).lower() == 'true',
-    'syllabus': str(syllabus).lower() == 'true',
-    'assignments': str(assignments).lower() == 'true',
-    'discussions': str(discussions).lower() == 'true',
+      'files': str(files).lower() == 'true',
+      'pages': str(pages).lower() == 'true',
+      'modules': str(modules).lower() == 'true',
+      'syllabus': str(syllabus).lower() == 'true',
+      'assignments': str(assignments).lower() == 'true',
+      'discussions': str(discussions).lower() == 'true',
   }
 
   print("Course Name: ", course_name)
@@ -791,31 +743,25 @@ def canvas_ingest() -> Response:
 
   canvas_id = os.getenv("CANVAS_ACCESS_TOKEN", default="")
   if len(canvas_id) == 0:
-      response = jsonify(message=f"CANVAS_ACCESS_TOKEN is not configured.")
-      response.status_code = 500
-      response.headers.add('Access-Control-Allow-Origin', '*')
-      return response
+    response = jsonify(message=f"CANVAS_ACCESS_TOKEN is not configured.")
+    response.status_code = 500
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
   try:
-      ingester = IngestCanvas()
-      accept_status = ingester.auto_accept_enrollments(canvas_course_id)
-      job_ids = ingester.ingest_course_content(canvas_course_id=canvas_course_id,
-                                       course_name=course_name,
-                                       content_ingest_dict=options)
+    ingester = IngestCanvas()
+    accept_status = ingester.auto_accept_enrollments(canvas_course_id)
+    job_ids = ingester.ingest_course_content(canvas_course_id=canvas_course_id, course_name=course_name, content_ingest_dict=options)
 
-      response = jsonify(
-        {
-          "outcome": f'Queued Canvas Ingest task',
-          "ingest_task_ids": job_ids
-        }
-      )
-      response.headers.add('Access-Control-Allow-Origin', '*')
-      return response
+    response = jsonify({"outcome": f'Queued Canvas Ingest task', "ingest_task_ids": job_ids})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
   except Exception as e:
-      response = jsonify(error=str(e), message=f"Internal Server Error {e}")
-      response.status_code = 500
-      response.headers.add('Access-Control-Allow-Origin', '*')
-      return response
+    response = jsonify(error=str(e), message=f"Internal Server Error {e}")
+    response.status_code = 500
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
 
 @app.route('/createProject', methods=['POST'])
 def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> Response:
@@ -913,15 +859,10 @@ def send_transactional_email(service: ExportService):
 
   if sender == '' or to_recipients == [] or body_text == '':
     # proper web error "400 Bad request"
-    abort(400,
-          description=f"Missing required parameter: 'sender' and 'to_recipients' and 'body_text' must be provided.")
+    abort(400, description=f"Missing required parameter: 'sender' and 'to_recipients' and 'body_text' must be provided.")
 
   try:
-    send_email(subject=subject,
-               body_text=body_text,
-               sender=sender,
-               recipients=to_recipients,
-               bcc_recipients=bcc_recipients)
+    send_email(subject=subject, body_text=body_text, sender=sender, recipients=to_recipients, bcc_recipients=bcc_recipients)
     response = Response(status=200)
   except Exception as e:
     response = Response(status=500)
@@ -944,6 +885,7 @@ def updateProjectDocuments(flaskExecutor: ExecutorInterface) -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
+
 @app.route('/getClinicalKGContexts', methods=['GET'])
 def clinicalKGContexts(graph_db: GraphDatabase) -> Response:
   user_query = request.args.get('user_query', default='', type=str)
@@ -961,6 +903,7 @@ def clinicalKGContexts(graph_db: GraphDatabase) -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
+
 @app.route('/getPrimeKGContexts', methods=['GET'])
 def getPrimeKGContexts(graph_db: GraphDatabase) -> Response:
   user_query = request.args.get('user_query', default='', type=str)
@@ -972,6 +915,7 @@ def getPrimeKGContexts(graph_db: GraphDatabase) -> Response:
   response = jsonify(results)
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
+
 
 # External-connection CRUD lives in the Next.js frontend (see
 # uiuc-chat-frontend `src/pages/api/UIUC-api/projectConnections*`). The

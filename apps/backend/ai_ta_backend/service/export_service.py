@@ -5,24 +5,24 @@ import tempfile
 import uuid
 import zipfile
 
+from injector import inject
 import pandas as pd
 import redis
-from injector import inject
 
 from ai_ta_backend.database.connection_manager import ConnectionManager
 from ai_ta_backend.database.sql import SQLDatabase
-from ai_ta_backend.executors.process_pool_executor import ProcessPoolExecutorAdapter
+from ai_ta_backend.executors.process_pool_executor import \
+    ProcessPoolExecutorAdapter
 from ai_ta_backend.service.sentry_service import SentryService
 from ai_ta_backend.utils.email.send_transactional_email import send_email
-from ai_ta_backend.utils.export_utils import (
-  _cleanup,
-  _create_zip,
-  _create_zip_for_user_convo_export,
-  _initialize_excel,
-  _initialize_file_paths,
-  _process_conversation,
-  _process_conversation_for_user_convo_export,
-)
+from ai_ta_backend.utils.export_utils import _cleanup
+from ai_ta_backend.utils.export_utils import _create_zip
+from ai_ta_backend.utils.export_utils import _create_zip_for_user_convo_export
+from ai_ta_backend.utils.export_utils import _initialize_excel
+from ai_ta_backend.utils.export_utils import _initialize_file_paths
+from ai_ta_backend.utils.export_utils import _process_conversation
+from ai_ta_backend.utils.export_utils import \
+    _process_conversation_for_user_convo_export
 
 
 def _task_method(index):
@@ -33,8 +33,7 @@ def _task_method(index):
 class ExportService:
 
   @inject
-  def __init__(self, sentry: SentryService, executor: ProcessPoolExecutorAdapter,
-               conn_manager: ConnectionManager):
+  def __init__(self, sentry: SentryService, executor: ProcessPoolExecutorAdapter, conn_manager: ConnectionManager):
     self.sentry = sentry
     self.executor = executor
     self.conn_manager = conn_manager
@@ -236,8 +235,7 @@ class ExportService:
       s3_filepath = f"courses/{course_name}/{filename}"
       # background task of downloading data - map it with above ID
       s3, bucket_name = self.conn_manager.get_s3_client(course_name)
-      self.executor.submit(export_data_in_bg_emails, s3, response, "conversations", course_name, s3_filepath,
-                           bucket_name, emails)
+      self.executor.submit(export_data_in_bg_emails, s3, response, "conversations", course_name, s3_filepath, bucket_name, emails)
       return {"response": 'Download from S3', "s3_path": s3_filepath}
 
     # Fetch data
@@ -301,9 +299,7 @@ class ExportService:
         from_date (str, optional): The start date for the data export. Defaults to ''.
         to_date (str, optional): The end date for the data export. Defaults to ''.
     """
-    print(
-        f"Exporting extended conversation history for course: {course_name}, from_date: {from_date}, to_date: {to_date}"
-    )
+    print(f"Exporting extended conversation history for course: {course_name}, from_date: {from_date}, to_date: {to_date}")
     error_log = []
 
     try:
@@ -321,11 +317,8 @@ class ExportService:
     if response_count > 500:
       filename = course_name[0:10] + '-' + str(generate_short_id()) + '_convos_extended.zip'
       s3_filepath = f"courses/{course_name}/{filename}"
-      print(
-          f"Response count greater than 500, processing in background. Filename: {filename}, S3 filepath: {s3_filepath}"
-      )
-      self.executor.submit(export_data_in_bg_extended, s3, response, "conversations", course_name, s3_filepath,
-                           bucket_name)
+      print(f"Response count greater than 500, processing in background. Filename: {filename}, S3 filepath: {s3_filepath}")
+      self.executor.submit(export_data_in_bg_extended, s3, response, "conversations", course_name, s3_filepath, bucket_name)
       return {"response": 'Download from S3', "s3_path": s3_filepath}
 
     if response_count > 0:
@@ -357,8 +350,7 @@ class ExportService:
 
           for convo in response["data"]:
             # print(f"Processing conversation ID: {convo['convo_id']}")
-            _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num, error_log, wrap_format,
-                                  bucket_name)
+            _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num, error_log, wrap_format, bucket_name)
             row_num += len(convo['convo']['messages'])
 
           if len(response["data"]) > 0:
@@ -411,8 +403,8 @@ class ExportService:
     if count > 500:
       filename = f"{user_email}_{project_name}_conversations.zip"
       s3_filepath = f"/conversations/{filename}"
-      self.executor.submit(export_convo_history_user_bg, s3, response.get("data"), count, user_email, s3_filepath,
-                           project_name, bucket_name)
+      self.executor.submit(export_convo_history_user_bg, s3, response.get("data"), count, user_email, s3_filepath, project_name,
+                           bucket_name)
       return {"response": 'Download from S3', "s3_path": s3_filepath}
 
     if count > 0:
@@ -429,8 +421,7 @@ class ExportService:
             return {"response": "No data found for the given user and project."}
 
           for convo in response['data']:
-            _process_conversation_for_user_convo_export(s3, convo, project_name, markdown_dir, media_dir,
-                                                        error_log, bucket_name)
+            _process_conversation_for_user_convo_export(s3, convo, project_name, markdown_dir, media_dir, error_log, bucket_name)
 
           # Create zip file
           zip_file_path = _create_zip_for_user_convo_export(markdown_dir, media_dir, error_log)
@@ -472,8 +463,7 @@ def export_convo_history_user_bg(s3, conversations, count, user_email, s3_path, 
           response = sql.getAllConversationsForUserAndProject(user_email, project_name, curr_count)
           curr_count += len(response["data"])
           for convo in response["data"]:
-            _process_conversation_for_user_convo_export(s3, convo, project_name, markdown_dir, media_dir, error_log,
-                                                        bucket_name)
+            _process_conversation_for_user_convo_export(s3, convo, project_name, markdown_dir, media_dir, error_log, bucket_name)
 
         except Exception as e:
           error_log.append(f"Error fetching conversations: {str(e)}")
@@ -531,8 +521,7 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
 
       for convo in response["data"]:
         print(f"Processing conversation ID: {convo['convo_id']}")
-        _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num, error_log, wrap_format,
-                              bucket_name)
+        _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num, error_log, wrap_format, bucket_name)
         row_num += len(convo['convo']['messages'])
 
       # Update first_id for the next batch

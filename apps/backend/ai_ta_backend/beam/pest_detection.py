@@ -18,8 +18,8 @@ if beam.env.is_remote():
   import uuid
 
   import boto3
-  import requests
   from PIL import Image
+  import requests
   from ultralytics import YOLO
 
 # Simpler image, but slower cold starts: beam.Image.from_registry('ultralytics/ultralytics:latest-cpu')

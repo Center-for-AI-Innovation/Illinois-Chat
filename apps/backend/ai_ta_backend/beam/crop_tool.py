@@ -8,11 +8,12 @@ import re
 from typing import Any, Dict
 
 import beam
-import requests
-from beam import App, QueueDepthAutoscaler, Runtime  # RequestLatencyAutoscaler,
-
+from beam import App  # RequestLatencyAutoscaler,
+from beam import QueueDepthAutoscaler
+from beam import Runtime
 # python script to send a POST request to GDD url endpoint and gett the response
 from bs4 import BeautifulSoup
+import requests
 
 requirements = ["beautifulsoup4==4.12.3"]
 
@@ -32,10 +33,7 @@ app = App(
 url = 'https://warm.isws.illinois.edu/warm/cropdata/calcresult.asp'
 
 # Set up the headers
-headers = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Referer': 'https://warm.isws.illinois.edu/warm/cropdata/cropddcalc.asp'
-}
+headers = {'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://warm.isws.illinois.edu/warm/cropdata/cropddcalc.asp'}
 
 
 # Set up the dynamic payload

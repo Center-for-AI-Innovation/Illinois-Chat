@@ -5,10 +5,11 @@ import os
 import time
 import uuid
 
-import pandas as pd
 from dotenv import load_dotenv
 from ollama import Client
-from qdrant_client import QdrantClient, models
+import pandas as pd
+from qdrant_client import models
+from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from tqdm import tqdm
 

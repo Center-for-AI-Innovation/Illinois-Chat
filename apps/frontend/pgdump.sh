@@ -15,5 +15,4 @@
 source .env
 
 # Use the environment variables directly
-PGPASSWORD=$SUPABASE_PASSWORD pg_dump -h aws-0-us-east-1.pooler.supabase.com -U postgres.$SUPABASE_URL -d postgres --schema-only > schema.sql
-
+PGPASSWORD=$SUPABASE_PASSWORD pg_dump -h aws-0-us-east-1.pooler.supabase.com -U postgres.$SUPABASE_URL -d postgres --schema-only >schema.sql
