@@ -1,5 +1,7 @@
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+import threading
 
 from ai_ta_backend.database.aws import AWSStorage
 from ai_ta_backend.database.connection_manager import ConnectionManager
@@ -16,33 +18,57 @@ from ai_ta_backend.service.workflow_service import WorkflowService
 _thread_pool = ThreadPoolExecutor(max_workers=10)
 _process_pool = ProcessPoolExecutor(max_workers=10)
 
+# lru_cache is not atomic on cache miss; serialize construction so concurrent
+# gthread workers don't each build engines / caches / nomic logins.
+_singleton_lock = threading.RLock()
 
-@lru_cache
+
+def _locked_singleton(factory):
+  """Wrap an @lru_cache factory so first-call construction is thread-safe.
+
+  Uses RLock because factories nest (e.g. get_retrieval_service ->
+  get_connection_manager -> get_sql_database).
+  """
+
+  @lru_cache
+  def cached():
+    return factory()
+
+  def wrapper():
+    with _singleton_lock:
+      return cached()
+
+  wrapper.cache_clear = cached.cache_clear  # type: ignore[attr-defined]
+  wrapper.cache_info = cached.cache_info  # type: ignore[attr-defined]
+  return wrapper
+
+
+@_locked_singleton
 def get_sql_database() -> SQLDatabase:
   return SQLDatabase()
 
 
-@lru_cache
+@_locked_singleton
 def get_aws_storage() -> AWSStorage:
   return AWSStorage()
 
 
-@lru_cache
+@_locked_singleton
 def get_vector_database() -> VectorDatabase:
   return VectorDatabase()
 
 
-@lru_cache
+@_locked_singleton
 def get_sentry_service() -> SentryService:
   return SentryService()
 
 
-@lru_cache
+@_locked_singleton
 def get_posthog_service() -> PosthogService:
   return PosthogService()
 
 
-@lru_cache
+@_locked_singleton
 def get_connection_manager() -> ConnectionManager:
   return ConnectionManager(
       get_sql_database(),
@@ -51,7 +77,7 @@ def get_connection_manager() -> ConnectionManager:
   )
 
 
-@lru_cache
+@_locked_singleton
 def get_retrieval_service() -> RetrievalService:
   return RetrievalService(
       get_posthog_service(),
@@ -61,12 +87,12 @@ def get_retrieval_service() -> RetrievalService:
   )
 
 
-@lru_cache
+@_locked_singleton
 def get_nomic_service() -> NomicService:
   return NomicService(get_sentry_service(), get_sql_database())
 
 
-@lru_cache
+@_locked_singleton
 def get_export_service() -> ExportService:
   return ExportService(
       get_sentry_service(),
@@ -75,12 +101,12 @@ def get_export_service() -> ExportService:
   )
 
 
-@lru_cache
+@_locked_singleton
 def get_workflow_service() -> WorkflowService:
   return WorkflowService(get_sql_database())
 
 
-@lru_cache
+@_locked_singleton
 def get_project_service() -> ProjectService:
   return ProjectService(
       get_sql_database(),

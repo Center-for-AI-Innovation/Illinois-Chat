@@ -1,18 +1,17 @@
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import os
 import pprint
 import smtplib
 import time
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import List
 
+from ai_ta_backend.types.types import ClerkUser
+from dotenv import load_dotenv
 import pydantic
 import requests
-import sentry_sdk
-from dotenv import load_dotenv
 from retry import retry
-
-from ai_ta_backend.types.types import ClerkUser
+import sentry_sdk
 
 load_dotenv(override=True)
 
@@ -29,9 +28,7 @@ def get_all_users_from_clerk() -> List[ClerkUser]:
   # Get all users from Clerk
   headers = {'Authorization': f'Bearer {os.environ["CLERK_BEARER_TOKEN"]}'}
   while not done:
-    users = requests.get(f"https://api.clerk.com/v1/users?limit={limit}&offset={offset}&order_by=-created_at",
-                         headers=headers,
-                         timeout=12)
+    users = requests.get(f"https://api.clerk.com/v1/users?limit={limit}&offset={offset}&order_by=-created_at", headers=headers, timeout=12)
     all_users.extend(users.json())
     if len(users.json()) == 0:
       done = True
@@ -101,8 +98,13 @@ def send_html_email(subject: str, html_text: str, sender: str, receipients: list
     for r in emails:
       file.write(r + "\n")
 
-  # TODO: Add EmailNewsletter model to SQL and load unsubscribe list from the database.
-  unsubscribe_list: list[str] = []
+  # Unsubscribe list must come from SQL once EmailNewsletter exists.
+  # Do not send with an empty stub — that would mail people who opted out.
+  raise NotImplementedError("Newsletter send blocked: EmailNewsletter unsubscribe list is not "
+                            "implemented yet. Refusing to send without opt-out filtering.")
+
+  # --- unreachable until EmailNewsletter unsubscribe query is wired ---
+  unsubscribe_list: list[str] = []  # replace with SQL query
   print("Unsubscribed emails: ", unsubscribe_list)
 
   # Remove any receipients that are in the unsubscribe list

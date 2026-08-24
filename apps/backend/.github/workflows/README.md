@@ -5,14 +5,16 @@ This directory contains GitHub Actions workflows for the AI TA Backend project.
 ## 📁 Available Workflows
 
 ### `deploy-to-ecs.yml` - ECS Deployment
+
 Automatically deploys the application to AWS ECS Fargate on code changes.
 
 ## 🚀 ECS Deployment - How It Works
 
 The `deploy-to-ecs.yml` workflow triggers on pushes to `illinois-chat` branch when these files change:
+
 - `ai_ta_backend/**` - Application code
-- `requirements.txt` - Python dependencies  
-- `Self-Hosted-Dockerfile` or `Dockerfile.ecs` - Container configuration
+- `requirements.txt` - Python dependencies
+- `Self-Hosted-Dockerfile` - Container configuration
 - `.github/workflows/deploy-to-ecs.yml` - This workflow file
 
 ## ⚙️ ECS Deployment - Configuration
@@ -32,6 +34,7 @@ env:
 ## 🔑 ECS Deployment - Required Secrets
 
 Add these secrets in GitHub repository settings for ECS deployment:
+
 - `AWS_ACCESS_KEY_ID` - AWS access key with ECR and ECS permissions
 - `AWS_SECRET_ACCESS_KEY` - AWS secret access key
 
@@ -44,6 +47,7 @@ Add these secrets in GitHub repository settings for ECS deployment:
 5. **Wait** - Ensures deployment completes successfully
 
 ## ⏱️ Typical Timing
+
 - **Total**: 6-12 minutes
 - **Build & Push**: 3-5 minutes
 - **ECS Deployment**: 2-5 minutes
@@ -68,8 +72,9 @@ Trigger ECS deployment manually via GitHub Actions tab → "Run workflow" button
 ## 🚫 ECS Deployment - Skip Conditions
 
 Changes to these files won't trigger ECS deployment:
+
 - Documentation (`docs/**`, `*.md`)
-- Scripts (`scripts/**`) 
+- Scripts (`scripts/**`)
 - Test files (`test-docs/**`)
 - VS Code config (`.vscode/**`)
 - Media files (`media/**`)
@@ -77,17 +82,19 @@ Changes to these files won't trigger ECS deployment:
 ## 🔍 ECS Deployment - Troubleshooting
 
 ### Common Issues:
+
 - **Missing secrets**: Add AWS credentials to repository secrets
 - **Permission errors**: Ensure IAM user has ECR and ECS permissions
 - **Health check failures**: Check `/health` endpoint and application logs
 - **Task definition errors**: Verify ECS service configuration matches workflow
 
 ### Quick Commands:
+
 ```bash
 # Check ECS service status
 aws ecs describe-services --cluster uiuc-chat-dev --services backend-service-358yl957
 
-# View recent logs  
+# View recent logs
 aws logs tail /ecs/ai-ta-backend --follow
 
 # Force new deployment (if needed)
