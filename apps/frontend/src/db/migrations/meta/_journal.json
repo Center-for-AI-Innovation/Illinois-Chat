@@ -92,6 +92,13 @@
       "when": 1779081600000,
       "tag": "0012_chatbot_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779081700000,
+      "tag": "0013_documents_doc_groups_cascade",
+      "breakpoints": true
     }
   ]
 }
