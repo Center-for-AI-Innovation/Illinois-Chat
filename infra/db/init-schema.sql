@@ -488,10 +488,17 @@ BEGIN
 
         raise log 'id of document group: %', v_doc_group_id;
 
-        -- Upsert the association in documents_doc_groups
-        INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
-        VALUES (v_document_id, v_doc_group_id)
-        ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        -- Upsert the association in documents_doc_groups.
+        -- Concurrent delete between SELECT and INSERT: no-op (do not fail ingest).
+        BEGIN
+            INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
+            VALUES (v_document_id, v_doc_group_id)
+            ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        EXCEPTION
+            WHEN foreign_key_violation THEN
+                RAISE LOG 'add_document_to_group: skipping FK violation for document_id=% doc_group_id=%',
+                    v_document_id, v_doc_group_id;
+        END;
 
         raise log 'completed for %',v_doc_group_id;
     END LOOP;
@@ -540,10 +547,17 @@ BEGIN
 
         raise log 'id of document group: %', v_doc_group_id;
 
-        -- Upsert the association in documents_doc_groups
-        INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
-        VALUES (v_document_id, v_doc_group_id)
-        ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        -- Upsert the association in documents_doc_groups.
+        -- Concurrent delete between SELECT and INSERT: no-op (do not fail ingest).
+        BEGIN
+            INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
+            VALUES (v_document_id, v_doc_group_id)
+            ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        EXCEPTION
+            WHEN foreign_key_violation THEN
+                RAISE LOG 'add_document_to_group_url: skipping FK violation for document_id=% doc_group_id=%',
+                    v_document_id, v_doc_group_id;
+        END;
 
         raise log 'completed for %',v_doc_group_id;
     END LOOP;

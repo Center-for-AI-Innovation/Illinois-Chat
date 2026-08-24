@@ -371,7 +371,7 @@ export function ProjectFilesTable({
             if (decrement === 0) return doc_group
             return {
               ...doc_group,
-              doc_count: (doc_group.doc_count || 0) - decrement,
+              doc_count: Math.max(0, (doc_group.doc_count || 0) - decrement),
             }
           })
         },
