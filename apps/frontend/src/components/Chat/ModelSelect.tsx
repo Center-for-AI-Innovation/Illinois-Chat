@@ -7,8 +7,15 @@ import {
   IconAlertTriangle,
   IconInfoCircle,
 } from '@tabler/icons-react'
-import { forwardRef, useContext, useEffect, useState } from 'react'
-import { useMediaQuery } from '@mantine/hooks'
+import {
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
+import { useMediaQuery, useViewportSize } from '@mantine/hooks'
 import HomeContext from '~/pages/api/home/home.context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { Group, Select, Title, Text, ActionIcon, Tooltip } from '@mantine/core'
@@ -46,6 +53,49 @@ interface ModelDropdownProps {
   isWebLLM?: boolean
   loadingModelId: string | null
   chat_ui: ChatUI
+}
+
+const MODEL_DROPDOWN_MAX_CAP_PX = 480
+const MODEL_DROPDOWN_PADDING_PX = 8
+
+/** Keep the model list inside the settings modal (or viewport fallback) so it can scroll instead of overflowing. */
+export function getModelDropdownMaxHeight({
+  triggerRect,
+  containerRect,
+  padding = MODEL_DROPDOWN_PADDING_PX,
+  cap = MODEL_DROPDOWN_MAX_CAP_PX,
+}: {
+  triggerRect: Pick<DOMRect, 'top' | 'bottom'>
+  containerRect: Pick<DOMRect, 'top' | 'bottom'>
+  padding?: number
+  cap?: number
+}): number {
+  const spaceBelow = containerRect.bottom - triggerRect.bottom - padding
+  const spaceAbove = triggerRect.top - containerRect.top - padding
+  const available = Math.max(spaceBelow, spaceAbove)
+  return Math.max(0, Math.min(cap, available))
+}
+
+export function getModelDropdownBoundaryRect(
+  triggerEl: HTMLElement,
+): Pick<DOMRect, 'top' | 'bottom'> {
+  const boundary =
+    triggerEl.closest('[data-settings-modal-body]') ||
+    triggerEl.closest('[data-settings-modal]') ||
+    triggerEl.closest('.mantine-Modal-content') ||
+    triggerEl.closest('[role="dialog"]')
+
+  if (boundary instanceof HTMLElement) {
+    return boundary.getBoundingClientRect()
+  }
+
+  return {
+    top: 0,
+    bottom:
+      typeof window !== 'undefined'
+        ? window.innerHeight
+        : MODEL_DROPDOWN_MAX_CAP_PX,
+  }
 }
 
 interface ModelItemProps extends React.ComponentPropsWithoutRef<'div'> {
@@ -329,7 +379,45 @@ const ModelDropdown: React.FC<
   setLoadingModelId,
   chat_ui,
 }) => {
-  const { state, dispatch: homeDispatch } = useContext(HomeContext)
+  const { state } = useContext(HomeContext)
+  const { height: viewportHeight } = useViewportSize()
+  const selectInputRef = useRef<HTMLInputElement>(null)
+  const [dropdownOpened, setDropdownOpened] = useState(false)
+  const [maxDropdownHeight, setMaxDropdownHeight] = useState(
+    MODEL_DROPDOWN_MAX_CAP_PX,
+  )
+
+  const constrainDropdownHeight = useCallback(() => {
+    const triggerEl = selectInputRef.current
+    const measuredViewportHeight =
+      viewportHeight ||
+      (typeof window !== 'undefined'
+        ? window.innerHeight
+        : MODEL_DROPDOWN_MAX_CAP_PX)
+
+    if (!triggerEl) {
+      setMaxDropdownHeight(
+        Math.min(
+          MODEL_DROPDOWN_MAX_CAP_PX,
+          Math.max(0, measuredViewportHeight - 200),
+        ),
+      )
+      return
+    }
+
+    setMaxDropdownHeight(
+      getModelDropdownMaxHeight({
+        triggerRect: triggerEl.getBoundingClientRect(),
+        containerRect: getModelDropdownBoundaryRect(triggerEl),
+      }),
+    )
+  }, [viewportHeight])
+
+  useEffect(() => {
+    if (dropdownOpened) {
+      constrainDropdownHeight()
+    }
+  }, [constrainDropdownHeight, dropdownOpened])
 
   // Filter out providers that are not enabled and their models which are disabled
   const { enabledProvidersAndModels, allModels } = Object.keys(
@@ -385,15 +473,21 @@ const ModelDropdown: React.FC<
 
       <div
         tabIndex={0}
-        className="relative mt-4 flex w-full flex-col items-start px-4"
+        className="relative mt-4 flex w-full flex-col items-start overflow-visible px-4"
       >
         <Select
-          className="menu z-[50] w-full"
+          ref={selectInputRef}
+          className="menu w-full"
           size="md"
           placeholder="Select a model"
           aria-label="Select a model"
           searchable
           value={value}
+          onDropdownOpen={() => {
+            setDropdownOpened(true)
+            constrainDropdownHeight()
+          }}
+          onDropdownClose={() => setDropdownOpened(false)}
           onChange={async (modelId) => {
             if (state.webLLMModelIdLoading.isLoading) {
               setLoadingModelId(modelId)
@@ -441,7 +535,10 @@ const ModelDropdown: React.FC<
               setLoadingModelId={setLoadingModelId}
             />
           )}
-          maxDropdownHeight={480}
+          maxDropdownHeight={maxDropdownHeight}
+          zIndex={400}
+          positionDependencies={[maxDropdownHeight]}
+          switchDirectionOnFlip
           rightSectionWidth="auto"
           icon={
             selectedModel ? (
@@ -525,7 +622,8 @@ const ModelDropdown: React.FC<
               boxShadow: theme.shadows.lg,
               width: '100%',
               maxWidth: '100%',
-              position: 'absolute',
+              overflowY: 'auto',
+              zIndex: 400,
             },
             item: {
               color: 'var(--modal-button-text)',
@@ -548,8 +646,8 @@ const ModelDropdown: React.FC<
               },
             },
           })}
-          dropdownPosition="bottom"
-          withinPortal
+          dropdownPosition="flip"
+          withinPortal={false}
         />
       </div>
     </>
