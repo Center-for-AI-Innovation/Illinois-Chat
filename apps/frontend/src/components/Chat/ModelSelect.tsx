@@ -57,6 +57,8 @@ interface ModelDropdownProps {
 
 const MODEL_DROPDOWN_MAX_CAP_PX = 480
 const MODEL_DROPDOWN_PADDING_PX = 8
+/** Roughly three model rows: below this the list is unusable, so let the modal scroll instead. */
+const MODEL_DROPDOWN_MIN_PX = 160
 
 /** Keep the model list inside the settings modal (or viewport fallback) so it can scroll instead of overflowing. */
 export function getModelDropdownMaxHeight({
@@ -64,16 +66,40 @@ export function getModelDropdownMaxHeight({
   containerRect,
   padding = MODEL_DROPDOWN_PADDING_PX,
   cap = MODEL_DROPDOWN_MAX_CAP_PX,
+  floor = MODEL_DROPDOWN_MIN_PX,
 }: {
   triggerRect: Pick<DOMRect, 'top' | 'bottom'>
   containerRect: Pick<DOMRect, 'top' | 'bottom'>
   padding?: number
   cap?: number
+  floor?: number
 }): number {
   const spaceBelow = containerRect.bottom - triggerRect.bottom - padding
   const spaceAbove = triggerRect.top - containerRect.top - padding
   const available = Math.max(spaceBelow, spaceAbove)
-  return Math.max(0, Math.min(cap, available))
+  // A container too short for `floor` gets `floor` anyway; the modal's own overflow clips it.
+  return Math.min(cap, Math.max(Math.min(floor, cap), available))
+}
+
+/**
+ * Mantine passes `maxDropdownHeight` through `rem()`, which divides by a hardcoded 16 —
+ * so a raw pixel value renders as `px/16rem` and grows with the user's root font size.
+ * Pre-scale it so the emitted rem resolves back to the pixel height we measured.
+ */
+export function toRemScaledDropdownHeight(
+  pxHeight: number,
+  rootFontSizePx: number,
+): number {
+  const rootFontSize = rootFontSizePx > 0 ? rootFontSizePx : 16
+  return (pxHeight * 16) / rootFontSize
+}
+
+function getRootFontSizePx(): number {
+  if (typeof window === 'undefined') return 16
+  const parsed = Number.parseFloat(
+    window.getComputedStyle(document.documentElement).fontSize,
+  )
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16
 }
 
 export function getModelDropdownBoundaryRect(
@@ -233,6 +259,7 @@ export const ModelItem = forwardRef<
                   multiline
                   width={280}
                   withArrow
+                  withinPortal
                   label={getCountryOfConcernShortMessage(countryOfConcern)}
                 >
                   <span
@@ -395,27 +422,49 @@ const ModelDropdown: React.FC<
         ? window.innerHeight
         : MODEL_DROPDOWN_MAX_CAP_PX)
 
-    if (!triggerEl) {
-      setMaxDropdownHeight(
-        Math.min(
+    const availablePx = triggerEl
+      ? getModelDropdownMaxHeight({
+          triggerRect: triggerEl.getBoundingClientRect(),
+          containerRect: getModelDropdownBoundaryRect(triggerEl),
+        })
+      : Math.min(
           MODEL_DROPDOWN_MAX_CAP_PX,
-          Math.max(0, measuredViewportHeight - 200),
-        ),
-      )
-      return
-    }
+          Math.max(MODEL_DROPDOWN_MIN_PX, measuredViewportHeight - 200),
+        )
 
     setMaxDropdownHeight(
-      getModelDropdownMaxHeight({
-        triggerRect: triggerEl.getBoundingClientRect(),
-        containerRect: getModelDropdownBoundaryRect(triggerEl),
-      }),
+      toRemScaledDropdownHeight(availablePx, getRootFontSizePx()),
     )
   }, [viewportHeight])
 
   useEffect(() => {
     if (dropdownOpened) {
       constrainDropdownHeight()
+    }
+  }, [constrainDropdownHeight, dropdownOpened])
+
+  // The modal body is its own scroll container, so scrolling it moves the (non-portalled)
+  // dropdown without changing the viewport size. Re-measure instead of keeping a stale height.
+  useEffect(() => {
+    if (!dropdownOpened || typeof window === 'undefined') return
+
+    let frame: number | null = null
+    const handleReposition = () => {
+      if (frame !== null) return
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+        constrainDropdownHeight()
+      })
+    }
+
+    // Capture phase so inner scroll containers, not just the window, are observed.
+    window.addEventListener('scroll', handleReposition, true)
+    window.addEventListener('resize', handleReposition)
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', handleReposition, true)
+      window.removeEventListener('resize', handleReposition)
     }
   }, [constrainDropdownHeight, dropdownOpened])
 
@@ -538,7 +587,6 @@ const ModelDropdown: React.FC<
           maxDropdownHeight={maxDropdownHeight}
           zIndex={400}
           positionDependencies={[maxDropdownHeight]}
-          switchDirectionOnFlip
           rightSectionWidth="auto"
           icon={
             selectedModel ? (
@@ -560,6 +608,7 @@ const ModelDropdown: React.FC<
                   multiline
                   width={280}
                   withArrow
+                  withinPortal
                   label={getCountryOfConcernShortMessage(selectedModelCountry)}
                 >
                   <span
