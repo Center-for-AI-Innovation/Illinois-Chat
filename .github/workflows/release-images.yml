@@ -13,10 +13,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # check-mode: none, matching pr-checks.yml and illinois-chat-dev.yml.
+      #
+      # Why: main has never been linted, so check-mode: all points trunk at
+      # the whole accumulated tree (1436 files, 895 issues) and fails. Here
+      # that failure would block a published release from building and
+      # pushing its images, for reasons unrelated to the release.
+      #
+      # Part of the same stopgap; see #86 for the real fix (check-mode:
+      # pull_request on PRs, plus a .trunk/trunk.yaml exclusion for
+      # apps/frontend).
       - name: Install Trunk
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: all
+          check-mode: none
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -68,14 +78,69 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-frontend
           IMAGE_TAG: ${{ github.event.release.tag_name }}
+          POSTHOG_API_KEY: ${{ secrets.PROD_POSTHOG_API_KEY }}
+          NEXT_PUBLIC_KEYCLOAK_URL: ${{ secrets.PROD_NEXT_PUBLIC_KEYCLOAK_URL }}
+          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_REALM }}
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.PROD_POSTHOG_API_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.PROD_NEXT_PUBLIC_POSTHOG_HOST }}
+          NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: ${{ vars.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG || 'True' }}
+          NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ${{ vars.NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT }}
         run: |
           cd apps/frontend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+
+          # NEXT_PUBLIC_* values are inlined by Next.js at BUILD time, including into
+          # server-side code. A missing or malformed value here cannot be corrected by
+          # runtime env vars — it ships baked into the image. Fail loudly instead.
+          if [ -z "$NEXT_PUBLIC_KEYCLOAK_URL" ]; then
+            echo "::error::PROD_NEXT_PUBLIC_KEYCLOAK_URL is empty. The server would fall back to"
+            echo "::error::deriving the JWT issuer from the request Host header, which fails token"
+            echo "::error::verification behind a load balancer (401 'Invalid token' on every API call)."
+            exit 1
+          fi
+          case "$NEXT_PUBLIC_KEYCLOAK_URL" in
+            */) ;;
+            *)
+              echo "::error::PROD_NEXT_PUBLIC_KEYCLOAK_URL must end with a trailing slash."
+              echo "::error::The app builds URLs as \${KEYCLOAK_URL}realms/\${REALM}, so a missing"
+              echo "::error::slash produces an invalid issuer and JWKS endpoint."
+              exit 1
+              ;;
+          esac
+
+          docker build \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_REALM="$NEXT_PUBLIC_KEYCLOAK_REALM" \
+            --build-arg NEXT_PUBLIC_KEYCLOAK_CLIENT_ID="$NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" \
+            --build-arg NEXT_PUBLIC_POSTHOG_KEY="$NEXT_PUBLIC_POSTHOG_KEY" \
+            --build-arg NEXT_PUBLIC_POSTHOG_HOST="$NEXT_PUBLIC_POSTHOG_HOST" \
+            --build-arg NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG="$NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG" \
+            --build-arg NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT="$NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT" \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
 
       - name: Push frontend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-frontend
+          IMAGE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Build crawlee image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: uiuc-chat-crawlee
+          IMAGE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd apps/crawlee
+          docker build -f Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            .
+
+      - name: Push crawlee image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: uiuc-chat-crawlee
           IMAGE_TAG: ${{ github.event.release.tag_name }}
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG

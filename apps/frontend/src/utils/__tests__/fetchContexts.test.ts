@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchContexts } from '../fetchContexts'
 
 describe('fetchContexts (browser/jsdom)', () => {
@@ -68,5 +68,40 @@ describe('fetchContexts (browser/jsdom)', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network'))
 
     await expect(fetchContexts('CS101', 'query')).resolves.toEqual([])
+  })
+})
+
+describe('fetchContextsFromBackend', () => {
+  beforeEach(() => {
+    vi.stubEnv('RAILWAY_URL', 'https://backend.example')
+  })
+
+  it('throws with the status when the backend rejects the request', async () => {
+    // Unlike fetchContexts, the backend helper propagates failures so callers
+    // can distinguish "no contexts" from "retrieval broke".
+    const { default: fetchContextsFromBackend } = await import(
+      '../fetchContexts'
+    )
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('boom', { status: 503 }),
+    )
+
+    await expect(
+      fetchContextsFromBackend('CS101', 'query', 4000, [], 'c1'),
+    ).rejects.toThrow(/Status: 503/)
+  })
+
+  it('returns the parsed contexts when the backend responds ok', async () => {
+    const { default: fetchContextsFromBackend } = await import(
+      '../fetchContexts'
+    )
+    const data = [{ id: 1, text: 't' }]
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(data), { status: 200 }),
+    )
+
+    await expect(
+      fetchContextsFromBackend('CS101', 'query', 4000, [], 'c1', 25),
+    ).resolves.toEqual(data)
   })
 })
