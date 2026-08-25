@@ -25,6 +25,7 @@ from langchain.embeddings.ollama import OllamaEmbeddings
 # from langchain.chat_models import AzureChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.schema import Document
+import openai
 import pytz
 from qdrant_client.http import models
 
