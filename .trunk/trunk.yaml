@@ -36,7 +36,7 @@ lint:
     - ruff@0.2.2
     - shellcheck@0.9.0
     - shfmt@3.6.0
-    - trivy@0.49.1
+    - trivy@0.74.0
     - yamllint@1.35.1
   ignore:
     - linters: [ALL]
