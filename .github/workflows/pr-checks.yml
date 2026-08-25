@@ -32,10 +32,15 @@ jobs:
       #
       # fetch-depth: 0 above is required -- trunk needs the base commit
       # present locally to compute the diff.
-      - name: Trunk Check (PR diff only)
+      #
+      # arguments: apps/frontend -- scoped to frontend only for now, so
+      # backend/infra/etc changes don't get linted here. Drop this once
+      # those trees are ready to be linted too.
+      - name: Trunk Check (PR diff only, frontend-only for now)
         uses: trunk-io/trunk-action@v1
         with:
           check-mode: pull_request
+          arguments: apps/frontend
 
       # Backend tests placeholder
       - name: Backend tests
