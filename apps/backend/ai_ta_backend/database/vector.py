@@ -315,7 +315,9 @@ class VectorDatabase:
         Each entry in *collections* is a dict with keys:
             name (str): collection name
             top_n (int, optional): override for limit
-            use_filter (bool, optional): whether to apply the course filter (default True)
+            use_filter (bool, optional): whether to apply the search filter
+                (conversation_id / doc_groups / optional course_name). Default True.
+                Set False for shared corpora that should be unfiltered.
             processor (str, optional): key into RESULT_PROCESSORS for post-processing
         """
         all_results = []
@@ -369,6 +371,8 @@ class VectorDatabase:
         doc_groups: List[str],
         admin_disabled_doc_groups: List[str],
         public_doc_groups: List[dict],
+        *,
+        apply_course_filter: bool = True,
     ) -> models.Filter:
         """
         Create search conditions for regular searches (no conversation filtering).
@@ -379,6 +383,11 @@ class VectorDatabase:
             doc_groups: List of document groups to include
             admin_disabled_doc_groups: List of document groups to exclude
             public_doc_groups: List of public document groups that can be accessed
+            apply_course_filter: When False (external Qdrant), omit the
+                ``course_name`` payload constraint. Shared corpora like
+                pubmed are not partitioned by project; partitioning by
+                collection / dedicated cluster is enough. conversation_id
+                and doc_groups filters still apply.
         """
 
         must_conditions = []
@@ -428,22 +437,19 @@ class VectorDatabase:
                     )
                     should_conditions.append(combined_condition)
 
-        # Handle user's own course documents
-        own_course_condition = models.Filter(
-            must=[
+        # Own-docs branch: course_name is skipped for external Qdrant (shared
+        # collections are not partitioned by project). doc_groups still apply.
+        own_must: list = []
+        if apply_course_filter:
+            own_must.append(
                 FieldCondition(key="course_name", match=MatchValue(value=course_name))
-            ]
-        )
-
-        # If specific doc_groups are specified
+            )
         if restrict_doc_groups:
-            if own_course_condition.must:
-                own_course_condition.must.append(
-                    FieldCondition(key="doc_groups", match=MatchAny(any=doc_groups))
-                )
-
-        # Add the own_course_condition to should_conditions
-        should_conditions.append(own_course_condition)
+            own_must.append(
+                FieldCondition(key="doc_groups", match=MatchAny(any=doc_groups))
+            )
+        if own_must:
+            should_conditions.append(models.Filter(must=own_must))
 
         # Construct the final filter (apply must to enforce no conversation_id)
         vector_search_filter = models.Filter(
@@ -540,7 +546,11 @@ class VectorDatabase:
                 "default_collection", os.environ.get("QDRANT_COLLECTION_NAME", "")
             ),
             query_filter=self._create_search_filter(
-                course_name, doc_groups, disabled_doc_groups, public_doc_groups
+                course_name,
+                doc_groups,
+                disabled_doc_groups,
+                public_doc_groups,
+                apply_course_filter=False,
             ),
             with_vectors=False,
             query_vector=user_query_embedding,
