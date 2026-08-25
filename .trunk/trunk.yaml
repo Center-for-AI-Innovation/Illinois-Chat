@@ -52,6 +52,12 @@ lint:
     - linters: [prettier]
       paths:
         - apps/frontend/**
+    # Checked-in GitBook screenshots. oxipng rewrites all ~49 of them, which
+    # is pure binary churn in any PR that happens to touch the docs tree and
+    # tells us nothing about code quality.
+    - linters: [oxipng]
+      paths:
+        - "**/.gitbook/assets/**"
 actions:
   enabled:
     - trunk-announce
