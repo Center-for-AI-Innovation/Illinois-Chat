@@ -36,7 +36,7 @@ lint:
     - ruff@0.2.2
     - shellcheck@0.9.0
     - shfmt@3.6.0
-    - trivy@0.49.1
+    - trivy@0.74.0
     - yamllint@1.35.1
   ignore:
     - linters: [ALL]
@@ -52,6 +52,12 @@ lint:
     - linters: [prettier]
       paths:
         - apps/frontend/**
+    # Checked-in GitBook screenshots. oxipng rewrites all ~49 of them, which
+    # is pure binary churn in any PR that happens to touch the docs tree and
+    # tells us nothing about code quality.
+    - linters: [oxipng]
+      paths:
+        - "**/.gitbook/assets/**"
 actions:
   enabled:
     - trunk-announce
