@@ -4,14 +4,21 @@ import {
   IconDownload,
   IconExternalLink,
   IconSparkles,
-  IconAlertTriangleFilled,
+  IconAlertTriangle,
   IconInfoCircle,
 } from '@tabler/icons-react'
-import { forwardRef, useContext, useEffect, useState } from 'react'
-import { useMediaQuery } from '@mantine/hooks'
+import {
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
+import { useMediaQuery, useViewportSize } from '@mantine/hooks'
 import HomeContext from '~/pages/api/home/home.context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
-import { Group, Select, Title, Text, ActionIcon } from '@mantine/core'
+import { Group, Select, Title, Text, ActionIcon, Tooltip } from '@mantine/core'
 import Link from 'next/link'
 import React from 'react'
 import { type OpenAIModel } from '~/utils/modelProviders/types/openai'
@@ -31,6 +38,10 @@ import {
   recommendedModelIds,
   warningLargeModelIds,
 } from '~/utils/modelProviders/ConfigWebLLM'
+import {
+  getCountryOfConcern,
+  getCountryOfConcernShortMessage,
+} from '~/utils/modelProviders/countriesOfConcern'
 import { LoadingSpinner } from '../UIUC-Components/LoadingSpinner'
 
 interface ModelDropdownProps {
@@ -42,6 +53,75 @@ interface ModelDropdownProps {
   isWebLLM?: boolean
   loadingModelId: string | null
   chat_ui: ChatUI
+}
+
+const MODEL_DROPDOWN_MAX_CAP_PX = 480
+const MODEL_DROPDOWN_PADDING_PX = 8
+/** Roughly three model rows: below this the list is unusable, so let the modal scroll instead. */
+const MODEL_DROPDOWN_MIN_PX = 160
+
+/** Keep the model list inside the settings modal (or viewport fallback) so it can scroll instead of overflowing. */
+export function getModelDropdownMaxHeight({
+  triggerRect,
+  containerRect,
+  padding = MODEL_DROPDOWN_PADDING_PX,
+  cap = MODEL_DROPDOWN_MAX_CAP_PX,
+  floor = MODEL_DROPDOWN_MIN_PX,
+}: {
+  triggerRect: Pick<DOMRect, 'top' | 'bottom'>
+  containerRect: Pick<DOMRect, 'top' | 'bottom'>
+  padding?: number
+  cap?: number
+  floor?: number
+}): number {
+  const spaceBelow = containerRect.bottom - triggerRect.bottom - padding
+  const spaceAbove = triggerRect.top - containerRect.top - padding
+  const available = Math.max(spaceBelow, spaceAbove)
+  // A container too short for `floor` gets `floor` anyway; the modal's own overflow clips it.
+  return Math.min(cap, Math.max(Math.min(floor, cap), available))
+}
+
+/**
+ * Mantine passes `maxDropdownHeight` through `rem()`, which divides by a hardcoded 16 —
+ * so a raw pixel value renders as `px/16rem` and grows with the user's root font size.
+ * Pre-scale it so the emitted rem resolves back to the pixel height we measured.
+ */
+export function toRemScaledDropdownHeight(
+  pxHeight: number,
+  rootFontSizePx: number,
+): number {
+  const rootFontSize = rootFontSizePx > 0 ? rootFontSizePx : 16
+  return (pxHeight * 16) / rootFontSize
+}
+
+function getRootFontSizePx(): number {
+  if (typeof window === 'undefined') return 16
+  const parsed = Number.parseFloat(
+    window.getComputedStyle(document.documentElement).fontSize,
+  )
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16
+}
+
+export function getModelDropdownBoundaryRect(
+  triggerEl: HTMLElement,
+): Pick<DOMRect, 'top' | 'bottom'> {
+  const boundary =
+    triggerEl.closest('[data-settings-modal-body]') ||
+    triggerEl.closest('[data-settings-modal]') ||
+    triggerEl.closest('.mantine-Modal-content') ||
+    triggerEl.closest('[role="dialog"]')
+
+  if (boundary instanceof HTMLElement) {
+    return boundary.getBoundingClientRect()
+  }
+
+  return {
+    top: 0,
+    bottom:
+      typeof window !== 'undefined'
+        ? window.innerHeight
+        : MODEL_DROPDOWN_MAX_CAP_PX,
+  }
 }
 
 interface ModelItemProps extends React.ComponentPropsWithoutRef<'div'> {
@@ -113,6 +193,7 @@ export const ModelItem = forwardRef<
     const [isModelCached, setIsModelCached] = useState(false)
     const showSparkles = recommendedModelIds.includes(label)
     const showWarningLargeModel = warningLargeModelIds.includes(label)
+    const countryOfConcern = getCountryOfConcern(modelId)
     const { state, dispatch: homeDispatch } = useContext(HomeContext)
     // const {
     //   state: {
@@ -173,6 +254,30 @@ export const ModelItem = forwardRef<
               <Text size="sm" style={{ marginLeft: '8px' }}>
                 {label}
               </Text>
+              {countryOfConcern && (
+                <Tooltip
+                  multiline
+                  width={280}
+                  withArrow
+                  withinPortal
+                  label={getCountryOfConcernShortMessage(countryOfConcern)}
+                >
+                  <span
+                    aria-label={`Country of concern warning: ${countryOfConcern}`}
+                    style={{
+                      marginLeft: '6px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <IconAlertTriangle
+                      size="0.9rem"
+                      aria-hidden="true"
+                      className="text-yellow-500"
+                    />
+                  </span>
+                </Tooltip>
+              )}
             </div>
             {downloadSize && (
               <div
@@ -262,7 +367,7 @@ export const ModelItem = forwardRef<
                 )}
                 {showWarningLargeModel && (
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <IconAlertTriangleFilled
+                    <IconAlertTriangle
                       size="1rem"
                       aria-hidden="true"
                       style={{ marginLeft: '8px' }}
@@ -301,7 +406,67 @@ const ModelDropdown: React.FC<
   setLoadingModelId,
   chat_ui,
 }) => {
-  const { state, dispatch: homeDispatch } = useContext(HomeContext)
+  const { state } = useContext(HomeContext)
+  const { height: viewportHeight } = useViewportSize()
+  const selectInputRef = useRef<HTMLInputElement>(null)
+  const [dropdownOpened, setDropdownOpened] = useState(false)
+  const [maxDropdownHeight, setMaxDropdownHeight] = useState(
+    MODEL_DROPDOWN_MAX_CAP_PX,
+  )
+
+  const constrainDropdownHeight = useCallback(() => {
+    const triggerEl = selectInputRef.current
+    const measuredViewportHeight =
+      viewportHeight ||
+      (typeof window !== 'undefined'
+        ? window.innerHeight
+        : MODEL_DROPDOWN_MAX_CAP_PX)
+
+    const availablePx = triggerEl
+      ? getModelDropdownMaxHeight({
+          triggerRect: triggerEl.getBoundingClientRect(),
+          containerRect: getModelDropdownBoundaryRect(triggerEl),
+        })
+      : Math.min(
+          MODEL_DROPDOWN_MAX_CAP_PX,
+          Math.max(MODEL_DROPDOWN_MIN_PX, measuredViewportHeight - 200),
+        )
+
+    setMaxDropdownHeight(
+      toRemScaledDropdownHeight(availablePx, getRootFontSizePx()),
+    )
+  }, [viewportHeight])
+
+  useEffect(() => {
+    if (dropdownOpened) {
+      constrainDropdownHeight()
+    }
+  }, [constrainDropdownHeight, dropdownOpened])
+
+  // The modal body is its own scroll container, so scrolling it moves the (non-portalled)
+  // dropdown without changing the viewport size. Re-measure instead of keeping a stale height.
+  useEffect(() => {
+    if (!dropdownOpened || typeof window === 'undefined') return
+
+    let frame: number | null = null
+    const handleReposition = () => {
+      if (frame !== null) return
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+        constrainDropdownHeight()
+      })
+    }
+
+    // Capture phase so inner scroll containers, not just the window, are observed.
+    window.addEventListener('scroll', handleReposition, true)
+    window.addEventListener('resize', handleReposition)
+
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', handleReposition, true)
+      window.removeEventListener('resize', handleReposition)
+    }
+  }, [constrainDropdownHeight, dropdownOpened])
 
   // Filter out providers that are not enabled and their models which are disabled
   const { enabledProvidersAndModels, allModels } = Object.keys(
@@ -343,6 +508,7 @@ const ModelDropdown: React.FC<
   )
 
   const selectedModel = allModels.find((model) => model.id === value)
+  const selectedModelCountry = getCountryOfConcern(value)
 
   return (
     <>
@@ -356,15 +522,21 @@ const ModelDropdown: React.FC<
 
       <div
         tabIndex={0}
-        className="relative mt-4 flex w-full flex-col items-start px-4"
+        className="relative mt-4 flex w-full flex-col items-start overflow-visible px-4"
       >
         <Select
-          className="menu z-[50] w-full"
+          ref={selectInputRef}
+          className="menu w-full"
           size="md"
           placeholder="Select a model"
           aria-label="Select a model"
           searchable
           value={value}
+          onDropdownOpen={() => {
+            setDropdownOpened(true)
+            constrainDropdownHeight()
+          }}
+          onDropdownClose={() => setDropdownOpened(false)}
           onChange={async (modelId) => {
             if (state.webLLMModelIdLoading.isLoading) {
               setLoadingModelId(modelId)
@@ -412,7 +584,9 @@ const ModelDropdown: React.FC<
               setLoadingModelId={setLoadingModelId}
             />
           )}
-          maxDropdownHeight={480}
+          maxDropdownHeight={maxDropdownHeight}
+          zIndex={400}
+          positionDependencies={[maxDropdownHeight]}
           rightSectionWidth="auto"
           icon={
             selectedModel ? (
@@ -428,11 +602,37 @@ const ModelDropdown: React.FC<
             ) : null
           }
           rightSection={
-            <IconChevronDown
-              size="1rem"
-              aria-hidden="true"
-              className="mr-2 text-[--modal-button-text]"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {selectedModelCountry && (
+                <Tooltip
+                  multiline
+                  width={280}
+                  withArrow
+                  withinPortal
+                  label={getCountryOfConcernShortMessage(selectedModelCountry)}
+                >
+                  <span
+                    aria-label={`Country of concern warning: ${selectedModelCountry}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      pointerEvents: 'auto',
+                    }}
+                  >
+                    <IconAlertTriangle
+                      size="1rem"
+                      aria-hidden="true"
+                      className="text-yellow-500"
+                    />
+                  </span>
+                </Tooltip>
+              )}
+              <IconChevronDown
+                size="1rem"
+                aria-hidden="true"
+                className="mr-2 text-[--modal-button-text]"
+              />
+            </div>
           }
           classNames={{
             root: 'w-full',
@@ -471,7 +671,8 @@ const ModelDropdown: React.FC<
               boxShadow: theme.shadows.lg,
               width: '100%',
               maxWidth: '100%',
-              position: 'absolute',
+              overflowY: 'auto',
+              zIndex: 400,
             },
             item: {
               color: 'var(--modal-button-text)',
@@ -494,8 +695,8 @@ const ModelDropdown: React.FC<
               },
             },
           })}
-          dropdownPosition="bottom"
-          withinPortal
+          dropdownPosition="flip"
+          withinPortal={false}
         />
       </div>
     </>
@@ -512,7 +713,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
     const isSmallScreen = useMediaQuery('(max-width: 960px)')
     const defaultModel = selectBestModel(llmProviders).id
     const [loadingModelId, setLoadingModelId] = useState<string | null>(null)
-    const [isAccordionOpen, setIsAccordionOpen] = useState(false)
+    const [isAccordionOpen, setIsAccordionOpen] = useState(true)
 
     // console.log('defaultModelId in chat page: ', defaultModelId)
 
@@ -587,6 +788,41 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                         className={`${montserrat_paragraph.variable} flex-1 p-4 font-montserratParagraph`}
                       >
                         <div className="space-y-6">
+                          {/* Countries of Concern Section */}
+                          <div>
+                            <Text
+                              size={'sm'}
+                              className={`${montserrat_heading.variable} mb-2 font-montserratHeading font-semibold`}
+                            >
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                }}
+                              >
+                                <IconAlertTriangle
+                                  size="1rem"
+                                  aria-hidden="true"
+                                  className="text-yellow-500"
+                                />
+                                Countries of Concern
+                              </span>
+                            </Text>
+                            <Text
+                              size={'sm'}
+                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            >
+                              Models marked with a yellow warning icon originate
+                              from countries the U.S. Department of Commerce has
+                              flagged as countries of concern (currently China,
+                              Russia, Iran, and North Korea). These models may
+                              carry data-handling, supply-chain, or compliance
+                              risks. They are disabled by default; admins can
+                              still enable them after reviewing the warning.
+                            </Text>
+                          </div>
+
                           {/* NCSA VLM Section */}
                           <div>
                             <Text

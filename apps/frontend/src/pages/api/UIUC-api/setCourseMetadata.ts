@@ -2,8 +2,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { NextResponse } from 'next/server'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { ensureRedisConnected } from '~/utils/redisClient'
+import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { superAdmins } from '~/utils/superAdmins'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -21,7 +22,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const is_private = JSON.parse((req.query.is_private as string) || 'false')
   const is_frozen = JSON.parse((req.query.is_frozen as string) || 'false')
   const course_admins = JSON.parse(
-    (req.query.course_admins as string) || '["rohan13@illinois.edu"]',
+    (req.query.course_admins as string) || JSON.stringify(superAdmins),
   )
   const approved_emails_list = JSON.parse(
     (req.query.approved_emails_list as string) || '[]',
@@ -81,11 +82,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       allow_logged_in_users,
       is_frozen,
     }
-    console.log('Right before setting course_metadata with: ', course_metadata)
-    const redisClient = await ensureRedisConnected()
-    await redisClient.hSet('course_metadatas', {
-      [course_name]: JSON.stringify(course_metadata),
-    })
+    await writeCourseMetadata(course_name, course_metadata)
 
     return res.status(200).json({ success: true })
   } catch (error) {

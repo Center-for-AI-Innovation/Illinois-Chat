@@ -421,6 +421,65 @@ describe('handleFunctionCalling (node)', () => {
     })
   })
 
+  it('handleToolCall keeps s3Paths alongside the other output fields', async () => {
+    // s3_paths must survive next to data/image_urls — they are the raw keys
+    // used to re-sign after the 1h presigned URLs expire.
+    const { handleToolCall } = await import('../handleFunctionCalling')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify('n8n-key'), { status: 200 }),
+    )
+    ;(runN8nFlowBackend as any).mockResolvedValueOnce({
+      data: {
+        resultData: {
+          lastNodeExecuted: 'final',
+          runData: {
+            final: [
+              {
+                data: {
+                  main: [
+                    [
+                      {
+                        json: {
+                          data: { ok: true },
+                          image_urls: ['https://signed.example/a.png'],
+                          s3_paths: ['courses/cs101/a.png'],
+                        },
+                      },
+                    ],
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
+    })
+
+    const tool: any = {
+      id: 'w1',
+      invocationId: 'inv1',
+      name: 't',
+      readableName: 'Tool',
+      description: 'd',
+      aiGeneratedArgumentValues: { a: 1 },
+    }
+    const conversation: any = {
+      id: 'c1',
+      messages: [{ id: 'm1', role: 'user', content: 'hi', tools: [tool] }],
+    }
+
+    await handleToolCall([tool], conversation, 'proj', 'http://localhost')
+    expect(conversation.messages[0].tools[0].output).toEqual({
+      data: { ok: true },
+      imageUrls: ['https://signed.example/a.png'],
+      s3Paths: ['courses/cs101/a.png'],
+    })
+  })
+
   it('handleToolCall skips when last message has no tools array', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
     vi.spyOn(console, 'error').mockImplementation(() => {})

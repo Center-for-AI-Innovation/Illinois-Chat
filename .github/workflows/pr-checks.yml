@@ -7,26 +7,52 @@ on:
       - illinois-chat
       - main
 
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write # trunk-action posts lint results as check-run annotations
+
 jobs:
   trunk-and-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Trunk
+      # Lint only what this PR changed, by diffing against the PR base sha.
+      # check-mode: all would point trunk at the whole accumulated tree
+      # (~1436 files, ~895 pre-existing issues, since main was never linted)
+      # and attribute every one of them to whichever PR happened to be open.
+      #
+      # fetch-depth: 0 above is required -- trunk needs the base commit
+      # present locally to compute the diff.
+      - name: Trunk Check (PR diff only)
         uses: trunk-io/trunk-action@v1
         with:
-          check-mode: true
+          check-mode: pull_request
 
       # Backend tests placeholder
       - name: Backend tests
         run: |
           echo "TODO: add backend tests (e.g., pytest) here"
 
-      # Frontend tests placeholder
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: apps/frontend
+        run: npm ci
+
       - name: Frontend tests
-        run: |
-          echo "TODO: add frontend tests (e.g., npm test) here"
+        working-directory: apps/frontend
+        run: npm run test:coverage:check
