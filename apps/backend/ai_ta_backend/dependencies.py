@@ -1,7 +1,9 @@
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+from functools import wraps
 import threading
+from typing import Callable, TypeVar
 
 from ai_ta_backend.database.aws import AWSStorage
 from ai_ta_backend.database.connection_manager import ConnectionManager
@@ -18,24 +20,29 @@ from ai_ta_backend.service.workflow_service import WorkflowService
 _thread_pool = ThreadPoolExecutor(max_workers=10)
 _process_pool = ProcessPoolExecutor(max_workers=10)
 
-# lru_cache is not atomic on cache miss; serialize construction so concurrent
-# gthread workers don't each build engines / caches / nomic logins.
-_singleton_lock = threading.RLock()
+T = TypeVar("T")
 
 
-def _locked_singleton(factory):
-  """Wrap an @lru_cache factory so first-call construction is thread-safe.
+def _locked_singleton(factory: Callable[[], T]) -> Callable[[], T]:
+  """Wrap a zero-arg factory as a thread-safe process singleton.
 
-  Uses RLock because factories nest (e.g. get_retrieval_service ->
-  get_connection_manager -> get_sql_database).
+  ``lru_cache`` is not atomic on cache miss. Each factory gets its own lock so
+  a slow cold start (nomic login, Qdrant client, OpenAI embeddings) cannot
+  convoy unrelated getters. Double-checked locking: fast path reads the cache
+  without holding the lock once the instance exists.
   """
+  lock = threading.Lock()
 
   @lru_cache
-  def cached():
+  def cached() -> T:
     return factory()
 
-  def wrapper():
-    with _singleton_lock:
+  @wraps(factory)
+  def wrapper() -> T:
+    info = cached.cache_info()
+    if info.currsize > 0:
+      return cached()
+    with lock:
       return cached()
 
   wrapper.cache_clear = cached.cache_clear  # type: ignore[attr-defined]

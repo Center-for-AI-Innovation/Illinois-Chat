@@ -473,9 +473,9 @@ class RetrievalService:
       user_query_embedding,
       disabled_doc_groups,
       public_doc_groups,
+      openai_embedding_latency: float,
       top_n: int = 100,
       conversation_id: str = "",
-      openai_embedding_latency: float = 0.0,
   ):
     """
         Search the vector database for a given query, course name, and document groups.

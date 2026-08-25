@@ -86,6 +86,69 @@ describe('UIUC-api runN8nFlow', () => {
     )
   })
 
+  it('runN8nFlowBackend aborts immediately when signal is already aborted', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.signal?.aborted) {
+        const error: any = new Error('aborted')
+        error.name = 'AbortError'
+        throw error
+      }
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn(async () => ({ ok: true })),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock as any)
+
+    const signal = AbortSignal.abort()
+    await expect(runN8nFlowBackend('k', 'n', { a: 1 }, signal)).rejects.toThrow(
+      'timed out',
+    )
+  })
+
+  it('runN8nFlowBackend falls back when JSON error body fails to parse', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: vi.fn(async () => {
+          throw new Error('not json')
+        }),
+        text: vi.fn(async () => ''),
+      })) as any,
+    )
+
+    await expect(runN8nFlowBackend('k', 'n', { a: 1 })).rejects.toThrow(
+      'Backend returned 500',
+    )
+  })
+
+  it('runN8nFlowBackend falls back when HTML error body fails to read', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: new Headers({ 'content-type': 'text/html' }),
+        json: vi.fn(async () => ({})),
+        text: vi.fn(async () => {
+          throw new Error('stream broken')
+        }),
+      })) as any,
+    )
+
+    await expect(runN8nFlowBackend('k', 'n', { a: 1 })).rejects.toThrow(
+      'Backend returned 502',
+    )
+  })
+
   it('handler returns 405/400/200/408/500 for various cases', async () => {
     const res0 = createMockRes()
     await handler(createMockReq({ method: 'GET' }) as any, res0 as any)

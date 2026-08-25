@@ -15,9 +15,26 @@ vi.mock('axios', () => ({
   default: { post: hoisted.axiosPost },
 }))
 
-import handler from '~/pages/api/scrapeWeb'
+import handler, {
+  formatUrl,
+  formatUrlAndMatchRegex,
+} from '~/pages/api/scrapeWeb'
 
 describe('scrapeWeb API', () => {
+  it('formatUrl and formatUrlAndMatchRegex prepend http when missing', () => {
+    expect(formatUrl('example.com')).toBe('http://example.com')
+    expect(formatUrl('https://secure.example.com')).toBe(
+      'https://secure.example.com',
+    )
+
+    const bare = formatUrlAndMatchRegex('example.com/path?q=1')
+    expect(bare.fullUrl).toBe('example.com/path')
+    expect(bare.matchRegex).toContain('example.com/path')
+
+    const already = formatUrlAndMatchRegex('https://example.com/path/')
+    expect(already.fullUrl).toBe('example.com/path')
+  })
+
   it('returns 405 for non-POST methods', async () => {
     const res = createMockRes()
     await handler(createMockReq({ method: 'GET' }) as any, res as any)
