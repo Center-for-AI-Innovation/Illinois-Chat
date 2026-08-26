@@ -16,6 +16,11 @@
 -- Source of truth: apps/frontend/src/db/schema.ts (documents/doc-group/
 -- embeddings subset) + apps/frontend/src/db/migrations/0001_custom_functions.sql.
 -- See docs/external-connections-setup.md for the full setup walkthrough.
+--
+-- This script provisions a NEW store and must always reflect the latest schema.
+-- Bringing an ALREADY-provisioned store up to date is the job of the ordered
+-- scripts in infra/db/external-migrations/ — any document-related change made
+-- here needs a matching numbered file there. See that directory's README.
 
 BEGIN;
 
