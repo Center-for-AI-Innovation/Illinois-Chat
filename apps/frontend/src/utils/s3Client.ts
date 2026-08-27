@@ -34,6 +34,25 @@ if (region && process.env.AWS_KEY && process.env.AWS_SECRET) {
   s3Client = new S3Client({ region })
 }
 
+// MinIO Client configuration
+let vyriadMinioClient: S3Client | null = null
+if (
+  process.env.MINIO_KEY &&
+  process.env.MINIO_SECRET &&
+  process.env.MINIO_ENDPOINT
+) {
+  vyriadMinioClient = new S3Client({
+    region: process.env.MINIO_REGION || 'us-east-1', // MinIO requires a region, but it can be arbitrary
+    credentials: {
+      accessKeyId: process.env.MINIO_KEY,
+      secretAccessKey: process.env.MINIO_SECRET,
+    },
+    endpoint: process.env.MINIO_ENDPOINT,
+    forcePathStyle: true, // Required for MinIO
+    ...s3CompatibleChecksumConfig,
+  })
+}
+
 // Client for generating presigned URLs handed to the browser. Signs against
 // the public MinIO endpoint (MINIO_PUBLIC_ENDPOINT) so the URL is reachable
 // from outside the Docker network. Only used on the default (no per-project
@@ -65,6 +84,32 @@ function getPresignedUrlClient(): S3Client | null {
   return new S3Client({ region })
 }
 
+function getPresignedUrlVyriadClient(): S3Client | null {
+  const publicEndpoint =
+    process.env.VYRIAD_MINIO_PUBLIC_ENDPOINT ||
+    process.env.VYRIAD_MINIO_ENDPOINT
+
+  if (
+    process.env.VYRIAD_MINIO_KEY &&
+    process.env.VYRIAD_MINIO_SECRET &&
+    publicEndpoint
+  ) {
+    return new S3Client({
+      region: process.env.VYRIAD_MINIO_REGION || 'us-east-1',
+      endpoint: publicEndpoint,
+      credentials: {
+        accessKeyId: process.env.VYRIAD_MINIO_KEY,
+        secretAccessKey: process.env.VYRIAD_MINIO_SECRET,
+      },
+      forcePathStyle: true,
+      ...s3CompatibleChecksumConfig,
+    })
+  }
+
+  return vyriadMinioClient
+}
+
+
 // Keys reaching the presign routes are often recovered from a URL pathname by the
 // client. Path-style S3/MinIO URLs are `<endpoint>/<bucket>/<key>`, so that pathname
 // carries the bucket and signing it verbatim yields a valid signature for an object
@@ -77,4 +122,10 @@ function normalizeS3Key(key: string, bucket: string): string {
   return key.startsWith(prefix) ? key.slice(prefix.length) : key
 }
 
-export { s3Client, getPresignedUrlClient, normalizeS3Key }
+export {
+  s3Client,
+  vyriadMinioClient,
+  getPresignedUrlClient,
+  getPresignedUrlVyriadClient,
+  normalizeS3Key
+}
