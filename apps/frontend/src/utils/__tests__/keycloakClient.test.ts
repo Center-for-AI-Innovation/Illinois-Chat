@@ -78,8 +78,9 @@ describe('keycloakClient', () => {
     }))
 
     vi.resetModules()
-    const { fetchRealmPublicKey, getJwksUri } =
-      await import('../keycloakClient')
+    const { fetchRealmPublicKey, getJwksUri } = await import(
+      '../keycloakClient'
+    )
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ keys: [{ x5c: ['CERTDATA'] }] }), {

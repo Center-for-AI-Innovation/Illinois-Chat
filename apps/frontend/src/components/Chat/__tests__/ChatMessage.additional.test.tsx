@@ -371,8 +371,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Assistant message with array Content[] ────────────────────────────
 
   it('renders assistant message when content is an array of text items', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-arr',
@@ -417,8 +418,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool output with error ────────────────────────────────────────────
 
   it('renders tool error state in the tool output accordion', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-err',
@@ -472,8 +474,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool with text output ─────────────────────────────────────────────
 
   it('renders tool output text when available', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-text',
@@ -532,8 +535,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool with no image_urls shows JSON arguments ──────────────────────
 
   it('renders JSON.stringify of arguments when no image_urls present', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-json',
@@ -591,8 +595,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── "Generating final response" loading state ─────────────────────────
 
   it('shows "Generating final response" when loading and no intermediate states active', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-gen',
@@ -640,8 +645,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── MessageActions hidden during streaming ────────────────────────────
 
   it('hides MessageActions when message is streaming and is last message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-stream-hide',
@@ -685,8 +691,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── MessageActions visible when not streaming ─────────────────────────
 
   it('shows MessageActions for non-streaming assistant messages', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-actions',
@@ -729,8 +736,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Sources button hidden during streaming ────────────────────────────
 
   it('does not show Sources button while streaming the last message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const ctxPdf = makeContextWithMetadata({
       readable_filename: 'Doc.pdf',
@@ -783,8 +791,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Assistant message displays contexts from previous user message ────
 
   it('uses contexts from previous user message when assistant has none', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const ctxPdf = makeContextWithMetadata({
       readable_filename: 'Lecture.pdf',
@@ -838,8 +847,9 @@ describe('ChatMessage - additional coverage', () => {
 
   it('closes feedback modal when Close button is clicked', async () => {
     const user = userEvent.setup()
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-fb-close',
@@ -895,8 +905,9 @@ describe('ChatMessage - additional coverage', () => {
   it('calls onFeedback with correct arguments when feedback is submitted', async () => {
     const user = userEvent.setup()
     const onFeedback = vi.fn()
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-fb-submit',
@@ -949,8 +960,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Streaming cursor on assistant text-only message ───────────────────
 
   it('appends cursor to content when streaming and this is the last message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-cursor',
@@ -1164,8 +1176,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Query rewrite result: wasQueryRewritten=false ─────────────────────
 
   it('shows "No query optimization necessary" when wasQueryRewritten is false', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-no-rewrite',
@@ -1211,8 +1224,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Query rewriting loading state ─────────────────────────────────────
 
   it('shows "Optimizing search query" loading state for the last message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-qr-loading',
@@ -1252,8 +1266,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Retrieval loading state ───────────────────────────────────────────
 
   it('shows "Retrieving documents" loading state for the last message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-ret-loading',
@@ -1293,8 +1308,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Routing loading state ─────────────────────────────────────────────
 
   it('shows "Routing the request" loading state for the last message', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-routing',
@@ -1488,8 +1504,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── User message with contexts shows "Retrieved documents" accordion ──
 
   it('shows "Retrieved documents" accordion for user messages with contexts', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-retrieved',
@@ -1546,8 +1563,9 @@ describe('ChatMessage - additional coverage', () => {
 
   it('closes sources sidebar when conversation changes', async () => {
     const user = userEvent.setup()
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const ctxPdf = makeContextWithMetadata({
       readable_filename: 'Doc.pdf',
@@ -1604,8 +1622,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool with aiGeneratedArgumentValues with empty image_urls ─────────
 
   it('shows "No arguments provided" when image_urls array is empty', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-empty-imgs',
@@ -1661,8 +1680,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool with data output (no text) ───────────────────────────────────
 
   it('renders JSON.stringify of output.data when output.text is absent', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-data',
@@ -1720,8 +1740,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Assistant with think tag content as array ─────────────────────────
 
   it('renders think tag dropdown when content array includes think tags', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-think-arr',
@@ -1767,8 +1788,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Assistant message at index 0 (no previous user message) ───────────
 
   it('handles assistant message at index 0 gracefully', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-first',
@@ -1809,8 +1831,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Loading state hidden for agent mode ───────────────────────────────
 
   it('does not show "Generating final response" for agent mode conversations', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-agent-mode',
@@ -1854,8 +1877,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool with loading state (output and error both undefined) ─────────
 
   it('shows loading state for tools that are still running', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-loading',
@@ -1909,8 +1933,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Sources sidebar with web context thumbnail ────────────────────────
 
   it('loads thumbnails for web contexts using favicon', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const ctxWeb = makeContextWithMetadata({
       readable_filename: 'Web Article',
@@ -2001,8 +2026,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool routing accordion with image arguments ───────────────────────
 
   it('renders tool routing with image argument previews', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-imgs',
@@ -2063,8 +2089,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Inline code cursor placeholder ────────────────────────────────────
 
   it('renders cursor placeholder in inline code as pulsing span', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-inline-cursor',
@@ -2105,8 +2132,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Assistant message without contexts and no previous user msg ctx ───
 
   it('does not show Sources button when neither message has contexts', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-no-ctx',
@@ -2153,8 +2181,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Message with undefined contexts ───────────────────────────────────
 
   it('handles message with undefined contexts gracefully', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const assistantMsg = makeMessage({
       id: 'a-undef-ctx',
@@ -2203,8 +2232,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Multiple tools with routing badges ────────────────────────────────
 
   it('renders multiple tool routing accordions with badges', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-multi-tools',
@@ -2270,8 +2300,9 @@ describe('ChatMessage - additional coverage', () => {
   // ── Tool output with imageUrls renders images ─────────────────────────
 
   it('renders tool output images when imageUrls are present', async () => {
-    const { ChatMessage, SourcesSidebarProvider } =
-      await import('../ChatMessage')
+    const { ChatMessage, SourcesSidebarProvider } = await import(
+      '../ChatMessage'
+    )
 
     const userMsg = makeMessage({
       id: 'u-tool-out-imgs',

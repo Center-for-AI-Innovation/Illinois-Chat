@@ -113,8 +113,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall populates tool output via runN8nFlowBackend on the server', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
 
     ;(runN8nFlowBackend as any).mockResolvedValueOnce({
       data: {
@@ -183,8 +184,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall sets timeout error when runN8nFlowBackend throws timed out', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -213,8 +215,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall preserves non-timeout errors from runN8nFlowBackend', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -241,8 +244,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall sets empty response error when workflow response is missing json', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -332,8 +336,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall sets error when n8n workflow returns an error object', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -373,8 +378,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall returns imageUrls output when workflow responds with image_urls only', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify('n8n-key'), { status: 200 }),
@@ -525,8 +531,9 @@ describe('handleFunctionCalling (node)', () => {
 
   it('handleToolCall parses JSON "data" output and merges image_urls when present', async () => {
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } =
-      await import('~/pages/api/UIUC-api/runN8nFlow')
+    const { runN8nFlowBackend } = await import(
+      '~/pages/api/UIUC-api/runN8nFlow'
+    )
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify('n8n-key'), { status: 200 }),

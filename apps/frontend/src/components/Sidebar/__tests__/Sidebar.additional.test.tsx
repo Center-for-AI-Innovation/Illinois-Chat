@@ -284,8 +284,9 @@ describe('Sidebar – additional coverage', () => {
   // -------------------------------------------------------------------
   describe('when permission is edit', () => {
     beforeEach(async () => {
-      const { get_user_permission } =
-        await import('~/components/UIUC-Components/runAuthCheck')
+      const { get_user_permission } = await import(
+        '~/components/UIUC-Components/runAuthCheck'
+      )
       vi.mocked(get_user_permission).mockReturnValue('edit' as any)
     })
 
@@ -398,8 +399,9 @@ describe('Sidebar – additional coverage', () => {
   // -------------------------------------------------------------------
   describe('when permission is no_permission', () => {
     beforeEach(async () => {
-      const { get_user_permission } =
-        await import('~/components/UIUC-Components/runAuthCheck')
+      const { get_user_permission } = await import(
+        '~/components/UIUC-Components/runAuthCheck'
+      )
       vi.mocked(get_user_permission).mockReturnValue('no_permission' as any)
     })
 
@@ -465,8 +467,9 @@ describe('Sidebar – additional coverage', () => {
   // -------------------------------------------------------------------
   describe('when permission is view', () => {
     beforeEach(async () => {
-      const { get_user_permission } =
-        await import('~/components/UIUC-Components/runAuthCheck')
+      const { get_user_permission } = await import(
+        '~/components/UIUC-Components/runAuthCheck'
+      )
       vi.mocked(get_user_permission).mockReturnValue('view' as any)
     })
 
