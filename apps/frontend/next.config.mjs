@@ -13,6 +13,11 @@ const bundleAnalyzerConfig = {
 /** @type {import("next").NextConfig} */
 const config = {
   i18n: nextI18NextConfig.i18n,
+  serverRuntimeConfig: {
+    bodyParser: {
+      sizeLimit: '100mb',
+    },
+  },
   webpack(config, { isServer }) {
     // Merge existing experiments with the required ones
     config.experiments = {
@@ -55,19 +60,21 @@ const config = {
   // },
   images: {
     unoptimized: true,
-    remotePatterns: [
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'github.com' },
-      {
-        protocol: 'https',
-        hostname: 'uiuc-chatbot.s3.us-east-1.amazonaws.com',
-      },
-      { protocol: 'https', hostname: 'images.squarespace-cdn.com' },
-      { protocol: 'https', hostname: 'raw.githubusercontent.com' },
-      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
-      { protocol: 'https', hostname: 'anthropic.com' },
-      { protocol: 'https', hostname: 'via.placeholder.com' },
+    domains: [
+      'images.unsplash.com',
+      'github.com',
+      'uiuc-chatbot.s3.us-east-1.amazonaws.com',
+      'images.squarespace-cdn.com',
+      'raw.githubusercontent.com',
+      'avatars.githubusercontent.com',
+      'anthropic.com',
+      'via.placeholder.com',
     ],
+  },
+  experimental: {
+    esmExternals: false, // To make certain packages work with the /pages router.
+    // Keep Node-only packages (postgres uses tls, perf_hooks) out of the bundle; required for API routes that use dbClient/vectorSearch.
+    serverComponentsExternalPackages: ['postgres'],
   },
   async headers() {
     return [

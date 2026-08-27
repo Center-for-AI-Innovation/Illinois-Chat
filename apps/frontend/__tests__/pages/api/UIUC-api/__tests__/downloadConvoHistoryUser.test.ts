@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMockReq } from '~/test-utils/nextApi'
 
-vi.mock('~/server/authorization', () => ({
+vi.mock('~/pages/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

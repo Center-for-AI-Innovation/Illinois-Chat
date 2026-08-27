@@ -28,7 +28,7 @@ vi.mock('~/utils/connectionManager', () => ({
   connectionManager: { getS3Client: hoisted.getS3Client },
 }))
 
-vi.mock('~/server/authorization', () => ({
+vi.mock('~/pages/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

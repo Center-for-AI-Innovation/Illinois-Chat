@@ -8,7 +8,7 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { eq } from 'drizzle-orm'
-import { withCourseAccessFromRequest } from '~/server/authorization'
+import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 
 type ChatFileUploadResponse = {
   success?: boolean

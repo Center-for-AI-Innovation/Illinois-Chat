@@ -1,7 +1,7 @@
 // src/pages/home/home.tsx
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { useTranslation } from 'next-i18next/pages'
+import { useTranslation } from 'next-i18next'
 import Head from 'next/head'
 
 import { useCreateReducer } from '@/hooks/useCreateReducer'

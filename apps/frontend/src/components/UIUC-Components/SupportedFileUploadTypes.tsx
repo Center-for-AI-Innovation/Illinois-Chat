@@ -11,18 +11,19 @@ import {
   IconMusic,
   IconCode,
   IconFileTypeTxt,
-  type TablerIcon,
+  type TablerIconsProps,
 } from '@tabler/icons-react'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
+} from '../Tooltip'
 import { motion } from 'framer-motion'
 
 interface FileType {
-  icon: TablerIcon
+  icon: (props: TablerIconsProps) => JSX.Element
+  // icon: React.FC<TablerIconsProps>,
   label: string
   color: string
 }
@@ -138,25 +139,22 @@ const SupportedFileUploadTypes = () => {
 
             return (
               <Tooltip key={index}>
-                <TooltipTrigger
-                  tabIndex={-1}
-                  render={
-                    <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      className="flex flex-col items-center"
-                    >
-                      <IconComponent
-                        className={`h-6 w-6 ${type.color}`}
-                        size={24}
-                        stroke={1.5}
-                        aria-hidden="true"
-                      />
-                      <span className="mt-1 text-xs text-gray-500">
-                        {type.label}
-                      </span>
-                    </motion.div>
-                  }
-                />
+                <TooltipTrigger tabIndex={-1}>
+                  <motion.div
+                    whileHover={{ scale: 1.1 }}
+                    className="flex flex-col items-center"
+                  >
+                    <IconComponent
+                      className={`h-6 w-6 ${type.color}`}
+                      size={24}
+                      stroke={1.5}
+                      aria-hidden="true"
+                    />
+                    <span className="mt-1 text-xs text-gray-500">
+                      {type.label}
+                    </span>
+                  </motion.div>
+                </TooltipTrigger>
                 <TooltipContent>
                   <p>{type.label} files supported</p>
                 </TooltipContent>

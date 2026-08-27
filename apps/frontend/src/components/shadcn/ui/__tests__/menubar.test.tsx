@@ -32,9 +32,7 @@ describe('shadcn menubar', () => {
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarPortal>
             <MenubarContent>
-              <MenubarGroup>
-                <MenubarLabel inset>Options</MenubarLabel>
-              </MenubarGroup>
+              <MenubarLabel inset>Options</MenubarLabel>
               <MenubarSeparator />
               <MenubarGroup>
                 <MenubarItem inset>

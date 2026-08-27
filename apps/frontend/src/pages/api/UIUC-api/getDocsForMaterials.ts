@@ -3,7 +3,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { connectionManager } from '~/utils/connectionManager'
 import { documents } from '~/db/schema'
-import { withCourseAccessFromRequest } from '~/server/authorization'
+import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 
 // export const runtime = 'edge'
 

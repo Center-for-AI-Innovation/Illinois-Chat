@@ -1,9 +1,9 @@
-// export { default } from '~/components/home/home'
+// export { default } from '~/pages/api/home'
 
 import { useAuth } from 'react-oidc-context'
 import { type NextPage } from 'next'
 import React, { useEffect, useState } from 'react'
-import Home from '~/components/home/home'
+import Home from '../api/home/home'
 import { useRouter } from 'next/router'
 
 import { type CourseMetadata } from '~/types/courseMetadata'

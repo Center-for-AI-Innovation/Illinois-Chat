@@ -35,7 +35,7 @@ const oneLight = Object.fromEntries(
   ]),
 )
 
-import { useTranslation } from 'next-i18next/pages'
+import { useTranslation } from 'next-i18next'
 
 import { programmingLanguages } from '@/utils/app/codeblock'
 import { generateSecureRandomString } from '@/utils/cryptoRandom'

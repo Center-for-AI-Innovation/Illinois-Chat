@@ -18,7 +18,10 @@ vi.mock('axios', async () => {
   }
 })
 
-import { addConfigV2, addEdgeConfigItem } from '~/utils/addCourseEdgeConfig'
+import {
+  addConfigV2,
+  addEdgeConfigItem,
+} from '~/pages/api/UIUC-api/addCourseEdgeConfig'
 
 describe('UIUC-api edge config helpers', () => {
   const originalEnv = { ...process.env }

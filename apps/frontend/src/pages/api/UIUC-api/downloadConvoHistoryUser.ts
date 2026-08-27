@@ -1,7 +1,7 @@
 import { getBackendUrl } from '~/utils/apiUtils'
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { withCourseAccessFromRequest } from '~/server/authorization'
+import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 
 export default withCourseAccessFromRequest('any')(handler)
 

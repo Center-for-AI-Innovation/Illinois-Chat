@@ -1,6 +1,6 @@
 import { withAuth } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
-import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
 
 interface ModelUsage {
   model_name: string

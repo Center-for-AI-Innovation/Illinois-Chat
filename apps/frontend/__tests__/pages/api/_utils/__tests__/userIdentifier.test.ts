@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getUserIdentifier } from '~/server/userIdentifier'
+import { getUserIdentifier } from '~/pages/api/_utils/userIdentifier'
 
 describe('getUserIdentifier', () => {
   it('prefers req.user.email when present', () => {

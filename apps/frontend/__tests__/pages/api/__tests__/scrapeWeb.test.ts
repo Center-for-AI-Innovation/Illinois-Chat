@@ -7,7 +7,7 @@ const hoisted = vi.hoisted(() => ({
   axiosPost: vi.fn(),
 }))
 
-vi.mock('~/server/authorization', () => ({
+vi.mock('~/pages/api/authorization', () => ({
   withCourseOwnerOrAdminAccess: () => (h: any) => h,
 }))
 

@@ -8,7 +8,7 @@ const hoisted = vi.hoisted(() => ({
   OpenAIError: class OpenAIError extends Error {},
 }))
 
-vi.mock('~/server/authorization', () => ({
+vi.mock('~/pages/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

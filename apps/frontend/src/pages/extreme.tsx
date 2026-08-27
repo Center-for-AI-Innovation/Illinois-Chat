@@ -1,1 +1,1 @@
-export { default } from '~/components/home/home'
+export { default } from '~/pages/api/home'

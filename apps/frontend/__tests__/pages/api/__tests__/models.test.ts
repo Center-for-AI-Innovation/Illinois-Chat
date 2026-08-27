@@ -19,7 +19,7 @@ const hoisted = vi.hoisted(() => ({
   getOpenAICompatibleModels: vi.fn(async (p: any) => p),
 }))
 
-vi.mock('~/server/authorization', () => ({
+vi.mock('~/pages/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 

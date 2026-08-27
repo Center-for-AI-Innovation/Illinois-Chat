@@ -3,7 +3,7 @@ import { connectionManager } from '~/utils/connectionManager'
 import { eq, sql, and, gte, InferSelectModel } from 'drizzle-orm'
 import type { NextApiResponse, NextApiRequest } from 'next'
 import { AuthenticatedRequest } from '~/utils/authMiddleware'
-import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
 
 // export const runtime = 'edge'
 

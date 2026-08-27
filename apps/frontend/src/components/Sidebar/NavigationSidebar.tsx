@@ -1,22 +1,24 @@
 import { createStyles, rem } from '@mantine/core'
 import {
-  IconBrain,
-  IconChartDots3,
   IconChevronLeft,
-  IconCode,
   IconDeviceLaptop,
   IconHome,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconMenu2,
-  IconMessageCode,
   IconMoon,
-  IconReportAnalytics,
   IconSun,
 } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import {
+  Brain,
+  ChartDots3,
+  Code,
+  MessageCode,
+  ReportAnalytics,
+} from 'tabler-icons-react'
 import { useTheme } from '~/contexts/ThemeContext'
 import { ThemeToggle } from '../UIUC-Components/ThemeToggle'
 
@@ -393,7 +395,7 @@ export default function NavigationSidebar({
     {
       name: <NavText>LLMs</NavText>,
       icon: (
-        <IconBrain
+        <Brain
           size={18}
           strokeWidth={2}
           style={{ marginRight: '3px', marginLeft: '3px' }}
@@ -405,7 +407,7 @@ export default function NavigationSidebar({
     {
       name: <NavText>Analysis</NavText>,
       icon: (
-        <IconReportAnalytics
+        <ReportAnalytics
           size={18}
           strokeWidth={2}
           style={{ marginRight: '3px', marginLeft: '3px' }}
@@ -417,7 +419,7 @@ export default function NavigationSidebar({
     {
       name: <NavText>Prompting</NavText>,
       icon: (
-        <IconMessageCode
+        <MessageCode
           size={18}
           strokeWidth={2}
           style={{ marginRight: '3px', marginLeft: '3px' }}
@@ -429,7 +431,7 @@ export default function NavigationSidebar({
     {
       name: <NavText>Tools</NavText>,
       icon: (
-        <IconChartDots3
+        <ChartDots3
           size={18}
           strokeWidth={2}
           style={{ marginRight: '3px', marginLeft: '3px' }}
@@ -441,7 +443,7 @@ export default function NavigationSidebar({
     {
       name: <NavText>API</NavText>,
       icon: (
-        <IconCode
+        <Code
           size={18}
           strokeWidth={2}
           style={{ marginRight: '3px', marginLeft: '3px' }}

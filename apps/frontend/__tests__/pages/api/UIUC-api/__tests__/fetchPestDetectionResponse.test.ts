@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchPestDetectionResponse } from '~/utils/fetchPestDetectionResponse'
+import { fetchPestDetectionResponse } from '~/pages/api/UIUC-api/fetchPestDetectionResponse'
 
 describe('fetchPestDetectionResponse', () => {
   it('returns JSON when ok and throws when not ok', async () => {

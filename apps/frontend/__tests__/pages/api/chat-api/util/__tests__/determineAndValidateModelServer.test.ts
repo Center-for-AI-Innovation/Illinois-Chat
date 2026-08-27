@@ -14,7 +14,7 @@ vi.mock('~/utils/modelProviders/WebLLM', () => ({
   webLLMModels: [{ id: 'webllm-1' }],
 }))
 
-import { determineAndValidateModelServer } from '~/server/determineAndValidateModelServer'
+import { determineAndValidateModelServer } from '~/pages/api/chat-api/util/determineAndValidateModelServer'
 
 describe('determineAndValidateModelServer', () => {
   it('throws when no enabled models are available', async () => {

@@ -1,7 +1,7 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import axios from 'axios'
-import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
 
 interface ScrapeRequestBody {
   url: string | null

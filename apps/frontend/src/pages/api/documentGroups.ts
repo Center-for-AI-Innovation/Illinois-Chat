@@ -12,7 +12,7 @@ import {
 } from '~/db/dbHelpers'
 
 import { updateDocGroupsInVectorStore } from '~/utils/vectorUtils'
-import { withCourseAccessFromRequest } from '~/server/authorization'
+import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 
 interface RequestBody {
   action:

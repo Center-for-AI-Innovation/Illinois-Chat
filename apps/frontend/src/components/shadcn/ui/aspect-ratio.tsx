@@ -1,22 +1,7 @@
-import { cn } from '@/components/shadcn/lib/utils'
+'use client'
 
-function AspectRatio({
-  ratio,
-  className,
-  ...props
-}: React.ComponentProps<'div'> & { ratio: number }) {
-  return (
-    <div
-      data-slot="aspect-ratio"
-      style={
-        {
-          '--ratio': ratio,
-        } as React.CSSProperties
-      }
-      className={cn('aspect-(--ratio) relative', className)}
-      {...props}
-    />
-  )
-}
+import * as AspectRatioPrimitive from '@radix-ui/react-aspect-ratio'
+
+const AspectRatio = AspectRatioPrimitive.Root
 
 export { AspectRatio }
