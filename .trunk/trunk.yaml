@@ -46,6 +46,23 @@ lint:
         - .DS_Store
         - .vscode/**/*
         - README.md
+    # Frontend-only for now: apps/backend and everything else outside
+    # apps/frontend has a lint backlog that isn't ready to be gated on.
+    # Keeps CI diff-only (pull_request/push check-mode) while only ever
+    # surfacing frontend issues. Drop this once those trees are linted.
+    - linters: [ALL]
+      paths:
+        - apps/backend/**
+        - apps/crawlee/**
+        - docs/**
+        - infra/**
+        - media/**
+        - qdrant_data/**
+        - scripts/**
+        - test-docs/**
+        - DEV_SETUP.md
+        - LICENSE
+        - qdrant_config.yaml
     # apps/frontend pins prettier 2.8.8 + prettier-plugin-tailwindcss 0.2.x via
     # prettier.config.cjs; trunk's hermetic prettier 3 cannot load that config
     # (exit 2 on every file). The app enforces its own formatting (npm run format).

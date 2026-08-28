@@ -32,6 +32,11 @@ jobs:
       #
       # fetch-depth: 0 above is required -- trunk needs the base commit
       # present locally to compute the diff.
+      #
+      # Non-frontend paths (apps/backend, infra, etc.) are ignored repo-wide
+      # in .trunk/trunk.yaml for now, so this stays diff-only while only
+      # ever surfacing frontend issues. Drop that ignore rule once those
+      # trees are ready to be linted too.
       - name: Trunk Check (PR diff only)
         uses: trunk-io/trunk-action@v1
         with:
