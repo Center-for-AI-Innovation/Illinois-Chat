@@ -4,6 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 
 const hoisted = vi.hoisted(() => {
+  // Mutable so individual tests can drive the drizzle query result (or make it
+  // reject) without rebuilding the chain.
+  const dbState: { rows: unknown[]; error: Error | null } = {
+    rows: [],
+    error: null,
+  }
+
   const makeDbChain = () => {
     const chain: any = {}
     const methods = [
@@ -18,11 +25,15 @@ const hoisted = vi.hoisted(() => {
     ]
     for (const m of methods) chain[m] = (..._args: unknown[]) => chain
     chain.then = (onFulfilled: any, onRejected?: any) =>
-      Promise.resolve([] as unknown[]).then(onFulfilled, onRejected)
+      (dbState.error
+        ? Promise.reject(dbState.error)
+        : Promise.resolve(dbState.rows)
+      ).then(onFulfilled, onRejected)
     return chain
   }
 
   return {
+    dbState,
     hGet: vi.fn(),
     hGetAll: vi.fn(),
     hExists: vi.fn(),
@@ -85,6 +96,7 @@ import getCourseExistsHandler, {
 } from '~/pages/api/UIUC-api/getCourseExists'
 import getCourseMetadataHandler, {
   getCourseMetadata,
+  getUserLastAccessForCourse,
 } from '~/pages/api/UIUC-api/getCourseMetadata'
 
 describe('UIUC-api course metadata routes', () => {
@@ -99,6 +111,8 @@ describe('UIUC-api course metadata routes', () => {
     })
     hoisted.getBatchProjectTimestamps.mockReset()
     hoisted.getBatchProjectTimestamps.mockResolvedValue(new Map())
+    hoisted.dbState.rows = []
+    hoisted.dbState.error = null
   })
 
   it('getCourseMetadata returns parsed metadata or null', async () => {
@@ -142,6 +156,79 @@ describe('UIUC-api course metadata routes', () => {
     )
   })
 
+  it('getUserLastAccessForCourse returns the latest timestamp as ISO', async () => {
+    hoisted.dbState.rows = [
+      { lastAccessedAt: new Date('2026-03-04T05:06:07.000Z') },
+    ]
+    await expect(
+      getUserLastAccessForCourse('me@example.com', 'CS101'),
+    ).resolves.toBe('2026-03-04T05:06:07.000Z')
+  })
+
+  it('getUserLastAccessForCourse returns null when there are no conversations', async () => {
+    hoisted.dbState.rows = []
+    await expect(
+      getUserLastAccessForCourse('me@example.com', 'CS101'),
+    ).resolves.toBeNull()
+
+    hoisted.dbState.rows = [{ lastAccessedAt: null }]
+    await expect(
+      getUserLastAccessForCourse('me@example.com', 'CS101'),
+    ).resolves.toBeNull()
+  })
+
+  it('getUserLastAccessForCourse returns null when the query fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    hoisted.dbState.error = new Error('db down')
+    await expect(
+      getUserLastAccessForCourse('me@example.com', 'CS101'),
+    ).resolves.toBeNull()
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('getCourseMetadata handler includes last_accessed_at for the caller', async () => {
+    hoisted.hGet.mockResolvedValueOnce(JSON.stringify({ is_private: false }))
+    hoisted.dbState.rows = [
+      { lastAccessedAt: new Date('2026-01-02T03:04:05.000Z') },
+    ]
+
+    const res = createMockRes()
+    await getCourseMetadataHandler(
+      createMockReq({
+        method: 'GET',
+        query: { course_name: 'CS101' },
+        user: { email: 'me@example.com' },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        last_accessed_at: '2026-01-02T03:04:05.000Z',
+      }),
+    )
+  })
+
+  it('getCourseMetadata handler returns 500 when the response fails to serialize', async () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    hoisted.hGet.mockResolvedValueOnce(JSON.stringify({ is_private: false }))
+
+    const res = createMockRes()
+    res.json.mockImplementationOnce(() => {
+      throw new Error('serialize boom')
+    })
+
+    await getCourseMetadataHandler(
+      createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenLastCalledWith(500)
+    spy.mockRestore()
+  })
+
   it('getCoursesByOwnerOrAdmin filters metadata based on owner/admin', async () => {
     hoisted.hGetAll.mockResolvedValueOnce({
       CS101: JSON.stringify({
@@ -159,6 +246,124 @@ describe('UIUC-api course metadata routes', () => {
     expect(result).toHaveLength(2)
     expect(Object.keys(result[0] ?? {})[0]).toBe('CS101')
     expect(Object.keys(result[1] ?? {})[0]).toBe('CS102')
+  })
+
+  it('getCoursesByOwnerOrAdmin skips frozen projects', async () => {
+    hoisted.hGetAll.mockResolvedValueOnce({
+      CS101: JSON.stringify({
+        course_owner: 'me@example.com',
+        course_admins: [],
+      }),
+      CS102: JSON.stringify({
+        course_owner: 'me@example.com',
+        course_admins: [],
+        is_frozen: true,
+      }),
+    })
+
+    const result = await getCoursesByOwnerOrAdmin('me@example.com')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toHaveProperty('CS101')
+  })
+
+  it('getCoursesByOwnerOrAdmin enriches entries with last_accessed_at', async () => {
+    hoisted.hGetAll.mockResolvedValueOnce({
+      CS101: JSON.stringify({
+        course_owner: 'me@example.com',
+        course_admins: [],
+      }),
+      CS102: JSON.stringify({
+        course_owner: 'me@example.com',
+        course_admins: [],
+      }),
+    })
+    hoisted.dbState.rows = [
+      {
+        projectName: 'CS101',
+        lastAccessedAt: new Date('2026-02-03T04:05:06.000Z'),
+      },
+      { projectName: 'CS102', lastAccessedAt: null },
+    ]
+
+    const result = await getCoursesByOwnerOrAdmin('me@example.com')
+    expect(result[0]?.CS101).toMatchObject({
+      last_accessed_at: '2026-02-03T04:05:06.000Z',
+    })
+    expect(result[1]?.CS102).toMatchObject({ last_accessed_at: null })
+  })
+
+  it('getCoursesByOwnerOrAdmin still returns metadata when the last-access query fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    hoisted.hGetAll.mockResolvedValueOnce({
+      CS101: JSON.stringify({
+        course_owner: 'me@example.com',
+        course_admins: [],
+      }),
+    })
+    hoisted.dbState.error = new Error('db down')
+
+    const result = await getCoursesByOwnerOrAdmin('me@example.com')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toHaveProperty('CS101')
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('getCoursesByOwnerOrAdmin returns [] when redis has nothing or fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    hoisted.hGetAll.mockResolvedValueOnce(null)
+    await expect(getCoursesByOwnerOrAdmin('me@example.com')).resolves.toEqual(
+      [],
+    )
+
+    hoisted.hGetAll.mockRejectedValueOnce(new Error('redis down'))
+    await expect(getCoursesByOwnerOrAdmin('me@example.com')).resolves.toEqual(
+      [],
+    )
+
+    spy.mockRestore()
+  })
+
+  it('getAllCourseMetadata skips frozen projects', async () => {
+    hoisted.hGetAll.mockResolvedValueOnce({
+      CS101: JSON.stringify({ is_private: false }),
+      CS102: JSON.stringify({ is_private: false, is_frozen: true }),
+    })
+
+    const all = await getAllCourseMetadata()
+    expect(all).toHaveLength(1)
+    expect(all[0]).toHaveProperty('CS101')
+  })
+
+  it('getAllCourseMetadata returns [] when redis has nothing or fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    hoisted.hGetAll.mockResolvedValueOnce(null)
+    await expect(getAllCourseMetadata()).resolves.toEqual([])
+
+    hoisted.hGetAll.mockResolvedValueOnce({ CS101: 'not-json' })
+    await expect(getAllCourseMetadata()).resolves.toEqual([])
+
+    spy.mockRestore()
+  })
+
+  it('getAllCourseMetadata handler returns 500 when the response fails to serialize', async () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    hoisted.hGetAll.mockResolvedValueOnce({})
+
+    const res = createMockRes()
+    res.json.mockImplementationOnce(() => {
+      throw new Error('serialize boom')
+    })
+
+    await getAllCourseMetadataHandler(
+      createMockReq({ user: { email: 'me@example.com' } }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenLastCalledWith(500)
+    spy.mockRestore()
   })
 
   it('getAllCourseMetadata returns all entries when redis has data', async () => {

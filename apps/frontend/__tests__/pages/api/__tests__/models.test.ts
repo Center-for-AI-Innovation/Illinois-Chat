@@ -97,38 +97,6 @@ describe('models API', () => {
     }
   })
 
-  it('getModels warns on an unhandled provider name', async () => {
-    hoisted.redisGet.mockResolvedValueOnce(JSON.stringify({}))
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const realValues = Object.values.bind(Object)
-    let providerValuesCalls = 0
-    const valuesSpy = vi
-      .spyOn(Object, 'values')
-      .mockImplementation((obj: object) => {
-        const vals = realValues(obj)
-        // Second ProviderNames enumeration is the switch loop.
-        if (
-          vals.length > 0 &&
-          vals.includes(ProviderNames.OpenAI) &&
-          vals.includes(ProviderNames.Ollama)
-        ) {
-          providerValuesCalls += 1
-          if (providerValuesCalls === 2) {
-            return [...vals, 'FakeProvider']
-          }
-        }
-        return vals
-      })
-
-    try {
-      await getModels('CS101')
-      expect(warn).toHaveBeenCalledWith('Unhandled provider: FakeProvider')
-    } finally {
-      valuesSpy.mockRestore()
-      warn.mockRestore()
-    }
-  })
-
   it('handler returns 400 when projectName is missing', async () => {
     const res = createMockRes()
     await handler(

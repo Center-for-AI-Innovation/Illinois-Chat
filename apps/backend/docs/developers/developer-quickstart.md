@@ -16,7 +16,7 @@ description: Thanks for contributing to UIUC.chat ❤️
 <summary>Background info on Key accounts</summary>
 
 * Google: `caiincsa@gmail.com`
-* Managed services: Vercel, Railway, Beam, Supabase, S3, Posthog, Sentry.
+* Managed services: Vercel, Railway, Supabase, S3, Posthog, Sentry.
 * Self-hosted: pgvector (Postgres), Ollama.
 * Task management via [our Github Projects board](https://github.com/orgs/Center-for-AI-Innovation/projects?query=is:open).
 
@@ -58,7 +58,7 @@ sudo apt-get update && sudo apt-get install -y infisical
 
 If it's running on `localhost`, the env vars come from **Infisical**, our shared secrets manager. You can add new env vars at [env.uiuc.chat](https://env.uiuc.chat/)
 
-If it's in production, or any cloud service, the env vars are stored directly in that cloud service. Those include Vercel, Railway, Beam.cloud and more. You can edit env vars in those services, just be careful.
+If it's in production, or any cloud service, the env vars are stored directly in that cloud service. Those include Vercel, Railway and more. You can edit env vars in those services, just be careful.
 
 ## Frontend Setup
 

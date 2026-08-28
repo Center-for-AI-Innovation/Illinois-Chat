@@ -32,9 +32,9 @@ We host our Python backend and a few supporting services on Railway.&#x20;
 
 
 
-#### Beam.cloud: $15/mo
+#### Beam.cloud: $15/mo (retired)
 
-Beam.cloud runs our document ingest queue, and a few supporting functions for [AI Tool use](../features/tool-use-in-conversation.md#tools-demo).&#x20;
+Beam.cloud used to run our document ingest queue, and a few supporting functions for [AI Tool use](../features/tool-use-in-conversation.md#tools-demo). Ingest now runs on the self-hosted RabbitMQ worker, so this cost no longer applies.&#x20;
 
 <figure><img src="../.gitbook/assets/CleanShot 2025-04-07 at 13.01.06.png" alt=""><figcaption></figcaption></figure>
 
@@ -126,9 +126,9 @@ S3 stores user-uploaded content that's not text, like PDFs, Word, PowerPoint, Vi
 
 Currently this cost about $10/mo in storage + data egress fees.&#x20;
 
-#### Beam Serverless functions&#x20;
+#### Beam Serverless functions (retired)&#x20;
 
-We run highly scalable jobs, primarily document ingest, on Beam.cloud. It's [wonderfully cheap and reliable](https://x.com/KastanDay/status/1790066477372158196). Highly recommend. Steady-state average of $5/mo so far.&#x20;
+We used to run highly scalable jobs, primarily document ingest, on Beam.cloud, at a steady-state average of $5/mo. Document ingest has since moved to the self-hosted RabbitMQ worker.&#x20;
 
 <figure><img src="../.gitbook/assets/CleanShot 2024-08-07 at 21.05.32.png" alt=""><figcaption></figcaption></figure>
 

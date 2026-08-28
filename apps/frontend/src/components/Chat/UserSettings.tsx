@@ -1,13 +1,5 @@
 import { useContext, useEffect } from 'react'
-import {
-  Divider,
-  Flex,
-  Input,
-  Modal,
-  Title,
-  createStyles,
-  Tabs,
-} from '@mantine/core'
+import { Divider, Flex, Modal, Title, createStyles, Tabs } from '@mantine/core'
 import HomeContext from '~/pages/api/home/home.context'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import React from 'react'
@@ -20,8 +12,6 @@ import { useTranslation } from 'react-i18next'
 import { prebuiltAppConfig } from '~/utils/modelProviders/ConfigWebLLM'
 import * as webllm from '@mlc-ai/web-llm'
 import { type WebllmModel, webLLMModels } from '~/utils/modelProviders/WebLLM'
-import { IconExternalLink } from '@tabler/icons-react'
-import Link from 'next/link'
 
 const useStyles = createStyles((theme) => ({
   modalContent: {
@@ -120,7 +110,9 @@ export const UserSettings = () => {
       />
       <Modal.Content
         data-settings-modal
-        className={`${classes.modalContent} ${isSmallScreen ? 'p-2' : 'p-4'} overflow-hidden bg-[--modal] text-[--modal-text] md:rounded-lg`}
+        className={`${classes.modalContent} ${
+          isSmallScreen ? 'p-2' : 'p-4'
+        } overflow-hidden bg-[--modal] text-[--modal-text] md:rounded-lg`}
       >
         <Modal.Header className={classes.modalHeader}>
           <Modal.Title
@@ -151,19 +143,31 @@ export const UserSettings = () => {
           >
             <Tabs.List mt={'xl'} ml="xs">
               <Tabs.Tab
-                className={`${classes.tab} ${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-[--modal-text]`}
+                className={`${classes.tab} ${
+                  isSmallScreen ? 'px-2 text-xs' : 'text-md'
+                } ${
+                  montserrat_paragraph.variable
+                } font-montserratParagraph text-[--modal-text]`}
                 value="model"
               >
                 Model
               </Tabs.Tab>
               <Tabs.Tab
-                className={`${classes.tab} ${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-[--modal-text]`}
+                className={`${classes.tab} ${
+                  isSmallScreen ? 'px-2 text-xs' : 'text-md'
+                } ${
+                  montserrat_paragraph.variable
+                } font-montserratParagraph text-[--modal-text]`}
                 value="documentGroups"
               >
                 Document Groups
               </Tabs.Tab>
               <Tabs.Tab
-                className={`${classes.tab} ${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-[--modal-text]`}
+                className={`${classes.tab} ${
+                  isSmallScreen ? 'px-2 text-xs' : 'text-md'
+                } ${
+                  montserrat_paragraph.variable
+                } font-montserratParagraph text-[--modal-text]`}
                 value="tools"
               >
                 Tools
@@ -185,26 +189,6 @@ export const UserSettings = () => {
                   handleUpdateConversation={handleUpdateConversation}
                   t={t}
                 />
-                <Input.Description
-                  className={`mt-3 text-right ${isSmallScreen ? 'text-xs' : 'text-sm'} ${
-                    montserrat_paragraph.variable
-                  } font-montserratParagraph`}
-                >
-                  <Link
-                    tabIndex={0}
-                    href="https://platform.openai.com/account/usage"
-                    target="_blank"
-                    className="hover:underline"
-                  >
-                    View account usage on OpenAI{' '}
-                    <IconExternalLink
-                      size={15}
-                      aria-hidden="true"
-                      style={{ position: 'relative', top: '2px' }}
-                      className="mb-2 inline"
-                    />
-                  </Link>
-                </Input.Description>
               </Flex>
             </Tabs.Panel>
 

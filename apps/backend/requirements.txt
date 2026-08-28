@@ -81,7 +81,7 @@ docx2txt==0.8 # Alternative DOCX processing
 # Not currently supporting coursera ingest
 # cs-dlp @ git+https://github.com/raffaem/cs-dlp.git@0.12.0b0 # previously called coursera-dl
 
-# removed due to /ingest in Beam
+# only needed by the ingest worker, which installs its own requirements
 # canvasapi==3.2.0
 # GitPython==3.1.40
 # pydub==0.25.1

@@ -17,9 +17,6 @@ from ai_ta_backend.service.retrieval_service import RetrievalService
 from ai_ta_backend.service.sentry_service import SentryService
 from ai_ta_backend.service.workflow_service import WorkflowService
 
-_thread_pool = ThreadPoolExecutor(max_workers=10)
-_process_pool = ProcessPoolExecutor(max_workers=10)
-
 T = TypeVar("T")
 
 
@@ -48,6 +45,19 @@ def _locked_singleton(factory: Callable[[], T]) -> Callable[[], T]:
   wrapper.cache_clear = cached.cache_clear  # type: ignore[attr-defined]
   wrapper.cache_info = cached.cache_info  # type: ignore[attr-defined]
   return wrapper
+
+
+@_locked_singleton
+def get_thread_pool() -> ThreadPoolExecutor:
+  return ThreadPoolExecutor(max_workers=10)
+
+
+@_locked_singleton
+def get_process_pool() -> ProcessPoolExecutor:
+  """Built lazily: forking a pool at import time would make every gunicorn
+  worker inherit one, and forking a process that already has threads running
+  can deadlock the child."""
+  return ProcessPoolExecutor(max_workers=10)
 
 
 @_locked_singleton
@@ -89,7 +99,7 @@ def get_retrieval_service() -> RetrievalService:
   return RetrievalService(
       get_posthog_service(),
       get_sentry_service(),
-      _thread_pool,
+      get_thread_pool(),
       get_connection_manager(),
   )
 
@@ -103,7 +113,7 @@ def get_nomic_service() -> NomicService:
 def get_export_service() -> ExportService:
   return ExportService(
       get_sentry_service(),
-      _process_pool,
+      get_process_pool(),
       get_connection_manager(),
   )
 

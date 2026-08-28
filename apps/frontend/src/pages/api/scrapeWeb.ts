@@ -12,14 +12,14 @@ interface ScrapeRequestBody {
 
 export default withCourseOwnerOrAdminAccess()(handler)
 
-export const formatUrl = (url: string) => {
+const formatUrl = (url: string) => {
   if (!/^https?:\/\//i.test(url)) {
     url = 'http://' + url
   }
   return url
 }
 
-export const formatUrlAndMatchRegex = (url: string) => {
+const formatUrlAndMatchRegex = (url: string) => {
   // fullUrl always starts with http://. Is the starting place of the scrape.
   // baseUrl is used to construct the match statement.
 

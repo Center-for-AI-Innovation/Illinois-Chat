@@ -4,99 +4,63 @@ This directory contains GitHub Actions workflows for the AI TA Backend project.
 
 ## 📁 Available Workflows
 
-### `deploy-to-ecs.yml` - ECS Deployment
+### `build-and-push-on-tag.yml` - Build and Push Images
 
-Automatically deploys the application to AWS ECS Fargate on code changes.
+Builds the backend and worker images and pushes them to Amazon ECR. It only
+publishes images — deployment is handled separately.
 
-## 🚀 ECS Deployment - How It Works
+## 🚀 How It Works
 
-The `deploy-to-ecs.yml` workflow triggers on pushes to `illinois-chat` branch when these files change:
+The workflow triggers on any pushed git tag and runs two independent jobs:
 
-- `ai_ta_backend/**` - Application code
-- `requirements.txt` - Python dependencies
-- `Self-Hosted-Dockerfile` - Container configuration
-- `.github/workflows/deploy-to-ecs.yml` - This workflow file
+| Job                     | Dockerfile                  | ECR repository      |
+| ----------------------- | --------------------------- | ------------------- |
+| `build-and-push`        | `Self-Hosted-Dockerfile`    | `uiuc-chat-backend` |
+| `build-and-push-worker` | `ai_ta_backend/rabbitmq/`   | `uiuc-chat-worker`  |
 
-## ⚙️ ECS Deployment - Configuration
+Both images are tagged with the git tag that triggered the run.
 
-Update these environment variables in `deploy-to-ecs.yml` to match your AWS setup:
+## ⚙️ Configuration
+
+Update these environment variables in `build-and-push-on-tag.yml` to match your
+AWS setup:
 
 ```yaml
 env:
   AWS_REGION: us-east-2
   ECR_REPOSITORY: uiuc-chat-backend
-  ECS_SERVICE: backend-service-358yl957
-  ECS_CLUSTER: uiuc-chat-dev
-  ECS_TASK_DEFINITION: backend
-  CONTAINER_NAME: backend
+  ECR_REPOSITORY_WORKER: uiuc-chat-worker
 ```
 
-## 🔑 ECS Deployment - Required Secrets
+## 🔑 Required Secrets
 
-Add these secrets in GitHub repository settings for ECS deployment:
+Add these secrets in GitHub repository settings:
 
-- `AWS_ACCESS_KEY_ID` - AWS access key with ECR and ECS permissions
+- `AWS_ACCESS_KEY_ID` - AWS access key with ECR push permissions
 - `AWS_SECRET_ACCESS_KEY` - AWS secret access key
 
-## 📋 ECS Deployment - Process
+## 📋 Process
 
-1. **Build** - Creates Docker image with latest code
-2. **Push** - Uploads image to ECR repository
-3. **Update** - Downloads current ECS task definition
-4. **Deploy** - Updates ECS service with new image
-5. **Wait** - Ensures deployment completes successfully
+1. **Checkout** - Fetches the tagged commit
+2. **Authenticate** - Configures AWS credentials and logs in to ECR
+3. **Tag** - Derives the image tag from the git tag
+4. **Build & Push** - Builds the image and pushes it to ECR
 
-## ⏱️ Typical Timing
-
-- **Total**: 6-12 minutes
-- **Build & Push**: 3-5 minutes
-- **ECS Deployment**: 2-5 minutes
-
-## 🛡️ Safety Features
-
-- **Zero downtime** - Rolling deployment keeps service running
-- **Health checks** - New tasks must pass `/health` endpoint checks
-- **Automatic rollback** - Failed deployments revert automatically
-- **Previous versions preserved** - Manual rollback always possible
-
-## 🔧 ECS Deployment - Manual Trigger
-
-Trigger ECS deployment manually via GitHub Actions tab → "Run workflow" button on `deploy-to-ecs.yml`.
-
-## 📊 Monitoring
-
-- **GitHub Actions**: Watch workflow progress in Actions tab
-- **ECS Console**: Monitor deployment in AWS ECS service console
-- **CloudWatch**: View application logs in `/ecs/ai-ta-backend` log group
-
-## 🚫 ECS Deployment - Skip Conditions
-
-Changes to these files won't trigger ECS deployment:
-
-- Documentation (`docs/**`, `*.md`)
-- Scripts (`scripts/**`)
-- Test files (`test-docs/**`)
-- VS Code config (`.vscode/**`)
-- Media files (`media/**`)
-
-## 🔍 ECS Deployment - Troubleshooting
+## 🔍 Troubleshooting
 
 ### Common Issues:
 
 - **Missing secrets**: Add AWS credentials to repository secrets
-- **Permission errors**: Ensure IAM user has ECR and ECS permissions
-- **Health check failures**: Check `/health` endpoint and application logs
-- **Task definition errors**: Verify ECS service configuration matches workflow
+- **Permission errors**: Ensure the IAM user has ECR push permissions
+- **Wrong tag**: The image tag is taken verbatim from the git tag, so re-tagging
+  requires a new tag or a manual ECR cleanup
 
 ### Quick Commands:
 
 ```bash
-# Check ECS service status
-aws ecs describe-services --cluster uiuc-chat-dev --services backend-service-358yl957
+# List pushed backend image tags
+aws ecr list-images --repository-name uiuc-chat-backend --region us-east-2
 
-# View recent logs
-aws logs tail /ecs/ai-ta-backend --follow
-
-# Force new deployment (if needed)
-aws ecs update-service --cluster uiuc-chat-dev --service backend-service-358yl957 --force-new-deployment
+# List pushed worker image tags
+aws ecr list-images --repository-name uiuc-chat-worker --region us-east-2
 ```
