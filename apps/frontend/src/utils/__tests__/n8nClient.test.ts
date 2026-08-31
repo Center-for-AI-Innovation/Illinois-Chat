@@ -38,11 +38,9 @@ describe('n8nClient', () => {
     expect(getN8nBaseUrl()).toBe('https://n8n.example')
   })
 
-  it('getN8nBaseUrl falls back to the hosted default', () => {
+  it('getN8nBaseUrl throws when N8N_URL is unset', () => {
     vi.stubEnv('N8N_URL', '')
-    expect(getN8nBaseUrl()).toBe(
-      'https://primary-production-1817.up.railway.app',
-    )
+    expect(() => getN8nBaseUrl()).toThrow(/N8N_URL is not configured/)
   })
 
   it('getN8nWorkflows requires an api key', async () => {
@@ -67,10 +65,7 @@ describe('n8nClient', () => {
       )
 
     const result = await getN8nWorkflows({ apiKey: 'k', limit: 10 })
-    expect(result).toEqual([
-      [{ id: '1', name: 'A' }],
-      [{ id: '2', name: 'B' }],
-    ])
+    expect(result).toEqual([[{ id: '1', name: 'A' }], [{ id: '2', name: 'B' }]])
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       'https://n8n.example/api/v1/workflows?limit=10',
     )
@@ -247,9 +242,9 @@ describe('n8nClient', () => {
       .mockResolvedValueOnce(
         jsonResponse({ message: 'unauthorized' }, { status: 401 }),
       )
-    await expect(getN8nExecutions({ apiKey: 'k', limit: 1 })).rejects.toBeInstanceOf(
-      N8nUnauthorizedError,
-    )
+    await expect(
+      getN8nExecutions({ apiKey: 'k', limit: 1 }),
+    ).rejects.toBeInstanceOf(N8nUnauthorizedError)
   })
 
   it('getN8nExecutions throws on non-ok and unauthorized responses', async () => {
@@ -289,16 +284,18 @@ describe('n8nClient', () => {
   })
 
   it('getLatestN8nExecutionId throws when there are no executions', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ data: [] }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      jsonResponse({ data: [] }),
+    )
     await expect(getLatestN8nExecutionId('k')).rejects.toThrow(
       /No executions found/,
     )
   })
 
   it('switchN8nWorkflow activates and deactivates', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
-      jsonResponse({ ok: true }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => jsonResponse({ ok: true }))
 
     await expect(
       switchN8nWorkflow({ apiKey: 'k', id: '1', activate: 'True' }),
@@ -339,9 +336,7 @@ describe('n8nClient', () => {
           {
             id: '1',
             name: 'Mine',
-            nodes: [
-              { name: 'n8n Form Trigger', parameters: { path: 'abc' } },
-            ],
+            nodes: [{ name: 'n8n Form Trigger', parameters: { path: 'abc' } }],
           },
         ],
       }),
@@ -378,9 +373,9 @@ describe('n8nClient', () => {
     ).toEqual({ 'field-0': 'hi', 'field-1': '["a","b"]' })
     expect(formatN8nFormData('{not json', workflow)).toBeUndefined()
     expect(formatN8nFormData(null, workflow)).toBeUndefined()
-    expect(
-      formatN8nFormData(JSON.stringify({ Query: 'x' }), workflow),
-    ).toEqual({ 'field-0': 'x' })
+    expect(formatN8nFormData(JSON.stringify({ Query: 'x' }), workflow)).toEqual(
+      { 'field-0': 'x' },
+    )
   })
 
   it('formatN8nFormDataForWorkflow returns undefined when lookup fails', async () => {
@@ -428,14 +423,16 @@ describe('n8nClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response('nope', { status: 500 }),
     )
-    await expect(executeN8nForm('hook', undefined)).rejects.toThrow(/Error: 500/)
+    await expect(executeN8nForm('hook', undefined)).rejects.toThrow(
+      /Error: 500/,
+    )
   })
 
   it('getN8nWorkflows treats missing data as an empty page and honors a live abort signal', async () => {
     const controller = new AbortController()
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      jsonResponse({}),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({}))
     await expect(
       getN8nWorkflows({ apiKey: 'k', signal: controller.signal }),
     ).resolves.toEqual([[]])
@@ -461,9 +458,9 @@ describe('n8nClient', () => {
       }
       return new Response('ok', { status: 200 })
     })
-    await expect(executeN8nForm('hook', { 'field-0': 'v' }, signal)).rejects.toThrow(
-      /aborted/,
-    )
+    await expect(
+      executeN8nForm('hook', { 'field-0': 'v' }, signal),
+    ).rejects.toThrow(/aborted/)
   })
 
   it('aborts in-flight n8n fetches when the caller signal is already aborted', async () => {
@@ -476,8 +473,8 @@ describe('n8nClient', () => {
       }
       return jsonResponse({ data: [] })
     })
-    await expect(
-      getN8nWorkflows({ apiKey: 'k', signal }),
-    ).rejects.toThrow(/aborted/)
+    await expect(getN8nWorkflows({ apiKey: 'k', signal })).rejects.toThrow(
+      /aborted/,
+    )
   })
 })

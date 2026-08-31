@@ -77,9 +77,10 @@ describe('UIUC-api backend proxy routes', () => {
       },
     ]
     hoisted.getDocumentsDb.mockResolvedValueOnce({
-      select: () => ({
+      selectDistinct: () => ({
         from: () => ({
-          where: async () => docs,
+          // Postgres does the dedup now; the driver hands back distinct rows.
+          where: async () => [docs[0], docs[2]],
         }),
       }),
     })

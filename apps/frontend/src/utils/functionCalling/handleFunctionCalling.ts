@@ -125,13 +125,21 @@ export async function handleFunctionCall(
           } catch (fixError) {
             // If healing fails, throw error with context
             throw new Error(
-              `Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}. Original arguments: ${args.substring(0, 200)}`,
+              `Failed to parse tool arguments: ${
+                parseError instanceof Error
+                  ? parseError.message
+                  : String(parseError)
+              }. Original arguments: ${args.substring(0, 200)}`,
             )
           }
         }
         // If not healable, throw error
         throw new Error(
-          `Failed to parse tool arguments: ${parseError instanceof Error ? parseError.message : String(parseError)}. Arguments: ${args.substring(0, 200)}`,
+          `Failed to parse tool arguments: ${
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError)
+          }. Arguments: ${args.substring(0, 200)}`,
         )
       }
     }
@@ -539,8 +547,8 @@ export function getOpenAIToolFromUIUCTool(
                     param?.type === 'number'
                       ? 'number'
                       : param?.type === 'Boolean'
-                        ? 'Boolean'
-                        : 'string',
+                      ? 'Boolean'
+                      : 'string',
                   description: param?.description,
                   enum: param?.enum,
                 }
@@ -637,7 +645,9 @@ export async function fetchTools(
   if (!api_key || api_key === 'undefined') {
     try {
       const response = await fetch(
-        `${base_url ? base_url : ''}/api/UIUC-api/tools/getN8nKeyFromProject?course_name=${course_name}`,
+        `${
+          base_url ? base_url : ''
+        }/api/UIUC-api/tools/getN8nKeyFromProject?course_name=${course_name}`,
         {
           method: 'GET',
         },
@@ -687,7 +697,7 @@ export async function fetchTools(
       : workflows
     : [workflows]
   if (full_details) return firstPage
-  return getUIUCToolFromN8n(firstPage as any)
+  return getUIUCToolFromN8n(firstPage as unknown as N8nWorkflow[])
 }
 
 export const useFetchAllWorkflows = (

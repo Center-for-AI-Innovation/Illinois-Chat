@@ -27,6 +27,12 @@ vi.mock('~/utils/n8nClient', () => ({
       this.name = 'N8nUnauthorizedError'
     }
   },
+  N8nClientError: class N8nClientError extends Error {
+    constructor(message: string) {
+      super(message)
+      this.name = 'N8nClientError'
+    }
+  },
 }))
 
 vi.mock('~/db/schema', () => ({
@@ -79,13 +85,20 @@ describe('UIUC-api/tools routes', () => {
 
     hoisted.switchN8nWorkflow.mockRejectedValueOnce(new Error('Bad Gateway'))
     const res2 = createMockRes()
-    const result = await activateWorkflowHandler(
+    await activateWorkflowHandler(
       createMockReq({
         query: { api_key: 'k', id: '1', activate: 'true' },
       }) as any,
       res2 as any,
     )
-    expect(result).toBeInstanceOf(Error)
+    expect(res2.status).toHaveBeenCalledWith(500)
+
+    const resMissing = createMockRes()
+    await activateWorkflowHandler(
+      createMockReq({ query: { api_key: 'k' } }) as any,
+      resMissing as any,
+    )
+    expect(resMissing.status).toHaveBeenCalledWith(400)
 
     hoisted.switchN8nWorkflow.mockResolvedValueOnce({ message: 'bad request' })
     const res3 = createMockRes()

@@ -59,6 +59,9 @@ export async function runN8nFlow(params: {
       if (Date.now() - start > LOCK_TIMEOUT_MS) {
         return null
       }
+      // Back off between attempts; the Flask original spun without a delay
+      // and hammered the n8n API for the full 5-minute window.
+      await sleep(500)
       id = await getLatestN8nExecutionId(apiKey, signal)
       lockedMsg = await lockFlow(id)
       if (lockedMsg === 'Workflow updated') break

@@ -13,6 +13,21 @@ export type SmtpConnect = (
   onSecure: () => void,
 ) => TLSSocket
 
+/** Overall guard so an unresponsive SMTP host can't hang an API route. */
+const SMTP_TIMEOUT_MS = Number(process.env.SES_TIMEOUT_MS) || 15_000
+
+/**
+ * Reject any address/header value containing CR or LF. Without this, a value
+ * that reaches here from user-controlled data could inject extra SMTP
+ * commands or message headers.
+ */
+function assertNoCrlf(value: string, field: string): string {
+  if (/[\r\n]/.test(value)) {
+    throw new Error(`Invalid ${field}: line breaks are not allowed`)
+  }
+  return value
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name]
   if (!value) {
@@ -29,15 +44,19 @@ function encodeSubject(subject: string): string {
 function buildMessage(params: SendTransactionalEmailParams): string {
   const { subject, bodyText, sender, recipients, bccRecipients = [] } = params
   const headers = [
-    `From: ${sender}`,
-    `To: ${recipients.join(', ')}`,
+    `From: ${assertNoCrlf(sender, 'sender')}`,
+    `To: ${recipients.map((r) => assertNoCrlf(r, 'recipient')).join(', ')}`,
     `Subject: ${encodeSubject(subject)}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: 7bit',
   ]
   if (bccRecipients.length > 0) {
-    headers.push(`Bcc: ${bccRecipients.join(', ')}`)
+    headers.push(
+      `Bcc: ${bccRecipients
+        .map((r) => assertNoCrlf(r, 'recipient'))
+        .join(', ')}`,
+    )
   }
   return `${headers.join('\r\n')}\r\n\r\n${bodyText}\r\n`
 }
@@ -45,21 +64,31 @@ function buildMessage(params: SendTransactionalEmailParams): string {
 function readReply(socket: TLSSocket): Promise<string> {
   return new Promise((resolve, reject) => {
     let buffer = ''
+    const cleanup = () => {
+      clearTimeout(timer)
+      socket.off('data', onData)
+      socket.off('error', onError)
+    }
     const onData = (chunk: Buffer) => {
       buffer += chunk.toString('utf8')
       const lines = buffer.split(/\r?\n/).filter((line) => line.length > 0)
       const last = lines[lines.length - 1]
       // SMTP multiline replies prefix continuation lines with `NNN-`.
       if (last && /^\d{3} /.test(last)) {
-        socket.off('data', onData)
-        socket.off('error', onError)
+        cleanup()
         resolve(buffer)
       }
     }
     const onError = (error: Error) => {
-      socket.off('data', onData)
+      cleanup()
       reject(error)
     }
+    // A silent server would otherwise leave this promise pending forever and
+    // hang the calling API route.
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new Error('SMTP timed out waiting for a reply'))
+    }, SMTP_TIMEOUT_MS)
     socket.on('data', onData)
     socket.once('error', onError)
   })
@@ -99,11 +128,23 @@ export async function sendTransactionalEmail(
   const username = requireEnv('USERNAME_SMTP')
   const password = requireEnv('PASSWORD_SMTP')
 
+  assertNoCrlf(sender, 'sender')
+  recipients.forEach((r) => assertNoCrlf(r, 'recipient'))
+  bccRecipients.forEach((r) => assertNoCrlf(r, 'recipient'))
+
   const socket = await new Promise<TLSSocket>((resolve, reject) => {
-    const tlsSocket = smtpConnect({ host, port, servername: host }, () =>
-      resolve(tlsSocket),
-    )
-    tlsSocket.once('error', reject)
+    const tlsSocket = smtpConnect({ host, port, servername: host }, () => {
+      clearTimeout(connectTimer)
+      resolve(tlsSocket)
+    })
+    const connectTimer = setTimeout(() => {
+      tlsSocket.destroy()
+      reject(new Error('SMTP connection timed out'))
+    }, SMTP_TIMEOUT_MS)
+    tlsSocket.once('error', (error) => {
+      clearTimeout(connectTimer)
+      reject(error)
+    })
   })
 
   try {

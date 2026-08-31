@@ -10,14 +10,16 @@ async function handler(req: any, res: any) {
 
   const { course_name } = req.query
 
-  if (!course_name || typeof course_name !== 'string') {
-    return res.status(400).json({ error: 'course_name parameter is required' })
+  if (!course_name) {
+    return res.status(400).json({ error: 'course_name is required' })
   }
 
   try {
     const docsDb = await connectionManager.getDocumentsDb(course_name)
-    const data = await docsDb
-      .select({
+    // SELECT DISTINCT so Postgres dedupes instead of pulling every row for the
+    // course into memory. Same key set the Flask `/getAll` deduped on.
+    const distinctFiles = await docsDb
+      .selectDistinct({
         s3_path: documents.s3_path,
         readable_filename: documents.readable_filename,
         course_name: documents.course_name,
@@ -27,21 +29,7 @@ async function handler(req: any, res: any) {
       .from(documents)
       .where(eq(documents.course_name, course_name))
 
-    const unique = new Map<string, (typeof data)[number]>()
-    for (const item of data) {
-      const key = JSON.stringify([
-        item.s3_path,
-        item.readable_filename,
-        item.course_name,
-        item.url,
-        item.base_url,
-      ])
-      if (!unique.has(key)) {
-        unique.set(key, item)
-      }
-    }
-
-    return res.status(200).json({ distinct_files: Array.from(unique.values()) })
+    return res.status(200).json({ distinct_files: distinctFiles })
   } catch (error) {
     console.error('Error fetching course data:', error)
     return res.status(500).json({

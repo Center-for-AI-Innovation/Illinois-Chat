@@ -2,7 +2,6 @@
 // and `/switch_workflow` proxies. Auth is the per-project API key stored
 // on `projects.n8n_api_key`.
 
-const DEFAULT_N8N_URL = 'https://primary-production-1817.up.railway.app'
 const GET_TIMEOUT_MS = 8_000
 const FORM_TIMEOUT_MS = 60_000
 
@@ -21,12 +20,27 @@ export class N8nClientError extends Error {
 }
 
 export function getN8nBaseUrl(): string {
-  const raw = process.env.N8N_URL || DEFAULT_N8N_URL
+  // No hardcoded fallback: this is a self-hostable deployment, and silently
+  // sending a project's n8n API key to somebody else's hosted instance is
+  // worse than failing loudly.
+  const raw = (process.env.N8N_URL || '').trim()
+  if (!raw) {
+    throw new N8nClientError(
+      'N8N_URL is not configured; set it to your n8n instance base URL',
+    )
+  }
   return raw.endsWith('/') ? raw.slice(0, -1) : raw
 }
 
 function n8nHeaders(apiKey: string): HeadersInit {
   return { 'X-N8N-API-KEY': apiKey, Accept: 'application/json' }
+}
+
+/** Clamp caller-supplied limits so they can't smuggle extra query params. */
+function normalizeLimit(limit: number | undefined, fallback: number): number {
+  const parsed = Math.floor(Number(limit))
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback
+  return Math.min(parsed, 250)
 }
 
 function requireApiKey(apiKey: string): void {
@@ -66,9 +80,17 @@ async function n8nFetch(
 async function readJson(response: Response): Promise<any> {
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('application/json')) {
+    // A 401 with a non-JSON body (nginx/proxy error page) is still an auth
+    // failure — classify it before falling through to the generic error, so
+    // callers can surface "bad API key" instead of a 500.
+    if (response.status === 401) {
+      throw new N8nUnauthorizedError()
+    }
     const text = await response.text().catch(() => '')
     throw new N8nClientError(
-      `n8n returned ${response.status} ${response.statusText}${text ? `: ${text.slice(0, 200)}` : ''}`,
+      `n8n returned ${response.status} ${response.statusText}${
+        text ? `: ${text.slice(0, 200)}` : ''
+      }`,
     )
   }
   return response.json()
@@ -109,15 +131,18 @@ export async function getN8nWorkflows(params: {
 }): Promise<N8nWorkflowRecord[][] | N8nWorkflowRecord[] | N8nWorkflowRecord> {
   const {
     apiKey,
-    limit = 100,
+    limit: rawLimit = 100,
     pagination = true,
     active = false,
     workflowName = '',
     signal,
   } = params
   requireApiKey(apiKey)
+  const limit = normalizeLimit(rawLimit, 100)
 
-  const firstPath = `/api/v1/workflows?limit=${limit}${active ? '&active=true' : ''}`
+  const firstPath = `/api/v1/workflows?limit=${limit}${
+    active ? '&active=true' : ''
+  }`
   const first = await n8nFetch(firstPath, apiKey, { signal })
   const body = await readJson(first)
   throwIfUnauthorized(first, body)
@@ -138,7 +163,9 @@ export async function getN8nWorkflows(params: {
   const pages: N8nWorkflowRecord[][] = [firstPage]
   let cursor: string | undefined = body?.nextCursor
   while (cursor) {
-    const path = `/api/v1/workflows?limit=${limit}&cursor=${encodeURIComponent(cursor)}`
+    const path = `/api/v1/workflows?limit=${limit}&cursor=${encodeURIComponent(
+      cursor,
+    )}`
     const next = await n8nFetch(path, apiKey, { signal })
     const nextBody = await readJson(next)
     throwIfUnauthorized(next, nextBody)
@@ -171,8 +198,9 @@ export async function getN8nExecutions(params: {
   pagination?: boolean
   signal?: AbortSignal
 }): Promise<N8nExecution[] | N8nExecution[][] | N8nExecution | null> {
-  const { apiKey, limit, id, pagination = true, signal } = params
+  const { apiKey, limit: rawLimit, id, pagination = true, signal } = params
   requireApiKey(apiKey)
+  const limit = normalizeLimit(rawLimit, 20)
 
   const first = await n8nFetch(
     `/api/v1/executions?includeData=true&limit=${limit}`,
@@ -200,7 +228,9 @@ export async function getN8nExecutions(params: {
   let cursor: string | undefined = body?.nextCursor
   while (cursor) {
     const next = await n8nFetch(
-      `/api/v1/executions?includeData=true&limit=${limit}&cursor=${encodeURIComponent(cursor)}`,
+      `/api/v1/executions?includeData=true&limit=${limit}&cursor=${encodeURIComponent(
+        cursor,
+      )}`,
       apiKey,
       { signal },
     )
@@ -218,7 +248,7 @@ export async function getN8nExecutions(params: {
     // inspect the first execution of each collected page and return it (or
     // null) as soon as a cursor page has been fetched.
     if (id) {
-      return pages[0]?.[0]?.id === id ? (pages[0][0] ?? null) : null
+      return pages[0]?.[0]?.id === id ? pages[0][0] ?? null : null
     }
   }
 
@@ -298,7 +328,8 @@ export function formatN8nFormData(
     const values =
       workflow.nodes?.find((node) => node.name === 'n8n Form Trigger')
         ?.parameters?.formFields?.values ?? []
-    const payload = typeof inputted === 'string' ? JSON.parse(inputted) : inputted
+    const payload =
+      typeof inputted === 'string' ? JSON.parse(inputted) : inputted
     if (!payload || typeof payload !== 'object') return undefined
 
     const labelToField: Record<string, string> = {}
@@ -312,7 +343,9 @@ export function formatN8nFormData(
     )) {
       const field = labelToField[key]
       if (!field) continue
-      formatted[field] = Array.isArray(value) ? JSON.stringify(value) : String(value)
+      formatted[field] = Array.isArray(value)
+        ? JSON.stringify(value)
+        : String(value)
     }
     return formatted
   } catch {
@@ -325,7 +358,8 @@ export async function executeN8nForm(
   data: Record<string, string> | undefined,
   signal?: AbortSignal,
 ): Promise<void> {
-  const payload = data && Object.keys(data).length > 0 ? data : { 'field-0': '' }
+  const payload =
+    data && Object.keys(data).length > 0 ? data : { 'field-0': '' }
   const form = new FormData()
   for (const [key, value] of Object.entries(payload)) {
     form.append(key, value)

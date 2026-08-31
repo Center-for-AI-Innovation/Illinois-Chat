@@ -1,10 +1,7 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/pages/api/authorization'
-import {
-  getN8nWorkflows,
-  N8nUnauthorizedError,
-} from '~/utils/n8nClient'
+import { getN8nWorkflows, N8nUnauthorizedError } from '~/utils/n8nClient'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -17,6 +14,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'api_key is required' })
   }
 
+  const rawLimit = Array.isArray(limit) ? limit[0] : limit
+  const parsedLimit = Number(rawLimit)
+  const safeLimit =
+    Number.isFinite(parsedLimit) && parsedLimit >= 1
+      ? Math.min(Math.floor(parsedLimit), 250)
+      : 10
+
   const paginationEnabled =
     pagination === undefined ||
     pagination === 'true' ||
@@ -26,7 +30,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     const workflows = await getN8nWorkflows({
       apiKey: api_key,
-      limit: limit ? Number(limit) : 10,
+      limit: safeLimit,
       pagination: paginationEnabled,
     })
     return res.status(200).json(workflows)

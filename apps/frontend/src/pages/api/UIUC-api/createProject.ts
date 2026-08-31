@@ -7,17 +7,8 @@ import { db } from '~/db/dbClient'
 import { preAuthorizedApiKeys, projects } from '~/db/schema'
 import { encryptKeyIfNeeded } from '~/utils/crypto'
 import { ensureRedisConnected } from '~/utils/redisClient'
-import { superAdmins } from '~/utils/superAdmins'
-
-const DEFAULT_METADATA_SCHEMA = {
-  document_type: { type: 'string' },
-  document_title: { type: 'string' },
-  author: { type: 'string' },
-  creation_date: { type: 'string', format: 'date' },
-  keywords: { type: 'array', items: { type: 'string' } },
-  category: { type: 'string' },
-  summary: { type: 'string' },
-}
+import { isSuperAdmin, superAdmins } from '~/utils/superAdmins'
+import { generateSchemaFromProjectDescription } from '~/utils/generateMetadataSchema'
 
 function emailsInclude(emails: unknown, ownerEmail: string): boolean {
   if (!Array.isArray(emails)) return false
@@ -39,9 +30,10 @@ async function seedPreAssignedLlmKeys(
   }
 
   for (const row of matching) {
-    const body = row.providerBodyNoModels as
-      | { apiKey?: string; [key: string]: unknown }
-      | null
+    const body = row.providerBodyNoModels as {
+      apiKey?: string
+      [key: string]: unknown
+    } | null
     if (!body || !row.providerName) continue
     if (typeof body.apiKey === 'string') {
       body.apiKey = await encryptKeyIfNeeded(body.apiKey)
@@ -61,15 +53,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const {
     project_name,
     project_description,
-    project_owner_email,
+    project_owner_email: requested_owner_email,
     is_private,
     allow_logged_in_users,
   } = req.body
 
-  if (!project_name || !project_owner_email) {
-    return res.status(400).json({
-      error: 'project_name and project_owner_email are required',
-    })
+  if (!project_name) {
+    return res.status(400).json({ error: 'project_name is required' })
+  }
+
+  // The owner is the authenticated caller, not whatever the body claims —
+  // otherwise any signed-in user could create a project owned by someone else.
+  // Super admins keep the ability to create a project on another user's behalf.
+  const callerEmail = req.user?.email
+  if (!callerEmail) {
+    return res.status(401).json({ error: 'Unauthenticated' })
+  }
+
+  const project_owner_email =
+    requested_owner_email && isSuperAdmin(callerEmail)
+      ? requested_owner_email
+      : callerEmail
+
+  if (
+    requested_owner_email &&
+    requested_owner_email.toLowerCase() !== project_owner_email.toLowerCase()
+  ) {
+    console.warn(
+      `createProject: ignoring project_owner_email "${requested_owner_email}" from non-super-admin ${callerEmail}`,
+    )
   }
 
   try {
@@ -114,10 +126,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     await writeCourseMetadata(project_name, seededMetadata)
 
     try {
+      // Mirrors Flask `ProjectService.generate_json_schema`: the schema is
+      // LLM-generated from the description, with a static fallback.
+      const metadataSchema = await generateSchemaFromProjectDescription(
+        project_name,
+        project_description,
+      )
       await db.insert(projects).values({
         course_name: project_name,
         description: project_description || null,
-        metadata_schema: DEFAULT_METADATA_SCHEMA,
+        metadata_schema: metadataSchema,
       })
     } catch (projectErr) {
       console.error(

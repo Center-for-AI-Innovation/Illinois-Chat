@@ -9,6 +9,7 @@ const hoisted = vi.hoisted(() => {
     selectFrom: vi.fn(),
     redisSet: vi.fn(),
     encryptKeyIfNeeded: vi.fn(async (k: string) => `enc:${k}`),
+    generateSchema: vi.fn(async () => ({ generated: { type: 'string' } })),
   }
 })
 
@@ -34,6 +35,12 @@ vi.mock('~/utils/redisClient', () => ({
 
 vi.mock('~/utils/superAdmins', () => ({
   superAdmins: ['admin@example.com'],
+  isSuperAdmin: (email?: string | null) =>
+    (email ?? '').toLowerCase() === 'admin@example.com',
+}))
+
+vi.mock('~/utils/generateMetadataSchema', () => ({
+  generateSchemaFromProjectDescription: hoisted.generateSchema,
 }))
 
 vi.mock('~/db/schema', () => ({
@@ -57,13 +64,99 @@ describe('UIUC-api/createProject', () => {
     expect(res.status).toHaveBeenCalledWith(405)
   })
 
-  it('returns 400 for missing required fields', async () => {
+  it('returns 400 when project_name is missing', async () => {
     const res = createMockRes()
     await handler(
-      createMockReq({ method: 'POST', body: { project_name: 'x' } }) as any,
+      createMockReq({
+        method: 'POST',
+        user: { email: 'o@example.com' },
+        body: {},
+      }) as any,
       res as any,
     )
     expect(res.status).toHaveBeenCalledWith(400)
+  })
+
+  it('returns 401 when the request has no authenticated user', async () => {
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: { project_name: 'x', project_owner_email: 'o@example.com' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(401)
+  })
+
+  it('ignores a spoofed project_owner_email and uses the caller', async () => {
+    hoisted.checkCourseExists.mockResolvedValueOnce(false)
+    hoisted.writeCourseMetadata.mockResolvedValueOnce(undefined)
+    hoisted.insertValues.mockResolvedValueOnce(undefined)
+    hoisted.selectFrom.mockResolvedValueOnce([])
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        user: { email: 'caller@example.com' },
+        body: { project_name: 'x', project_owner_email: 'victim@example.com' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(hoisted.writeCourseMetadata).toHaveBeenCalledWith(
+      'x',
+      expect.objectContaining({ course_owner: 'caller@example.com' }),
+    )
+  })
+
+  it('lets a super admin create a project on behalf of another user', async () => {
+    hoisted.checkCourseExists.mockResolvedValueOnce(false)
+    hoisted.writeCourseMetadata.mockResolvedValueOnce(undefined)
+    hoisted.insertValues.mockResolvedValueOnce(undefined)
+    hoisted.selectFrom.mockResolvedValueOnce([])
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        user: { email: 'admin@example.com' },
+        body: { project_name: 'x', project_owner_email: 'owner@example.com' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(hoisted.writeCourseMetadata).toHaveBeenCalledWith(
+      'x',
+      expect.objectContaining({ course_owner: 'owner@example.com' }),
+    )
+  })
+
+  it('stores the LLM-generated metadata schema on the projects row', async () => {
+    hoisted.checkCourseExists.mockResolvedValueOnce(false)
+    hoisted.writeCourseMetadata.mockResolvedValueOnce(undefined)
+    hoisted.insertValues.mockResolvedValueOnce(undefined)
+    hoisted.selectFrom.mockResolvedValueOnce([])
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        user: { email: 'o@example.com' },
+        body: { project_name: 'x', project_description: 'desc' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(hoisted.generateSchema).toHaveBeenCalledWith('x', 'desc')
+    expect(hoisted.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        course_name: 'x',
+        description: 'desc',
+        metadata_schema: { generated: { type: 'string' } },
+      }),
+    )
   })
 
   it('returns 409 when project exists and 503 when existence check fails', async () => {
@@ -72,6 +165,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: { project_name: 'x', project_owner_email: 'o@example.com' },
       }) as any,
       res1 as any,
@@ -83,6 +177,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: { project_name: 'x', project_owner_email: 'o@example.com' },
       }) as any,
       res2 as any,
@@ -100,6 +195,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: {
           project_name: 'x',
           project_description: 'desc',
@@ -128,6 +224,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: { project_name: 'x', project_owner_email: 'o@example.com' },
       }) as any,
       res1 as any,
@@ -142,6 +239,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: { project_name: 'x', project_owner_email: 'o@example.com' },
       }) as any,
       res2 as any,
@@ -170,6 +268,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: { project_name: 'x', project_owner_email: 'o@example.com' },
       }) as any,
       res as any,
@@ -192,6 +291,7 @@ describe('UIUC-api/createProject', () => {
     await handler(
       createMockReq({
         method: 'POST',
+        user: { email: 'o@example.com' },
         body: { project_name: 'x', project_owner_email: 'o@example.com' },
       }) as any,
       res as any,
