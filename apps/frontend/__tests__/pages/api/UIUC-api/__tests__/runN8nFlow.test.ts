@@ -3,87 +3,62 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 
+const hoisted = vi.hoisted(() => ({
+  runN8nFlow: vi.fn(),
+}))
+
 vi.mock('~/utils/authMiddleware', () => ({
   withAuth: (fn: any) => fn,
 }))
 
-vi.mock('~/utils/apiUtils', () => ({
-  getBackendUrl: () => 'http://backend',
+vi.mock('~/server/n8n/runFlow', () => ({
+  runN8nFlow: hoisted.runN8nFlow,
 }))
 
 import handler, { runN8nFlowBackend } from '~/pages/api/UIUC-api/runN8nFlow'
 
 describe('UIUC-api runN8nFlow', () => {
   beforeEach(() => {
-    vi.unstubAllGlobals()
+    hoisted.runN8nFlow.mockReset()
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it('runN8nFlowBackend returns JSON response on success', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: vi.fn(async () => ({ ok: true })),
-      })) as any,
-    )
-
+    hoisted.runN8nFlow.mockResolvedValueOnce({ ok: true })
     await expect(runN8nFlowBackend('k', 'n', { a: 1 })).resolves.toEqual({
       ok: true,
     })
   })
 
-  it('runN8nFlowBackend throws an error message from JSON payload when not ok', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: vi.fn(async () => ({ error: 'bad' })),
-        text: vi.fn(async () => '<html/>'),
-      })) as any,
-    )
-
+  it('runN8nFlowBackend throws an error message from the flow runner', async () => {
+    hoisted.runN8nFlow.mockRejectedValueOnce(new Error('bad'))
     await expect(runN8nFlowBackend('k', 'n', { a: 1 })).rejects.toThrow('bad')
   })
 
-  it('runN8nFlowBackend throws an HTML-specific error when content-type is not JSON', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        status: 502,
-        statusText: 'Bad Gateway',
-        headers: new Headers({ 'content-type': 'text/html' }),
-        json: vi.fn(async () => ({})),
-        text: vi.fn(async () => '<html>oops</html>'),
-      })) as any,
-    )
-
-    await expect(runN8nFlowBackend('k', 'n', { a: 1 })).rejects.toThrow('HTML')
-  })
-
   it('runN8nFlowBackend throws a timeout hint on AbortError', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        const error: any = new Error('aborted')
-        error.name = 'AbortError'
-        throw error
-      }) as any,
-    )
-
+    const error: any = new Error('aborted')
+    error.name = 'AbortError'
+    hoisted.runN8nFlow.mockRejectedValueOnce(error)
     await expect(runN8nFlowBackend('k', 'n', { a: 1 })).rejects.toThrow(
       'timed out',
     )
+  })
+
+  it('runN8nFlowBackend aborts immediately when the caller signal is already aborted', async () => {
+    hoisted.runN8nFlow.mockImplementationOnce(async ({ signal }) => {
+      if (signal?.aborted) {
+        const error: any = new Error('aborted')
+        error.name = 'AbortError'
+        throw error
+      }
+      return { ok: true }
+    })
+    await expect(
+      runN8nFlowBackend('k', 'n', { a: 1 }, AbortSignal.abort()),
+    ).rejects.toThrow('timed out')
   })
 
   it('handler returns 405/400/200/408/500 for various cases', async () => {
@@ -98,16 +73,7 @@ describe('UIUC-api runN8nFlow', () => {
     )
     expect(res1.status).toHaveBeenCalledWith(400)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: vi.fn(async () => ({ result: true })),
-      })) as any,
-    )
+    hoisted.runN8nFlow.mockResolvedValueOnce({ result: true })
     const res2 = createMockRes()
     await handler(
       createMockReq({
@@ -119,14 +85,9 @@ describe('UIUC-api runN8nFlow', () => {
     expect(res2.status).toHaveBeenCalledWith(200)
     expect(res2.json).toHaveBeenCalledWith({ result: true })
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        const error: any = new Error('timed out')
-        error.name = 'AbortError'
-        throw error
-      }) as any,
-    )
+    const timeout: any = new Error('aborted')
+    timeout.name = 'AbortError'
+    hoisted.runN8nFlow.mockRejectedValueOnce(timeout)
     const res3 = createMockRes()
     await handler(
       createMockReq({
@@ -137,17 +98,7 @@ describe('UIUC-api runN8nFlow', () => {
     )
     expect(res3.status).toHaveBeenCalledWith(408)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        status: 500,
-        statusText: 'boom',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        json: vi.fn(async () => ({ error: 'boom' })),
-        text: vi.fn(async () => ''),
-      })) as any,
-    )
+    hoisted.runN8nFlow.mockRejectedValueOnce(new Error('boom'))
     const res4 = createMockRes()
     await handler(
       createMockReq({

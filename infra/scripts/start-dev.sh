@@ -206,6 +206,12 @@ ensure_local_app_envs() {
 	append_env_if_missing "$frontend_env" "POSTHOG_API_KEY" ""
 	append_env_if_missing "$frontend_env" "ENCRYPTION_MASTER_KEY" "$encryption_master_key"
 	append_env_if_missing "$frontend_env" "ALLOWED_EMBEDDING_PROVIDERS" "$allowed_embedding_providers"
+	append_env_if_missing "$frontend_env" "N8N_URL" "${N8N_URL:-}"
+	append_env_if_missing "$frontend_env" "SES_HOST" "${SES_HOST:-}"
+	append_env_if_missing "$frontend_env" "SES_PORT" "${SES_PORT:-465}"
+	append_env_if_missing "$frontend_env" "USERNAME_SMTP" "${USERNAME_SMTP:-}"
+	append_env_if_missing "$frontend_env" "PASSWORD_SMTP" "${PASSWORD_SMTP:-}"
+	append_env_if_missing "$frontend_env" "EMAIL_SENDER" "${EMAIL_SENDER:-}"
 
 	local crawlee_env="apps/crawlee/.env"
 	ensure_env_file "$crawlee_env" "Crawlee local development env"

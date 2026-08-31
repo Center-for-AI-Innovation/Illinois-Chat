@@ -15,7 +15,8 @@ import {
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { runN8nFlowBackend } from '~/pages/api/UIUC-api/runN8nFlow'
 import { fetchContextsByVectorEngine } from '~/utils/fetchContexts'
-import { getBackendUrl } from '~/utils/apiUtils'
+import { getN8nWorkflows } from '~/utils/n8nClient'
+import { type N8nWorkflow } from '~/types/tools'
 import { generatePresignedUrl } from '~/pages/api/download'
 // Reuse existing functions instead of duplicating
 import {
@@ -56,7 +57,9 @@ function conversationToMessagesWithContexts(
   const contextSummary = lastUserMessage.contexts
     .map(
       (ctx, idx) =>
-        `[Context ${idx + 1} from "${ctx.readable_filename}" (page ${ctx.pagenumber || 'N/A'})]: ${ctx.text}`,
+        `[Context ${idx + 1} from "${ctx.readable_filename}" (page ${
+          ctx.pagenumber || 'N/A'
+        })]: ${ctx.text}`,
     )
     .join('\n\n')
 
@@ -143,7 +146,9 @@ export async function selectToolsServer(
 
   // Add image info if present
   if (imageUrls.length > 0 && imageDescription) {
-    const imageInfo = `Image URL(s): ${imageUrls.join(', ')};\nImage Description: ${imageDescription}`
+    const imageInfo = `Image URL(s): ${imageUrls.join(
+      ', ',
+    )};\nImage Description: ${imageDescription}`
     if (messagesToSend.length > 0) {
       const lastMsg = messagesToSend[messagesToSend.length - 1]
       if (lastMsg && typeof lastMsg.content === 'string') {
@@ -414,7 +419,9 @@ export async function fetchContextsServer(
         lastError = `Expected array, got ${typeof contexts}`
         if (attempt < delaysMs.length - 1) {
           console.warn(
-            `[fetchContextsServer] retry ${attempt + 1}/${delaysMs.length} failed (${lastError})`,
+            `[fetchContextsServer] retry ${attempt + 1}/${
+              delaysMs.length
+            } failed (${lastError})`,
           )
           continue
         }
@@ -433,7 +440,9 @@ export async function fetchContextsServer(
       lastError = error instanceof Error ? error.message : 'Unknown error'
       if (attempt < delaysMs.length - 1) {
         console.warn(
-          `[fetchContextsServer] retry ${attempt + 1}/${delaysMs.length} failed (${lastError})`,
+          `[fetchContextsServer] retry ${attempt + 1}/${
+            delaysMs.length
+          } failed (${lastError})`,
         )
         continue
       }
@@ -498,27 +507,20 @@ export async function fetchToolsServer(
   }
 
   try {
-    const backendUrl = getBackendUrl()
-    if (!backendUrl) {
-      return []
-    }
+    const workflows = await getN8nWorkflows({
+      apiKey,
+      limit,
+      pagination: false,
+      signal,
+    })
 
-    const response = await fetch(
-      `${backendUrl}/getworkflows?api_key=${apiKey}&limit=${limit}&pagination=false`,
-      { signal },
-    )
-
-    if (!response.ok) {
-      throw new Error(`Unable to fetch n8n tools: ${response.statusText}`)
-    }
-
-    const workflows = await response.json()
     if (!Array.isArray(workflows) || workflows.length === 0) {
       return []
     }
 
-    // Handle response structure: backend may return [[workflows]] or [workflows]
-    const workflowArray = Array.isArray(workflows[0]) ? workflows[0] : workflows
+    const workflowArray = (Array.isArray(workflows[0])
+      ? workflows[0]
+      : workflows) as unknown as N8nWorkflow[]
 
     if (!Array.isArray(workflowArray) || workflowArray.length === 0) {
       return []

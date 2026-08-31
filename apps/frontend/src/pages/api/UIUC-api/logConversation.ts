@@ -11,7 +11,6 @@ import {
 import { RunTree } from 'langsmith'
 import { sanitizeForLogging } from '@/utils/sanitization'
 import { llmConvoMonitor } from '~/db/schema'
-import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseAccessFromRequest } from '~/pages/api/authorization'
 import { AllSupportedModels } from '~/utils/modelProviders/LLMProvider'
 import { eq } from 'drizzle-orm'
@@ -207,62 +206,6 @@ const logConversation = async (
   } catch (error: any) {
     console.log('new error from database in logConversation:', error)
   }
-
-  // Send to our custom monitor
-  try {
-    const response = await fetch(getBackendUrl() + '/llm-monitor-message', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        // messages: sanitizedConversation.messages, // we get these from database on the backend.
-        course_name: course_name,
-        conversation_id: conversationId,
-        model_name: sanitizedConversation.model?.name,
-        user_email: sanitizedConversation.userEmail,
-      }),
-    })
-
-    if (!response.ok) {
-      console.error('Error sending to AI TA backend:', response.statusText)
-    }
-  } catch (error) {
-    console.error('Error sending to AI TA backend:', error)
-  }
-
-  // console.log('👇👇👇👇👇👇👇👇👇👇👇👇👇')
-  // console.log(
-  //   '2nd Latest message object (user)',
-  //   conversation.messages[conversation.messages.length - 2],
-  // )
-  // console.log(
-  //   'Latest message object (assistant)',
-  //   conversation.messages[conversation.messages.length - 1],
-  // )
-  // console.log('full convo id', conversation.id)
-  // console.log(
-  //   'User message',
-  //   (
-  //     conversation.messages[conversation.messages.length - 2]
-  //       ?.content[0] as Content
-  //   ).text,
-  // )
-  // console.log(
-  //   'Assistant message',
-  //   conversation.messages[conversation.messages.length - 2]?.content,
-  // )
-  // console.log(
-  //   'Engineered prompt',
-  //   conversation.messages[conversation.messages.length - 2]!
-  //     .finalPromtEngineeredMessage,
-  // )
-  // console.log(
-  //   'System message',
-  //   conversation.messages[conversation.messages.length - 2]!
-  //     .latestSystemMessage,
-  // )
-  // console.log('👆👆👆👆👆👆👆👆👆👆👆👆👆')
 
   // Log to Langsmith
   const rt = new RunTree({

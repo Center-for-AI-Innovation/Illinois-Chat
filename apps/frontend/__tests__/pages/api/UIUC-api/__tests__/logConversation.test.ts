@@ -38,10 +38,6 @@ vi.mock('drizzle-orm', () => ({
   eq: () => ({}),
 }))
 
-vi.mock('~/utils/apiUtils', () => ({
-  getBackendUrl: () => 'http://backend',
-}))
-
 vi.mock('@/utils/sanitization', () => ({
   sanitizeForLogging: (v: any) => v,
 }))
@@ -79,10 +75,6 @@ describe('UIUC-api/logConversation', () => {
   })
 
   it('logs a full conversation and returns 200', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }))
-
     const res = createMockRes()
     await handler(
       createMockReq({
@@ -119,12 +111,7 @@ describe('UIUC-api/logConversation', () => {
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(hoisted.insertValues).toHaveBeenCalled()
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'http://backend/llm-monitor-message',
-      expect.any(Object),
-    )
     expect(runTreeInstances.length).toBeGreaterThan(0)
-    fetchSpy.mockRestore()
   })
 
   it('merges delta with existing conversation (including edit truncation)', async () => {
@@ -146,10 +133,6 @@ describe('UIUC-api/logConversation', () => {
         },
       },
     ])
-
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }))
 
     const res = createMockRes()
     await handler(
@@ -187,6 +170,5 @@ describe('UIUC-api/logConversation', () => {
       'c',
       'd',
     ])
-    fetchSpy.mockRestore()
   })
 })

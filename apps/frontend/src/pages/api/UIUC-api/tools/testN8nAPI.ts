@@ -1,25 +1,22 @@
 import { withAuth } from '~/utils/authMiddleware'
-import { getBackendUrl } from '~/utils/apiUtils'
-
-// export const runtime = 'edge'
+import { getN8nWorkflows } from '~/utils/n8nClient'
 
 async function handler(req: any, res: any) {
   const { n8nApiKey } = req.body
-  // console.log(`Testing API key: '${n8nApiKey}'`)
 
-  const parsedPagination = true
-  const limit = 1
+  const workflows = await getN8nWorkflows({
+    apiKey: n8nApiKey,
+    limit: 1,
+    pagination: true,
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : 'unknown'
+    throw new Error(`Unable to fetch n8n tools: ${message}`)
+  })
 
-  const response = await fetch(
-    `${getBackendUrl()}/getworkflows?api_key=${n8nApiKey}&limit=${limit}&pagination=${parsedPagination}`,
-  )
-
-  if (!response.ok) {
-    // return res.status(response.status).json({ error: response.statusText })
-    throw new Error(`Unable to fetch n8n tools: ${response.statusText}`)
+  if (!workflows) {
+    throw new Error('Unable to fetch n8n tools: empty response')
   }
   return res.status(200).json({ message: 'Success' })
-  // console.log('Fetch was ok. ', await response.json())
 }
 
 export default withAuth(handler)

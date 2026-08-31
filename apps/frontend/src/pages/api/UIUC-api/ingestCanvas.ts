@@ -1,6 +1,6 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { getBackendUrl } from '~/utils/apiUtils'
+import { sendTransactionalEmail } from '~/utils/sendTransactionalEmail'
 import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
@@ -24,37 +24,21 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
       return res.status(400).json({ error: '❌❌ Missing body parameters' })
     }
 
-    console.log('About to send transactional email')
-
-    // Send email to kastan alerting that he needs to approve a canvas course
-    const sendEmailResponse = await fetch(
-      `${getBackendUrl()}/send-transactional-email`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to_recipients_list: ['rohan13@illinois.edu'],
-          bcc_recipients_list: [],
-          sender: 'rohan13@illinois.edu',
-          subject: 'New Canvas Course Ingestion Request',
-          body_text: `New Canvas course ingestion request received:
+    try {
+      await sendTransactionalEmail({
+        sender: process.env.EMAIL_SENDER || 'rohan13@illinois.edu',
+        recipients: ['rohan13@illinois.edu'],
+        bccRecipients: [],
+        subject: 'New Canvas Course Ingestion Request',
+        bodyText: `New Canvas course ingestion request received:
 Course Name: ${courseName}
 Canvas URL: ${canvas_url}
 Selected Options: ${selectedCanvasOptions.join(', ')}
 Please review and approve at https://canvas.illinois.edu/ using account uiuc.chat@ad.uillinois.edu.`,
-        }),
-      },
-    )
-    // const emailResponseBody = await sendEmailResponse.json()
-    // Add error checking for the response
-    if (!sendEmailResponse.ok) {
-      console.error(
-        `Email API responded with status: ${sendEmailResponse.status}`,
-      )
+      })
+    } catch (emailError) {
+      console.error('Email API failed:', emailError)
     }
-    // console.debug("Sent email to Kastan to alert him of new Canvas ingest")
 
     const response = await fetch(
       `${process.env.INGEST_URL}`.replace('/ingest', '/canvas_ingest'),
