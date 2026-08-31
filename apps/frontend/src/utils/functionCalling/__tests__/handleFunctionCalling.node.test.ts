@@ -6,8 +6,12 @@ vi.mock('~/pages/api/UIUC-api/runN8nFlow', () => ({
   runN8nFlowBackend: vi.fn(),
 }))
 
-vi.mock('~/utils/apiUtils', () => ({
-  getBackendUrl: vi.fn(() => undefined),
+const hoisted = vi.hoisted(() => ({
+  getN8nWorkflows: vi.fn(),
+}))
+
+vi.mock('~/utils/n8nClient', () => ({
+  getN8nWorkflows: hoisted.getN8nWorkflows,
 }))
 
 describe('handleFunctionCalling (node)', () => {
@@ -48,62 +52,85 @@ describe('handleFunctionCalling (node)', () => {
     ).resolves.toEqual([])
   })
 
-  it('fetchTools throws when backendUrl is missing on the server', async () => {
+  it('fetchTools maps a flat n8n workflow list on the server', async () => {
     const { fetchTools } = await import('../handleFunctionCalling')
-    await expect(fetchTools('proj', 'k', 10, 'true', false)).rejects.toThrow(
-      /No backend URL configured/i,
+    hoisted.getN8nWorkflows.mockResolvedValueOnce([
+      {
+        id: 'w1',
+        name: 'My Workflow',
+        active: true,
+        updatedAt: 'u',
+        createdAt: 'c',
+        nodes: [
+          {
+            type: 'n8n-nodes-base.formTrigger',
+            parameters: {
+              formDescription: 'd',
+              formFields: { values: [] },
+            },
+          },
+        ],
+      },
+    ])
+    await expect(fetchTools('proj', 'k', 10, 'false', false)).resolves.toHaveLength(
+      1,
     )
   })
 
-  it('fetchTools calls the backend /getworkflows endpoint on the server', async () => {
+  it('fetchTools throws when n8n lookup fails on the server', async () => {
+    hoisted.getN8nWorkflows.mockRejectedValueOnce(new Error('n8n down'))
     const { fetchTools } = await import('../handleFunctionCalling')
-    const { getBackendUrl } = await import('~/utils/apiUtils')
+    await expect(fetchTools('proj', 'k', 10, 'true', false)).rejects.toThrow(
+      /n8n down/i,
+    )
+  })
 
-    ;(getBackendUrl as any).mockReturnValueOnce('http://backend')
+  it('fetchTools calls n8n directly on the server', async () => {
+    const { fetchTools } = await import('../handleFunctionCalling')
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(
-        JSON.stringify([
-          [
+    hoisted.getN8nWorkflows.mockResolvedValueOnce([
+      [
+        {
+          id: 'w1',
+          name: 'My Workflow',
+          active: true,
+          updatedAt: 'u',
+          createdAt: 'c',
+          nodes: [
             {
-              id: 'w1',
-              name: 'My Workflow',
-              active: true,
-              updatedAt: 'u',
-              createdAt: 'c',
-              nodes: [
-                {
-                  type: 'n8n-nodes-base.formTrigger',
-                  parameters: {
-                    formDescription: 'd',
-                    formFields: { values: [] },
-                  },
-                },
-              ],
+              type: 'n8n-nodes-base.formTrigger',
+              parameters: {
+                formDescription: 'd',
+                formFields: { values: [] },
+              },
             },
           ],
-        ]),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      ),
-    )
+        },
+      ],
+    ])
 
     const tools = await fetchTools('proj', 'k', 10, 'true', false)
     expect(tools).toHaveLength(1)
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'http://backend/getworkflows?api_key=k&limit=10&pagination=true',
-      ),
-    )
+    expect(hoisted.getN8nWorkflows).toHaveBeenCalledWith({
+      apiKey: 'k',
+      limit: 10,
+      pagination: true,
+    })
   })
 
-  it('fetchTools throws when the backend responds non-ok', async () => {
+  it('fetchTools returns the raw first page when full_details is true', async () => {
     const { fetchTools } = await import('../handleFunctionCalling')
-    const { getBackendUrl } = await import('~/utils/apiUtils')
+    const workflow = { id: 'w1', name: 'Mine', active: true, nodes: [] }
+    hoisted.getN8nWorkflows.mockResolvedValueOnce(workflow)
+    await expect(fetchTools('proj', 'k', 10, 'false', true)).resolves.toEqual([
+      workflow,
+    ])
+  })
 
-    ;(getBackendUrl as any).mockReturnValueOnce('http://backend')
-
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response('nope', { status: 500, statusText: 'Server Error' }),
+  it('fetchTools throws when n8n responds with an error', async () => {
+    const { fetchTools } = await import('../handleFunctionCalling')
+    hoisted.getN8nWorkflows.mockRejectedValueOnce(
+      new Error('Unable to fetch n8n tools: Server Error'),
     )
 
     await expect(fetchTools('proj', 'k', 10, 'true', false)).rejects.toThrow(

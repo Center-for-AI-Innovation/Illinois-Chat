@@ -6,6 +6,8 @@ import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 const hoisted = vi.hoisted(() => ({
   select: vi.fn(),
   insert: vi.fn(),
+  switchN8nWorkflow: vi.fn(),
+  getN8nWorkflows: vi.fn(),
 }))
 
 vi.mock('~/utils/authMiddleware', () => ({
@@ -16,8 +18,15 @@ vi.mock('~/pages/api/authorization', () => ({
   withCourseAccessFromRequest: () => (handler: any) => handler,
 }))
 
-vi.mock('~/utils/apiUtils', () => ({
-  getBackendUrl: () => 'http://backend',
+vi.mock('~/utils/n8nClient', () => ({
+  getN8nWorkflows: hoisted.getN8nWorkflows,
+  switchN8nWorkflow: hoisted.switchN8nWorkflow,
+  N8nUnauthorizedError: class N8nUnauthorizedError extends Error {
+    constructor(message = 'Unauthorized') {
+      super(message)
+      this.name = 'N8nUnauthorizedError'
+    }
+  },
 }))
 
 vi.mock('~/db/schema', () => ({
@@ -48,7 +57,8 @@ describe('UIUC-api/tools routes', () => {
   beforeEach(() => {
     hoisted.select.mockReset()
     hoisted.insert.mockReset()
-    vi.unstubAllGlobals()
+    hoisted.switchN8nWorkflow.mockReset()
+    hoisted.getN8nWorkflows.mockReset()
   })
 
   afterEach(() => {
@@ -56,15 +66,7 @@ describe('UIUC-api/tools routes', () => {
   })
 
   it('activateWorkflow returns 200 on success and status on backend failures', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: vi.fn(async () => ({ ok: true })),
-      })) as any,
-    )
+    hoisted.switchN8nWorkflow.mockResolvedValueOnce({ ok: true })
 
     const res1 = createMockRes()
     await activateWorkflowHandler(
@@ -75,33 +77,17 @@ describe('UIUC-api/tools routes', () => {
     )
     expect(res1.status).toHaveBeenCalledWith(200)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        status: 502,
-        statusText: 'Bad Gateway',
-        text: vi.fn(async () => 'oops'),
-      })) as any,
-    )
+    hoisted.switchN8nWorkflow.mockRejectedValueOnce(new Error('Bad Gateway'))
     const res2 = createMockRes()
-    await activateWorkflowHandler(
+    const result = await activateWorkflowHandler(
       createMockReq({
         query: { api_key: 'k', id: '1', activate: 'true' },
       }) as any,
       res2 as any,
     )
-    expect(res2.status).toHaveBeenCalledWith(502)
+    expect(result).toBeInstanceOf(Error)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: vi.fn(async () => ({ message: 'bad request' })),
-      })) as any,
-    )
+    hoisted.switchN8nWorkflow.mockResolvedValueOnce({ message: 'bad request' })
     const res3 = createMockRes()
     await activateWorkflowHandler(
       createMockReq({
@@ -110,6 +96,17 @@ describe('UIUC-api/tools routes', () => {
       res3 as any,
     )
     expect(res3.status).toHaveBeenCalledWith(400)
+
+    const { N8nUnauthorizedError } = await import('~/utils/n8nClient')
+    hoisted.switchN8nWorkflow.mockRejectedValueOnce(new N8nUnauthorizedError())
+    const res4 = createMockRes()
+    await activateWorkflowHandler(
+      createMockReq({
+        query: { api_key: 'k', id: '1', activate: 'false' },
+      }) as any,
+      res4 as any,
+    )
+    expect(res4.status).toHaveBeenCalledWith(401)
   })
 
   it('getN8nKeyFromProject returns 404 when missing, 200 when found, and 500 on db error', async () => {
@@ -192,15 +189,7 @@ describe('UIUC-api/tools routes', () => {
   })
 
   it('testN8nAPI returns 200 on ok and rejects on non-ok responses', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: vi.fn(async () => ({})),
-      })) as any,
-    )
+    hoisted.getN8nWorkflows.mockResolvedValueOnce([[{ id: 'w' }]])
 
     const res1 = createMockRes()
     await testN8nAPIHandler(
@@ -209,14 +198,7 @@ describe('UIUC-api/tools routes', () => {
     )
     expect(res1.status).toHaveBeenCalledWith(200)
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        status: 500,
-        statusText: 'boom',
-      })) as any,
-    )
+    hoisted.getN8nWorkflows.mockRejectedValueOnce(new Error('boom'))
 
     await expect(
       testN8nAPIHandler(

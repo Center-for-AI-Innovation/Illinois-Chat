@@ -1,20 +1,36 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 
+const hoisted = vi.hoisted(() => ({
+  getN8nWorkflows: vi.fn(),
+  getDocumentsDb: vi.fn(),
+}))
+
 vi.mock('~/pages/api/authorization', () => ({
   withCourseOwnerOrAdminAccess: () => (h: any) => h,
   withCourseAccessFromRequest: () => (h: any) => h,
 }))
 
-vi.mock('~/utils/apiUtils', () => ({
-  getBackendUrl: () => 'http://backend',
+vi.mock('~/utils/n8nClient', () => ({
+  getN8nWorkflows: hoisted.getN8nWorkflows,
+  N8nUnauthorizedError: class N8nUnauthorizedError extends Error {
+    constructor(message = 'Unauthorized') {
+      super(message)
+      this.name = 'N8nUnauthorizedError'
+    }
+  },
+}))
+
+vi.mock('~/utils/connectionManager', () => ({
+  connectionManager: { getDocumentsDb: hoisted.getDocumentsDb },
 }))
 
 import getAllCourseDataHandler from '~/pages/api/UIUC-api/getAllCourseData'
 import getN8nWorkflowsHandler from '~/pages/api/UIUC-api/getN8nWorkflows'
+import { N8nUnauthorizedError } from '~/utils/n8nClient'
 
 describe('UIUC-api backend proxy routes', () => {
-  it('getAllCourseData validates method/params and proxies fetch', async () => {
+  it('getAllCourseData validates method/params and returns distinct documents', async () => {
     const res1 = createMockRes()
     await getAllCourseDataHandler(
       createMockReq({ method: 'POST' }) as any,
@@ -29,16 +45,7 @@ describe('UIUC-api backend proxy routes', () => {
     )
     expect(res2.status).toHaveBeenCalledWith(400)
 
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response('nope', { status: 500 }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
-
+    hoisted.getDocumentsDb.mockRejectedValueOnce(new Error('db down'))
     const res3 = createMockRes()
     await getAllCourseDataHandler(
       createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
@@ -46,16 +53,49 @@ describe('UIUC-api backend proxy routes', () => {
     )
     expect(res3.status).toHaveBeenCalledWith(500)
 
+    const docs = [
+      {
+        s3_path: 'a',
+        readable_filename: 'a.pdf',
+        course_name: 'CS101',
+        url: null,
+        base_url: null,
+      },
+      {
+        s3_path: 'a',
+        readable_filename: 'a.pdf',
+        course_name: 'CS101',
+        url: null,
+        base_url: null,
+      },
+      {
+        s3_path: 'b',
+        readable_filename: 'b.pdf',
+        course_name: 'CS101',
+        url: 'http://x',
+        base_url: 'http://x',
+      },
+    ]
+    hoisted.getDocumentsDb.mockResolvedValueOnce({
+      select: () => ({
+        from: () => ({
+          where: async () => docs,
+        }),
+      }),
+    })
+
     const res4 = createMockRes()
     await getAllCourseDataHandler(
       createMockReq({ method: 'GET', query: { course_name: 'CS101' } }) as any,
       res4 as any,
     )
     expect(res4.status).toHaveBeenCalledWith(200)
-    fetchSpy.mockRestore()
+    expect(res4.json).toHaveBeenCalledWith({
+      distinct_files: [docs[0], docs[2]],
+    })
   })
 
-  it('getN8nWorkflows validates inputs and proxies fetch', async () => {
+  it('getN8nWorkflows validates inputs and calls n8n directly', async () => {
     const res1 = createMockRes()
     await getN8nWorkflowsHandler(
       createMockReq({ method: 'POST' }) as any,
@@ -70,18 +110,7 @@ describe('UIUC-api backend proxy routes', () => {
     )
     expect(res2.status).toHaveBeenCalledWith(400)
 
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        new Response('nope', { status: 500, statusText: 'boom' }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ workflows: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
-
+    hoisted.getN8nWorkflows.mockRejectedValueOnce(new Error('boom'))
     const res3 = createMockRes()
     await getN8nWorkflowsHandler(
       createMockReq({ method: 'GET', query: { api_key: 'k' } }) as any,
@@ -89,12 +118,28 @@ describe('UIUC-api backend proxy routes', () => {
     )
     expect(res3.status).toHaveBeenCalledWith(500)
 
-    const res4 = createMockRes()
+    hoisted.getN8nWorkflows.mockRejectedValueOnce(new N8nUnauthorizedError())
+    const res401 = createMockRes()
     await getN8nWorkflowsHandler(
       createMockReq({ method: 'GET', query: { api_key: 'k' } }) as any,
+      res401 as any,
+    )
+    expect(res401.status).toHaveBeenCalledWith(401)
+
+    hoisted.getN8nWorkflows.mockResolvedValueOnce([[{ id: 'w1' }]])
+    const res4 = createMockRes()
+    await getN8nWorkflowsHandler(
+      createMockReq({
+        method: 'GET',
+        query: { api_key: 'k', limit: '25', pagination: 'false' },
+      }) as any,
       res4 as any,
     )
     expect(res4.status).toHaveBeenCalledWith(200)
-    fetchSpy.mockRestore()
+    expect(hoisted.getN8nWorkflows).toHaveBeenCalledWith({
+      apiKey: 'k',
+      limit: 25,
+      pagination: false,
+    })
   })
 })

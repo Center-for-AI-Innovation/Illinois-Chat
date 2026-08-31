@@ -257,6 +257,12 @@ services:
       EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-http://host.docker.internal:11434/v1}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-8B}
       NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY:-}
+      N8N_URL: ${N8N_URL:-}
+      SES_HOST: ${SES_HOST:-}
+      SES_PORT: ${SES_PORT:-}
+      USERNAME_SMTP: ${USERNAME_SMTP:-}
+      PASSWORD_SMTP: ${PASSWORD_SMTP:-}
+      EMAIL_SENDER: ${EMAIL_SENDER:-}
     depends_on:
       keycloak:
         condition: service_healthy

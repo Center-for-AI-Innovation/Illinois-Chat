@@ -731,6 +731,15 @@ describe('handleFunctionCalling utils (browser/jsdom)', () => {
     )
   })
 
+  it('fetchTools throws when the client-side n8n workflows request is not ok', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('nope', { status: 500, statusText: 'Server Error' }),
+    )
+    await expect(fetchTools('proj', 'k', 10, 'true', false)).rejects.toThrow(
+      /Unable to fetch n8n tools/i,
+    )
+  })
+
   it('useFetchAllWorkflows throws when neither course_name nor api_key provided', () => {
     expect(() => useFetchAllWorkflows()).toThrow(
       /one of course_name OR api_key/i,

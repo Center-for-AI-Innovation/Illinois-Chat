@@ -9,12 +9,12 @@ import {
   type N8nWorkflow,
   type OpenAICompatibleTool,
 } from '~/types/tools'
-import { getBackendUrl } from '~/utils/apiUtils'
 import {
   type AllLLMProviders,
   type AnySupportedModel,
   ProviderNames,
 } from '~/utils/modelProviders/LLMProvider'
+import { getN8nWorkflows } from '~/utils/n8nClient'
 
 export async function handleFunctionCall(
   message: Message,
@@ -662,40 +662,32 @@ export async function fetchTools(
   }
 
   const parsedPagination = pagination.toLowerCase() === 'true'
-
-  // Check if we're running on client-side (browser) or server-side
   const isClientSide = typeof window !== 'undefined'
 
-  let response: Response
-
   if (isClientSide) {
-    // Client-side: use our API route
-    response = await fetch(
+    const response = await fetch(
       `/api/UIUC-api/getN8nWorkflows?api_key=${api_key}&limit=${limit}&pagination=${parsedPagination}&course_name=${course_name}`,
     )
-  } else {
-    // Server-side: use direct backend call
-    const backendUrl = getBackendUrl()
-    if (!backendUrl) {
-      throw new Error(
-        'No backend URL configured. Please provide base_url parameter or set RAILWAY_URL environment variable.',
-      )
+    if (!response.ok) {
+      throw new Error(`Unable to fetch n8n tools: ${response.statusText}`)
     }
-    response = await fetch(
-      `${backendUrl}/getworkflows?api_key=${api_key}&limit=${limit}&pagination=${parsedPagination}`,
-    )
+    const workflows = await response.json()
+    if (full_details) return workflows[0]
+    return getUIUCToolFromN8n(workflows[0])
   }
 
-  if (!response.ok) {
-    // return res.status(response.status).json({ error: response.statusText })
-    throw new Error(`Unable to fetch n8n tools: ${response.statusText}`)
-  }
-
-  const workflows = await response.json()
-  if (full_details) return workflows[0]
-
-  const uiucTools = getUIUCToolFromN8n(workflows[0])
-  return uiucTools
+  const workflows = await getN8nWorkflows({
+    apiKey: api_key,
+    limit,
+    pagination: parsedPagination,
+  })
+  const firstPage = Array.isArray(workflows)
+    ? Array.isArray(workflows[0])
+      ? workflows[0]
+      : workflows
+    : [workflows]
+  if (full_details) return firstPage
+  return getUIUCToolFromN8n(firstPage as any)
 }
 
 export const useFetchAllWorkflows = (

@@ -1,6 +1,7 @@
-import { withAuth } from '~/utils/authMiddleware'
-import { getBackendUrl } from '~/utils/apiUtils'
+import { eq } from 'drizzle-orm'
 import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { documents } from '~/db/schema'
+import { connectionManager } from '~/utils/connectionManager'
 
 async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
@@ -14,19 +15,33 @@ async function handler(req: any, res: any) {
   }
 
   try {
-    const response = await fetch(
-      `${getBackendUrl()}/getAll?course_name=${course_name}`,
-    )
-
-    if (!response.ok) {
-      console.error('Failed to fetch course data. Err status:', response.status)
-      return res.status(response.status).json({
-        error: `Failed to fetch course data. Status: ${response.status}`,
+    const docsDb = await connectionManager.getDocumentsDb(course_name)
+    const data = await docsDb
+      .select({
+        s3_path: documents.s3_path,
+        readable_filename: documents.readable_filename,
+        course_name: documents.course_name,
+        url: documents.url,
+        base_url: documents.base_url,
       })
+      .from(documents)
+      .where(eq(documents.course_name, course_name))
+
+    const unique = new Map<string, (typeof data)[number]>()
+    for (const item of data) {
+      const key = JSON.stringify([
+        item.s3_path,
+        item.readable_filename,
+        item.course_name,
+        item.url,
+        item.base_url,
+      ])
+      if (!unique.has(key)) {
+        unique.set(key, item)
+      }
     }
 
-    const data = await response.json()
-    return res.status(200).json(data)
+    return res.status(200).json({ distinct_files: Array.from(unique.values()) })
   } catch (error) {
     console.error('Error fetching course data:', error)
     return res.status(500).json({

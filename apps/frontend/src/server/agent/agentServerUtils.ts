@@ -15,7 +15,7 @@ import {
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { runN8nFlowBackend } from '~/pages/api/UIUC-api/runN8nFlow'
 import { fetchContextsByVectorEngine } from '~/utils/fetchContexts'
-import { getBackendUrl } from '~/utils/apiUtils'
+import { getN8nWorkflows } from '~/utils/n8nClient'
 import { generatePresignedUrl } from '~/pages/api/download'
 // Reuse existing functions instead of duplicating
 import {
@@ -498,26 +498,17 @@ export async function fetchToolsServer(
   }
 
   try {
-    const backendUrl = getBackendUrl()
-    if (!backendUrl) {
-      return []
-    }
+    const workflows = await getN8nWorkflows({
+      apiKey,
+      limit,
+      pagination: false,
+      signal,
+    })
 
-    const response = await fetch(
-      `${backendUrl}/getworkflows?api_key=${apiKey}&limit=${limit}&pagination=false`,
-      { signal },
-    )
-
-    if (!response.ok) {
-      throw new Error(`Unable to fetch n8n tools: ${response.statusText}`)
-    }
-
-    const workflows = await response.json()
     if (!Array.isArray(workflows) || workflows.length === 0) {
       return []
     }
 
-    // Handle response structure: backend may return [[workflows]] or [workflows]
     const workflowArray = Array.isArray(workflows[0]) ? workflows[0] : workflows
 
     if (!Array.isArray(workflowArray) || workflowArray.length === 0) {
