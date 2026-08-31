@@ -419,9 +419,8 @@ describe('handleFunctionCalling (node)', () => {
     // s3_paths must survive next to data/image_urls — they are the raw keys
     // used to re-sign after the 1h presigned URLs expire.
     const { handleToolCall } = await import('../handleFunctionCalling')
-    const { runN8nFlowBackend } = await import(
-      '~/pages/api/UIUC-api/runN8nFlow'
-    )
+    const { runN8nFlowBackend } =
+      await import('~/pages/api/UIUC-api/runN8nFlow')
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify('n8n-key'), { status: 200 }),
