@@ -13,7 +13,12 @@ const bundleAnalyzerConfig = {
 /** @type {import("next").NextConfig} */
 const config = {
   i18n: nextI18NextConfig.i18n,
-  webpack(config, { isServer }) {
+  serverRuntimeConfig: {
+    bodyParser: {
+      sizeLimit: '100mb',
+    },
+  },
+  webpack(config, { isServer, webpack }) {
     // Merge existing experiments with the required ones
     config.experiments = {
       ...(config.experiments || {}),
@@ -38,6 +43,13 @@ const config = {
         net: false,
         perf_hooks: false,
       }
+
+      // mathjax-full falls back to eval('require') for its version unless this is defined.
+      config.plugins.push(
+        new webpack.DefinePlugin({
+          PACKAGE_VERSION: JSON.stringify('3.2.1'),
+        }),
+      )
     }
 
     return config
@@ -67,6 +79,17 @@ const config = {
       { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
       { protocol: 'https', hostname: 'anthropic.com' },
       { protocol: 'https', hostname: 'via.placeholder.com' },
+    ],
+  },
+  experimental: {
+    esmExternals: false, // To make certain packages work with the /pages router.
+    // Let Node require() these directly instead of webpack bundling them:
+    // postgres is Node-only; sanitize-html/undici trip up webpack's ESM/CJS resolution.
+    serverComponentsExternalPackages: [
+      'postgres',
+      'sanitize-html',
+      'undici',
+      '@qdrant/js-client-rest',
     ],
   },
   async headers() {
