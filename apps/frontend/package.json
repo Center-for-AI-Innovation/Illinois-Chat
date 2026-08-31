@@ -210,6 +210,9 @@
     "vite-tsconfig-paths": "^6.0.5",
     "vitest": "^3.2.4"
   },
+  "overrides": {
+    "nwsapi": "2.2.25"
+  },
   "ct3aMetadata": {
     "initVersion": "7.12.2"
   },
