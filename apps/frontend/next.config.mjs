@@ -60,6 +60,12 @@ const config = {
   //   locales: ['en'],
   //   defaultLocale: 'en',
   // },
+  // `next build` type-checks every file tsconfig `include` matches. Point it at a
+  // build-only tsconfig that omits tests so a spec's type error cannot fail the
+  // production build; tests are still checked against tsconfig.json.
+  typescript: {
+    tsconfigPath: 'tsconfig.build.json',
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

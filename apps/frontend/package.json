@@ -10,6 +10,8 @@
     "dev": "infisical run --env=dev -- next dev --webpack",
     "local": "next dev --webpack",
     "lint": "eslint src __tests__ --ext .js,.jsx,.ts,.tsx --max-warnings=10000",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "typecheck:all": "tsc --noEmit -p tsconfig.json",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",

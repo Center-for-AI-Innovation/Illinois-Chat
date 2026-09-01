@@ -382,7 +382,7 @@ export interface Props {
   contentRenderer?: (message: Message) => JSX.Element
   onImageUrlsUpdate?: (message: Message, messageIndex: number) => void
   courseName: string
-  disableCitations: boolean
+  disableCitations?: boolean
 }
 
 // Add this helper function before the ChatMessage component
