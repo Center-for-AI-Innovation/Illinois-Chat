@@ -19,16 +19,17 @@ export async function generatePresignedUrl(
     ResponseContentType = 'application/png'
   }
 
-  const { client, bucket, isOverride } = await connectionManager.getS3Client(
-    courseName,
-  )
+  const { client, bucket, isOverride } =
+    await connectionManager.getS3Client(courseName)
   if (!bucket) {
     throw new Error(
       `S3 bucket not configured for project '${courseName}' (no s3_config.bucket_name and S3_BUCKET_NAME unset)`,
     )
   }
   // Default path: sign against the browser-reachable MinIO endpoint.
-  const signingClient = isOverride ? client : getPresignedUrlClient() ?? client
+  const signingClient = isOverride
+    ? client
+    : (getPresignedUrlClient() ?? client)
 
   const command = new GetObjectCommand({
     Bucket: bucket,
