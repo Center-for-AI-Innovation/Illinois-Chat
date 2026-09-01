@@ -30,6 +30,7 @@ export const AuthMenu = ({ size = 34 }: AuthMenuProps) => {
         {/* Gradient avatar with a diagonal "shine" that sweeps across on hover.
             Shine + lift reproduced from the former Mantine createStyles ::after. */}
         <DropdownMenuTrigger
+          nativeButton={false}
           render={
             <Avatar
               aria-label="User Menu"
