@@ -74,7 +74,7 @@ export function ChatbotHubCard(card: ChatbotCardData) {
   return (
     <>
       <Card
-        className={`group relative flex min-h-[380px] w-full flex-col overflow-hidden rounded-[14px] bg-white transition-transform duration-200 ease-out hover:scale-[1.03] dark:bg-[#13294b] [&:has(a:focus-visible)]:ring-2 [&:has(a:focus-visible)]:ring-[--illinois-orange] [&:has(a:focus-visible)]:ring-offset-2 ${
+        className={`group relative flex min-h-[380px] w-full flex-col gap-0 overflow-hidden rounded-[14px] bg-white py-0 transition-transform duration-200 ease-out hover:scale-[1.03] dark:bg-[#13294b] [&:has(a:focus-visible)]:ring-2 [&:has(a:focus-visible)]:ring-[--illinois-orange] [&:has(a:focus-visible)]:ring-offset-2 ${
           hasAdminAccess
             ? 'border border-[--illinois-orange-branding] dark:border-[#32517a]'
             : 'border border-[#e5e7eb] shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-[#32517a] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]'

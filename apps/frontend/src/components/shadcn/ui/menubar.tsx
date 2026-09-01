@@ -101,7 +101,7 @@ function MenubarItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/menubar-item data-[variant=destructive]:[&>svg]:text-destructive! gap-2 rounded-sm px-2 py-1.5 text-sm focus:bg-accent focus:text-accent-foreground data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[disabled]:opacity-50 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 [&:not([data-variant=destructive])]:focus:[&_*]:text-accent-foreground [&_svg:not([class*='size-'])]:size-4",
+        "group/menubar-item gap-2 rounded-sm px-2 py-1.5 text-sm focus:bg-accent focus:text-accent-foreground data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[disabled]:opacity-50 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:[&>svg]:!text-destructive [&:not([data-variant=destructive])]:focus:[&_*]:text-accent-foreground [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}

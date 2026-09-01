@@ -143,6 +143,7 @@
     "@next/bundle-analyzer": "^16.2.9",
     "@nightwatch/selenium-server": "^4.20.0",
     "@swc/core": "^1.9.2",
+    "@tailwindcss/container-queries": "^0.1.1",
     "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
