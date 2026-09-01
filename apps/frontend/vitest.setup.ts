@@ -192,7 +192,6 @@ if (typeof window !== 'undefined' && typeof Element !== 'undefined') {
   }
 }
 
-
 if (typeof window !== 'undefined') {
   const nativeGetComputedStyle = window.getComputedStyle.bind(window)
   window.getComputedStyle = ((elt: Element, pseudoElt?: string | null) => {

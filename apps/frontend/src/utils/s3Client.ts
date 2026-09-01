@@ -109,7 +109,6 @@ function getPresignedUrlVyriadClient(): S3Client | null {
   return vyriadMinioClient
 }
 
-
 // Keys reaching the presign routes are often recovered from a URL pathname by the
 // client. Path-style S3/MinIO URLs are `<endpoint>/<bucket>/<key>`, so that pathname
 // carries the bucket and signing it verbatim yields a valid signature for an object
@@ -127,5 +126,5 @@ export {
   vyriadMinioClient,
   getPresignedUrlClient,
   getPresignedUrlVyriadClient,
-  normalizeS3Key
+  normalizeS3Key,
 }
