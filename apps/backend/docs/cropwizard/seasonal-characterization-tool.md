@@ -17,20 +17,28 @@ For every trial you get, per development phase (emergence, flowering, grain fill
 
 Alongside the per-stage breakdown, the tool returns season totals, two charts (a heatmap of conditions across trials and stages, and a season accumulation timeline), and a downloadable zip of the underlying CSV outputs, so you can take the numbers into your own analysis.
 
-Weather comes from public datasets (NASA POWER by default) and soils from SSURGO or ISRIC, so all you need to supply is the trial list itself.
+Weather comes from public datasets (NASA POWER by default) and soils from SSURGO (default) or ISRIC, so all you need to supply is the trial list itself.
 
 ### How to use it
 
-1. Put your trial list in a small CSV file (format below) and host it at a **public link** — for example a public GitHub file, a shared cloud-storage link that serves the raw file, or any web server. _Attaching the file to the chat is not enough yet: the file must be reachable by URL._
-2. Paste the link into the chat and ask about the season, for example:
+1. Put your trial list in a small CSV file (format below) and host it at a **public `https` link** (up to 5 MB). Any of these work:
+   * a file in a **public GitHub repository or gist** — use the _Raw_ link,
+   * a **Google Sheet** shared with "anyone with the link" — use its CSV export link (the sheet's URL with `/export?format=csv` in place of `/edit`),
+   * a **Dropbox** or similar cloud-storage share link that serves the raw file (redirects are followed),
+   * any web server.
 
-> Characterize the growing season for the trials in https://example.org/my\_trials.csv
+   _Attaching the file to the chat is not enough yet: the file must be reachable by URL._
+2. Paste the link into the chat and ask about the season. Mention the crop if your trials are **maize** — soybean is assumed otherwise. For example:
+
+> Characterize the growing season for the soybean trials in https://example.org/my\_trials.csv
 >
 > Using the trials in this CSV \<link>, how much rain fell during grain fill at each site?
 >
 > Was my Champaign trial under water stress during flowering? Trials: \<link>
+>
+> My maize trials are listed at \<link> — what were conditions like at each site, stage by stage?
 
-CropWizard recognizes when the tool is relevant, invokes it automatically, and folds the results into its answer — you will see the tool listed under _Routing to tools_ and its output under _Tool outputs_, followed by a final response that interprets the numbers. Simulations take real work: a typical run finishes in about **30 seconds to a minute**.
+CropWizard recognizes when the tool is relevant, invokes it automatically, and folds the results into its answer — you will see it under _Routing the request to relevant tools_ and its results under _Tool output_, followed by a final response that interprets the numbers. Simulations take real work: a typical run finishes in about **30 seconds to a couple of minutes**.
 
 ### Input CSV format
 
@@ -51,9 +59,9 @@ urbana_il,40.1106,-88.2073,3.2,2021-05-20
 
 **Genetics for soybean** — a number from −2 to 7.99. The integer part is the maturity group (−2 = 000, 0 = 0, 3 = III) and the decimal part selects early (.0–.33), mid (.34–.66), or late (.67–.99) within the group. So `3.5` means mid maturity group III. Values of 8 and above are not supported.
 
-**Genetics for maize** — relative maturity days, with an optional leading letter: `A_100`, `A100`, or plain `100` all work.
+**Genetics for maize** — relative maturity days, with an optional leading letter: `A_100`, `A100`, or plain `100` all work. Put the letter first if you use one: a trailing letter (`100a`) is not read and the cultivar is treated as late-maturing, with a warning.
 
-**Planting** — use `YYYY-MM-DD`. Slash dates like `5/6/2021` are rejected because they are ambiguous (May 6 or June 5?). A bare year is accepted but the simulation then covers the whole calendar year and the model picks its own sowing date, so a full date gives much more meaningful results.
+**Planting** — use `YYYY-MM-DD`. Slash dates like `5/6/2021` are rejected because they are ambiguous (May 6 or June 5?). A bare year (`2021`) or year and month (`2021-05`) is accepted, but the simulation then covers the whole calendar year and the model picks its own sowing date, so a full date gives much more meaningful results.
 
 The tool checks your file before running and, if something is off, tells you exactly which row and what to fix.
 
@@ -61,7 +69,7 @@ The tool checks your file before running and, if something is off, tells you exa
 
 * **Trial count:** designed for **1 to 5 trials** per question, at up to 3 distinct locations. A single site works fine. It characterizes each trial's season; it does not compare or cluster trials against each other.
 * **Crops:** soybean and maize.
-* **Coverage:** the default weather source (NASA POWER) and soil source ISRIC are global; the SSURGO soil and DAYMET weather datasets cover the United States only. If site-specific soil data cannot be retrieved for a location, the simulation still runs on the crop model's default soil profile and the response says so.
+* **Coverage:** the defaults are NASA POWER weather (global) and SSURGO soil (United States only). For sites outside the US, ask for **ISRIC** soil in your prompt — it is global. Other selectable sources are DAYMET weather (US only) and CHIRPS weather. If site-specific soil data cannot be retrieved for a location, the simulation still runs on the crop model's default soil profile and the response says so.
 * **Partial results:** if one trial fails or times out, you still get results for the rest, with an explanation of what went wrong.
 * **Downloads:** links to the charts and the CSV outputs are valid for 7 days.
 
