@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Text, Card, Button, Input, Image } from '@mantine/core'
 import { IconArrowRight } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
@@ -10,107 +10,10 @@ import {
   DialogTrigger,
 } from '../Dialog'
 import NextLink from 'next/link'
-import axios from 'axios'
-import { type FileUpload } from './UploadNotification'
-import { type QueryClient } from '@tanstack/react-query'
-export default function MITIngestForm({
-  project_name,
-  setUploadFiles,
-}: {
-  project_name: string
-  setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
-  queryClient: QueryClient
-}): JSX.Element {
-  const [isUrlUpdated, setIsUrlUpdated] = useState(false)
-  const [isUrlValid, setIsUrlValid] = useState(false)
+
+export default function MITIngestForm(): JSX.Element {
   const [url, setUrl] = useState('')
-  const [maxUrls, setMaxUrls] = useState('50')
   const [open, setOpen] = useState(false)
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value
-    setUrl(input)
-    setIsUrlValid(validateUrl(input))
-  }
-  const validateUrl = (input: string) => {
-    const regex = /^https?:\/\/ocw\.mit\.edu\/.+/
-    return regex.test(input)
-  }
-  const downloadMITCourse = async (
-    url: string | null,
-    courseName: string | null,
-    localDir: string | null,
-  ) => {
-    try {
-      if (!url || !courseName || !localDir) return null
-      console.log('calling downloadMITCourse')
-      const response = await axios.get(`/api/UIUC-api/downloadMITCourse`, {
-        params: {
-          url: url,
-          course_name: courseName,
-          local_dir: localDir,
-        },
-      })
-      return response.data
-    } catch (error) {
-      console.error('Error during MIT course download:', error)
-      return null
-    }
-  }
-
-  const handleIngest = async () => {
-    setOpen(false)
-    if (isUrlValid) {
-      const newFile: FileUpload = {
-        name: url,
-        status: 'uploading',
-        type: 'mit',
-      }
-      setUploadFiles((prevFiles) => [...prevFiles, newFile])
-      setUploadFiles((prevFiles) =>
-        prevFiles.map((file) =>
-          file.name === url ? { ...file, status: 'ingesting' } : file,
-        ),
-      )
-      try {
-        const data = await downloadMITCourse(url, project_name, 'local_dir')
-        if (data) {
-          setUploadFiles((prevFiles) =>
-            prevFiles.map((file) =>
-              file.name === url ? { ...file, status: 'complete' } : file,
-            ),
-          )
-        } else {
-          // downloadMITCourse returned null, treat as error
-          setUploadFiles((prevFiles) =>
-            prevFiles.map((file) =>
-              file.name === url ? { ...file, status: 'error' } : file,
-            ),
-          )
-        }
-      } catch (error) {
-        console.error('Error during MIT course import:', error)
-        setUploadFiles((prevFiles) =>
-          prevFiles.map((file) =>
-            file.name === url ? { ...file, status: 'error' } : file,
-          ),
-        )
-      }
-    } else {
-      alert('Invalid URL (please include https://)')
-    }
-  }
-  const [inputErrors, setInputErrors] = useState({
-    maxUrls: { error: false, message: '' },
-    maxDepth: { error: false, message: '' },
-  })
-
-  useEffect(() => {
-    if (url && url.length > 0 && validateUrl(url)) {
-      setIsUrlUpdated(true)
-    } else {
-      setIsUrlUpdated(false)
-    }
-  }, [url])
 
   return (
     <motion.div layout>
@@ -120,9 +23,6 @@ export default function MITIngestForm({
           setOpen(isOpen)
           if (!isOpen) {
             setUrl('')
-            setIsUrlValid(false)
-            setIsUrlUpdated(false)
-            setMaxUrls('50')
           }
         }}
       >
@@ -241,9 +141,7 @@ export default function MITIngestForm({
                   type="url"
                   value={url}
                   size="lg"
-                  onChange={(e) => {
-                    handleUrlChange(e)
-                  }}
+                  onChange={(e) => setUrl(e.target.value)}
                   disabled
                 />
               </div>
@@ -251,7 +149,6 @@ export default function MITIngestForm({
           </div>
           <div className="mt-4">
             <Button
-              onClick={handleIngest}
               disabled
               className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
             >

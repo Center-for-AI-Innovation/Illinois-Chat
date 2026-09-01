@@ -91,11 +91,7 @@ const StepUpload = ({
               queryClient={queryClient}
             />
 
-            <MITIngestForm
-              project_name={project_name}
-              setUploadFiles={setUploadFiles}
-              queryClient={queryClient}
-            />
+            <MITIngestForm />
 
             <CourseraIngestForm />
           </SimpleGrid>

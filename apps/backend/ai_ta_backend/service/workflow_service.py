@@ -4,14 +4,12 @@ import time
 from urllib.parse import quote
 
 import requests
-from injector import inject
 
 from ai_ta_backend.database.sql import SQLDatabase
 
 
 class WorkflowService:
 
-  @inject
   def __init__(self, sqlDb: SQLDatabase):
     self.sqlDb = sqlDb
     self.flows = []

@@ -101,7 +101,7 @@ You can return images + other text. That's fine and encouraged! Your tool can ou
 
 ### Example tool using images
 
-There's just two nodes: first capture input params, then call a POST endpoint hosted on Beam's serverless infra.
+There's just two nodes: first capture input params, then call a POST endpoint that hosts your tool code.
 
 <figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.53.49.png" alt=""><figcaption></figcaption></figure>
 
@@ -109,7 +109,7 @@ Step 1: Capture the input params. We just need the `image_urls` field.
 
 <figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.50.21.png" alt=""><figcaption><p>n8n form node with only <code>image_urls</code> as input. </p></figcaption></figure>
 
-Step 2: call a POST endpoint hosted on Beam. Auth is handled by an Authorization Header. The `body` uses the values from the last node as an input. No explicit return is necessary because we use the output of your last node as the return value of the tool. This works seamlessly across all the nodes offered by n8n.
+Step 2: call the POST endpoint. Auth is handled by an Authorization Header. The `body` uses the values from the last node as an input. No explicit return is necessary because we use the output of your last node as the return value of the tool. This works seamlessly across all the nodes offered by n8n.
 
 <div><figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.51.52.png" alt=""><figcaption><p>HTTP</p></figcaption></figure> <figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.52.26.png" alt=""><figcaption></figcaption></figure></div>
 
@@ -119,7 +119,7 @@ In our experience, we like defining arbitrary python functions and run those as 
 
 <figure><img src="../.gitbook/assets/CleanShot 2024-06-26 at 17.47.41.png" alt=""><figcaption><p>Call any HTTP endpoint you'd like! </p></figcaption></figure>
 
-I host these endpoints on [Beam.cloud](https://www.beam.cloud/), which is a [phenomenal "serverless" hosting service](https://x.com/KastanDay/status/1790066477372158196). They're super low cost, with a truly next-level development experience. I highly recommend them.
+Host these endpoints wherever you like — any service that can serve an HTTP endpoint will work. Our own tool endpoints previously ran on Beam.cloud, which has since been retired from our stack.
 
 ### Development
 

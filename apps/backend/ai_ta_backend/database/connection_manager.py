@@ -21,7 +21,6 @@ from contextlib import contextmanager
 import boto3
 from botocore.config import Config
 from cachetools import TTLCache
-from injector import inject
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -73,7 +72,6 @@ class DisposingTTLCache(TTLCache):
 class ConnectionManager:
     """Resolves per-project infrastructure connections with caching."""
 
-    @inject
     def __init__(self, sql_db: SQLDatabase, vector_db: VectorDatabase, aws: AWSStorage):
         self._sql_db = sql_db
         self._vector_db = vector_db

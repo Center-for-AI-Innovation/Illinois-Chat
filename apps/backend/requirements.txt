@@ -1,6 +1,5 @@
 Flask==3.1.0
 flask-cors==5.0.0
-Flask-Injector==0.15.0
 gunicorn==23.0.0
 protobuf==5.29.3
 aiohttp==3.11.12
@@ -52,9 +51,7 @@ langchain==0.3.18
 langchainhub==0.1.21
 langchain_openai==0.3.5
 langchain_qdrant==0.2.0
-langchain_neo4j==0.4.0
 langchain_community==0.3.16
-langgraph==0.2.69
 canvasapi==3.2.0
 
 # Data
@@ -84,7 +81,7 @@ docx2txt==0.8 # Alternative DOCX processing
 # Not currently supporting coursera ingest
 # cs-dlp @ git+https://github.com/raffaem/cs-dlp.git@0.12.0b0 # previously called coursera-dl
 
-# removed due to /ingest in Beam
+# only needed by the ingest worker, which installs its own requirements
 # canvasapi==3.2.0
 # GitPython==3.1.40
 # pydub==0.25.1

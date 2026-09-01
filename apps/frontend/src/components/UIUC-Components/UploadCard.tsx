@@ -251,11 +251,7 @@ export const UploadCard = memo(function UploadCard({
               queryClient={queryClient}
             />
 
-            <MITIngestForm
-              project_name={projectName}
-              setUploadFiles={handleSetUploadFiles}
-              queryClient={queryClient}
-            />
+            <MITIngestForm />
 
             <CourseraIngestForm />
           </SimpleGrid>
