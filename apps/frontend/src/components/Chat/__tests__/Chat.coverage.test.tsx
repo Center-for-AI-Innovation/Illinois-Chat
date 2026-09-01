@@ -289,8 +289,14 @@ describe('Chat (coverage)', () => {
     )
 
     expect(fetchPresignedUrl).toHaveBeenCalledWith('cs101/banner.png', 'CS101')
-    expect((webllm as any).__instances.length).toBeGreaterThan(0)
-    expect((webllm as any).__instances[0].loadModel).toHaveBeenCalled()
+    // ChatUI is constructed only after the dynamic import of @mlc-ai/web-llm
+    // resolves, so the instance appears asynchronously.
+    await waitFor(() =>
+      expect((webllm as any).__instances.length).toBeGreaterThan(0),
+    )
+    await waitFor(() =>
+      expect((webllm as any).__instances[0].loadModel).toHaveBeenCalled(),
+    )
   }, 15000)
 
   it('emits an error toast when tools fail to load', async () => {
@@ -469,7 +475,9 @@ describe('Chat (coverage)', () => {
       },
     )
 
-    expect((webllm as any).__instances.length).toBeGreaterThan(0)
+    await waitFor(() =>
+      expect((webllm as any).__instances.length).toBeGreaterThan(0),
+    )
     await user.click(screen.getByRole('button', { name: /send-webllm/i }))
     await waitFor(() => expect((notifications as any).show).toHaveBeenCalled())
   })
@@ -920,7 +928,9 @@ describe('Chat (coverage)', () => {
       },
     )
 
-    expect((webllm as any).__instances.length).toBeGreaterThan(0)
+    await waitFor(() =>
+      expect((webllm as any).__instances.length).toBeGreaterThan(0),
+    )
     const instance = (webllm as any).__instances[0]
     instance.isModelLoading
       .mockImplementationOnce(() => true)
