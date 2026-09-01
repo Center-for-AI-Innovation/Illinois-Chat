@@ -13,11 +13,6 @@ const bundleAnalyzerConfig = {
 /** @type {import("next").NextConfig} */
 const config = {
   i18n: nextI18NextConfig.i18n,
-  serverRuntimeConfig: {
-    bodyParser: {
-      sizeLimit: '100mb',
-    },
-  },
   webpack(config, { isServer, webpack }) {
     // Merge existing experiments with the required ones
     config.experiments = {

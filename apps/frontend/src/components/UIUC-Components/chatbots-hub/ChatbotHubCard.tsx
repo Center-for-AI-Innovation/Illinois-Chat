@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Bot, Info, Settings, Share2 } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
-import { Button } from '~/components/shadcn/ui/button'
+import { Button, buttonVariants } from '~/components/shadcn/ui/button'
+import { cn } from '~/components/shadcn/lib/utils'
 import { Card, CardContent } from '~/components/shadcn/ui/card'
 import { Separator } from '~/components/shadcn/ui/separator'
 import {
@@ -207,17 +208,16 @@ export function ChatbotHubCard(card: ChatbotCardData) {
               {metadata && (
                 <div className="relative z-10 flex shrink-0 items-center gap-1">
                   {hasAdminAccess && (
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9"
+                    <Link
+                      href={`/${course_name}/dashboard`}
                       aria-label={`Settings for ${title}`}
+                      className={cn(
+                        buttonVariants({ variant: 'ghost', size: 'icon' }),
+                        'h-9 w-9',
+                      )}
                     >
-                      <Link href={`/${course_name}/dashboard`}>
-                        <Settings className="h-4 w-4 text-[--illinois-blue] dark:text-white" />
-                      </Link>
-                    </Button>
+                      <Settings className="h-4 w-4 text-[--illinois-blue] dark:text-white" />
+                    </Link>
                   )}
                   <Button
                     variant="ghost"

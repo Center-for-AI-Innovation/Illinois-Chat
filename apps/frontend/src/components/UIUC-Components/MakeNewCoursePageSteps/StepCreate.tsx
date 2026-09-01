@@ -208,7 +208,7 @@ const StepCreate = ({
               value={organization ?? UNSET_VALUE}
               onValueChange={(value) =>
                 onUpdateOrganization?.(
-                  value === UNSET_VALUE ? undefined : value,
+                  value == null || value === UNSET_VALUE ? undefined : value,
                 )
               }
             >
