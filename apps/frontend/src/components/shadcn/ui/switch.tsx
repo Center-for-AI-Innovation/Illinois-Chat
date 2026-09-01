@@ -23,9 +23,9 @@ const switchVariants = cva(
     variants: {
       variant: {
         default:
-          'border-transparent data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-white/15',
+          'border-transparent data-[checked]:bg-primary data-[unchecked]:bg-input dark:data-[unchecked]:bg-white/15',
         labeled:
-          'data-checked:border-[var(--dashboard-button)] data-checked:bg-[var(--dashboard-button)] data-unchecked:border-[var(--dashboard-background-darker)] data-unchecked:bg-[var(--dashboard-background-dark)] dark:data-unchecked:border-white/25 dark:data-unchecked:bg-white/15',
+          'data-[checked]:border-[var(--dashboard-button)] data-[checked]:bg-[var(--dashboard-button)] data-[unchecked]:border-[var(--dashboard-background-darker)] data-[unchecked]:bg-[var(--dashboard-background-dark)] dark:data-[unchecked]:border-white/25 dark:data-[unchecked]:bg-white/15',
       },
       size: {
         sm: 'h-5 w-10',
@@ -45,10 +45,10 @@ const switchThumbVariants = cva(
   {
     variants: {
       size: {
-        sm: 'h-4 w-4 data-checked:translate-x-5 data-unchecked:translate-x-0',
+        sm: 'h-4 w-4 data-[checked]:translate-x-5 data-[unchecked]:translate-x-0',
         default:
-          'h-5 w-5 data-checked:translate-x-6 data-unchecked:translate-x-0',
-        lg: 'h-[24px] w-[24px] data-checked:translate-x-7 data-unchecked:translate-x-0',
+          'h-5 w-5 data-[checked]:translate-x-6 data-[unchecked]:translate-x-0',
+        lg: 'h-[24px] w-[24px] data-[checked]:translate-x-7 data-[unchecked]:translate-x-0',
       },
     },
     defaultVariants: {

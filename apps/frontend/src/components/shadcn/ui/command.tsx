@@ -22,7 +22,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        'rounded-xl! flex size-full flex-col overflow-hidden bg-popover p-1 text-popover-foreground',
+        'flex size-full flex-col overflow-hidden !rounded-xl bg-popover p-1 text-popover-foreground',
         className,
       )}
       {...props}
@@ -52,7 +52,7 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          'rounded-xl! top-1/3 translate-y-0 overflow-hidden p-0',
+          'top-1/3 translate-y-0 overflow-hidden !rounded-xl p-0',
           className,
         )}
         showCloseButton={showCloseButton}
@@ -69,11 +69,11 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:pl-2! border-input/30 bg-input/30">
+      <InputGroup className="[&>*]:data-[slot=input-group-addon]:pl-2! !h-8 !rounded-lg border-input/30 bg-input/30 !shadow-none">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            'outline-hidden w-full text-sm disabled:cursor-not-allowed disabled:opacity-50',
+            'w-full text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}
           {...props}
@@ -123,7 +123,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        '**:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 text-foreground',
+        '[&_*]:[[cmdk-group-heading]]:px-2 [&_*]:[[cmdk-group-heading]]:py-1.5 [&_*]:[[cmdk-group-heading]]:text-xs [&_*]:[[cmdk-group-heading]]:font-medium [&_*]:[[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 text-foreground',
         className,
       )}
       {...props}
@@ -153,13 +153,13 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "group/command-item outline-hidden in-data-[slot=dialog-content]:rounded-lg! data-selected:bg-muted data-selected:text-foreground data-selected:**:[svg]:text-foreground relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "group/command-item [[data-slot=dialog-content]_&]:rounded-lg! relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected]:bg-muted data-[selected]:text-foreground data-[disabled=true]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 data-[selected]:[&_svg]:text-foreground",
         className,
       )}
       {...props}
     >
       {children}
-      <CheckIcon className="group-has-data-[slot=command-shortcut]/command-item:hidden ml-auto opacity-0 group-data-[checked=true]/command-item:opacity-100" />
+      <CheckIcon className="ml-auto opacity-0 group-has-[[data-slot=command-shortcut]]/command-item:hidden group-data-[checked=true]/command-item:opacity-100" />
     </CommandPrimitive.Item>
   )
 }
@@ -172,7 +172,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        'group-data-selected/command-item:text-foreground ml-auto text-xs tracking-widest text-muted-foreground',
+        'ml-auto text-xs tracking-widest text-muted-foreground group-data-[selected]/command-item:text-foreground',
         className,
       )}
       {...props}
