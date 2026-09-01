@@ -51,15 +51,15 @@ TL;DR:
 1. Start with **Grobid**. Excellent at parsing `sections`, `references`.&#x20;
 2. Re-run with **Unstructured**. Replace all figures and tables from Grobid with Unstructured, we find their `yolox` model is best at parsing tables accurately.
 3. For math (LaTeX), use Nougout.
-{% endhint %}
+   {% endhint %}
 
-***
+---
 
 Based on our empirical testing, and conversations with domain experts from NCSA and Argonne, this is our PDF parsing pipeline for Pumbed, Arxiv, and any typical scientific PDFs.&#x20;
 
-* [**Grobid**](https://github.com/kermitt2/grobid) **is the best at creating outlines from scientific PDFs.** The [Full-Text module](https://grobid.readthedocs.io/en/latest/training/fulltext/) properly segments articles into sections, like `1. introduction, 1.1 background on LLMs, 2. methods... etc.` Precise outlines is crucial to LLM-guided-retrieval, for the LLM to properly request other sections of the paper.
-  * We highly recommend the [doc2json wrapper around Grobid](https://github.com/allenai/s2orc-doc2json) to make it easier to use the outputs.
-* [**Unstructured**](https://github.com/Unstructured-IO/unstructured) **is the best at parsing tables.** In our experiments with tricky PDFs, YOLOX is slightly superior to Detectron2.&#x20;
+- [**Grobid**](https://github.com/kermitt2/grobid) **is the best at creating outlines from scientific PDFs.** The [Full-Text module](https://grobid.readthedocs.io/en/latest/training/fulltext/) properly segments articles into sections, like `1. introduction, 1.1 background on LLMs, 2. methods... etc.` Precise outlines is crucial to LLM-guided-retrieval, for the LLM to properly request other sections of the paper.
+  - We highly recommend the [doc2json wrapper around Grobid](https://github.com/allenai/s2orc-doc2json) to make it easier to use the outputs.
+- [**Unstructured**](https://github.com/Unstructured-IO/unstructured) **is the best at parsing tables.** In our experiments with tricky PDFs, YOLOX is slightly superior to Detectron2.&#x20;
 
 <pre class="language-python"><code class="lang-python">from unstructured.partition.auto import partition
 
@@ -74,16 +74,14 @@ Based on our empirical testing, and conversations with domain experts from NCSA 
 
 Here's a tricky table to parse. We want to capture all this info into a markdown-like format.&#x20;
 
-* We find Grobid really struggles with this; often misses the table entirerly.
-* Unstructured w/ `yolox` does a near-perfect job. In this case, the only problem is the `+/-` symbols are usually parsed into `+` symbols. Although readability is overall satisfactory.
+- We find Grobid really struggles with this; often misses the table entirerly.
+- Unstructured w/ `yolox` does a near-perfect job. In this case, the only problem is the `+/-` symbols are usually parsed into `+` symbols. Although readability is overall satisfactory.
 
 ![](<../.gitbook/assets/CleanShot 2024-07-01 at 11.01.24.png>)
 
-
-
 </details>
 
-* [**Nougut**](https://github.com/facebookresearch/nougat) **is the best at parsing mathematical symbols.** Excellent at parsing "rendered LaTeX symbols back raw LaTeX code." This method uses an encoder-decoder Transformer model, so realistically it requires a GPU to run.&#x20;
+- [**Nougut**](https://github.com/facebookresearch/nougat) **is the best at parsing mathematical symbols.** Excellent at parsing "rendered LaTeX symbols back raw LaTeX code." This method uses an encoder-decoder Transformer model, so realistically it requires a GPU to run.&#x20;
 
 ### Infrastructure & System Architecture
 
@@ -94,13 +92,13 @@ Here's a tricky table to parse. We want to capture all this info into a markdown
 
 **Processing Infra**
 
-* Python main process
-  * Use a [Queue](https://docs.python.org/3/library/queue.html) of PDFs to process.&#x20;
-  * Use a [`ProcessPoolExecutor`](https://docs.python.org/3/library/concurrent.futures.html#processpoolexecutor) to parallelize processing.
-  * Use TempFile objects to prevent the machine's disk from saturating.
-* Grobid - host an endpoint on a capable server, GPU recommended but not critical.
-* Unstructured - create a Flask/FastAPI endpoint on a capable server.&#x20;
-* Nougat - create a Flask/FastAPI endpoint on a capable server.
+- Python main process
+  - Use a [Queue](https://docs.python.org/3/library/queue.html) of PDFs to process.&#x20;
+  - Use a [`ProcessPoolExecutor`](https://docs.python.org/3/library/concurrent.futures.html#processpoolexecutor) to parallelize processing.
+  - Use TempFile objects to prevent the machine's disk from saturating.
+- Grobid - host an endpoint on a capable server, GPU recommended but not critical.
+- Unstructured - create a Flask/FastAPI endpoint on a capable server.&#x20;
+- Nougat - create a Flask/FastAPI endpoint on a capable server.
 
 ### Data layout in SQLite
 
@@ -146,7 +144,7 @@ SQLite, and most SQL implementations, don't allow for a single field to point to
 
 _**Junction tables**_ simply allow one article to have **many** `sections` and one `section` to have **many** `contexts`.
 
-* `Article_Sections` table
+- `Article_Sections` table
 
 ```sql
 CREATE TABLE IF NOT EXISTS article_sections (
@@ -158,7 +156,7 @@ CREATE TABLE IF NOT EXISTS article_sections (
 );
 ```
 
-* `Section_Contexts` table
+- `Section_Contexts` table
 
 ```sql
 CREATE TABLE IF NOT EXISTS sections_contexts (

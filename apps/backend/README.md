@@ -1,6 +1,6 @@
 # UIUC.chat ingest and retrieval
 
-A Flask application hosting endpoints for UIUC.chat. 
+A Flask application hosting endpoints for UIUC.chat.
 
 # [Start with the docs here](https://docs.uiuc.chat)
 
@@ -14,15 +14,16 @@ Architecture diagram of Flask + Next.js & React hosted on Vercel.
 
 ## Documentation
 
-* **Extensive usage docs on [UIUC.chat](docs.uiuc.chat/)**
+- **Extensive usage docs on [UIUC.chat](docs.uiuc.chat/)**
 
-## 🏎️ Quickstart 
+## 🏎️ Quickstart
 
 1. Rename `.env.template` to `.env` and fill in the required variables
 2. Install Python requirements `pip install -r requirements.txt`
 3. Start the server for development (with live reloads) `cd ai_ta_backend` then `flask --app ai_ta_backend.main:app --debug run --port 8000`
 
 ## 📣 Development
+
 Install the Trunk "superlinter" so your commits are formatted. Just one step:
 
 Mac: brew install trunk-io

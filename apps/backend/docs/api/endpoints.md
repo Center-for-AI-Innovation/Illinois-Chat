@@ -28,7 +28,6 @@ With your API key in hand, you can now make authenticated requests to the /chat 
 
 For a streaming response, where messages are sent and received in real-time, use the following Python code snippet:\
 
-
 ```python
 import requests
 
@@ -244,7 +243,7 @@ headers = {
     'Content-Type': 'application/json',
 }
 data = {
-    "model": "llama3.1:70b",    
+    "model": "llama3.1:70b",
     "messages": [
         {
             "role": "system",
@@ -275,13 +274,11 @@ For superior instruction following, GPT-4o model is always used for tool selecti
 Note: Available tools can be viewed under settings on the chat page.
 {% endhint %}
 
-
-
 #### Coming soon
 
 Document ingest via API. Currently only supported via the website GUI.
 
-***
+---
 
 ## External Connections API
 
@@ -290,4 +287,3 @@ Document ingest via API. Currently only supported via the website GUI.
 
 The backend still **reads** these rows at runtime for per-project dispatch — see [External Connections (feature doc)](../features/external-connections.md) and [Configuration Reference](../developers/external-connections-config.md).
 {% endhint %}
-

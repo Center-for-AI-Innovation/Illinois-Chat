@@ -1,23 +1,23 @@
 import asyncio
 import concurrent.futures
 import ftplib
+from functools import partial
 import gzip
 import json
+from multiprocessing import Manager
 import os
 import shutil
 import tarfile
 import threading
 import time
-import xml.etree.ElementTree as ET
-from functools import partial
-from multiprocessing import Manager
 from urllib.parse import urlparse
+import xml.etree.ElementTree as ET
 
+from minio import Minio
 import pandas as pd
+from posthog import Posthog
 import requests
 import supabase
-from minio import Minio
-from posthog import Posthog
 
 # POSTHOG = Posthog(sync_mode=False, project_api_key=os.environ['POSTHOG_API_KEY'], host="https://app.posthog.com")
 
@@ -37,25 +37,23 @@ def extractPubmedData():
   Main function to extract metadata and articles from the PubMed baseline folder.
   """
   global POSTHOG, SUPABASE_CLIENT, MINIO_CLIENT
-    
+
   # Initialize only if not already initialized
   if 'POSTHOG' not in globals():
-        POSTHOG = Posthog(sync_mode=False, 
-                         project_api_key=os.environ['POSTHOG_API_KEY'], 
-                         host="https://app.posthog.com")
+    POSTHOG = Posthog(sync_mode=False, project_api_key=os.environ['POSTHOG_API_KEY'], host="https://app.posthog.com")
 
   # TODO: Replace with DATABASE_CLIENT
   if 'SUPABASE_CLIENT' not in globals():
-        SUPABASE_CLIENT = supabase.create_client(  # type: ignore
-            supabase_url=os.getenv('SUPABASE_URL'),  # type: ignore
-            supabase_key=os.getenv('SUPABASE_API_KEY')  # type: ignore
-        )
+    SUPABASE_CLIENT = supabase.create_client(  # type: ignore
+        supabase_url=os.getenv('SUPABASE_URL'),  # type: ignore
+        supabase_key=os.getenv('SUPABASE_API_KEY')  # type: ignore
+    )
 
   if 'MINIO_CLIENT' not in globals():
-        MINIO_CLIENT = Minio(os.environ['MINIO_ENDPOINT'],
-                            access_key=os.environ['MINIO_ACCESS_KEY'],
-                            secret_key=os.environ['MINIO_SECRET'],
-                            secure=True)
+    MINIO_CLIENT = Minio(os.environ['MINIO_ENDPOINT'],
+                         access_key=os.environ['MINIO_ACCESS_KEY'],
+                         secret_key=os.environ['MINIO_SECRET'],
+                         secure=True)
 
   start_time = time.monotonic()
 
@@ -92,8 +90,8 @@ def extractPubmedData():
 
 def getFilesToProcess(file_list: list):
   # TODO: Need to find the definition for this table and add to models
-  last_processed_response = SUPABASE_CLIENT.table("pubmed_daily_update").select("*").order(
-      "created_at", desc=True).limit(1).execute()  # type: ignore
+  last_processed_response = SUPABASE_CLIENT.table("pubmed_daily_update").select("*").order("created_at",
+                                                                                           desc=True).limit(1).execute()  # type: ignore
   last_processed_file = last_processed_response.data[0]['last_xml_file']
   print("Last processed file: ", last_processed_file)
   files_to_process = []
@@ -135,8 +133,7 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
       # find PMC ID and DOI for all articles
       metadata_with_ids = getArticleIDs(metadata, error_log)
       metadata_update_time = time.time()
-      print("Time taken to get PMC ID and DOI for 100 articles: ",
-            round(metadata_update_time - metadata_extract_start_time, 2), "seconds")
+      print("Time taken to get PMC ID and DOI for 100 articles: ", round(metadata_update_time - metadata_extract_start_time, 2), "seconds")
 
       # download the articles
       complete_metadata = downloadArticles(metadata_with_ids, batch_dir, error_log)
@@ -231,11 +228,9 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
 
   end_time = time.monotonic()
 
-  POSTHOG.capture(distinct_id="pubmed_extraction",
-                  event="processPubmedXML",
-                  properties={
-                      "total_runtime": end_time - start_time,
-                  })
+  POSTHOG.capture(distinct_id="pubmed_extraction", event="processPubmedXML", properties={
+      "total_runtime": end_time - start_time,
+  })
 
 
 def downloadXML(ftp_address: str, ftp_path: str, file: str, local_dir: str):
@@ -321,11 +316,9 @@ def extractXMLFile(gz_filepath: str):
       with open(xml_filepath, 'wb') as f_out:
         shutil.copyfileobj(f_in, f_out)
 
-    POSTHOG.capture(distinct_id="pubmed_extraction",
-                    event="extractXMLFile",
-                    properties={
-                        "total_runtime": time.monotonic() - start_time,
-                    })
+    POSTHOG.capture(distinct_id="pubmed_extraction", event="extractXMLFile", properties={
+        "total_runtime": time.monotonic() - start_time,
+    })
 
     return xml_filepath
   except Exception as e:
@@ -428,10 +421,8 @@ def processArticleItem(item: ET.Element, directory: str, error_file: str):
         'last_revised'] = f"{medline_citation.find('DateRevised/Year').text}-{medline_citation.find('DateRevised/Month').text}-{medline_citation.find('DateRevised/Day').text}"
 
     # some articles don't have all fields present for publication date
-    if issue.find('PubDate/Year') is not None and issue.find('PubDate/Month') is not None and issue.find(
-        'PubDate/Day') is not None:
-      article_data[
-          'published'] = f"{issue.find('PubDate/Year').text}-{issue.find('PubDate/Month').text}-{issue.find('PubDate/Day').text}"
+    if issue.find('PubDate/Year') is not None and issue.find('PubDate/Month') is not None and issue.find('PubDate/Day') is not None:
+      article_data['published'] = f"{issue.find('PubDate/Year').text}-{issue.find('PubDate/Month').text}-{issue.find('PubDate/Day').text}"
     elif issue.find('PubDate/Year') is not None and issue.find('PubDate/Month') is not None:
       article_data['published'] = f"{issue.find('PubDate/Year').text}-{issue.find('PubDate/Month').text}-01"
     elif issue.find('PubDate/Year') is not None:

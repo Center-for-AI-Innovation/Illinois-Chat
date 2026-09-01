@@ -27,12 +27,12 @@ Edit `.github/workflows/deploy-to-ecs.yml` and update these values to match your
 
 ```yaml
 env:
-  AWS_REGION: us-east-1                  # Your AWS region
-  ECR_REPOSITORY: ai-ta-backend         # Your ECR repository name
-  ECS_SERVICE: ai-ta-backend-service    # Your ECS service name
-  ECS_CLUSTER: ai-ta-backend-cluster    # Your ECS cluster name
+  AWS_REGION: us-east-1 # Your AWS region
+  ECR_REPOSITORY: ai-ta-backend # Your ECR repository name
+  ECS_SERVICE: ai-ta-backend-service # Your ECS service name
+  ECS_CLUSTER: ai-ta-backend-cluster # Your ECS cluster name
   ECS_TASK_DEFINITION: ai-ta-backend-task-definition # Your task definition family name
-  CONTAINER_NAME: ai-ta-backend         # Container name in your task definition
+  CONTAINER_NAME: ai-ta-backend # Container name in your task definition
 ```
 
 ### 3. GitHub Secrets
@@ -48,48 +48,50 @@ The AWS user/role needs these permissions:
 
 ```json
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ecr:GetAuthorizationToken",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:InitiateLayerUpload",
-                "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload",
-                "ecr:PutImage"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ecs:UpdateService",
-                "ecs:DescribeServices",
-                "ecs:DescribeTaskDefinition",
-                "ecs:RegisterTaskDefinition"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": "iam:PassRole",
-            "Resource": [
-                "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
-                "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole"
-            ]
-        }
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecs:UpdateService",
+        "ecs:DescribeServices",
+        "ecs:DescribeTaskDefinition",
+        "ecs:RegisterTaskDefinition"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskExecutionRole",
+        "arn:aws:iam::YOUR_ACCOUNT_ID:role/ecsTaskRole"
+      ]
+    }
+  ]
 }
 ```
 
 ## 🚀 How to Deploy
 
 ### Automatic Deployment
+
 Push code to `main` or `illinois-chat` branch:
+
 ```bash
 git add .
 git commit -m "Your changes"
@@ -97,6 +99,7 @@ git push origin illinois-chat
 ```
 
 ### Manual Deployment
+
 1. Go to your GitHub repository
 2. Click "Actions" tab
 3. Select "Redeploy to AWS ECS Fargate"
@@ -133,14 +136,17 @@ The workflow uses a **rolling deployment** strategy:
 ### Common Issues
 
 1. **Workflow fails at "Login to Amazon ECR"**
+
    - Check AWS credentials in GitHub secrets
    - Verify IAM permissions for ECR
 
 2. **Deployment takes too long**
+
    - Check ECS service health check configuration
    - Verify application starts quickly and responds to `/health`
 
 3. **New tasks fail health checks**
+
    - Check CloudWatch logs for application errors
    - Verify `/health` endpoint is accessible on port 8001
 
@@ -171,6 +177,7 @@ aws ecs update-service \
 - **Health Status**: ECS Console → Service → Health and metrics
 
 The deployment is complete when:
+
 - ✅ GitHub Actions workflow shows "success"
 - ✅ ECS service shows "steady state"
 - ✅ New tasks pass health checks

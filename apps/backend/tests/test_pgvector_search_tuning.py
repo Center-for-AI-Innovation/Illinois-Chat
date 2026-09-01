@@ -10,53 +10,56 @@ from __future__ import annotations
 
 
 class _FakeCursor:
-    def __init__(self):
-        self.executed: list[str] = []
-        self.description = [("page_content",)]
 
-    def execute(self, sql, params=None):
-        self.executed.append(sql)
+  def __init__(self):
+    self.executed: list[str] = []
+    self.description = [("page_content",)]
 
-    def fetchall(self):
-        return []
+  def execute(self, sql, params=None):
+    self.executed.append(sql)
 
-    def __enter__(self):
-        return self
+  def fetchall(self):
+    return []
 
-    def __exit__(self, *args):
-        return False
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args):
+    return False
 
 
 class _FakeConn:
-    def __init__(self, cursor):
-        self._cursor = cursor
-        self.closed = False
 
-    def cursor(self):
-        return self._cursor
+  def __init__(self, cursor):
+    self._cursor = cursor
+    self.closed = False
 
-    def close(self):
-        self.closed = True
+  def cursor(self):
+    return self._cursor
+
+  def close(self):
+    self.closed = True
 
 
 class _FakeEngine:
-    def __init__(self, conn):
-        self._conn = conn
 
-    def raw_connection(self):
-        return self._conn
+  def __init__(self, conn):
+    self._conn = conn
+
+  def raw_connection(self):
+    return self._conn
 
 
 def test_search_applies_transaction_local_hnsw_tuning():
-    from ai_ta_backend.database.vector_store import PgVectorStore
+  from ai_ta_backend.database.vector_store import PgVectorStore
 
-    cur = _FakeCursor()
-    conn = _FakeConn(cur)
-    store = PgVectorStore(engine=_FakeEngine(conn))
+  cur = _FakeCursor()
+  conn = _FakeConn(cur)
+  store = PgVectorStore(engine=_FakeEngine(conn))
 
-    store.search(query_embedding=[0.0, 0.1, 0.2], course_name="demo")
+  store.search(query_embedding=[0.0, 0.1, 0.2], course_name="demo")
 
-    assert cur.executed[0] == "SET LOCAL hnsw.iterative_scan = relaxed_order"
-    assert cur.executed[1] == "SET LOCAL hnsw.ef_search = 100"
-    assert "SELECT" in cur.executed[2]
-    assert conn.closed
+  assert cur.executed[0] == "SET LOCAL hnsw.iterative_scan = relaxed_order"
+  assert cur.executed[1] == "SET LOCAL hnsw.ef_search = 100"
+  assert "SELECT" in cur.executed[2]
+  assert conn.closed

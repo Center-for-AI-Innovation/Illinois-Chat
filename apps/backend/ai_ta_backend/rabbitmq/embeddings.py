@@ -96,15 +96,14 @@ The script is structured as follows:
 # import tempfile
 # from langchain.llms import OpenAI
 import asyncio
+# for storing API inputs, outputs, and metadata
+from dataclasses import dataclass
+from dataclasses import field
 import json
 import logging
-
 # import os
 import re
 import time
-
-# for storing API inputs, outputs, and metadata
-from dataclasses import dataclass, field
 from typing import Any, List
 from wsgiref.util import request_uri
 
@@ -118,8 +117,8 @@ import tiktoken  # for counting tokens
 
 class OpenAIAPIProcessor:
 
-  def __init__(self, input_prompts_list, request_url, api_key, max_requests_per_minute, max_tokens_per_minute,
-               token_encoding_name, max_attempts, logging_level, model):
+  def __init__(self, input_prompts_list, request_url, api_key, max_requests_per_minute, max_tokens_per_minute, token_encoding_name,
+               max_attempts, logging_level, model):
     self.request_url = request_url
     self.api_key = api_key
     self.max_requests_per_minute = max_requests_per_minute
@@ -148,7 +147,8 @@ class OpenAIAPIProcessor:
     logging.basicConfig(level=self.logging_level)
     logging.debug(f"Logging initialized at level {self.logging_level}")
 
-    logging.debug(f"OpenAI API Processor initialized with model {self.model}, request_url {self.request_url}, api_endpoint {self.request_url}")
+    logging.debug(
+        f"OpenAI API Processor initialized with model {self.model}, request_url {self.request_url}, api_endpoint {self.request_url}")
 
     # infer API endpoint and construct request header
     api_endpoint = api_endpoint_from_url(self.request_url, self.model)
@@ -189,8 +189,8 @@ class OpenAIAPIProcessor:
 
             next_request = APIRequest(task_id=next(task_id_generator),
                                       request_json=request_json,
-                                      token_consumption=num_tokens_consumed_from_request(
-                                          request_json, api_endpoint, self.token_encoding_name),
+                                      token_consumption=num_tokens_consumed_from_request(request_json, api_endpoint,
+                                                                                         self.token_encoding_name),
                                       attempts_left=self.max_attempts,
                                       metadata=request_json.pop("metadata", None))
             status_tracker.num_tasks_started += 1
@@ -260,8 +260,7 @@ class OpenAIAPIProcessor:
     if status_tracker.num_tasks_failed > 0:
       logging.warning(f"{status_tracker.num_tasks_failed} / {status_tracker.num_tasks_started} requests failed.")
     if status_tracker.num_rate_limit_errors > 0:
-      logging.warning(
-          f"{status_tracker.num_rate_limit_errors} rate limit errors received. Consider running at a lower rate.")
+      logging.warning(f"{status_tracker.num_rate_limit_errors} rate limit errors received. Consider running at a lower rate.")
 
     # asyncio wait for task_list (skip when empty - e.g. image OCR with no text)
     if task_list:
@@ -358,8 +357,7 @@ class APIRequest:
         status_tracker.num_tasks_failed += 1
         return data
     else:
-      data = ([self.request_json, response, self.metadata] if self.metadata else [self.request_json, response]
-             )  # type: ignore
+      data = ([self.request_json, response, self.metadata] if self.metadata else [self.request_json, response])  # type: ignore
       #append_to_jsonl(data, save_filepath)
       status_tracker.num_tasks_in_progress -= 1
       status_tracker.num_tasks_succeeded += 1

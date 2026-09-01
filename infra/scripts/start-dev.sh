@@ -65,7 +65,7 @@ EOF
 # makes decryption fail and per-project overrides silently fall back to defaults.
 # Generate once into the root .env, then sync into the app-local .env files.
 ensure_encryption_master_key() {
-	if [ -n "${ENCRYPTION_MASTER_KEY:-}" ]; then
+	if [ -n "${ENCRYPTION_MASTER_KEY-}" ]; then
 		return
 	fi
 	print_status "Generating ENCRYPTION_MASTER_KEY (shared by backend, worker, and frontend)..."
@@ -101,7 +101,7 @@ ensure_local_app_envs() {
 	local aws_region="${AWS_REGION:-us-east-1}"
 	local keycloak_admin="${KEYCLOAK_ADMIN_USERNAME:-admin}"
 	local keycloak_password="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
-	local encryption_master_key="${ENCRYPTION_MASTER_KEY:-}"
+	local encryption_master_key="${ENCRYPTION_MASTER_KEY-}"
 	local allowed_embedding_providers="${ALLOWED_EMBEDDING_PROVIDERS:-openai,ollama}"
 
 	local backend_env="apps/backend/.env"
@@ -498,7 +498,7 @@ print_success "PostgreSQL schema initialized and verified."
 print_status "Creating Qdrant collection..."
 
 # Ensure QDRANT_URL is defined
-if [[ -z ${QDRANT_URL:-} ]]; then
+if [[ -z ${QDRANT_URL-} ]]; then
 	QDRANT_URL="http://localhost:6333"
 	print_warning "QDRANT_URL not set, using default: $QDRANT_URL"
 fi
@@ -520,7 +520,7 @@ print_status "Creating Qdrant collection..."
 print_status "Checking if Qdrant collection exists..."
 # Build headers (optionally include API key if provided)
 CURL_HEADERS=("-H" "Content-Type: application/json")
-if [[ -n ${QDRANT_API_KEY:-} ]]; then
+if [[ -n ${QDRANT_API_KEY-} ]]; then
 	CURL_HEADERS+=("-H" "api-key: $QDRANT_API_KEY")
 fi
 
@@ -584,12 +584,12 @@ print_success "Qdrant collection ready!"
 print_status "Setting up MinIO bucket..."
 
 # Ensure MinIO environment variables are set
-if [[ -z ${AWS_ACCESS_KEY_ID:-} ]]; then
+if [[ -z ${AWS_ACCESS_KEY_ID-} ]]; then
 	AWS_ACCESS_KEY_ID="minioadmin"
 	print_warning "AWS_ACCESS_KEY_ID not set, using default: $AWS_ACCESS_KEY_ID"
 fi
 
-if [[ -z ${AWS_SECRET_ACCESS_KEY:-} ]]; then
+if [[ -z ${AWS_SECRET_ACCESS_KEY-} ]]; then
 	AWS_SECRET_ACCESS_KEY="minioadmin"
 	print_warning "AWS_SECRET_ACCESS_KEY not set, using default: $AWS_SECRET_ACCESS_KEY"
 fi

@@ -11,8 +11,6 @@
 
 **Recommendation:** Starting with the "Equal and Below" option is advisable for a focused and manageable scrape. If your needs expand, you can re-run the process with broader options as required.
 
-
-
 ## Backend Code
 
 Web crawling is powered by [Crawlee.dev](https://crawlee.dev/). Our implementation is [open source on Github](https://github.com/UIUC-Chatbot/crawlee).
