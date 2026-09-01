@@ -136,10 +136,6 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               >
                 <Notifications position="bottom-center" zIndex={2077} />
               </aside>
-              {/* sonner toasts, backed by src/utils/toastUtils.ts. The Mantine
-                  <Notifications> above stays mounted for the remaining direct
-                  notifications.show callers until they migrate in later slices. */}
-              <Toaster position="bottom-center" />
               <ReactQueryDevtools
                 initialIsOpen={false}
                 position="left"
@@ -182,6 +178,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
                 }}
               >
                 <ThemeProvider>
+                  <Toaster position="bottom-center" />
                   <Component {...pageProps} />
                 </ThemeProvider>
               </MantineProvider>
