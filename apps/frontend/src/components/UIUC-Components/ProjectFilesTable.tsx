@@ -362,12 +362,17 @@ export function ProjectFilesTable({
         ['documentGroups', course_name],
         (old = []) => {
           return old.map((doc_group) => {
-            recordsToDelete.forEach((record) => {
-              if (doc_group.name in record.doc_groups) {
-                doc_group.doc_count -= 1
+            const decrement = recordsToDelete.reduce((count, record) => {
+              if (record.doc_groups?.includes(doc_group.name)) {
+                return count + 1
               }
-            })
-            return doc_group
+              return count
+            }, 0)
+            if (decrement === 0) return doc_group
+            return {
+              ...doc_group,
+              doc_count: Math.max(0, (doc_group.doc_count || 0) - decrement),
+            }
           })
         },
       )
