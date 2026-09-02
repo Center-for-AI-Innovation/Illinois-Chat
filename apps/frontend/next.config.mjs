@@ -82,17 +82,14 @@ const config = {
       { protocol: 'https', hostname: 'via.placeholder.com' },
     ],
   },
-  experimental: {
-    esmExternals: false, // To make certain packages work with the /pages router.
-    // Let Node require() these directly instead of webpack bundling them:
-    // postgres is Node-only; sanitize-html/undici trip up webpack's ESM/CJS resolution.
-    serverComponentsExternalPackages: [
-      'postgres',
-      'sanitize-html',
-      'undici',
-      '@qdrant/js-client-rest',
-    ],
-  },
+  // Let Node require() these directly instead of webpack bundling them:
+  // postgres is Node-only; sanitize-html/undici trip up webpack's ESM/CJS resolution.
+  serverExternalPackages: [
+    'postgres',
+    'sanitize-html',
+    'undici',
+    '@qdrant/js-client-rest',
+  ],
   async headers() {
     return [
       {
