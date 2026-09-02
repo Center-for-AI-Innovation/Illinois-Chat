@@ -14,6 +14,36 @@ vi.mock('framer-motion', () => ({
   ),
 }))
 
+// Base UI's DropdownMenu drives its open/close state off real CSS animations
+// (animationend events), which jsdom never fires. That leaves the popup's
+// mount/unmount timing nondeterministic in tests, closing itself moments
+// after opening independent of any interaction. This app's tests only need
+// to verify that selecting an access-level option calls the right handler,
+// not that Base UI's floating popup positions/animates correctly (that's
+// covered by Base UI's own test suite) — so render a minimal, always-open
+// stand-in instead of the real popup.
+vi.mock('@/components/shadcn/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: any) =>
+    React.createElement(React.Fragment, null, children),
+  DropdownMenuTrigger: ({ render }: any) => render,
+  DropdownMenuContent: ({ children }: any) =>
+    React.createElement('div', null, children),
+  DropdownMenuRadioGroup: ({ children, onValueChange }: any) =>
+    React.createElement(
+      'div',
+      null,
+      React.Children.map(children, (child: any) =>
+        React.cloneElement(child, {
+          onClick: () => onValueChange(child.props.value),
+        }),
+      ),
+    ),
+  DropdownMenuRadioItem: ({ children, onClick }: any) =>
+    React.createElement('div', { role: 'menuitemradio', onClick }, children),
+  DropdownMenuShortcut: ({ children }: any) =>
+    React.createElement('span', null, children),
+}))
+
 vi.mock('../EmailListAccordion', () => ({
   default: ({ is_for_admins }: any) =>
     React.createElement(
@@ -46,14 +76,7 @@ describe('ShareSettingsModal', () => {
     expect(screen.queryByText(/Share your chatbot/i)).not.toBeInTheDocument()
   })
 
-  // TODO(react19): flaky under React 19 in jsdom — these drive a Radix
-  // DropdownMenu via userEvent, and React 19's event timing + jsdom's faked
-  // PointerEvents make the menu open intermittently (runs vary between 1 and 2
-  // failures with no code change). The product works (build passes; Radix
-  // supports React 19 in real browsers). Re-enable after rewriting these to
-  // open the menu deterministically (fake timers w/ manual advancement, or a
-  // non-pointer interaction). Tracked as a wave-3b follow-up.
-  it.skip('copies share link and changes access level', async () => {
+  it('copies share link and changes access level', async () => {
     const user = userEvent.setup()
     const { callSetCourseMetadata } = await import('~/utils/apiUtils')
     const writeSpy = vi
@@ -99,8 +122,7 @@ describe('ShareSettingsModal', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  // TODO(react19): flaky under React 19 in jsdom — see note above.
-  it.skip('shows member controls when transitioning back to invited access', async () => {
+  it('shows member controls when transitioning back to invited access', async () => {
     const user = userEvent.setup()
 
     const ShareSettingsModal = (await import('../ShareSettingsModal')).default
@@ -118,11 +140,14 @@ describe('ShareSettingsModal', () => {
       screen.getByRole('button', { name: /Change access|Access/i }),
     )
     await user.click(
-      await screen.findByText(/Private \(only invited members\)/i),
+      screen.getByRole('menuitemradio', {
+        name: /Private \(only invited members\)/i,
+      }),
     )
-    await new Promise((r) => setTimeout(r, 350))
 
-    expect(screen.getByText(/Members accordion/i)).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByText(/Members accordion/i)).toBeInTheDocument(),
+    )
     expect(screen.getByText(/Admins accordion/i)).toBeInTheDocument()
   })
 })
