@@ -5,7 +5,7 @@ import {
   IconArrowRight,
   IconSettings,
 } from '@tabler/icons-react'
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 import {
   type MutableRefObject,
   memo,
@@ -27,7 +27,7 @@ import { type Plugin } from '@/types/plugin'
 import posthog from 'posthog-js'
 import { v4 as uuidv4 } from 'uuid'
 
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 
 import { fetchPresignedUrl } from '~/utils/apiUtils'
 import { ChatInput } from './ChatInput'
@@ -1791,7 +1791,7 @@ export const Chat = memo(
     // Add this function to create dividers with statements
     const renderIntroductoryStatements = () => {
       return (
-        <div className="chat_welcome xs:mx-2 mt-4 max-w-3xl gap-3 px-4 last:mb-2 sm:mx-4 md:mx-auto lg:mx-auto ">
+        <div className="chat_welcome xs:mx-2 mt-4 max-w-3xl gap-3 px-4 last:mb-2 sm:mx-4 md:mx-auto lg:mx-auto">
           <div className="backdrop-filter-[blur(10px)] rounded-lg bg-[--welcome-background] p-6">
             <Text
               className={`mb-2 text-lg ${montserrat_heading.variable} font-montserratHeading`}
@@ -1851,7 +1851,7 @@ export const Chat = memo(
                     <Button
                       variant="link"
                       tabIndex={-1}
-                      className={`text-md h-auto p-2 font-bold leading-relaxed text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph `}
+                      className={`text-md h-auto p-2 font-bold leading-relaxed text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph`}
                     >
                       <IconArrowRight
                         size={25}
