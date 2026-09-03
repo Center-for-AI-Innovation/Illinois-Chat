@@ -30,9 +30,9 @@ describe('StepCreate', () => {
     vi.clearAllMocks()
   })
 
-  // Base UI renders each option as <div role="option"> wrapping a separate
-  // text element, so getByRole('option', { name }) does not resolve against
-  // the visible label. Match on the option's own text instead.
+  // Await the popup before querying: a synchronous getByRole races Base UI's
+  // popup mount. Matching on textContent is just for the failure message,
+  // which lists the options that were actually rendered.
   const pickOption = async (label: string) => {
     const listbox = await screen.findByRole('listbox')
     const options = within(listbox).getAllByRole('option')

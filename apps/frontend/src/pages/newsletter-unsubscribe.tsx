@@ -55,7 +55,7 @@ export default function Unsubscribe() {
           "See ya, wouldn't wanna be ya! 🌅 Redirecting to home page in 5 seconds...",
         type: 'success',
         autoClose: 5000,
-        icon: <IconSunset2 />,
+        icon: <IconSunset2 size={16} />,
       })
 
       setTimeout(() => {
