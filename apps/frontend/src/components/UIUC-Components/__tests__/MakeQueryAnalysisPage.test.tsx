@@ -13,9 +13,9 @@ vi.mock('@mantine/notifications', () => ({
   showNotification: vi.fn(),
 }))
 
-vi.mock('~/pages/util/downloadConversationHistory', () => ({
+vi.mock('~/utils/downloadConversationHistory', () => ({
   __esModule: true,
-  default: vi.fn(async () => ({ message: 'ok' })),
+  downloadConversationHistory: vi.fn(async () => ({ message: 'ok' })),
 }))
 
 vi.mock('@mantine/core', async (importOriginal) => {
@@ -183,8 +183,8 @@ describe('MakeQueryAnalysisPage', () => {
 
     await user.click(screen.getByText(/Download Conversation History/i))
     const downloadConversationHistory = (
-      await import('~/pages/util/downloadConversationHistory')
-    ).default as any
+      (await import('~/utils/downloadConversationHistory')) as any
+    ).downloadConversationHistory
     await waitFor(() => expect(downloadConversationHistory).toHaveBeenCalled())
   })
 

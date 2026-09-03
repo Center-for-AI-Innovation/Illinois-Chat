@@ -49,7 +49,8 @@ afterEach(() => {
 describe('projectConnections/active handler', () => {
   it('rejects non-PATCH methods with 405', async () => {
     mockRepoAndManager(() => ({ found: true, is_active: true }))
-    const { handler } = await import('../active')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/active')
     const res = makeRes()
     await handler(
       {
@@ -66,7 +67,8 @@ describe('projectConnections/active handler', () => {
 
   it('returns 400 on invalid body', async () => {
     mockRepoAndManager(() => ({ found: true, is_active: true }))
-    const { handler } = await import('../active')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/active')
     const res = makeRes()
     await handler(
       {
@@ -82,7 +84,8 @@ describe('projectConnections/active handler', () => {
 
   it('returns 404 when the row is missing and audits failure', async () => {
     mockRepoAndManager(() => ({ found: false, is_active: null }))
-    const { handler } = await import('../active')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/active')
     const res = makeRes()
     await handler(
       {
@@ -105,7 +108,8 @@ describe('projectConnections/active handler', () => {
 
   it('happy path: 200, invalidate, audit success with is_active in changed_fields', async () => {
     mockRepoAndManager(() => ({ found: true, is_active: false }))
-    const { handler } = await import('../active')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/active')
     const res = makeRes()
     await handler(
       {
