@@ -53,7 +53,11 @@ export default function Document(props: Props) {
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                // Must match ThemeContext's default of 'light', or a dark-OS first
+                // visit paints dark here and flashes to light once React mounts.
+                // Explicit 'system' still follows the OS.
+                const t = localStorage.theme
+                if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                   document.documentElement.classList.add('dark')
                 } else {
                   document.documentElement.classList.remove('dark')
