@@ -76,7 +76,7 @@ export const PermissionGate = ({
         <div className="items-left container flex flex-col justify-center gap-2 py-0">
           <div className="flex flex-col items-center justify-center">
             <h2
-              className={`${montserrat_heading.variable} p-8 font-montserratHeading text-[2.2rem] font-bold text-[--foreground]`}
+              className={`${montserrat_heading.variable} p-8 font-montserratHeading text-4xl font-bold text-[--foreground]`}
             >
               {' '}
               {getTitle()}
