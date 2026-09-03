@@ -395,8 +395,10 @@ export function ProjectFilesTable({
 
       showToastOnFileDeleted(true)
     },
-    onSettled: async () => {
+    onSuccess: () => {
       showToastOnFileDeleted()
+    },
+    onSettled: async () => {
       setShowDeleteButton(false)
       setSelectedCount(0)
       const sleep = (ms: number) =>

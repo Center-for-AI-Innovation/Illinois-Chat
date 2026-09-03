@@ -46,7 +46,7 @@ export default function Unsubscribe() {
           type: 'error',
           autoClose: 20000,
         })
-        throw new Error('Network response was not ok')
+        return
       }
 
       showToast({
