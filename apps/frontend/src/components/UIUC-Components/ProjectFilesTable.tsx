@@ -17,11 +17,8 @@ import {
   TextInput,
   Tooltip,
   createStyles,
-  type MantineTheme,
 } from '@mantine/core'
-import { notifications, showNotification } from '@mantine/notifications'
 import {
-  IconAlertTriangle,
   IconCheck,
   IconCopy,
   IconEye,
@@ -47,6 +44,7 @@ import { useDeleteFromDocGroup } from '@/hooks/queries/useDeleteFromDocGroup'
 
 import { handleExport } from '~/utils/handleExport'
 import { fetchPresignedUrl } from '~/utils/apiUtils'
+import { showErrorToast, showToast } from '~/utils/toastUtils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { showToastOnUpdate } from './MakeQueryAnalysisPage'
 
@@ -395,10 +393,12 @@ export function ProjectFilesTable({
         )
       }
 
-      showToastOnFileDeleted(theme, true)
+      showToastOnFileDeleted(true)
+    },
+    onSuccess: () => {
+      showToastOnFileDeleted()
     },
     onSettled: async () => {
-      showToastOnFileDeleted(theme)
       setShowDeleteButton(false)
       setSelectedCount(0)
       const sleep = (ms: number) =>
@@ -414,102 +414,19 @@ export function ProjectFilesTable({
   })
 
   if (isErrorDocuments) {
-    showNotification({
-      title: 'Error',
-      message: 'Failed to fetch documents',
-      color: 'red',
-      icon: <IconTrash size={24} />,
-    })
+    showErrorToast('Failed to fetch documents', 'Error')
 
     return errorStateForProjectFilesTable()
   }
 
-  const showToastOnFileDeleted = (theme: MantineTheme, was_error = false) => {
-    return (
-      // docs: https://mantine.dev/others/notifications/
-      notifications.show({
-        id: 'file-deleted-from-materials',
-        withCloseButton: true,
-        // onClose: () => console.debug('unmounted'),
-        // onOpen: () => console.debug('mounted'),
-        autoClose: 5000,
-        // position="top-center",
-        title: was_error ? 'Error deleting file' : 'Deleting file...',
-        message: was_error
-          ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
-          : 'The file is being deleted in the background.',
-        icon: was_error ? <IconAlertTriangle /> : <IconCheck />,
-        styles: {
-          root: {
-            backgroundColor: theme.colors.nearlyWhite,
-            borderColor: was_error
-              ? theme.colors.errorBorder
-              : 'var(--dashboard-background-dark)',
-          },
-          title: {
-            color: theme.colors.nearlyBlack,
-          },
-          description: {
-            color: theme.colors.nearlyBlack,
-          },
-          closeButton: {
-            color: theme.colors.nearlyBlack,
-            '&:hover': {
-              backgroundColor: theme.colors.dark[1],
-            },
-          },
-          icon: {
-            backgroundColor: was_error
-              ? theme.colors.errorBackground
-              : theme.colors.successBackground,
-            padding: '4px',
-          },
-        },
-        loading: false,
-      })
-    )
-  }
-
-  const showToast = (
-    theme: MantineTheme,
-    title: string,
-    message: string,
-    was_error = false,
-  ) => {
-    return notifications.show({
-      id: 'file-deleted-from-materials',
-      withCloseButton: true,
-      autoClose: 12000,
-      title: title,
-      message: message,
-      icon: was_error ? <IconAlertTriangle /> : <IconCheck />,
-      styles: {
-        root: {
-          backgroundColor: theme.colors.nearlyWhite,
-          borderColor: was_error
-            ? theme.colors.errorBorder
-            : 'var(--dashboard-background-dark)',
-        },
-        title: {
-          color: theme.colors.nearlyBlack,
-        },
-        description: {
-          color: theme.colors.nearlyBlack,
-        },
-        closeButton: {
-          color: theme.colors.nearlyBlack,
-          '&:hover': {
-            backgroundColor: theme.colors.dark[1],
-          },
-        },
-        icon: {
-          backgroundColor: was_error
-            ? theme.colors.errorBackground
-            : theme.colors.successBackground,
-          padding: '4px',
-        },
-      },
-      loading: false,
+  const showToastOnFileDeleted = (was_error = false) => {
+    return showToast({
+      autoClose: 5000,
+      title: was_error ? 'Error deleting file' : 'Deleting file...',
+      message: was_error
+        ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
+        : 'The file is being deleted in the background.',
+      type: was_error ? 'error' : 'success',
     })
   }
 
@@ -839,12 +756,13 @@ export function ProjectFilesTable({
                       disabled={!selectedCount}
                       onClick={() => {
                         if (selectedCount > 100) {
-                          showToast(
-                            theme,
-                            'Selection Limit Exceeded',
-                            'You have selected more than 100 documents. Please select less than or equal to 100 documents.',
-                            true,
-                          )
+                          showToast({
+                            title: 'Selection Limit Exceeded',
+                            message:
+                              'You have selected more than 100 documents. Please select less than or equal to 100 documents.',
+                            type: 'error',
+                            autoClose: 12000,
+                          })
                         } else {
                           setRecordsToDelete(selectedRecords)
                           setModalOpened(true)
