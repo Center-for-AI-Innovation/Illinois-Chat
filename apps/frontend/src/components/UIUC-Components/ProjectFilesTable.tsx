@@ -493,8 +493,9 @@ export function ProjectFilesTable({
           <div className="flex flex-wrap items-center gap-2">
             {tabValue !== 'failed' && (
               <Button
+                variant="dashboard"
                 onClick={() => setExportModalOpened(true)}
-                className={`w-full border-0 bg-[--dashboard-button] px-4 py-2 text-xs transition-colors duration-300 hover:bg-[--dashboard-button-hover] sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+                className={`w-full border-0 bg-[--dashboard-button] px-4 py-2 text-xs text-[--dashboard-button-foreground] transition-colors duration-300 hover:bg-[--dashboard-button-hover] sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
               >
                 Export
               </Button>
@@ -512,10 +513,11 @@ export function ProjectFilesTable({
                     }}
                   >
                     <Button
+                      variant="dashboard"
                       onClick={() => {
                         setShowMultiSelect(true)
                       }}
-                      className={`mb-2 w-full bg-[--dashboard-button] px-4 py-2 text-xs transition-colors duration-300 hover:bg-[--dashboard-button-hover] sm:mb-0 sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} border-0 font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+                      className={`mb-2 w-full bg-[--dashboard-button] px-4 py-2 text-xs text-[--dashboard-button-foreground] transition-colors duration-300 hover:bg-[--dashboard-button-hover] sm:mb-0 sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} border-0 font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
                     >
                       <span className="block sm:hidden">Add to Groups</span>
                       <span className="hidden sm:block">
@@ -1274,7 +1276,7 @@ export function ProjectFilesTable({
               Cancel
             </Button>
             <Button
-              className="btext-[--dashboard-button-foreground] min-w-[3rem] -translate-x-1 transform rounded-s-md bg-[--dashboard-button] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+              className="text-[--dashboard-button-foreground] min-w-[3rem] -translate-x-1 transform rounded-s-md bg-[--dashboard-button] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
               onClick={async () => {
                 setModalOpened(false)
                 setIsDeletingDocuments(true)
