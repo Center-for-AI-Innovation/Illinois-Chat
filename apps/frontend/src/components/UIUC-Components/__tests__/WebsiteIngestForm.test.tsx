@@ -10,13 +10,8 @@ import {
   renderWithProviders,
 } from '~/test-utils/renderWithProviders'
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
 }))
 
 vi.mock('axios', () => ({
@@ -569,6 +564,7 @@ describe('WebsiteIngestForm', () => {
     const user = userEvent.setup()
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
+    const toastUtils = await import('~/utils/toastUtils')
     const axiosMod = await import('axios')
     ;(axiosMod as any).default.post.mockImplementationOnce(async () => {
       throw new Error('scrape failed')
@@ -608,5 +604,14 @@ describe('WebsiteIngestForm', () => {
       const filesJson = screen.getByTestId('files').textContent ?? ''
       expect(filesJson).toContain('"status":"error"')
     })
+
+    expect(toastUtils.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Error during web scraping. Please try again.',
+        message: 'scrape failed',
+        type: 'error',
+        autoClose: 12000,
+      }),
+    )
   })
 })

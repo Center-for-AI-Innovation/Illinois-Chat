@@ -20,13 +20,12 @@ vi.mock('framer-motion', () => {
   }
 })
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 vi.mock('axios', () => ({ default: { post: vi.fn() } }))
@@ -223,7 +222,7 @@ describe('GitHubIngestForm', () => {
     const axios = (await import('axios')).default as any
     axios.post.mockRejectedValueOnce(new Error('boom'))
 
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
     const GitHubIngestForm = (await import('../GitHubIngestForm')).default
 
     render(<Harness Component={GitHubIngestForm} queryClient={queryClient} />)
@@ -241,7 +240,16 @@ describe('GitHubIngestForm', () => {
     await waitFor(() => expect(ingestButton).toBeEnabled())
     await user.click(ingestButton)
 
-    await waitFor(() => expect((notifications as any).show).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(showToast as any).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Error during web scraping. Please try again.',
+          message: 'boom',
+          type: 'error',
+          autoClose: 12000,
+        }),
+      ),
+    )
     await waitFor(() => expect(filesJson()).toContain('"status":"error"'))
   })
 })

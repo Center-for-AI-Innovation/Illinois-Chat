@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Text, Card, Button, Input, createStyles } from '@mantine/core'
 import {
-  IconAlertCircle,
   IconBrandGithub,
   IconWorldDownload,
   IconArrowRight,
@@ -17,18 +16,12 @@ import {
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
 // import { Checkbox } from '@radix-ui/react-checkbox'
-import { notifications } from '@mantine/notifications'
+import { showToast } from '~/utils/toastUtils'
 import axios from 'axios'
-import { Montserrat } from 'next/font/google'
 import { type FileUpload } from './UploadNotification'
 import Link from 'next/link'
 import { type QueryClient } from '@tanstack/react-query'
 import { useGatedIngestPoller } from '~/hooks/useGatedIngestPoller'
-const montserrat_med = Montserrat({
-  weight: '500',
-  subsets: ['latin'],
-})
-
 const POLL_INTERVAL_MS = 3000
 export default function GitHubIngestForm({
   project_name,
@@ -326,34 +319,11 @@ export default function GitHubIngestForm({
     } catch (error: any) {
       console.error('Error during web scraping:', error)
 
-      notifications.show({
-        id: 'error-notification',
-        withCloseButton: true,
-        closeButtonProps: { color: 'red' },
-        onClose: () => console.log('error unmounted'),
-        onOpen: () => console.log('error mounted'),
+      showToast({
+        title: 'Error during web scraping. Please try again.',
+        message: error.message,
+        type: 'error',
         autoClose: 12000,
-        title: (
-          <Text size={'lg'} className={`${montserrat_med.className}`}>
-            {'Error during web scraping. Please try again.'}
-          </Text>
-        ),
-        message: (
-          <Text className={`${montserrat_med.className} text-neutral-200`}>
-            {error.message}
-          </Text>
-        ),
-        color: 'red',
-        radius: 'lg',
-        icon: <IconAlertCircle aria-hidden="true" />,
-        className: 'my-notification-class',
-        style: {
-          backgroundColor: 'rgba(42,42,64,0.3)',
-          backdropFilter: 'blur(10px)',
-          borderLeft: '5px solid red',
-        },
-        withBorder: true,
-        loading: false,
       })
       throw error // Re-throw so handleIngest can update file status to 'error'
     }
