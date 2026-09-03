@@ -7,14 +7,12 @@ import { http, HttpResponse } from 'msw'
 import { server } from '~/test-utils/server'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
-  showNotification: vi.fn(),
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 vi.mock('axios', () => ({
@@ -264,8 +262,8 @@ describe('ProjectFilesTable', () => {
 
   it('shows a toast when attempting to delete more than 100 selected records', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications as any).show.mockClear()
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as any).mockClear()
 
     server.use(
       http.get('*/api/materialsTable/fetchProjectMaterials*', async () => {
@@ -313,7 +311,7 @@ describe('ProjectFilesTable', () => {
     const deleteLabels = await screen.findAllByText(/Delete 101/i)
     await user.click(deleteLabels[0]!.closest('button') as HTMLElement)
 
-    expect((notifications as any).show).toHaveBeenCalledWith(
+    expect(showToast as any).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Selection Limit Exceeded' }),
     )
   })
@@ -391,7 +389,7 @@ describe('ProjectFilesTable', () => {
   }, 20_000)
 
   it('renders an error-state table when document fetch fails', async () => {
-    const { showNotification } = await import('@mantine/notifications')
+    const { showErrorToast } = await import('~/utils/toastUtils')
 
     server.use(
       http.get('*/api/materialsTable/fetchProjectMaterials*', async () => {
@@ -420,7 +418,12 @@ describe('ProjectFilesTable', () => {
       { homeContext: { dispatch: vi.fn() } },
     )
 
-    await waitFor(() => expect(showNotification as any).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(showErrorToast as any).toHaveBeenCalledWith(
+        'Failed to fetch documents',
+        'Error',
+      ),
+    )
     expect(
       await screen.findByText(
         /Ah! We hit a wall when fetching your documents/i,
