@@ -103,8 +103,12 @@ vi.mock('../MakeNewCoursePageSteps/StepSuccess', () => ({
   default: () => <div data-testid="step-success">Success!</div>,
 }))
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: { show: vi.fn() },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 vi.mock('~/utils/apiUtils', async (importOriginal) => {
@@ -747,7 +751,7 @@ describe('MakeNewCoursePage', () => {
         apiUtils.createProject as ReturnType<typeof vi.fn>
       ).mockRejectedValueOnce(conflictError)
 
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
 
       const queryClient = createTestQueryClient()
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
@@ -771,10 +775,10 @@ describe('MakeNewCoursePage', () => {
       await user.click(continueBtn)
 
       await waitFor(() => {
-        expect(notifications.show).toHaveBeenCalledWith(
+        expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({
             title: 'Project name already taken',
-            color: 'red',
+            type: 'error',
           }),
         )
       })
@@ -802,8 +806,8 @@ describe('MakeNewCoursePage', () => {
         apiUtils.createProject as ReturnType<typeof vi.fn>
       ).mockRejectedValueOnce(serverError)
 
-      const { notifications } = await import('@mantine/notifications')
-      ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+      const { showToast } = await import('~/utils/toastUtils')
+      ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
       const MakeNewCoursePage = await importComponent()
       renderWithProviders(
@@ -823,10 +827,10 @@ describe('MakeNewCoursePage', () => {
       await user.click(continueBtn)
 
       await waitFor(() => {
-        expect(notifications.show).toHaveBeenCalledWith(
+        expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({
             title: 'Failed to create project',
-            color: 'red',
+            type: 'error',
           }),
         )
       })
@@ -846,8 +850,8 @@ describe('MakeNewCoursePage', () => {
         apiUtils.createProject as ReturnType<typeof vi.fn>
       ).mockRejectedValueOnce(emptyError)
 
-      const { notifications } = await import('@mantine/notifications')
-      ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+      const { showToast } = await import('~/utils/toastUtils')
+      ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
       const MakeNewCoursePage = await importComponent()
       renderWithProviders(
@@ -867,7 +871,7 @@ describe('MakeNewCoursePage', () => {
       await user.click(continueBtn)
 
       await waitFor(() => {
-        expect(notifications.show).toHaveBeenCalledWith(
+        expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({
             title: 'Failed to create project',
             message: expect.stringContaining(

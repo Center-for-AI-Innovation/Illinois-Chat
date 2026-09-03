@@ -1,5 +1,4 @@
 import { MantineProvider } from '@mantine/core'
-import { Notifications } from '@mantine/notifications'
 import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
@@ -129,13 +128,6 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
             <PostHogProvider client={posthog}>
               {/* <SpeedInsights /> */}
               <Analytics />
-              <aside
-                aria-label="Notifications"
-                aria-live="assertive"
-                aria-atomic="true"
-              >
-                <Notifications position="bottom-center" zIndex={2077} />
-              </aside>
               <ReactQueryDevtools
                 initialIsOpen={false}
                 position="left"
