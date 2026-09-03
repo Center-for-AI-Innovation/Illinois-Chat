@@ -58,7 +58,8 @@ afterEach(() => {
 describe('projectConnections/test handler', () => {
   it('rejects non-POST methods with 405', async () => {
     mockTesterAndRepo({})
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
@@ -75,7 +76,8 @@ describe('projectConnections/test handler', () => {
 
   it('returns 400 on invalid body', async () => {
     mockTesterAndRepo({})
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
@@ -91,7 +93,8 @@ describe('projectConnections/test handler', () => {
 
   it('success path: 200 ok + audit success + project_name null', async () => {
     mockTesterAndRepo({ qdrant: () => ({ ok: true }) })
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
@@ -130,7 +133,8 @@ describe('projectConnections/test handler', () => {
         message: 'Authentication rejected',
       }),
     })
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
@@ -169,7 +173,8 @@ describe('projectConnections/test handler', () => {
       row: { database_config: { encrypted: 'blob' } },
       decrypted: { connection_uri: 'postgres://u:p@h:5432/db' },
     })
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
@@ -192,7 +197,8 @@ describe('projectConnections/test handler', () => {
 
   it('stored mode: no stored config → ok:false not_found, audited', async () => {
     mockTesterAndRepo({ row: null })
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
@@ -217,7 +223,8 @@ describe('projectConnections/test handler', () => {
 
   it('audit never contains the secret config value', async () => {
     mockTesterAndRepo({ s3: () => ({ ok: true }) })
-    const { handler } = await import('../test')
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/test')
     const res = makeRes()
     await handler(
       {
