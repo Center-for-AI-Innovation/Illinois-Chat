@@ -3,7 +3,7 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { documents } from '~/db/dbClient'
 import { connectionManager } from '~/utils/connectionManager'
 import { eq } from 'drizzle-orm'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 // This is for "Documents" table, completed docs.
 
 type SuccessDocsResponse = {

@@ -55,7 +55,7 @@ function materialsRedirectMiddleware(request: NextRequest) {
 }
 
 // Combine the middlewares
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname, search, origin } = request.nextUrl
 
   // Only redirect the initial auth request, not the callback

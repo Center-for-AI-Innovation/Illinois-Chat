@@ -1,6 +1,6 @@
 import { CourseMetadata } from '~/types/courseMetadata'
 import { AuthenticatedRequest } from '~/utils/authMiddleware'
-import { AuthenticatedUser } from '~/middleware'
+import { AuthenticatedUser } from '~/proxy'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
