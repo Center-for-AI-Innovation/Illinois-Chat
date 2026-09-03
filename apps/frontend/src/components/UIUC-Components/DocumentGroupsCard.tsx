@@ -47,10 +47,10 @@ function DocumentGroupsCard({
                 size="icon-sm"
                 onClick={() => setAccordionOpened(!accordionOpened)}
                 title="More info on document groups"
-                className="hover:bg-[--background] [&_svg]:size-6"
+                className="hover:bg-[--background] [&_svg]:size-6 hover:[&_svg]:text-[--foreground]"
               >
                 <IconInfoCircle
-                  className="text-[--foreground-faded] hover:text-[--foreground]"
+                  className="text-[--foreground-faded]"
                   aria-hidden="true"
                 />
               </Button>

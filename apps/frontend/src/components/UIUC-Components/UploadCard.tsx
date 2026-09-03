@@ -14,7 +14,7 @@ import ChatbotTagsEditor from './ChatbotTagsEditor'
 import { IconShare } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Montserrat } from 'next/font/google'
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useAuth } from 'react-oidc-context'
 import CanvasIngestForm from './CanvasIngestForm'
 import CourseraIngestForm from './CourseraIngestForm'
@@ -29,6 +29,19 @@ const montserrat_light = Montserrat({
   weight: '400',
   subsets: ['latin'],
 })
+
+// Restores the `autosize` behavior the Mantine Textarea gave us: grow to fit
+// the content, with the `max-h-*` class doing what `maxRows` used to.
+function useAutosizeTextarea(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+  return ref
+}
 
 export const UploadCard = memo(function UploadCard({
   projectName,
@@ -57,6 +70,8 @@ export const UploadCard = memo(function UploadCard({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<FileUpload[]>([])
   const [metadata, setMetadata] = useState(initialMetadata)
+  const descriptionRef = useAutosizeTextarea(projectDescription)
+  const greetingRef = useAutosizeTextarea(introMessage)
 
   useEffect(() => {
     // Set initial query data
@@ -214,11 +229,12 @@ export const UploadCard = memo(function UploadCard({
                 Project Description
               </h3>
               <Textarea
+                ref={descriptionRef}
                 placeholder="Describe your project, goals, expected impact etc..."
                 aria-label="Project Description"
                 value={projectDescription}
                 onChange={(e) => setProjectDescription(e.target.value)}
-                className={`${montserrat_paragraph.variable} min-h-[7rem] bg-[--background] font-montserratParagraph text-base text-[--foreground]`}
+                className={`${montserrat_paragraph.variable} min-h-[7rem] max-h-[14rem] overflow-y-auto bg-[--background] font-montserratParagraph text-base text-[--foreground] dark:bg-[--background]`}
               />
               <Button
                 type="button"
@@ -267,9 +283,10 @@ export const UploadCard = memo(function UploadCard({
                   Shown before users send their first chat.
                 </p>
                 <Textarea
+                  ref={greetingRef}
                   id="greeting-textarea"
                   placeholder="Enter a greeting to help users get started with your bot"
-                  className={`w-full ${montserrat_paragraph.variable} max-h-[7rem] min-h-[3.5rem] bg-[--background] font-montserratParagraph text-[--foreground]`}
+                  className={`w-full ${montserrat_paragraph.variable} max-h-[7rem] min-h-[3.5rem] overflow-y-auto bg-[--background] font-montserratParagraph text-[--foreground] dark:bg-[--background]`}
                   value={introMessage}
                   onChange={(e) => {
                     setIntroMessage(e.target.value)
