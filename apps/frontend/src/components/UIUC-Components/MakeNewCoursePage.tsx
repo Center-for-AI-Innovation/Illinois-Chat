@@ -1,6 +1,6 @@
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 
 import { Card, Flex, Title } from '@mantine/core'
 import { Button } from '@/components/shadcn/ui/button'
@@ -27,10 +27,7 @@ import StepSuccess from './MakeNewCoursePageSteps/StepSuccess'
 import { useAuth } from 'react-oidc-context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from './GlobalFooter'
-import {
-  buildProjectChatPath,
-  isValidProjectName,
-} from '~/utils/projectName'
+import { buildProjectChatPath, isValidProjectName } from '~/utils/projectName'
 
 const MakeNewCoursePage = ({
   project_name,
@@ -62,10 +59,6 @@ const MakeNewCoursePage = ({
   const [hasCreatedProject, setHasCreatedProject] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<FileUpload[]>([])
   const [currentStep, setStep] = useState(0)
-
-  const useIllinoisChatConfig = useMemo(() => {
-    return process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG === 'True'
-  }, [])
 
   // Debounce project name input to avoid excessive API calls
   const [debouncedProjectName] = useDebouncedValue(projectName, 1000)
@@ -208,7 +201,6 @@ const MakeNewCoursePage = ({
     project_name: string,
     project_description: string | undefined,
     current_user_email: string,
-    is_private = false,
     initial_project_type?: ChatbotProjectType,
     initial_organization?: string,
   ): Promise<boolean> => {
@@ -218,7 +210,7 @@ const MakeNewCoursePage = ({
         project_name,
         project_description,
         current_user_email,
-        is_private,
+        true,
       )
       if (!result) {
         return false
@@ -422,7 +414,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
+              className="hover:bg-[--foreground]/10 border-[--foreground] text-[--foreground] hover:text-[--foreground]"
               onClick={goToPreviousStep}
               disabled={isFirstStep || shouldBlockNavigation}
               aria-label="Go to previous step"
@@ -452,7 +444,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
+              className="hover:bg-[--foreground]/10 border-[--foreground] text-[--foreground] hover:text-[--foreground]"
               aria-label={
                 isLastStep
                   ? 'Start chatting with your new chatbot'
@@ -475,7 +467,6 @@ const MakeNewCoursePage = ({
                       projectName,
                       projectDescription,
                       current_user_email,
-                      useIllinoisChatConfig,
                       projectType,
                       organization,
                     )

@@ -67,9 +67,7 @@ describe('buildProjectChatPath', () => {
   })
 
   it('encodes rather than mangles legacy special-char names', () => {
-    expect(buildProjectChatPath('cropwizard-1.5')).toBe(
-      '/cropwizard-1.5/chat',
-    )
+    expect(buildProjectChatPath('cropwizard-1.5')).toBe('/cropwizard-1.5/chat')
     expect(buildProjectChatPath('has space')).toBe('/has%20space/chat')
   })
 

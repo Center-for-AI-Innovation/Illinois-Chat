@@ -54,7 +54,9 @@ describe('UIUC-api/createProject', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Invalid project name',
-          message: expect.stringMatching(/letters, numbers|characters or fewer/),
+          message: expect.stringMatching(
+            /letters, numbers|characters or fewer/,
+          ),
         }),
       )
       expect(hoisted.checkCourseExists).not.toHaveBeenCalled()

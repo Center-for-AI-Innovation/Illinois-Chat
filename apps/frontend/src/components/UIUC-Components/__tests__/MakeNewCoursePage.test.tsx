@@ -468,7 +468,8 @@ describe('MakeNewCoursePage', () => {
       setIllinoisConfig('True')
     })
 
-    it('creates a project and advances to the success step', async () => {
+    it('creates a private project regardless of Illinois config', async () => {
+      setIllinoisConfig('False')
       const user = userEvent.setup()
       mockFetchCourseAvailable(false)
 
@@ -500,7 +501,7 @@ describe('MakeNewCoursePage', () => {
           'NewBot',
           '',
           'owner@example.com',
-          true, // useIllinoisChatConfig = true
+          true,
         )
       })
 

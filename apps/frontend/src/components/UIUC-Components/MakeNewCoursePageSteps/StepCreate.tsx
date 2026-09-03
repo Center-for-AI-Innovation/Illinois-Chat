@@ -101,63 +101,65 @@ const StepCreate = ({
                 (!isCheckingAvailability && isCourseAvailable === false))
             }
           >
-            <TooltipTrigger asChild>
-              <FormInput
-                as="input"
-                value={projectName}
-                label="Name"
-                required
-                placeholder="my-awesome-chatbot"
-                description="This becomes part of your chatbot's unique URL."
-                autoComplete="off"
-                disabled={!is_new_course}
-                autoFocus
-                status={getNameStatus()}
-                maxLength={PROJECT_NAME_MAX_LENGTH}
-                rightSlot={
-                  nameError && projectName ? (
-                    <span role="status">
-                      <XCircle
-                        className="size-4 text-red-500"
-                        aria-hidden="true"
-                      />
-                      <span className="sr-only">Name is invalid</span>
-                    </span>
-                  ) : isCheckingAvailability ? (
-                    <span role="status">
-                      <LoaderCircle
-                        className="size-4 animate-spin text-[--foreground-faded]"
-                        aria-hidden="true"
-                      />
-                      <span className="sr-only">
-                        Checking name availability...
+            <TooltipTrigger
+              render={
+                <FormInput
+                  as="input"
+                  value={projectName}
+                  label="Name"
+                  required
+                  placeholder="my-awesome-chatbot"
+                  description="This becomes part of your chatbot's unique URL."
+                  autoComplete="off"
+                  disabled={!is_new_course}
+                  autoFocus
+                  status={getNameStatus()}
+                  maxLength={PROJECT_NAME_MAX_LENGTH}
+                  rightSlot={
+                    nameError && projectName ? (
+                      <span role="status">
+                        <XCircle
+                          className="size-4 text-red-500"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Name is invalid</span>
                       </span>
-                    </span>
-                  ) : isCourseAvailable && projectName ? (
-                    <span role="status">
-                      <CheckCircle
-                        className="size-4 text-green-500"
-                        aria-hidden="true"
-                      />
-                      <span className="sr-only">Name is available</span>
-                    </span>
-                  ) : isCourseAvailable === false && projectName ? (
-                    <span role="status">
-                      <XCircle
-                        className="size-4 text-red-500"
-                        aria-hidden="true"
-                      />
-                      <span className="sr-only">Name is already taken</span>
-                    </span>
-                  ) : undefined
-                }
-                onInput={(e) =>
-                  setProjectName(
-                    (e.target as HTMLInputElement).value.replaceAll(' ', '-'),
-                  )
-                }
-              />
-            </TooltipTrigger>
+                    ) : isCheckingAvailability ? (
+                      <span role="status">
+                        <LoaderCircle
+                          className="size-4 animate-spin text-[--foreground-faded]"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">
+                          Checking name availability...
+                        </span>
+                      </span>
+                    ) : isCourseAvailable && projectName ? (
+                      <span role="status">
+                        <CheckCircle
+                          className="size-4 text-green-500"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Name is available</span>
+                      </span>
+                    ) : isCourseAvailable === false && projectName ? (
+                      <span role="status">
+                        <XCircle
+                          className="size-4 text-red-500"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Name is already taken</span>
+                      </span>
+                    ) : undefined
+                  }
+                  onInput={(e) =>
+                    setProjectName(
+                      (e.target as HTMLInputElement).value.replaceAll(' ', '-'),
+                    )
+                  }
+                />
+              }
+            />
             <TooltipContent
               side="right"
               className="border-red-500 bg-red-500 text-white"
@@ -223,7 +225,7 @@ const StepCreate = ({
               value={organization ?? UNSET_VALUE}
               onValueChange={(value) =>
                 onUpdateOrganization?.(
-                  value === UNSET_VALUE ? undefined : value,
+                  value == null || value === UNSET_VALUE ? undefined : value,
                 )
               }
             >

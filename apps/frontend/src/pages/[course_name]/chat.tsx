@@ -1,9 +1,9 @@
-// export { default } from '~/pages/api/home'
+// export { default } from '~/components/home/home'
 
 import { useAuth } from 'react-oidc-context'
 import { type NextPage } from 'next'
 import React, { useEffect, useState } from 'react'
-import Home from '../api/home/home'
+import Home from '~/components/home/home'
 import { useRouter } from 'next/router'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -13,6 +13,7 @@ import { montserrat_heading } from 'fonts'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import { getOrCreateAnonymousUserId } from '~/utils/anonymousUserId'
 
 const ChatPage: NextPage = () => {
   const auth = useAuth()
@@ -61,11 +62,14 @@ const ChatPage: NextPage = () => {
 
       // Special case: Cropwizard redirect
       if (
-        ['cropwizard', 'cropwizard-1.0', 'cropwizard-1'].includes(
-          courseName.toLowerCase(),
-        )
+        [
+          'cropwizard',
+          'cropwizard-1.0',
+          'cropwizard-1',
+          'cropwizard-1.5',
+        ].includes(courseName.toLowerCase())
       ) {
-        await router.push(`/cropwizard-1.5`)
+        await router.push(`/cropwizard-2.0`)
       }
 
       // Fetch course metadata
@@ -163,18 +167,7 @@ const ChatPage: NextPage = () => {
             if (auth.user?.profile.email) {
               setCurrentEmail(auth.user.profile.email)
             } else {
-              // Use PostHog ID when user is not logged in for public courses
-              const key = process.env.NEXT_PUBLIC_POSTHOG_KEY as string
-              const postHogUserObj = localStorage.getItem(
-                'ph_' + key + '_posthog',
-              )
-              if (postHogUserObj) {
-                const postHogUser = JSON.parse(postHogUserObj)
-                setCurrentEmail(postHogUser.distinct_id)
-              } else {
-                // Stay in loading state until PostHog ID is available
-                setCurrentEmail('')
-              }
+              setCurrentEmail(getOrCreateAnonymousUserId())
             }
             return
           } else {

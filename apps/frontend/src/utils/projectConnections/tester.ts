@@ -157,7 +157,10 @@ async function assertPublicHost(host: string): Promise<dns.LookupAddress[]> {
 }
 
 class TestError extends Error {
-  constructor(public code: TestErrorCode, message: string) {
+  constructor(
+    public code: TestErrorCode,
+    message: string,
+  ) {
     super(message)
   }
 }
@@ -184,6 +187,10 @@ function makePinnedLookup(
     // Prefer the first vetted address; refuse if for some reason it is now
     // private (shouldn't happen — we already vetted — but defensive).
     const a = vetted[0]
+    // Belt-and-suspenders: assertPublicHost never returns an empty list and
+    // never returns a private address, so this refusal cannot be reached
+    // through the public probe entry points.
+    /* v8 ignore start */
     if (!a || isPrivateAddress(a.address, a.family)) {
       callback(
         new Error(
@@ -194,6 +201,7 @@ function makePinnedLookup(
       )
       return
     }
+    /* v8 ignore stop */
     callback(null, a.address, a.family)
   }
 }
@@ -259,8 +267,8 @@ function classifyUnknown(e: unknown): TestResult {
     cause instanceof Error
       ? cause.message
       : typeof cause === 'string'
-      ? cause
-      : ''
+        ? cause
+        : ''
   const errno = (e as { code?: string } | undefined)?.code
   // Log the raw upstream error so operators can see what actually failed.
   // The user-facing response keeps a sanitized code/message — secrets in
