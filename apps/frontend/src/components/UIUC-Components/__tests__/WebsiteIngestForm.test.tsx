@@ -46,8 +46,7 @@ describe('WebsiteIngestForm', () => {
       .spyOn(globalThis, 'setInterval')
       .mockImplementation((fn: any) => {
         fn()
-        // @ts-expect-error - minimal timer handle for tests
-        return 0
+        return 0 as any
       })
 
     server.use(
@@ -103,8 +102,7 @@ describe('WebsiteIngestForm', () => {
   it('surfaces already-completed child URLs from successDocs even when docsInProgress is empty', async () => {
     vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
       fn()
-      // @ts-expect-error - minimal timer handle for tests
-      return 0
+      return 0 as any
     })
 
     server.use(
@@ -159,8 +157,7 @@ describe('WebsiteIngestForm', () => {
   it('matches docs.base_url to the file URL even when trailing slashes differ', async () => {
     vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
       fn()
-      // @ts-expect-error - minimal timer handle for tests
-      return 0
+      return 0 as any
     })
 
     server.use(
@@ -211,8 +208,7 @@ describe('WebsiteIngestForm', () => {
   it('polls ingest status and marks an ingesting file as complete when it shows up in success docs', async () => {
     vi.spyOn(globalThis, 'setInterval').mockImplementation((fn: any) => {
       fn()
-      // @ts-expect-error - minimal timer handle for tests
-      return 0
+      return 0 as any
     })
 
     server.use(
@@ -484,8 +480,7 @@ describe('WebsiteIngestForm', () => {
       (fn: any, ms?: any) => {
         if (ms === 8000) {
           fn()
-          // @ts-expect-error - minimal timer handle for tests
-          return 0
+          return 0 as any
         }
         return originalSetTimeout(fn, ms)
       },
@@ -531,8 +526,7 @@ describe('WebsiteIngestForm', () => {
       (fn: any, ms?: any) => {
         if (ms === 8000) {
           fn()
-          // @ts-expect-error - minimal timer handle for tests
-          return 0
+          return 0 as any
         }
         return originalSetTimeout(fn, ms)
       },
@@ -585,8 +579,7 @@ describe('WebsiteIngestForm', () => {
       (fn: any, ms?: any) => {
         if (ms === 8000) {
           fn()
-          // @ts-expect-error - minimal timer handle for tests
-          return 0
+          return 0 as any
         }
         return originalSetTimeout(fn, ms)
       },

@@ -13,7 +13,7 @@ const hoisted = vi.hoisted(() => {
   }
 })
 
-vi.mock('~/pages/api/authorization', () => ({
+vi.mock('~/server/authorization', () => ({
   withCourseOwnerOrAdminAccess: () => (handler: any) => handler,
   withCourseAccessFromRequest: () => (handler: any) => handler,
 }))

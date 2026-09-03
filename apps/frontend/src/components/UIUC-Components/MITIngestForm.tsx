@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '../Dialog'
+} from '@/components/shadcn/ui/dialog'
 import NextLink from 'next/link'
 import axios from 'axios'
 import { type FileUpload } from './UploadNotification'
@@ -23,7 +23,9 @@ export default function MITIngestForm({
   queryClient: QueryClient
 }): JSX.Element {
   const [isUrlValid, setIsUrlValid] = useState(false)
-  const delayedInvalidateRef = useRef<ReturnType<typeof setTimeout>>()
+  const delayedInvalidateRef = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined)
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
   const [open, setOpen] = useState(false)
@@ -146,50 +148,44 @@ export default function MITIngestForm({
         }}
       >
         <DialogTrigger
-          asChild
           tabIndex={0}
+          nativeButton={false}
           className="focus:bg-[--dashboard-background-dark]"
-        >
-          <Card
-            role="button"
-            onKeyDown={(e: React.KeyboardEvent) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                ;(e.currentTarget as HTMLElement).click()
-              }
-            }}
-            className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-            style={{ height: '100%' }}
-          >
-            <div className="-ml-2 mb-2 flex items-center justify-between">
-              <div className="flex items-center space-x-1">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full">
-                  <Image
-                    src="/media/mitocw_logo.jpg"
-                    alt="MIT OCW Logo"
-                    width={32}
-                    height={32}
-                    className="rounded-full object-contain"
-                  />
+          render={
+            <Card
+              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+              style={{ height: '100%' }}
+            >
+              <div className="-ml-2 mb-2 flex items-center justify-between">
+                <div className="flex items-center space-x-1">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full">
+                    <Image
+                      src="/media/mitocw_logo.jpg"
+                      alt="MIT OCW Logo"
+                      width={32}
+                      height={32}
+                      className="rounded-full object-contain"
+                    />
+                  </div>
+                  <Text className="text-xl font-semibold">MIT Course</Text>
                 </div>
-                <Text className="text-xl font-semibold">MIT Course</Text>
               </div>
-            </div>
 
-            <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
-              Import content from MIT OpenCourseWare, including lecture notes,
-              assignments, and course materials.
-            </Text>
-            <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
-              <span>Configure import</span>
-              <IconArrowRight
-                size={16}
-                aria-hidden="true"
-                className="ml-2 transition-transform group-hover:translate-x-1"
-              />
-            </div>
-          </Card>
-        </DialogTrigger>
+              <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
+                Import content from MIT OpenCourseWare, including lecture notes,
+                assignments, and course materials.
+              </Text>
+              <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
+                <span>Configure import</span>
+                <IconArrowRight
+                  size={16}
+                  aria-hidden="true"
+                  className="ml-2 transition-transform group-hover:translate-x-1"
+                />
+              </div>
+            </Card>
+          }
+        />
 
         <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto !rounded-2xl border-0 bg-[--modal] px-4 py-6 text-[--modal-text] sm:px-6">
           <DialogHeader>

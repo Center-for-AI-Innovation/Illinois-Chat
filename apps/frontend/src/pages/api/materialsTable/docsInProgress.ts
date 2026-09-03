@@ -3,7 +3,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { documentsInProgress } from '~/db/dbClient'
 import { connectionManager } from '~/utils/connectionManager'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { parseIngestStatusFilters } from '~/utils/ingestStatusFilters'
 
 // This is for "Documents in Progress" table, docs that are still being ingested.

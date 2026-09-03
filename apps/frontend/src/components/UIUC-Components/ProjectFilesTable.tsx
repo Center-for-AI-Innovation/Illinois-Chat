@@ -46,7 +46,7 @@ import { useAppendToDocGroup } from '@/hooks/queries/useAppendToDocGroup'
 import { useFetchDocumentGroups } from '@/hooks/queries/useFetchDocumentGroups'
 import { useDeleteFromDocGroup } from '@/hooks/queries/useDeleteFromDocGroup'
 
-import handleExport from '~/pages/util/handleExport'
+import { handleExport } from '~/utils/handleExport'
 import { fetchPresignedUrl } from '~/utils/apiUtils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { showToastOnUpdate } from './MakeQueryAnalysisPage'
@@ -155,9 +155,9 @@ export function ProjectFilesTable({
   }>({})
 
   // Refs for each row of failed documents
-  const textRefs = useRef<{ [key: number]: React.RefObject<HTMLDivElement> }>(
-    {},
-  )
+  const textRefs = useRef<{
+    [key: number]: React.RefObject<HTMLDivElement | null>
+  }>({})
   const multiSelectRef = useRef<HTMLDivElement>(null)
   const [selectedDocGroups, setSelectedDocGroups] = useState<string[]>([])
 
@@ -381,12 +381,17 @@ export function ProjectFilesTable({
         ['documentGroups', course_name],
         (old = []) => {
           return old.map((doc_group) => {
-            recordsToDelete.forEach((record) => {
-              if (doc_group.name in record.doc_groups) {
-                doc_group.doc_count -= 1
+            const decrement = recordsToDelete.reduce((count, record) => {
+              if (record.doc_groups?.includes(doc_group.name)) {
+                return count + 1
               }
-            })
-            return doc_group
+              return count
+            }, 0)
+            if (decrement === 0) return doc_group
+            return {
+              ...doc_group,
+              doc_count: Math.max(0, (doc_group.doc_count || 0) - decrement),
+            }
           })
         },
       )
@@ -553,7 +558,7 @@ export function ProjectFilesTable({
       <GlobalStyle />
       {/* Fixed Header Section */}
       <div className="flex-none">
-        <div className="flex items-center justify-between px-4 pt-4 sm:px-6 md:px-8 ">
+        <div className="flex items-center justify-between px-4 pt-4 sm:px-6 md:px-8">
           <div className="flex items-center md:space-x-4">
             <button
               onClick={() => onTabChange('success')}

@@ -3,7 +3,7 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { documents } from '~/db/dbClient'
 import { connectionManager } from '~/utils/connectionManager'
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { parseIngestStatusFilters } from '~/utils/ingestStatusFilters'
 // This is for "Documents" table, completed docs. POST-only: callers must send
 // the filenames/base_urls they are tracking so we never return the whole table.
