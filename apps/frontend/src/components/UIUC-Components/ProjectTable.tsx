@@ -141,7 +141,7 @@ const ListProjectTable: React.FC = () => {
             tabIndex={0}
             aria-label={courseName}
             key={courseName}
-            className="cursor-pointer border-[--table-border] hover:bg-[--background-faded] hover:text-[--foreground]"
+            className="cursor-pointer border-[--table-border] text-[--foreground] hover:bg-[--background-faded]"
             onClick={(e) => {
               // Check if cmd (Mac) or ctrl (Windows/Linux) key is pressed
               if (e.metaKey || e.ctrlKey) {
@@ -162,7 +162,6 @@ const ListProjectTable: React.FC = () => {
                 }
               }
             }}
-            style={{ cursor: 'pointer', color: 'var(--foreground)' }}
           >
             <TableCell className={cellClasses}>{courseName}</TableCell>
             <TableCell className={cellClasses}>
