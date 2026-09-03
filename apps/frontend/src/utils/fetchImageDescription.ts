@@ -1,5 +1,3 @@
-// src/pages/api/UIUC-api/fetchImageDescription.ts
-
 import { type Content, type Conversation, type ImageBody } from '@/types/chat'
 import { type AllLLMProviders } from '~/utils/modelProviders/LLMProvider'
 

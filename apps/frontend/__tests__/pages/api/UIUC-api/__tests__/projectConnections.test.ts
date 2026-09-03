@@ -76,7 +76,7 @@ describe('projectConnections handler — auth gate', () => {
       },
     }))
 
-    const mod = await import('../projectConnections')
+    const mod = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await mod.default(
       { method: 'GET', query: { project_name: 'demo' }, headers: {} } as any,
@@ -97,7 +97,7 @@ describe('projectConnections handler — auth gate', () => {
       },
     }))
 
-    const mod = await import('../projectConnections')
+    const mod = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await mod.default(
       { method: 'GET', query: { project_name: 'demo' }, headers: {} } as any,
@@ -143,7 +143,7 @@ describe('projectConnections handler — GET masks secrets', () => {
       connectionManager: { invalidate: vi.fn(async () => {}) },
     }))
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const req: any = {
       method: 'GET',
       query: { project_name: 'demo' },
@@ -167,7 +167,7 @@ describe('projectConnections handler — GET masks secrets', () => {
 describe('projectConnections handler — POST', () => {
   it('upserts, invalidates, and writes an audit entry with field NAMES only', async () => {
     mockRepoAndManager()
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const req: any = {
       method: 'POST',
       headers: {
@@ -216,7 +216,7 @@ describe('projectConnections handler — POST', () => {
 
   it('returns 404 when the project is unknown', async () => {
     mockRepoAndManager()
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       {
@@ -241,7 +241,7 @@ describe('projectConnections handler — POST', () => {
 
   it('returns 400 on validation error', async () => {
     mockRepoAndManager()
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       {
@@ -259,7 +259,7 @@ describe('projectConnections handler — POST', () => {
 describe('projectConnections handler — DELETE', () => {
   it('invalidates and audits on whole-row delete', async () => {
     mockRepoAndManager()
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       {
@@ -281,7 +281,7 @@ describe('projectConnections handler — DELETE', () => {
 
   it('records the kind on field-clear delete', async () => {
     mockRepoAndManager()
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       {
