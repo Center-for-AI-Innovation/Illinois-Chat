@@ -191,6 +191,60 @@ export const upsertBodySchema = z.discriminatedUnion('kind', [
 ])
 export type UpsertBody = z.infer<typeof upsertBodySchema>
 
+// Per-kind schemas for the partial-update path. `.partial()` on the object
+// schemas only — the merged result is validated against the full schema
+// server-side, which is what actually enforces required fields. Validating the
+// patch itself against the full schema would be wrong: the UI holds masked
+// secrets, so a request that changes one toggle legitimately arrives without
+// `api_key`.
+//
+// `embedding` uses its inner object because `embeddingConfigSchema` carries a
+// `.refine()` and ZodEffects has no `.partial()`. The refinement still runs on
+// the merged result.
+const partialConfigSchemas = {
+  s3: s3ConfigSchema.partial(),
+  database: databaseConfigSchema.partial(),
+  qdrant: qdrantConfigSchema.partial(),
+  embedding: z
+    .object({
+      provider: z.enum(EMBEDDING_PROVIDERS as unknown as [string, ...string[]]),
+      model: z.string().min(1),
+      base_url: z.string().url().optional(),
+      api_base: z.string().url().optional(),
+      api_key: z.string().min(1).optional(),
+      query_instruction: z.string().optional(),
+    })
+    .partial(),
+} as const
+
+export const patchBodySchema = z.discriminatedUnion('kind', [
+  upsertBaseSchema.extend({
+    kind: z.literal('s3'),
+    config: partialConfigSchemas.s3,
+  }),
+  upsertBaseSchema.extend({
+    kind: z.literal('database'),
+    config: partialConfigSchemas.database,
+  }),
+  upsertBaseSchema.extend({
+    kind: z.literal('qdrant'),
+    config: partialConfigSchemas.qdrant,
+  }),
+  upsertBaseSchema.extend({
+    kind: z.literal('embedding'),
+    config: partialConfigSchemas.embedding,
+  }),
+])
+export type PatchBody = z.infer<typeof patchBodySchema>
+
+/** The full schema for a kind, used to validate a merged patch result. */
+export const configSchemaByKind = {
+  s3: s3ConfigSchema,
+  database: databaseConfigSchema,
+  qdrant: qdrantConfigSchema,
+  embedding: embeddingConfigSchema,
+} as const satisfies Record<ConnectionKind, z.ZodTypeAny>
+
 export const setActiveBodySchema = z.object({
   project_name: z.string().min(1),
   is_active: z.boolean(),

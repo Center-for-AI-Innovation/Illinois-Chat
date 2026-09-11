@@ -16,11 +16,14 @@ import {
   getProjectIdByName,
   getConnectionByProject,
   upsertConnectionField,
+  patchConnectionField,
   deleteConnection,
   writeAuditEntry,
 } from '~/db/projectConnectionsRepo'
 import {
   upsertBodySchema,
+  patchBodySchema,
+  configSchemaByKind,
   deleteQuerySchema,
   getQuerySchema,
   CONNECTION_KINDS,
@@ -46,10 +49,12 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return await handleGet(req, res)
       case 'POST':
         return await handlePost(req, res, actorEmail, meta)
+      case 'PATCH':
+        return await handlePatch(req, res, actorEmail, meta)
       case 'DELETE':
         return await handleDelete(req, res, actorEmail, meta)
       default:
-        res.setHeader('Allow', 'GET, POST, DELETE')
+        res.setHeader('Allow', 'GET, POST, PATCH, DELETE')
         return res.status(405).json({ error: 'Method not allowed' })
     }
   } catch (err) {
@@ -192,6 +197,119 @@ async function handlePost(
       ...meta,
     })
     return res.status(500).json({ error: 'Failed to upsert connection' })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PATCH — change some fields of an existing connection kind
+// ---------------------------------------------------------------------------
+
+async function handlePatch(
+  req: AuthenticatedRequest,
+  res: NextApiResponse,
+  actorEmail: string,
+  meta: ReturnType<typeof extractRequestMeta>,
+) {
+  const parsed = patchBodySchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: formatZodError(parsed.error) })
+  }
+  const body = parsed.data
+  const projectName = body.project_name
+  const kind: ConnectionKind = body.kind
+  const patch = body.config as Record<string, unknown>
+
+  if (Object.keys(patch).length === 0) {
+    return res
+      .status(400)
+      .json({ error: 'config must contain at least one field to update' })
+  }
+
+  // Tracks whether the merged result failed validation, so the catch below can
+  // tell a bad request apart from a genuine server fault. `merge` runs inside
+  // the transaction and a throw there rolls the whole thing back, which is what
+  // we want — but the error surfaces here rather than at the parse site.
+  let validationError: ReturnType<typeof formatZodError> | null = null
+  let mergedFieldNames: string[] = []
+
+  try {
+    const result = await patchConnectionField({
+      projectName,
+      kind,
+      merge: async (current) => {
+        const stored =
+          (await decryptProjectConfig<Record<string, unknown>>(current)) ?? {}
+        // Patch on top of the stored config, so fields the UI never received
+        // in plaintext (secrets arrive masked) keep their real values.
+        const merged = { ...stored, ...patch }
+
+        // Validated against the *full* schema, not the partial one: the point
+        // of the merge is that the result must be a complete, valid config.
+        const validated = configSchemaByKind[kind].safeParse(merged)
+        if (!validated.success) {
+          validationError = formatZodError(validated.error)
+          throw new Error('merged config failed validation')
+        }
+        mergedFieldNames = Object.keys(patch)
+        return encryptProjectConfig(validated.data)
+      },
+    })
+
+    if (result.status === 'row_not_found') {
+      return res.status(404).json({
+        error: `Project '${projectName}' has no external connections configured.`,
+      })
+    }
+    if (result.status === 'kind_not_configured') {
+      return res.status(404).json({
+        error: `Project '${projectName}' has no '${kind}' connection to patch. Create it with POST first.`,
+      })
+    }
+
+    await invalidateForProject(projectName)
+
+    await writeAuditEntry({
+      actor_email: actorEmail,
+      action: 'upsert',
+      project_name: projectName,
+      kind,
+      outcome: 'success',
+      failure_reason: null,
+      // Field NAMES only — never the values.
+      changed_fields: mergedFieldNames,
+      ...meta,
+    })
+
+    const warning =
+      kind === 'database' && typeof patch.connection_uri === 'string'
+        ? supabasePoolerWarning(patch.connection_uri)
+        : null
+
+    return res.status(200).json({
+      success: true,
+      project_name: projectName,
+      kind,
+      // Echoed so a caller can see the patch did not flip activation. This
+      // route never writes is_active; use the /active route for that.
+      is_active: result.row.is_active,
+      ...(warning ? { warning } : {}),
+    })
+  } catch (e) {
+    if (validationError) {
+      return res.status(400).json({ error: validationError })
+    }
+    console.error('[projectConnections] patch failed:', e)
+    await writeAuditEntry({
+      actor_email: actorEmail,
+      action: 'upsert',
+      project_name: projectName,
+      kind,
+      outcome: 'failure',
+      failure_reason: e instanceof Error ? e.message.slice(0, 200) : 'unknown',
+      changed_fields: null,
+      ...meta,
+    })
+    return res.status(500).json({ error: 'Failed to patch connection' })
   }
 }
 
