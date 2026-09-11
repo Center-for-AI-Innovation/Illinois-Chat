@@ -177,3 +177,6 @@ pip-selfcheck.json
 
 # macOS
 .DS_Store
+
+# Local start-dev.sh --apps process tracking
+.illinois-chat-dev-apps.pid

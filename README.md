@@ -57,7 +57,11 @@ bash infra/scripts/stop-all.sh --volumes
 Use the dev stack when you want to run app processes directly with hot reload while Docker provides shared infrastructure.
 
 ```bash
+# Infrastructure only
 bash infra/scripts/start-dev.sh
+
+# Infrastructure plus backend, ingest worker, and frontend (dev / hot-reload)
+bash infra/scripts/start-dev.sh --apps
 ```
 
 This starts `infra/docker/docker-compose.dev.yaml` and non-destructively creates or appends missing keys in:
@@ -66,7 +70,9 @@ This starts `infra/docker/docker-compose.dev.yaml` and non-destructively creates
 - `apps/frontend/.env`
 - `apps/crawlee/.env`
 
-Run the backend, ingest worker, and frontend in separate terminals:
+`--apps` then starts the backend (`flask --debug` on port 8000), ingest worker (port 8001), and frontend (`npm run local` on port 3000) in the same terminal. `Ctrl+C` stops those three processes; Docker infrastructure stays up until you run `stop-dev.sh`.
+
+To start the apps yourself in separate terminals instead:
 
 ```bash
 cd apps/backend
