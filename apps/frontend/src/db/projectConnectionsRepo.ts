@@ -84,6 +84,121 @@ export async function upsertConnectionField(args: {
   return row
 }
 
+export type PatchConnectionResult =
+  | { status: 'ok'; row: ProjectExternalConnections }
+  | { status: 'row_not_found' }
+  | { status: 'kind_not_configured' }
+
+/**
+ * Rewrites one connection kind's encrypted blob without touching anything else
+ * on the row.
+ *
+ * Two things this does that `upsertConnectionField` cannot:
+ *
+ * 1. It leaves `is_active` alone. `upsertConnectionField` hardcodes
+ *    `is_active: true` in both its INSERT and its UPDATE branch, so reusing it
+ *    for a partial edit would quietly re-enable a connection that an operator
+ *    had deliberately disabled — a toggle flip turning traffic back on is not
+ *    an acceptable side effect.
+ *
+ * 2. The read and the write happen in one transaction with the row locked
+ *    (`SELECT … FOR UPDATE`). A read-then-write outside a transaction races a
+ *    concurrent secret rotation: both sides read the same blob, both merge onto
+ *    it, and the last writer silently discards the rotated key.
+ *
+ * The caller supplies `merge`, which receives the blob read *under the lock*
+ * and returns its replacement. Decryption, validation, and re-encryption stay
+ * with the caller so this module keeps to storage concerns — but because the
+ * callback runs inside the transaction, it is always merging onto current data.
+ *
+ * Patching is strictly an edit: a missing row or an unconfigured kind is
+ * reported rather than created, since there is no base config to merge onto.
+ */
+export async function patchConnectionField(args: {
+  projectName: string
+  kind: ConnectionKind
+  merge: (current: { encrypted: string }) => Promise<{ encrypted: string }>
+}): Promise<PatchConnectionResult> {
+  const { projectName, kind, merge } = args
+  const column = KIND_TO_COLUMN[kind]
+
+  return hostDb.transaction(async (tx) => {
+    const locked = await tx
+      .select()
+      .from(projectExternalConnections)
+      .where(eq(projectExternalConnections.project_name, projectName))
+      .limit(1)
+      .for('update')
+
+    const existing = locked[0]
+    if (!existing) return { status: 'row_not_found' as const }
+
+    const currentBlob = (existing as Record<string, unknown>)[column] as {
+      encrypted: string
+    } | null
+    if (!currentBlob) return { status: 'kind_not_configured' as const }
+
+    const nextBlob = await merge(currentBlob)
+
+    const [row] = await tx
+      .update(projectExternalConnections)
+      .set({ [column]: nextBlob, updated_at: new Date() })
+      .where(eq(projectExternalConnections.project_name, projectName))
+      .returning()
+
+    if (!row) {
+      throw new Error('patchConnectionField: no row returned from update')
+    }
+    return { status: 'ok' as const, row }
+  })
+}
+
+export interface ConnectionSummary {
+  project_name: string
+  is_active: boolean | null
+  updated_at: Date | null
+  created_at: Date | null
+  configured_kinds: ConnectionKind[]
+}
+
+/**
+ * Every project that has a connections row, with which kinds are configured.
+ *
+ * Returns no config contents — not even masked ones. This backs a list view
+ * that only needs to know a config exists; the detail route is where a config
+ * is actually read, so there is no reason for secrets to travel with the list.
+ */
+export async function listConnections(): Promise<ConnectionSummary[]> {
+  const rows = await hostDb
+    .select({
+      project_name: projectExternalConnections.project_name,
+      is_active: projectExternalConnections.is_active,
+      updated_at: projectExternalConnections.updated_at,
+      created_at: projectExternalConnections.created_at,
+      has_s3: sql<boolean>`${projectExternalConnections.s3_config} IS NOT NULL`,
+      has_database: sql<boolean>`${projectExternalConnections.database_config} IS NOT NULL`,
+      has_qdrant: sql<boolean>`${projectExternalConnections.qdrant_config} IS NOT NULL`,
+      has_embedding: sql<boolean>`${projectExternalConnections.embedding_config} IS NOT NULL`,
+    })
+    .from(projectExternalConnections)
+    .orderBy(projectExternalConnections.project_name)
+
+  return rows.map((row) => {
+    const configured: ConnectionKind[] = []
+    if (row.has_s3) configured.push('s3')
+    if (row.has_database) configured.push('database')
+    if (row.has_qdrant) configured.push('qdrant')
+    if (row.has_embedding) configured.push('embedding')
+    return {
+      project_name: row.project_name,
+      is_active: row.is_active,
+      updated_at: row.updated_at,
+      created_at: row.created_at,
+      configured_kinds: configured,
+    }
+  })
+}
+
 export async function deleteConnection(args: {
   projectName: string
   kind?: ConnectionKind
