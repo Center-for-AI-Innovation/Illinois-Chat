@@ -4,6 +4,24 @@ import type { AuthContextProps } from 'react-oidc-context'
 export const get_user_permission = (
   course_metadata: CourseMetadata,
   auth: AuthContextProps,
+  /**
+   * Whether the signed-in user is a platform super admin.
+   *
+   * Supplied by the caller (via `useFetchIsSuperAdmin`) rather than derived
+   * here, because only the env allowlist is inlined into the client bundle —
+   * a Redis-granted admin cannot be recognised without asking the server.
+   *
+   * Needed for parity with the API. The middlewares in
+   * `src/pages/api/authorization.ts` grant super admins admin-tier access, so
+   * without this the browser would render read-only controls for someone whose
+   * writes the server accepts. Mirrors that bypass exactly: it grants 'edit',
+   * which is the admin tier, and it does not override `is_frozen` or make a
+   * missing project appear to exist.
+   *
+   * Defaults to false so server-side callers and tests keep their old
+   * behaviour.
+   */
+  isPlatformSuperAdmin = false,
 ) => {
   // const router = useRouter()
 
@@ -29,11 +47,12 @@ export const get_user_permission = (
       }
 
       if (
-        userEmail &&
-        (userEmail === course_metadata.course_owner ||
-          course_metadata.course_admins.includes(userEmail))
+        isPlatformSuperAdmin ||
+        (userEmail &&
+          (userEmail === course_metadata.course_owner ||
+            course_metadata.course_admins.includes(userEmail)))
       ) {
-        // owner or admin
+        // owner, admin, or platform super admin
         return 'edit'
       } else {
         // course is public, so return view to non-admins.
@@ -48,11 +67,12 @@ export const get_user_permission = (
       }
 
       if (
-        userEmail &&
-        (userEmail === course_metadata.course_owner ||
-          course_metadata.course_admins.includes(userEmail))
+        isPlatformSuperAdmin ||
+        (userEmail &&
+          (userEmail === course_metadata.course_owner ||
+            course_metadata.course_admins.includes(userEmail)))
       ) {
-        // You are the course owner or an admin
+        // You are the course owner, an admin, or a platform super admin.
         // Can edit and view.
         return 'edit'
       } else if (

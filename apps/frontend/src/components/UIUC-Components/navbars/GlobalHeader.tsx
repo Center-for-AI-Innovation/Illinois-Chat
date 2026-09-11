@@ -2,11 +2,13 @@ import {
   IconClipboardText,
   IconHome,
   IconNews,
+  IconShieldCheck,
   IconSparkles,
 } from '@tabler/icons-react'
 import { Menu2 } from 'tabler-icons-react'
 
 import { useAuth } from 'react-oidc-context'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { AuthMenu } from './AuthMenu'
 
 export default function Header({ isNavbar = false }: { isNavbar?: boolean }) {
@@ -101,19 +103,30 @@ export function LandingPageHeader({
   const menuButtonRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState({ right: '20px' })
 
+  // Gated on the server's answer, not the NEXT_PUBLIC env list: a
+  // Redis-granted super admin is invisible to the client bundle, so an env-only
+  // check would hide this link from admins the API accepts writes from.
+  const { data: isSuperAdmin } = useFetchIsSuperAdmin({
+    enabled: auth.isAuthenticated,
+  })
+
   // Determine which elements should be visible based on screen width
   const showMyChatbotsInNav = windowWidth >= 580 // New: My Chatbots button
   const showDocsInNav = windowWidth >= 680 // Adjusted to make room for My Chatbots
   // const showNewsInNav = windowWidth >= 740 // Adjusted to make room for My Chatbots
   const showNewsInNav = false // News button temporarily hidden
   const showNewProjectInNav = windowWidth >= 864 // Adjusted to make room for My Chatbots
+  // Admin is the last link to earn a slot in the nav — it is the rarest and
+  // the widest addition — and falls into the hamburger below this width.
+  const showAdminInNav = isSuperAdmin === true && windowWidth >= 1000
 
   // Fix for hamburger menu logic to ensure menu is shown until all items are visible in nav
   const showHamburgerMenu =
     (!showMyChatbotsInNav ||
       !showDocsInNav ||
       // !showNewsInNav || // News button hidden
-      !showNewProjectInNav) &&
+      !showNewProjectInNav ||
+      (isSuperAdmin === true && !showAdminInNav)) &&
     forGeneralPurposeNotLandingpage === false
 
   // Update window width on resize
@@ -190,7 +203,8 @@ export function LandingPageHeader({
       showMyChatbotsInNav &&
       showDocsInNav &&
       // showNewsInNav && // News button hidden
-      showNewProjectInNav
+      showNewProjectInNav &&
+      (isSuperAdmin !== true || showAdminInNav)
     ) {
       setIsMenuOpen(false)
       setMenuVisible(false)
@@ -201,6 +215,8 @@ export function LandingPageHeader({
     showDocsInNav,
     // showNewsInNav, // News button hidden
     showNewProjectInNav,
+    isSuperAdmin,
+    showAdminInNav,
   ])
 
   // Handle link click to close menu
@@ -418,6 +434,28 @@ export function LandingPageHeader({
                   </span>
                 </Link>
               )}
+
+              {showAdminInNav && (
+                <Link href="/admin" className={classes.link} tabIndex={0}>
+                  <span className="flex items-center">
+                    <IconShieldCheck
+                      size={18}
+                      strokeWidth={2}
+                      aria-hidden="true"
+                      style={{
+                        marginRight: '8px',
+                        color: 'var(--illinois-orange)',
+                      }}
+                    />
+                    <span
+                      className={`${montserrat_heading.variable} font-montserratHeading`}
+                      style={{ color: 'var(--illinois-orange)' }}
+                    >
+                      Admin
+                    </span>
+                  </span>
+                </Link>
+              )}
             </>
           )}
         </div>
@@ -585,6 +623,33 @@ export function LandingPageHeader({
                           style={{ color: 'var(--illinois-orange)' }}
                         >
                           Create Your Own Bot
+                        </span>
+                      </div>
+                    </Link>
+                  )}
+
+                  {isSuperAdmin === true && !showAdminInNav && (
+                    <Link
+                      tabIndex={0}
+                      href="/admin"
+                      className="menu-item rounded transition-colors duration-200 hover:bg-orange-100"
+                      onClick={(e) => handleLinkClick(e)}
+                    >
+                      <div className="menu-item-content flex items-center p-2">
+                        <IconShieldCheck
+                          size={18}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                          style={{
+                            marginRight: '8px',
+                            color: 'var(--illinois-orange)',
+                          }}
+                        />
+                        <span
+                          className={`${montserrat_heading.variable} font-montserratHeading`}
+                          style={{ color: 'var(--illinois-orange)' }}
+                        >
+                          Admin
                         </span>
                       </div>
                     </Link>
