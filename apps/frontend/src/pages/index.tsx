@@ -1,14 +1,19 @@
 import { Button, Card } from '@mantine/core'
-import { type NextPage } from 'next'
+import { type GetStaticProps, type NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
 import React, { useState, useEffect, useMemo } from 'react'
 import { ArrowNarrowRight, ExternalLink, Link } from 'tabler-icons-react'
 
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
+import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
 import router from 'next/router'
+import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
+// Server-only (imports `redis`). Referenced solely from getStaticProps below,
+// so Next's SSG transform drops it from the client bundle.
+import { readAnnouncementBanner } from '~/utils/platformSettings.server'
 
 // Typing animation component
 const TypingAnimation: React.FC = () => {
@@ -126,15 +131,20 @@ const TypingAnimation: React.FC = () => {
   )
 }
 
-const Home: NextPage = () => {
-  const [isTooltipVisible, setIsTooltipVisible] = useState(false)
+interface HomeProps {
+  /**
+   * The runtime announcement banner, or `null` when Redis holds no usable
+   * configuration. Optional so the page still renders (on the legacy fallback)
+   * when mounted directly in tests.
+   */
+  announcementBanner?: AnnouncementBannerValue | null
+}
+
+const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
   const useIllinoisChatConfig = useMemo(() => {
     return (
       process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
     )
-  }, [])
-  const IllinoisChatBannerContent = useMemo(() => {
-    return process.env.NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT || null
   }, [])
 
   return (
@@ -166,49 +176,7 @@ const Home: NextPage = () => {
         </style>
       </Head>
 
-      {/* Rebranding announcement header bar */}
-      <section
-        aria-label="Site announcement"
-        className="relative w-full py-2 text-center"
-        style={{
-          background: 'var(--illinois-orange)',
-          color: 'var(--illinois-white)',
-        }}
-      >
-        <div
-          className={`inline-block ${montserrat_heading.variable} font-montserratHeading`}
-        >
-          <div className="relative inline-block cursor-help">
-            <span
-              className="text-lg font-bold"
-              onMouseEnter={() => setIsTooltipVisible(true)}
-              onMouseLeave={() => setIsTooltipVisible(false)}
-            >
-              {/*1. If useIllinoisChatConfig && IllinoisChatBannerContent → render HTML from IllinoisChatBannerContent*/}
-              {/*2. If !useIllinoisChatConfig → render default "Heads up" banner*/}
-              {/*3. Otherwise → render nothing*/}
-              {useIllinoisChatConfig && IllinoisChatBannerContent ? (
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: IllinoisChatBannerContent,
-                  }}
-                />
-              ) : !useIllinoisChatConfig ? (
-                <>
-                  Heads up: we’ve rebranded to Illinois Chat — please visit{' '}
-                  <a
-                    href="https://chat.illinois.edu"
-                    className="underline"
-                    tabIndex={0}
-                  >
-                    chat.illinois.edu
-                  </a>
-                </>
-              ) : null}
-            </span>
-          </div>
-        </div>
-      </section>
+      <AnnouncementBanner banner={announcementBanner} />
 
       <LandingPageHeader />
 
@@ -922,6 +890,46 @@ const Home: NextPage = () => {
       <GlobalFooter />
     </>
   )
+}
+
+/**
+ * Reads the announcement banner from Redis at generation time.
+ *
+ * ISR rather than client-side fetching so the public landing page stays static
+ * and visitors never see the bar pop in after paint.
+ *
+ * `readAnnouncementBanner()` is deliberately non-throwing: Next also runs this
+ * during `next build` inside Docker, where Redis is unreachable. A throw there
+ * fails the image build, so an unreachable store has to degrade to the legacy
+ * banner and let the first live request fill in the real value.
+ *
+ * `revalidate: 30` is the real propagation bound. `res.revalidate('/')` from
+ * the settings PUT only regenerates the replica that served that request; the
+ * others pick the change up on this timer.
+ */
+export const getStaticProps: GetStaticProps<HomeProps> = async () => {
+  const read = await readAnnouncementBanner()
+
+  return {
+    props: {
+      // Only a genuinely configured record becomes a non-null prop. `absent`,
+      // `invalid`, and `unavailable` all map to null, which is what makes the
+      // legacy fallback fire for those cases and *only* those cases.
+      //
+      // `updatedAt`/`updatedBy` are stripped rather than spread: `updatedBy`
+      // is an administrator's email address, and this page is public.
+      announcementBanner:
+        read.state === 'configured'
+          ? {
+              enabled: read.value.enabled,
+              message: read.value.message,
+              linkText: read.value.linkText,
+              linkUrl: read.value.linkUrl,
+            }
+          : null,
+    },
+    revalidate: 30,
+  }
 }
 
 export default Home
