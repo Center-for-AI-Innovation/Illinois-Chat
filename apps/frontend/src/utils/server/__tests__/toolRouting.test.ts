@@ -287,6 +287,33 @@ describe('getToolRouterStatus', () => {
     expect(status.status).toBe('offline')
     expect(status.reason).toBeTruthy()
   })
+
+  it('does not report custom when the stored OpenAI key cannot be decrypted', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    process.env.NEXT_PUBLIC_SIGNING_KEY = 'some-other-signing-key'
+    const foreignCiphertext = await encryptKeyIfNeeded('sk-unreachable')
+    process.env.NEXT_PUBLIC_SIGNING_KEY = 'test-signing-key'
+
+    storeProviders({
+      OpenAI: { provider: 'OpenAI', enabled: true, apiKey: foreignCiphertext },
+    })
+    expect((await getToolRouterStatus(PROJECT)).status).toBe('offline')
+
+    process.env.NCSA_HOSTED_VLM_BASE_URL = 'https://vllm.example.edu/v1'
+    expect((await getToolRouterStatus(PROJECT)).status).toBe('default')
+  })
+
+  it('does not report custom when the compat key cannot be decrypted', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    process.env.NEXT_PUBLIC_SIGNING_KEY = 'some-other-signing-key'
+    const foreignCiphertext = await encryptKeyIfNeeded('compat-unreachable')
+    process.env.NEXT_PUBLIC_SIGNING_KEY = 'test-signing-key'
+
+    storeProviders({
+      OpenAICompatible: { ...COMPAT_PROVIDER, apiKey: foreignCiphertext },
+    })
+    expect((await getToolRouterStatus(PROJECT)).status).toBe('offline')
+  })
 })
 
 describe('resolveToolRouter with an unparseable compat base URL', () => {
@@ -299,23 +326,37 @@ describe('resolveToolRouter with an unparseable compat base URL', () => {
     process.env = { ...ORIGINAL_ENV }
   })
 
-  it('treats a base URL that is not a URL as non-OpenRouter rather than failing', async () => {
-    storeProviders({
-      OpenAICompatible: { ...COMPAT_PROVIDER, baseUrl: 'not a url' },
-    })
-    const result = await resolveToolRouter({
-      projectName: PROJECT,
-      selectedModelId: 'Org/Compat-Model',
-    })
-    expect(result).toMatchObject({
-      source: 'custom',
-      provider: 'OpenAICompatible',
-      endpointUrl: 'not a url/chat/completions',
-      // Not lowercased and no OpenRouter headers: the URL did not parse.
-      modelId: 'Org/Compat-Model',
-    })
-    expect((result as any).extraHeaders).toBeUndefined()
-  })
+  it.each(['not a url', 'ftp://compat.example.com/v1'])(
+    'skips the compat tier for base URL %j and falls through to the next tier',
+    async (baseUrl) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      storeProviders({
+        OpenAICompatible: { ...COMPAT_PROVIDER, baseUrl },
+      })
+
+      // No further tier configured: offline, never "not a url/chat/completions".
+      const offline = await resolveToolRouter({
+        projectName: PROJECT,
+        selectedModelId: 'Org/Compat-Model',
+      })
+      expect(offline.source).toBe('offline')
+
+      // NCSA configured: the default tier is reached instead of a bad fetch.
+      process.env.NCSA_HOSTED_VLM_BASE_URL = 'https://vllm.example.edu/v1'
+      const fallback = await resolveToolRouter({
+        projectName: PROJECT,
+        selectedModelId: 'Org/Compat-Model',
+      })
+      expect(fallback).toMatchObject({
+        source: 'default',
+        provider: 'NCSAHostedVLM',
+      })
+      expect(warn).toHaveBeenCalled()
+
+      // The status badge agrees: nothing custom is configured.
+      expect((await getToolRouterStatus(PROJECT)).status).toBe('default')
+    },
+  )
 })
 
 describe('callToolRouter', () => {

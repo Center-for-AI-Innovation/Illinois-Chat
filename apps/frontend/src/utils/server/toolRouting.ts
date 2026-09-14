@@ -74,17 +74,27 @@ async function tryDecrypt(key: string, tier: string): Promise<string | null> {
   }
 }
 
-function isOpenRouterBaseUrl(baseUrl: string): boolean {
-  try {
-    const hostname = new URL(baseUrl).hostname.toLowerCase()
-    return hostname === 'openrouter.ai' || hostname.endsWith('.openrouter.ai')
-  } catch {
-    return false
-  }
+function isOpenRouterHostname(hostname: string): boolean {
+  const lower = hostname.toLowerCase()
+  return lower === 'openrouter.ai' || lower.endsWith('.openrouter.ai')
 }
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/$/, '')
+}
+
+// A non-empty but malformed base URL must not count as configured: resolution
+// would otherwise hand back an endpoint like "not a url/chat/completions",
+// fetch would fail, and the OpenAI/NCSA fallback tiers would never be tried.
+function parseHttpUrl(value: string): URL | null {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed
+      : null
+  } catch {
+    return null
+  }
 }
 
 function compatProviderConfigured(llmProviders: AllLLMProviders | null) {
@@ -93,7 +103,14 @@ function compatProviderConfigured(llmProviders: AllLLMProviders | null) {
   const baseUrl = compat.baseUrl?.trim()
   const apiKey = compat.apiKey?.trim()
   if (!baseUrl || !apiKey) return null
-  return { compat, baseUrl, apiKey }
+  const parsed = parseHttpUrl(baseUrl)
+  if (!parsed) {
+    console.warn(
+      'Tool router: OpenAI-compatible base URL is not an http(s) URL, skipping tier',
+    )
+    return null
+  }
+  return { compat, baseUrl, apiKey, hostname: parsed.hostname }
 }
 
 function compatEnabledModelIds(llmProviders: AllLLMProviders | null): string[] {
@@ -119,7 +136,7 @@ export async function resolveToolRouter(params: {
     if (isCompatModel) {
       const apiKey = await tryDecrypt(compatConfig.apiKey, 'OpenAI-compatible')
       if (apiKey !== null) {
-        const isOpenRouter = isOpenRouterBaseUrl(compatConfig.baseUrl)
+        const isOpenRouter = isOpenRouterHostname(compatConfig.hostname)
         return {
           source: 'custom',
           provider: 'OpenAICompatible',
@@ -187,17 +204,24 @@ export async function getToolRouterStatus(
 ): Promise<ToolRouterStatus> {
   const llmProviders = await readStoredProviders(projectName)
 
-  if (llmProviders?.OpenAI?.enabled && llmProviders.OpenAI.apiKey?.trim()) {
-    return { status: 'custom', provider: 'OpenAI' }
+  // Mirror resolveToolRouter: a stored key that cannot be decrypted is skipped
+  // there, so it must not be advertised as "custom" here either.
+  const storedOpenAIKey = llmProviders?.OpenAI?.apiKey?.trim()
+  if (llmProviders?.OpenAI?.enabled && storedOpenAIKey) {
+    const apiKey = await tryDecrypt(storedOpenAIKey, 'OpenAI')
+    if (apiKey !== null && apiKey.trim()) {
+      return { status: 'custom', provider: 'OpenAI' }
+    }
   }
 
   // A compat provider with no usable models never actually routes, so it must
   // not report "custom".
-  if (
-    compatProviderConfigured(llmProviders) &&
-    compatEnabledModelIds(llmProviders).length > 0
-  ) {
-    return { status: 'custom', provider: 'OpenAICompatible' }
+  const compatConfig = compatProviderConfigured(llmProviders)
+  if (compatConfig && compatEnabledModelIds(llmProviders).length > 0) {
+    const apiKey = await tryDecrypt(compatConfig.apiKey, 'OpenAI-compatible')
+    if (apiKey !== null) {
+      return { status: 'custom', provider: 'OpenAICompatible' }
+    }
   }
 
   if (process.env.NCSA_HOSTED_VLM_BASE_URL?.trim()) {
