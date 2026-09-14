@@ -113,9 +113,12 @@ ensure_encryption_master_key() {
 # them, the same way ENCRYPTION_MASTER_KEY is handled.
 ensure_sim_secrets() {
 	local name value
-	for name in SIM_POSTGRES_PASSWORD SIM_API_ENCRYPTION_KEY SIM_BETTER_AUTH_SECRET SIM_ENCRYPTION_KEY SIM_INTERNAL_API_SECRET; do
+	for name in SIM_POSTGRES_PASSWORD SIM_API_ENCRYPTION_KEY SIM_BETTER_AUTH_SECRET SIM_ENCRYPTION_KEY SIM_INTERNAL_API_SECRET SIM_KEYCLOAK_CLIENT_SECRET; do
 		eval "value=\${$name:-}"
-		if [ -n "$value" ]; then
+		# The literal below shipped as the .env.template default for the OIDC
+		# client secret; an existing .env still carrying it is treated as unset
+		# so every deployment ends up with its own secret.
+		if [ -n "$value" ] && [ "$value" != "simai-local-secret" ]; then
 			continue
 		fi
 		if [ "$name" = "SIM_API_ENCRYPTION_KEY" ]; then
@@ -141,6 +144,9 @@ ensure_sim_secrets() {
 			;;
 		SIM_POSTGRES_PASSWORD)
 			echo "[WARNING] SIM_POSTGRES_PASSWORD was not set, so a new one was generated. An existing sim-db volume keeps its old password; reset it or wipe the volume if Sim cannot connect."
+			;;
+		SIM_KEYCLOAK_CLIENT_SECRET)
+			echo "[WARNING] SIM_KEYCLOAK_CLIENT_SECRET was unset or still the published default, so a new one was generated. sim-keycloak-setup updates the Keycloak client and sim-sso-setup re-registers Sim's SSO provider with it on this start."
 			;;
 		esac
 	done

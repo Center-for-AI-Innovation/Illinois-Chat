@@ -35,6 +35,8 @@ bash infra/scripts/start-all.sh
 
 The script creates a repository-root `.env` from `.env.template` if needed, starts the frontend, backend, ingest worker, Crawlee, Postgres (pgvector-enabled `pgvector/pgvector:pg17`), Redis, RabbitMQ, MinIO, Qdrant, and Keycloak, then initializes the database (with `--create-schema` or `--wipe_data`) and Qdrant collection. Stopping the stack with `infra/scripts/stop-all.sh` keeps the volumes, so the database survives stop/start cycles without recreating the schema.
 
+**Upgrading a stack created before the Postgres mount moved** (both `docker-compose.yaml` and `docker-compose.dev.yaml` now mount `postgres-illinois-chat` at `/var/lib/postgresql/data`). The old parent mount let Docker shadow the image's declared data directory with an anonymous volume, so the real cluster never lived in the named volume and was orphaned on every `down` + `up`. An existing `postgres-illinois-chat` volume therefore holds only an empty `data/` mount point, and Postgres refuses to initialise into a non-empty directory. Either reset (`start-all.sh --wipe_data`, `start-dev.sh --clean`, or `stop-*.sh --volumes`) or remove the stale directory: `docker run --rm -v <project>_postgres-illinois-chat:/v alpine rmdir /v/data`. If you have data to keep, it is still in the old anonymous volume: stop the stack, find it with `docker volume ls -qf dangling=true` (a 64-character name), then `docker run --rm -v <that-volume>:/from -v <project>_postgres-illinois-chat:/to alpine sh -c 'rmdir /to/data && cp -a /from/. /to/'` before starting again. The `postgres-keycloak` service is now pinned to `postgres:18`, which is what the previously unpinned tag already resolved to, so no Keycloak data migration is needed.
+
 To reset local Docker data before starting:
 
 ```bash
@@ -50,6 +52,9 @@ bash infra/scripts/stop-all.sh
 
 # also remove full-stack volumes
 bash infra/scripts/stop-all.sh --volumes
+
+# stop only the full stack and leave the Sim AI containers running
+bash infra/scripts/stop-all.sh --no-sim
 ```
 
 ## Local Development
@@ -90,6 +95,9 @@ bash infra/scripts/stop-dev.sh
 
 # also remove local-development volumes
 bash infra/scripts/stop-dev.sh --volumes
+
+# stop only the dev infrastructure and leave the Sim AI containers running
+bash infra/scripts/stop-dev.sh --no-sim
 ```
 
 ### Sim AI Local Stack
@@ -103,7 +111,7 @@ The full and dev Docker stacks also start Sim AI against the same local Keycloak
 - Sim pgvector Postgres: `localhost:55432`
 - Shared Keycloak: `http://localhost:8080`
 
-Sim SSO uses the same local Keycloak realm as the app. Keycloak owns user authentication and creates Sim identities through the OIDC callback; the stack does not seed test users or passwords. `SIM_SSO_DOMAIN` is the single email domain routed to this Keycloak provider and defaults to `illinois.edu`; it must be one registrable domain, because Sim denies a sign-in whose email domain does not equal it once both are normalised, and a comma-separated list normalises to nothing and so denies every sign-in. New Sim users are held in a pending state until a Sim platform admin approves them with the existing Unban action under Settings > Admin. `SIM_APPROVAL_ADMIN_EMAIL` identifies the bootstrap platform admin; it has no default — set it to your address in `.env`, or the Sim stack refuses to start. This approval gate is implemented in Sim's database (see `infra/docker/sim/approval-setup.sql`) so the stack can continue using the upstream Sim images; approving, blocking, or re-blocking an email in the `sim_user_approval` table takes effect immediately, ending any live sessions of a blocked user. Sim's four secrets — `SIM_API_ENCRYPTION_KEY`, `SIM_BETTER_AUTH_SECRET`, `SIM_ENCRYPTION_KEY` and `SIM_INTERNAL_API_SECRET` — have no defaults; the stack refuses to start without them, and `start-dev.sh` / `start-all.sh` generate deployment-specific values into the root `.env` on first run. `SIM_API_ENCRYPTION_KEY` encrypts Sim API keys at rest inside Sim and must be exactly 64 hexadecimal characters (`openssl rand -hex 32`). On the Illinois Chat side, the Sim API key each project admin pastes on the Tools page is encrypted at rest with `ENCRYPTION_MASTER_KEY` (the same key that protects project external connections); both start scripts generate it once, and changing it afterwards means every project's Sim key must be re-entered. Outbound Sim requests are limited to sim.ai, `SIM_API_BASE_URL`'s origin, and any origins listed in `SIM_ALLOWED_SIM_ORIGINS` (comma-separated) — a project's Sim base URL must be one of these.
+Sim SSO uses the same local Keycloak realm as the app. Keycloak owns user authentication and creates Sim identities through the OIDC callback; the stack does not seed test users or passwords. `SIM_SSO_DOMAIN` is the single email domain routed to this Keycloak provider and defaults to `illinois.edu`; it must be one registrable domain, because Sim denies a sign-in whose email domain does not equal it once both are normalised, and a comma-separated list normalises to nothing and so denies every sign-in. New Sim users are held in a pending state until a Sim platform admin approves them with the existing Unban action under Settings > Admin. `SIM_APPROVAL_ADMIN_EMAIL` identifies the bootstrap platform admin; it has no default — set it to your address in `.env`, or the Sim stack refuses to start. This approval gate is implemented in Sim's database (see `infra/docker/sim/approval-setup.sql`) so the stack can continue using the upstream Sim images; approving, blocking, or re-blocking an email in the `sim_user_approval` table takes effect immediately, ending any live sessions of a blocked user. Sim's five secrets — `SIM_API_ENCRYPTION_KEY`, `SIM_BETTER_AUTH_SECRET`, `SIM_ENCRYPTION_KEY`, `SIM_INTERNAL_API_SECRET` and the Keycloak OIDC client secret `SIM_KEYCLOAK_CLIENT_SECRET` — have no defaults; the stack refuses to start without them, and `start-dev.sh` / `start-all.sh` generate deployment-specific values into the root `.env` on first run (an existing `.env` still carrying the old published default `simai-local-secret` is rotated the same way). `SIM_API_ENCRYPTION_KEY` encrypts Sim API keys at rest inside Sim and must be exactly 64 hexadecimal characters (`openssl rand -hex 32`). On the Illinois Chat side, the Sim API key each project admin pastes on the Tools page is encrypted at rest with `ENCRYPTION_MASTER_KEY` (the same key that protects project external connections); both start scripts generate it once, and changing it afterwards means every project's Sim key must be re-entered. Outbound Sim requests are limited to sim.ai, `SIM_API_BASE_URL`'s origin, and any origins listed in `SIM_ALLOWED_SIM_ORIGINS` (comma-separated) — a project's Sim base URL must be one of these.
 
 The Sim images are pinned by digest rather than tracking `latest`, so upgrading Sim is a deliberate change: the approval gate above patches Sim's own `user` table, and an unreviewed upgrade could break — or open — it. To move to a newer Sim, resolve the digest with `docker buildx imagetools inspect ghcr.io/simstudioai/simstudio:latest` and set `SIM_APP_IMAGE` (and the matching `SIM_REALTIME_IMAGE` / `SIM_MIGRATIONS_IMAGE`) in `.env`. Override other `SIM_*` values there if ports or credentials need to change.
 
