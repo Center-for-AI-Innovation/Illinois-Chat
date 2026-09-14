@@ -714,7 +714,7 @@ fi
 
 MINIO_CONTAINER="$("${COMPOSE[@]}" ps -q minio)"
 if [ -n "$MINIO_CONTAINER" ]; then
-	docker run --rm --entrypoint /bin/sh --network "container:${MINIO_CONTAINER}" minio/mc:RELEASE.2024-06-12T14-34-03Z \
+	docker run --rm --entrypoint /bin/sh --network "container:${MINIO_CONTAINER}" quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z \
 		-c "mc alias set local http://localhost:${DOCKER_INTERNAL_MINIO_API_PORT:-10000} '${AWS_ACCESS_KEY_ID}' '${AWS_SECRET_ACCESS_KEY}' >/dev/null && mc mb -p local/uiuc-chat >/dev/null 2>&1 || true"
 	print_success "✓ MinIO bucket 'uiuc-chat' is ready"
 else
