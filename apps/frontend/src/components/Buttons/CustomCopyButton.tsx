@@ -1,5 +1,10 @@
 import React, { useState } from 'react'
-import { Button, Tooltip, Text } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { IconCopy, IconInfoCircle } from '@tabler/icons-react'
 import { montserrat_paragraph } from 'fonts'
 
@@ -29,30 +34,7 @@ const CustomCopyButton: React.FC<CustomCopyButtonProps> = ({
       onClick={onClick}
     >
       <Button
-        className={`relative flex items-center justify-center bg-(--dashboard-button) px-3 py-2 text-center text-(--dashboard-button-foreground) transition-colors duration-200 hover:bg-(--dashboard-button-hover) active:bg-(--dashboard-button) ${montserrat_paragraph.variable} font-montserratParagraph`}
-        styles={{
-          root: {
-            height: 'auto',
-            minHeight: 36,
-            cursor: 'pointer',
-          },
-          inner: {
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexWrap: 'nowrap',
-            gap: '4px',
-          },
-          label: {
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            '@media (max-width: 480px)': {
-              whiteSpace: 'normal',
-            },
-          },
-        }}
+        className={`relative flex h-auto min-h-9 items-center justify-center gap-1 bg-(--dashboard-button) px-3 py-2 text-center text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) active:bg-(--dashboard-button) ${montserrat_paragraph.variable} font-montserratParagraph`}
       >
         <IconCopy size={18} aria-hidden="true" />
       </Button>
@@ -60,37 +42,17 @@ const CustomCopyButton: React.FC<CustomCopyButtonProps> = ({
         className={`${montserrat_paragraph.variable} text-md font-montserratParagraph ml-3 flex items-center text-(--dashboard-foreground) transition-colors duration-200 ease-in-out`}
       >
         {label}
-        <Tooltip
-          label={
-            <Text size="sm" color="gray.1">
-              {tooltip}
-            </Text>
-          }
-          position="bottom"
-          withArrow
-          multiline
-          width={220}
-          withinPortal
-          styles={(theme) => ({
-            tooltip: {
-              color: 'var(--tooltip)',
-              backgroundColor: 'var(--tooltip-background)',
-              borderRadius: theme.radius.md,
-              fontSize: theme.fontSizes.sm,
-              padding: '8px 12px',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            },
-            arrow: {
-              backgroundColor: theme.colors.dark[7],
-            },
-          })}
-        >
-          <span
-            className="ml-2 cursor-pointer transition-transform duration-200 ease-in-out"
-            style={{
-              transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-            }}
-            onClick={(e) => e.stopPropagation()}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span
+                className="ml-2 cursor-pointer transition-transform duration-200 ease-in-out"
+                style={{
+                  transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            }
           >
             <IconInfoCircle
               size={16}
@@ -100,7 +62,14 @@ const CustomCopyButton: React.FC<CustomCopyButtonProps> = ({
               }
               style={{ transition: 'all 0.2s ease-in-out' }}
             />
-          </span>
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            className="max-w-[220px] text-wrap bg-(--tooltip-background) text-sm text-(--tooltip)"
+            arrowClassName="bg-(--tooltip-background) fill-(--tooltip-background)"
+          >
+            {tooltip}
+          </TooltipContent>
         </Tooltip>
       </span>
     </div>

@@ -1,5 +1,9 @@
 import React, { useState } from 'react'
-import { Tooltip } from '@mantine/core'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { IconAlertTriangleFilled } from '@tabler/icons-react'
 import { CountryOfConcernModal } from './CountryOfConcernModal'
 import { Switch } from '@/components/shadcn/ui/switch'
@@ -91,22 +95,24 @@ export function ModelToggles({
                       onCheckedChange={handleChange}
                     />
                     {isFlagged && country && (
-                      <Tooltip
-                        multiline
-                        width={280}
-                        withArrow
-                        label={getCountryOfConcernShortMessage(country)}
-                      >
-                        <span
-                          aria-label={`Country of concern warning: ${country}`}
-                          className="inline-flex"
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <span
+                              aria-label={`Country of concern warning: ${country}`}
+                              className="inline-flex"
+                            />
+                          }
                         >
                           <IconAlertTriangleFilled
                             size="1rem"
                             className="text-yellow-500"
                             aria-hidden="true"
                           />
-                        </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[280px] text-wrap">
+                          {getCountryOfConcernShortMessage(country)}
+                        </TooltipContent>
                       </Tooltip>
                     )}
                   </div>

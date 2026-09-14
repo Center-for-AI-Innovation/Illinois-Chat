@@ -102,6 +102,12 @@ if (typeof window !== 'undefined' && typeof HTMLElement !== 'undefined') {
   if (!('releasePointerCapture' in HTMLElement.prototype)) {
     ;(HTMLElement.prototype as any).releasePointerCapture = vi.fn()
   }
+  // JSDOM doesn't implement the Web Animations API. Base UI's ScrollArea
+  // viewport calls element.getAnimations() to wait out any in-flight
+  // scroll/fade animation before hiding the scrollbar.
+  if (!('getAnimations' in Element.prototype)) {
+    ;(Element.prototype as any).getAnimations = vi.fn(() => [])
+  }
 }
 
 // JSDOM doesn't implement PointerEvent. Radix opens menus on pointer events;

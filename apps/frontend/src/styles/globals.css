@@ -98,6 +98,27 @@
   font-weight: 700;
 }
 
+/* Shimmer placeholder shown on <img> while it loads (was Mantine createStyles
+   in ImagePreview.tsx: a panning gradient, not an opacity pulse). */
+@keyframes image-loading-shimmer {
+  0% {
+    background-position: -600px 0;
+  }
+  100% {
+    background-position: 600px 0;
+  }
+}
+.image-loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0px,
+    rgba(229, 229, 229, 0.8) 40px,
+    #f0f0f0 80px
+  );
+  background-size: 600px;
+  animation: image-loading-shimmer 1.2s infinite;
+}
+
 /* WCAG 1.4.10 Reflow — ensure modals and popups remain accessible at all zoom levels */
 .mantine-Modal-content,
 .mantine-Modal-body {

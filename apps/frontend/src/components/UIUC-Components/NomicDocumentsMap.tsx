@@ -1,5 +1,6 @@
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
-import { Title, Text, Flex, Divider, ActionIcon } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import { Separator } from '@/components/shadcn/ui/separator'
 import React, { useEffect, useState } from 'react'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -40,7 +41,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
   return (
     <>
       {/* NOMIC MAP VISUALIZATION  */}
-      <Flex direction="column" align="center" w="100%">
+      <div className="flex w-full flex-col items-center">
         <div className="pt-5"></div>
         <div
           className="w-[98%] rounded-3xl"
@@ -56,27 +57,26 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
           <div className="w-full px-4 py-3 sm:px-6 sm:py-4 md:px-8">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                <Title
-                  order={3}
+                <h3
                   className={`pl-4 ${montserrat_heading.variable} font-montserratHeading text-lg sm:text-2xl`}
                 >
                   Concept Map of User Queries
-                </Title>
+                </h3>
 
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setAccordionOpened(!accordionOpened)}
-                  className="hover:bg-gray/10"
+                  className="hover:bg-gray-500/10"
                   title="More info on nomic map"
                 >
-                  <IconInfoCircle className="text-gray/60" />
-                </ActionIcon>
+                  <IconInfoCircle className="text-gray-500/60" />
+                </Button>
               </div>
             </div>
           </div>
 
-          <Divider className="w-full" color="gray.4" size="sm" />
+          <Separator className="w-full bg-gray-300" />
 
           {/* Accordion info button */}
           <AnimatePresence>
@@ -96,12 +96,12 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                       <div
                         className={`${montserrat_paragraph.variable} font-montserratParagraph flex-1 p-4`}
                       >
-                        <Text
+                        <p
                           className={`${montserrat_paragraph.variable} font-montserratParagraph mb-4 text-(--foreground)`}
                         >
                           The Concept Map visualizes all queries made in this
                           project:
-                        </Text>
+                        </p>
                         <ul className="list-inside list-disc space-y-2 text-(--foreground)">
                           <li className="text-sm">
                             <span className="font-bold text-(--accent)">
@@ -122,7 +122,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                             and knowledge gaps become visible
                           </li>
                         </ul>
-                        <Text className="mt-3" size="sm">
+                        <p className="mt-3 text-sm">
                           Learn more about{' '}
                           <a
                             className="text-(--dashboard-button) underline hover:text-(--dashboard-button-hover)"
@@ -132,7 +132,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                           >
                             semantic similarity visualizations
                           </a>
-                        </Text>
+                        </p>
                       </div>
                     </div>
                   </motion.div>
@@ -156,7 +156,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                 style={{ height: '80vh' }}
               />
               <div className="mt-4">
-                <Text className="pb-4 text-gray-400" size="sm">
+                <p className="pb-4 text-sm text-gray-400">
                   Note you are unable to login or edit this map. It&apos;s for
                   your visualization only. Please{' '}
                   <a
@@ -166,24 +166,23 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                     contact us
                   </a>{' '}
                   with questions.
-                </Text>
+                </p>
               </div>
             </>
           ) : (
             <>
               <div className="w-full px-12 pb-8">
-                <Text
-                  className={`${montserrat_heading.variable} font-montserratHeading`}
-                  size="lg"
+                <p
+                  className={`${montserrat_heading.variable} font-montserratHeading text-lg`}
                 >
                   Visualization Not Available Yet
-                </Text>
-                <Text className="mt-2">
+                </p>
+                <p className="mt-2">
                   We need at least 20 questions to generate a meaningful
                   visualization of how topics relate to each other. Please ask
                   more questions and check back later!
-                </Text>
-                <Text className="mt-3" size="sm">
+                </p>
+                <p className="mt-3 text-sm">
                   Learn more about{' '}
                   <a
                     className="text-(--dashboard-button) underline hover:text-(--dashboard-button-hover)"
@@ -193,12 +192,12 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                   >
                     semantic similarity visualizations
                   </a>
-                </Text>
+                </p>
               </div>
             </>
           )}
         </div>
-      </Flex>
+      </div>
     </>
   )
 }
