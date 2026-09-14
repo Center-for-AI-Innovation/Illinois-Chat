@@ -18,6 +18,10 @@ services:
       ENCRYPTION_KEY: ${SIM_ENCRYPTION_KEY:?set it in .env — start-dev.sh/start-all.sh generate one}
       API_ENCRYPTION_KEY: ${SIM_API_ENCRYPTION_KEY:?set it in .env — 64 hex chars, see .env.template}
       INTERNAL_API_SECRET: ${SIM_INTERNAL_API_SECRET:?set it in .env — start-dev.sh/start-all.sh generate one}
+      # Sim resolves relative internal tool requests (e.g. Function blocks -> /api/function/execute)
+      # against this URL. It must be reachable from inside the container, where Sim listens on 3000,
+      # not the host-mapped SIM_APP_PORT.
+      INTERNAL_API_BASE_URL: http://localhost:3000
       REDIS_URL: ${SIM_REDIS_URL:-}
       SOCKET_SERVER_URL: http://sim-realtime:3002
       NEXT_PUBLIC_SOCKET_URL: ${SIM_NEXT_PUBLIC_SOCKET_URL:-http://localhost:3011}
