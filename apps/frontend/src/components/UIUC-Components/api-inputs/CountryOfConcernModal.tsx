@@ -1,7 +1,14 @@
 import React from 'react'
-import { Button, Group, Modal, Text } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
 import { IconAlertTriangleFilled } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
+import { XIcon } from 'lucide-react'
 
 interface CountryOfConcernModalProps {
   opened: boolean
@@ -32,101 +39,61 @@ export function CountryOfConcernModal({
   children,
 }: CountryOfConcernModalProps) {
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      centered
-      radius="md"
-      zIndex={1000}
-      title={
-        <Text
-          size="lg"
-          weight={700}
-          className={`${montserrat_heading.variable} font-montserratHeading`}
-        >
-          {title}
-        </Text>
-      }
-      styles={{
-        header: {
-          color: 'var(--modal-text)',
-          backgroundColor: 'var(--modal)',
-          borderBottom: '1px solid var(--modal-border)',
-          padding: '20px 24px',
-          marginBottom: '16px',
-        },
-        content: {
-          color: 'var(--modal-text)',
-          backgroundColor: 'var(--modal)',
-          border: '1px solid var(--modal-border)',
-        },
-        body: {
-          padding: '0 24px 24px 24px',
-        },
-        title: {
-          marginBottom: 0,
-        },
-        close: {
-          color: 'var(--foreground-faded)',
-          marginTop: '4px',
-        },
-      }}
-    >
-      <Group spacing="sm" align="flex-start" noWrap>
-        <IconAlertTriangleFilled
-          size="1.5rem"
-          style={{
-            marginTop: 2,
-            flexShrink: 0,
-            color: 'var(--illinois-orange)',
-          }}
-          aria-hidden="true"
-        />
-        <Text
-          size="sm"
-          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-          style={{ lineHeight: 1.5, color: 'var(--modal-text)' }}
-        >
-          {children}
-        </Text>
-      </Group>
+    <Dialog open={opened} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        className="gap-0 rounded-md border border-(--modal-border) bg-(--modal) p-0 text-(--modal-text)"
+      >
+        <div className="mb-4 flex items-center justify-between border-b border-(--modal-border) bg-(--modal) px-6 py-5">
+          <DialogTitle
+            className={`text-lg font-bold ${montserrat_heading.variable} font-montserratHeading text-(--modal-text)`}
+          >
+            {title}
+          </DialogTitle>
+          <DialogClose
+            aria-label="Close"
+            className="modal-close-button-common mt-1 rounded p-1"
+          >
+            <XIcon className="size-4" aria-hidden="true" />
+          </DialogClose>
+        </div>
 
-      <Group position="right" mt="lg" spacing="sm">
-        <Button
-          variant="outline"
-          radius="md"
-          onClick={onClose}
-          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-          sx={{
-            borderColor: 'var(--modal-border)',
-            color: 'var(--modal-text)',
-            fontWeight: 600,
-            '&:hover': {
-              backgroundColor: 'var(--background-faded)',
-            },
-          }}
-        >
-          Cancel
-        </Button>
-        <Button
-          variant="filled"
-          radius="md"
-          onClick={onConfirm}
-          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-          sx={{
-            background: 'var(--dashboard-button) !important',
-            border: 'none',
-            color: 'var(--dashboard-button-foreground)',
-            fontWeight: 600,
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              background: 'var(--dashboard-button-hover) !important',
-            },
-          }}
-        >
-          {confirmLabel}
-        </Button>
-      </Group>
-    </Modal>
+        <div className="flex flex-col gap-4 px-6 pb-6">
+          <div className="flex items-start gap-2">
+            <IconAlertTriangleFilled
+              size="1.5rem"
+              style={{
+                marginTop: 2,
+                flexShrink: 0,
+                color: 'var(--illinois-orange)',
+              }}
+              aria-hidden="true"
+            />
+            <p
+              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
+              style={{ lineHeight: 1.5, color: 'var(--modal-text)' }}
+            >
+              {children}
+            </p>
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className={`rounded-md border-(--modal-border) font-semibold text-(--modal-text) hover:bg-(--background-faded) ${montserrat_paragraph.variable} font-montserratParagraph`}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onConfirm}
+              className={`rounded-md bg-(--dashboard-button) font-semibold text-(--dashboard-button-foreground) transition-all duration-200 hover:bg-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
+            >
+              {confirmLabel}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

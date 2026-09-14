@@ -1,6 +1,12 @@
+import * as React from 'react'
 import { Slider as SliderPrimitive } from '@base-ui/react/slider'
 
 import { cn } from '@/components/shadcn/lib/utils'
+
+interface SliderMark {
+  value: number
+  label?: React.ReactNode
+}
 
 function Slider({
   className,
@@ -8,8 +14,14 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  marks,
+  markLabelClassName,
   ...props
-}: SliderPrimitive.Root.Props) {
+}: SliderPrimitive.Root.Props & {
+  /** Fixed tick labels rendered below the track (Mantine `Slider marks`). */
+  marks?: SliderMark[]
+  markLabelClassName?: string
+}) {
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
@@ -39,6 +51,17 @@ function Slider({
             data-slot="slider-range"
             className="bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
           />
+          {marks?.map((mark) => (
+            <span
+              key={mark.value}
+              aria-hidden="true"
+              data-slot="slider-mark"
+              className="bg-background/80 absolute top-1/2 size-1 -translate-y-1/2 rounded-full"
+              style={{
+                left: `${((mark.value - min) / (max - min)) * 100}%`,
+              }}
+            />
+          ))}
         </SliderPrimitive.Track>
         {Array.from({ length: _values.length }, (_, index) => (
           <SliderPrimitive.Thumb
@@ -48,6 +71,27 @@ function Slider({
           />
         ))}
       </SliderPrimitive.Control>
+      {marks && marks.some((mark) => mark.label !== undefined) && (
+        <div className="relative mt-1 h-4 w-full">
+          {marks.map((mark) =>
+            mark.label === undefined ? null : (
+              <span
+                key={mark.value}
+                data-slot="slider-mark-label"
+                className={cn(
+                  'text-muted-foreground absolute -translate-x-1/2 text-xs whitespace-nowrap first:translate-x-0 last:-translate-x-full',
+                  markLabelClassName,
+                )}
+                style={{
+                  left: `${((mark.value - min) / (max - min)) * 100}%`,
+                }}
+              >
+                {mark.label}
+              </span>
+            ),
+          )}
+        </div>
+      )}
     </SliderPrimitive.Root>
   )
 }
