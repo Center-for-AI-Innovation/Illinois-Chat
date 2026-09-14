@@ -1843,6 +1843,8 @@ https://icflorescu.github.io/mantine-datatable/examples/records-selection/
 }
 body {
   @apply bg-background text-foreground;
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
 }
 
 .agent-thinking-dots {
