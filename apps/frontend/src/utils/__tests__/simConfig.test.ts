@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const hoisted = vi.hoisted(() => ({
   /** Rows keyed by course_name; `null` means the project row is absent. */
-  rows: new Map<string, Record<string, string | null> | null>(),
+  rows: new Map<string, Record<string, unknown> | null>(),
   selectCalls: 0,
   failNext: false,
+  updateCalls: [] as Array<{ set: unknown; where: unknown }>,
+  failUpdate: false,
 }))
 
 vi.mock('~/db/dbClient', () => ({
@@ -23,6 +25,14 @@ vi.mock('~/db/dbClient', () => ({
         }),
       }),
     }),
+    update: () => ({
+      set: (values: unknown) => ({
+        where: async (predicate: unknown) => {
+          hoisted.updateCalls.push({ set: values, where: predicate })
+          if (hoisted.failUpdate) throw new Error('write failed')
+        },
+      }),
+    }),
   },
 }))
 
@@ -30,6 +40,7 @@ vi.mock('~/db/dbClient', () => ({
 // so the mocked `where` above can look the row up.
 vi.mock('drizzle-orm', () => ({
   eq: (_column: unknown, value: string) => ({ courseName: value }),
+  and: (...conditions: unknown[]) => conditions,
 }))
 
 vi.mock('~/db/schema', () => ({
@@ -41,41 +52,62 @@ vi.mock('~/db/schema', () => ({
   },
 }))
 
+import { decryptProjectConfig, encryptProjectConfig } from '~/utils/crypto'
 import {
   invalidateSimConfigCache,
   resolveSimCredentials,
+  resolveStoredSimApiKey,
   simConfigErrorResponse,
   validateSimBaseUrl,
 } from '../simConfig'
+
+const MASTER_KEY = 'test-master-key'
 
 beforeEach(() => {
   hoisted.rows.clear()
   hoisted.selectCalls = 0
   hoisted.failNext = false
+  hoisted.updateCalls = []
+  hoisted.failUpdate = false
   invalidateSimConfigCache()
   vi.useRealTimers()
+  vi.stubEnv('ENCRYPTION_MASTER_KEY', MASTER_KEY)
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   vi.useRealTimers()
 })
 
-function storeConfig(
+/** Store a raw row exactly as the database would return it. */
+function storeRow(course: string, row: Record<string, unknown>) {
+  hoisted.rows.set(course, {
+    sim_base_url: null,
+    sim_workspace_id: 'ws-stored',
+    ...row,
+  })
+}
+
+/**
+ * Store a row with the key encrypted the way `upsertSimConfig` writes it. A
+ * string `sim_api_key` override is encrypted too; `null` is stored as-is.
+ */
+async function storeConfig(
   course: string,
   config: Partial<Record<string, string | null>> = {},
 ) {
-  hoisted.rows.set(course, {
-    sim_api_key: 'sk-sim-stored',
-    sim_base_url: null,
-    sim_workspace_id: 'ws-stored',
+  const key = 'sim_api_key' in config ? config.sim_api_key : 'sk-sim-stored'
+  storeRow(course, {
     ...config,
+    sim_api_key:
+      typeof key === 'string' ? await encryptProjectConfig(key) : key,
   })
 }
 
 describe('resolveSimCredentials', () => {
   it('resolves from the stored project row', async () => {
-    storeConfig('proj', { sim_base_url: 'http://localhost:3010' })
+    await storeConfig('proj', { sim_base_url: 'http://localhost:3010' })
 
     const result = await resolveSimCredentials('proj')
 
@@ -87,10 +119,85 @@ describe('resolveSimCredentials', () => {
         base_url: 'http://localhost:3010',
       },
     })
+    // An already-encrypted row needs no write-back.
+    expect(hoisted.updateCalls).toHaveLength(0)
+  })
+
+  it('resolves a legacy plaintext row, re-encrypts it once, and then serves it from cache', async () => {
+    storeRow('proj', { sim_api_key: { plaintext: 'sk-sim-legacy' } })
+
+    const first = await resolveSimCredentials('proj')
+    expect(first.ok && first.creds.api_key).toBe('sk-sim-legacy')
+
+    expect(hoisted.updateCalls).toHaveLength(1)
+    const written = hoisted.updateCalls[0]!.set as {
+      sim_api_key: { encrypted: string }
+    }
+    expect(written.sim_api_key.encrypted).toMatch(/^v1\./)
+    expect(JSON.stringify(written)).not.toContain('sk-sim-legacy')
+    await expect(
+      decryptProjectConfig<string>(written.sim_api_key),
+    ).resolves.toBe('sk-sim-legacy')
+    // The UPDATE is matched on the exact legacy value so it cannot clobber a
+    // key an admin saved in the meantime.
+    expect(hoisted.updateCalls[0]!.where).toEqual([
+      { courseName: 'proj' },
+      { courseName: { plaintext: 'sk-sim-legacy' } },
+    ])
+
+    const second = await resolveSimCredentials('proj')
+    expect(second.ok && second.creds.api_key).toBe('sk-sim-legacy')
+    expect(hoisted.selectCalls).toBe(1)
+    expect(hoisted.updateCalls).toHaveLength(1)
+  })
+
+  it('still resolves a legacy row when the re-encrypt write fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    storeRow('proj', { sim_api_key: { plaintext: 'sk-sim-legacy' } })
+    hoisted.failUpdate = true
+
+    const result = await resolveSimCredentials('proj')
+
+    expect(result.ok && result.creds.api_key).toBe('sk-sim-legacy')
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports decrypt_failed for an undecryptable key, does not cache it, and recovers once the key is restored', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await storeConfig('proj')
+
+    vi.stubEnv('ENCRYPTION_MASTER_KEY', 'a-different-master-key')
+    await expect(resolveSimCredentials('proj')).resolves.toEqual({
+      ok: false,
+      reason: 'decrypt_failed',
+    })
+    expect(hoisted.updateCalls).toHaveLength(0)
+
+    vi.stubEnv('ENCRYPTION_MASTER_KEY', MASTER_KEY)
+    const retried = await resolveSimCredentials('proj')
+    expect(retried.ok && retried.creds.api_key).toBe('sk-sim-stored')
+    expect(hoisted.selectCalls).toBe(2)
+  })
+
+  it('reports decrypt_failed for a bare-string key left by an unapplied migration', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    storeRow('proj', { sim_api_key: 'sk-sim-unmigrated' })
+
+    await expect(resolveSimCredentials('proj')).resolves.toEqual({
+      ok: false,
+      reason: 'decrypt_failed',
+    })
+    expect(hoisted.updateCalls).toHaveLength(0)
+    expect(String(error.mock.calls[0]?.[1])).toMatch(/0016/)
+  })
+
+  it('resolveStoredSimApiKey returns null for an absent key', async () => {
+    await expect(resolveStoredSimApiKey('proj', null)).resolves.toBeNull()
+    await expect(resolveStoredSimApiKey('proj', undefined)).resolves.toBeNull()
   })
 
   it('reports not_configured for a project with no key, and for no project', async () => {
-    storeConfig('blank', { sim_api_key: null })
+    await storeConfig('blank', { sim_api_key: null })
 
     await expect(resolveSimCredentials('blank')).resolves.toEqual({
       ok: false,
@@ -107,7 +214,7 @@ describe('resolveSimCredentials', () => {
   })
 
   it('treats an empty stored key as unconfigured rather than resolving it', async () => {
-    storeConfig('proj', { sim_api_key: '' })
+    await storeConfig('proj', { sim_api_key: '' })
 
     await expect(resolveSimCredentials('proj')).resolves.toEqual({
       ok: false,
@@ -117,7 +224,7 @@ describe('resolveSimCredentials', () => {
 
   it('distinguishes a failed read from an unconfigured project', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    storeConfig('proj')
+    await storeConfig('proj')
     hoisted.failNext = true
 
     await expect(resolveSimCredentials('proj')).resolves.toEqual({
@@ -127,7 +234,7 @@ describe('resolveSimCredentials', () => {
   })
 
   it('serves repeat reads from cache instead of re-querying', async () => {
-    storeConfig('proj')
+    await storeConfig('proj')
 
     await resolveSimCredentials('proj')
     await resolveSimCredentials('proj')
@@ -137,8 +244,8 @@ describe('resolveSimCredentials', () => {
   })
 
   it('caches per project rather than globally', async () => {
-    storeConfig('a')
-    storeConfig('b', { sim_api_key: 'sk-sim-b' })
+    await storeConfig('a')
+    await storeConfig('b', { sim_api_key: 'sk-sim-b' })
 
     const first = await resolveSimCredentials('a')
     const second = await resolveSimCredentials('b')
@@ -150,7 +257,7 @@ describe('resolveSimCredentials', () => {
 
   it('re-reads once the cached entry expires', async () => {
     vi.useFakeTimers()
-    storeConfig('proj')
+    await storeConfig('proj')
 
     await resolveSimCredentials('proj')
     vi.advanceTimersByTime(60_001)
@@ -160,11 +267,11 @@ describe('resolveSimCredentials', () => {
   })
 
   it('picks up a saved key immediately after invalidation', async () => {
-    storeConfig('proj', { sim_api_key: 'sk-sim-old' })
+    await storeConfig('proj', { sim_api_key: 'sk-sim-old' })
     const before = await resolveSimCredentials('proj')
     expect(before.ok && before.creds.api_key).toBe('sk-sim-old')
 
-    storeConfig('proj', { sim_api_key: 'sk-sim-new' })
+    await storeConfig('proj', { sim_api_key: 'sk-sim-new' })
     invalidateSimConfigCache('proj')
     const after = await resolveSimCredentials('proj')
 
@@ -173,7 +280,7 @@ describe('resolveSimCredentials', () => {
 
   it('does not cache a failed read as "no configuration"', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    storeConfig('proj')
+    await storeConfig('proj')
     hoisted.failNext = true
     await expect(resolveSimCredentials('proj')).resolves.toEqual({
       ok: false,
@@ -284,6 +391,10 @@ describe('simConfigErrorResponse', () => {
     expect(simConfigErrorResponse('not_configured')).toEqual({
       status: 400,
       error: 'Sim AI is not configured for this project',
+    })
+    expect(simConfigErrorResponse('decrypt_failed')).toMatchObject({
+      status: 503,
+      error: expect.stringMatching(/ENCRYPTION_MASTER_KEY.*0016/),
     })
   })
 

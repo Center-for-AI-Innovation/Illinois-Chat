@@ -5,7 +5,15 @@ import { db } from '~/db/dbClient'
 import { projects } from '~/db/schema'
 import { type SimProjectConfig } from '~/types/sim'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { encryptProjectConfig } from '~/utils/crypto'
 import { invalidateSimConfigCache, validateSimBaseUrl } from '~/utils/simConfig'
+
+type SimProjectUpdate = Partial<
+  Pick<
+    typeof projects.$inferInsert,
+    'sim_api_key' | 'sim_base_url' | 'sim_workspace_id'
+  >
+>
 
 /**
  * POST /api/UIUC-api/tools/upsertSimConfig
@@ -14,6 +22,9 @@ import { invalidateSimConfigCache, validateSimBaseUrl } from '~/utils/simConfig'
  * to NULL made saving credentials wipe `sim_base_url` — the sole way to point a
  * project at a self-hosted Sim — because the form never sends that field.
  * Sending an explicit `null` still clears a value.
+ *
+ * The API key is stored as the same encrypted envelope external connections
+ * use (`ENCRYPTION_MASTER_KEY`); the plaintext never reaches the database.
  */
 export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -26,8 +37,26 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   const body = req.body as Partial<SimProjectConfig>
-  const update: Partial<SimProjectConfig> = {}
-  if ('sim_api_key' in body) update.sim_api_key = body.sim_api_key ?? null
+  const update: SimProjectUpdate = {}
+  if ('sim_api_key' in body) {
+    const key = body.sim_api_key ?? null
+    if (key !== null && typeof key !== 'string') {
+      return res.status(400).json({ error: 'sim_api_key must be a string' })
+    }
+    if (key) {
+      try {
+        update.sim_api_key = await encryptProjectConfig(key)
+      } catch (error) {
+        console.error('[upsertSimConfig] failed to encrypt Sim API key', error)
+        return res.status(503).json({
+          error:
+            'Server is missing ENCRYPTION_MASTER_KEY; cannot store the Sim API key',
+        })
+      }
+    } else {
+      update.sim_api_key = null
+    }
+  }
   if ('sim_base_url' in body) {
     const baseUrl =
       typeof body.sim_base_url === 'string' ? body.sim_base_url.trim() : null

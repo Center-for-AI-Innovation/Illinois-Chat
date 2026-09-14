@@ -53,7 +53,20 @@ export interface SimExecutionResult {
   }
 }
 
-/** Per-project Sim config stored in DB. */
+/**
+ * Shape of the `projects.sim_api_key` JSONB column. `{ encrypted }` is the
+ * envelope written by `encryptProjectConfig` (the same one external
+ * connections use). `{ plaintext }` only exists for rows migration 0016
+ * converted from the old text column; the resolver re-encrypts those on
+ * first read.
+ */
+export type SimApiKeyField = { encrypted: string } | { plaintext: string }
+
+/**
+ * Per-project Sim config as the app uses it: the request body of
+ * upsertSimConfig and the decrypted, cached form on the server. The stored
+ * row holds `SimApiKeyField` instead of the plain key.
+ */
 export interface SimProjectConfig {
   sim_api_key: string | null
   sim_base_url: string | null

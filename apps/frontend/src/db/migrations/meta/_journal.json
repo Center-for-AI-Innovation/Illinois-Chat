@@ -120,6 +120,13 @@
       "when": 1779081900000,
       "tag": "0015_drop_n8n",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789430400000,
+      "tag": "0016_encrypt_sim_api_key",
+      "breakpoints": true
     }
   ]
 }

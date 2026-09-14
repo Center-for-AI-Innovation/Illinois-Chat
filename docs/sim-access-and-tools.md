@@ -55,7 +55,9 @@ page (`/<project-name>/tools`, "Tools" in the sidebar). You need two values from
 
 1. **API key** — in Sim, open **Settings → Sim Keys** and create an API key
    (`sk-sim-...`). The key is stored encrypted server-side and only a masked version is
-   ever shown again.
+   ever shown again. If the Tools page reports that the stored key "could not be read",
+   the deployment's `ENCRYPTION_MASTER_KEY` changed since the key was saved (or a database
+   migration is missing); paste the key again to restore tools.
 2. **Workspace ID** — in Sim, open the workspace you want to connect; the workspace ID
    is the identifier in the browser URL (`.../workspace/<workspace-id>/...`) and in the
    workspace settings.

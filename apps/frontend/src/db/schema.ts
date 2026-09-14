@@ -1,5 +1,6 @@
 // Generated schema.ts based on PostgreSQL database
 import { relations, sql } from 'drizzle-orm'
+import type { SimApiKeyField } from '~/types/sim'
 import {
   bigint,
   bigserial,
@@ -245,7 +246,8 @@ export const projects = pgTable('projects', {
   metadata_schema: jsonb('metadata_schema'),
   conversation_map_index: text('conversation_map_index'),
   document_map_index: text('document_map_index'),
-  sim_api_key: text('sim_api_key'),
+  // Encrypted envelope (see SimApiKeyField); never a plaintext key.
+  sim_api_key: jsonb('sim_api_key').$type<SimApiKeyField>(),
   sim_base_url: text('sim_base_url'),
   sim_workspace_id: text('sim_workspace_id'),
 })

@@ -8,6 +8,7 @@ import {
   getToolRouterStatus,
   type ToolRouterStatus,
 } from '~/utils/server/toolRouting'
+import { resolveStoredSimApiKey } from '~/utils/simConfig'
 
 /**
  * What this route tells the browser about a project's Sim configuration. The
@@ -19,6 +20,9 @@ import {
 export interface SimConfigResponse {
   has_api_key: boolean
   sim_api_key_masked: string | null
+  // Set when a key is stored but cannot be read (rotated ENCRYPTION_MASTER_KEY
+  // or unapplied migration); the form shows it so the admin re-enters the key.
+  sim_api_key_error?: string
   sim_base_url: string | null
   sim_workspace_id: string | null
   // Project-level tool-routing status for the badge on the tools page.
@@ -75,11 +79,32 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
   }
 
+  let keyFields: Pick<
+    SimConfigResponse,
+    'has_api_key' | 'sim_api_key_masked' | 'sim_api_key_error'
+  > = { has_api_key: false, sim_api_key_masked: null }
+  if (row) {
+    try {
+      const key = await resolveStoredSimApiKey(courseName, row.sim_api_key)
+      keyFields = {
+        has_api_key: Boolean(key),
+        sim_api_key_masked: key ? maskKey(key) : null,
+      }
+    } catch (error) {
+      console.error('[getSimConfig] could not read stored Sim API key', error)
+      keyFields = {
+        has_api_key: true,
+        sim_api_key_masked: null,
+        sim_api_key_error:
+          'The stored Sim API key could not be read. Enter it again to restore tools.',
+      }
+    }
+  }
+
   const config: SimConfigResponse = {
     ...(row
       ? {
-          has_api_key: Boolean(row.sim_api_key),
-          sim_api_key_masked: row.sim_api_key ? maskKey(row.sim_api_key) : null,
+          ...keyFields,
           sim_base_url: row.sim_base_url,
           sim_workspace_id: row.sim_workspace_id,
         }

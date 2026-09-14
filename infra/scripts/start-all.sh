@@ -83,10 +83,29 @@ POSTGRES_DATABASE="${POSTGRES_DATABASE:-postgres}"
 QDRANT_COLLECTION_NAME="${QDRANT_COLLECTION_NAME:-illinois_chat}"
 QDRANT_VECTOR_SIZE="${QDRANT_VECTOR_SIZE:-4096}"
 
-if [ "$wipe_data" = true ]; then
-	warn "Factory resetting full Docker stack volumes"
-	"${COMPOSE[@]}" down -v --remove-orphans
-fi
+# ENCRYPTION_MASTER_KEY encrypts project_external_connections configs and the
+# per-project Sim API keys. The backend, worker, and frontend must all share
+# the SAME value; docker-compose.yaml defaults it to empty, which would make
+# every Sim key save fail. Generate once into .env, like start-dev.sh does.
+ensure_encryption_master_key() {
+	if [ -n "${ENCRYPTION_MASTER_KEY:-}" ]; then
+		return
+	fi
+	log "Generating ENCRYPTION_MASTER_KEY (shared by backend, worker, and frontend)"
+	if command -v python3 >/dev/null 2>&1; then
+		ENCRYPTION_MASTER_KEY="$(python3 -c 'import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')"
+	else
+		ENCRYPTION_MASTER_KEY="$(openssl rand -base64 32 | tr '+/' '-_')"
+	fi
+	export ENCRYPTION_MASTER_KEY
+	if grep -q '^ENCRYPTION_MASTER_KEY=' .env; then
+		sed -i.bak "s|^ENCRYPTION_MASTER_KEY=.*|ENCRYPTION_MASTER_KEY=\"${ENCRYPTION_MASTER_KEY}\"|" .env
+		rm -f .env.bak
+	else
+		printf 'ENCRYPTION_MASTER_KEY="%s"\n' "$ENCRYPTION_MASTER_KEY" >>.env
+	fi
+	success "ENCRYPTION_MASTER_KEY written to .env"
+}
 
 # Sim's secrets have no defaults in docker-compose.sim.yaml — a working
 # default would be a published key, and API_ENCRYPTION_KEY is what encrypts
@@ -127,6 +146,8 @@ ensure_sim_secrets() {
 	done
 }
 
+ensure_encryption_master_key
+
 if [ "$with_sim" = true ]; then
 	ensure_sim_secrets
 	if [ -z "${SIM_APPROVAL_ADMIN_EMAIL:-}" ]; then
@@ -140,6 +161,13 @@ if [ "$with_sim" = true ]; then
 
 	log "Pulling Sim AI images"
 	"${COMPOSE[@]}" pull simstudio sim-realtime sim-migrations
+fi
+
+# After the secret helpers: `down -v` loads the Sim overlay, whose required
+# variables must already exist in the environment on a first run.
+if [ "$wipe_data" = true ]; then
+	warn "Factory resetting full Docker stack volumes"
+	"${COMPOSE[@]}" down -v --remove-orphans
 fi
 
 if [ -n "$rebuild_services" ]; then
@@ -263,6 +291,9 @@ done
 # here, from the migration itself — the one place the DDL lives.
 log "Ensuring Sim AI project config columns exist"
 psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0006_add_sim_columns.sql >/dev/null
+# 0016 converts a plaintext sim_api_key column to the encrypted JSONB
+# envelope; guarded on the column type, so re-running it is a no-op.
+psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0016_encrypt_sim_api_key.sql >/dev/null
 success "PostgreSQL schema verified"
 
 qdrant_headers=(-H "Content-Type: application/json")

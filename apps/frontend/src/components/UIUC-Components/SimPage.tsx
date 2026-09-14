@@ -57,6 +57,9 @@ const SimPage = ({ course_name }: { course_name: string }) => {
   // display, and a blank input on save means "keep the stored key".
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [storedKeyMasked, setStoredKeyMasked] = useState<string | null>(null)
+  // Server-reported problem reading the stored key (e.g. rotated master key);
+  // shown on the input so the admin knows to enter the key again.
+  const [storedKeyError, setStoredKeyError] = useState<string | null>(null)
   const [workspaceIdInput, setWorkspaceIdInput] = useState('')
   const [baseUrlInput, setBaseUrlInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -88,6 +91,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
           config: {
             has_api_key?: boolean
             sim_api_key_masked?: string | null
+            sim_api_key_error?: string | null
             sim_base_url?: string | null
             sim_workspace_id?: string | null
             tool_routing?: ToolRoutingStatus
@@ -97,6 +101,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
           if (config.tool_routing) setToolRouting(config.tool_routing)
           if (config.sim_api_key_masked)
             setStoredKeyMasked(config.sim_api_key_masked)
+          setStoredKeyError(config.sim_api_key_error ?? null)
           if (config.sim_workspace_id)
             setWorkspaceIdInput(config.sim_workspace_id)
           if (config.sim_base_url) setBaseUrlInput(config.sim_base_url)
@@ -165,6 +170,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
       setHasSavedConfig(Boolean(hasKey && workspaceIdInput))
       if (apiKeyInput) {
         setStoredKeyMasked(maskKey(apiKeyInput))
+        setStoredKeyError(null)
         setApiKeyInput('')
       }
       // The credentials just changed, so any tools discovered under the old
@@ -309,6 +315,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                           placeholder={storedKeyMasked ?? 'sk-sim-...'}
                           value={apiKeyInput}
                           onChange={(e) => setApiKeyInput(e.target.value)}
+                          error={storedKeyError}
                           styles={{
                             input: {
                               color: 'var(--foreground)',
