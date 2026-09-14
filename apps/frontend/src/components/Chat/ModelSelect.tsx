@@ -16,9 +16,26 @@ import {
   useState,
 } from 'react'
 import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
+import {
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxInputGroup,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from '@/components/shadcn/ui/combobox'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import HomeContext from '~/components/home/home.context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
-import { Group, Select, Title, Text, ActionIcon, Tooltip } from '@mantine/core'
 import Link from 'next/link'
 import React from 'react'
 import { type OpenAIModel } from '~/utils/modelProviders/types/openai'
@@ -135,6 +152,21 @@ interface ModelItemProps extends React.ComponentPropsWithoutRef<'div'> {
   chat_ui: ChatUI
 }
 
+interface ModelComboboxItem {
+  value: string
+  label: string
+  downloadSize?: string
+  modelId: string
+  selectedModelId: string | undefined
+  modelType: string
+  vram_required_MB: number
+}
+
+interface ModelComboboxGroup {
+  value: string
+  items: ModelComboboxItem[]
+}
+
 export const getModelLogo = (modelType: string) => {
   switch (modelType) {
     case ProviderNames.OpenAI:
@@ -235,7 +267,7 @@ export const ModelItem = forwardRef<
 
     return (
       <div ref={ref} {...others}>
-        <Group noWrap>
+        <div className="flex flex-nowrap items-center">
           <div>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <Image
@@ -251,31 +283,32 @@ export const ModelItem = forwardRef<
               ) : (
                 <IconCircleDashed stroke={2} />
               )} */}
-              <Text size="sm" style={{ marginLeft: '8px' }}>
+              <span className="text-sm" style={{ marginLeft: '8px' }}>
                 {label}
-              </Text>
+              </span>
               {countryOfConcern && (
-                <Tooltip
-                  multiline
-                  width={280}
-                  withArrow
-                  withinPortal
-                  label={getCountryOfConcernShortMessage(countryOfConcern)}
-                >
-                  <span
-                    aria-label={`Country of concern warning: ${countryOfConcern}`}
-                    style={{
-                      marginLeft: '6px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                    }}
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        aria-label={`Country of concern warning: ${countryOfConcern}`}
+                        style={{
+                          marginLeft: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      />
+                    }
                   >
                     <IconAlertTriangle
                       size="0.9rem"
                       aria-hidden="true"
                       className="text-yellow-500"
                     />
-                  </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[280px] text-wrap">
+                    {getCountryOfConcernShortMessage(countryOfConcern)}
+                  </TooltipContent>
                 </Tooltip>
               )}
             </div>
@@ -288,9 +321,9 @@ export const ModelItem = forwardRef<
                   paddingLeft: '36px', //line up with image and text better. needs to be a different layout in the future
                 }}
               >
-                <Text size="xs" opacity={0.65}>
+                <span className="text-xs" style={{ opacity: 0.65 }}>
                   {downloadSize}
-                </Text>
+                </span>
                 {state.webLLMModelIdLoading.id == modelId &&
                 state.webLLMModelIdLoading.isLoading ? (
                   <div
@@ -301,13 +334,12 @@ export const ModelItem = forwardRef<
                     }}
                   >
                     <LoadingSpinner size="xs" />
-                    <Text
-                      size="s"
+                    <span
                       style={{ marginLeft: '7px' }}
-                      className="text-(--accent)"
+                      className="text-xs text-(--accent)"
                     >
                       loading
-                    </Text>
+                    </span>
                   </div>
                 ) : (
                   <>
@@ -330,15 +362,14 @@ export const ModelItem = forwardRef<
                         style={{ marginLeft: '8px' }}
                       />
                     )}
-                    <Text
-                      size="xs"
-                      opacity={isModelCached ? 1 : 0.65}
+                    <span
+                      style={{ opacity: isModelCached ? 1 : 0.65 }}
                       className={
                         isModelCached ||
                         (state.webLLMModelIdLoading.id == modelId &&
                           !state.webLLMModelIdLoading.isLoading)
-                          ? 'ml-[3px] italic'
-                          : 'ml-1'
+                          ? 'ml-[3px] text-xs italic'
+                          : 'ml-1 text-xs'
                       }
                     >
                       {isModelCached ||
@@ -346,7 +377,7 @@ export const ModelItem = forwardRef<
                         !state.webLLMModelIdLoading.isLoading)
                         ? 'downloaded'
                         : 'download'}
-                    </Text>
+                    </span>
                   </>
                 )}
                 {showSparkles && (
@@ -356,13 +387,12 @@ export const ModelItem = forwardRef<
                       aria-hidden="true"
                       style={{ marginLeft: '8px' }}
                     />
-                    <Text
-                      size="xs"
-                      opacity={0.65}
-                      style={{ marginLeft: '4px' }}
+                    <span
+                      className="text-xs"
+                      style={{ opacity: 0.65, marginLeft: '4px' }}
                     >
                       recommended
-                    </Text>
+                    </span>
                   </div>
                 )}
                 {showWarningLargeModel && (
@@ -372,19 +402,18 @@ export const ModelItem = forwardRef<
                       aria-hidden="true"
                       style={{ marginLeft: '8px' }}
                     />
-                    <Text
-                      size="xs"
-                      opacity={0.65}
-                      style={{ marginLeft: '4px' }}
+                    <span
+                      className="text-xs"
+                      style={{ opacity: 0.65, marginLeft: '4px' }}
                     >
                       warning, requires large vRAM GPU
-                    </Text>
+                    </span>
                   </div>
                 )}
               </div>
             )}
           </div>
-        </Group>
+        </div>
       </div>
     )
   },
@@ -516,86 +545,81 @@ const ModelDropdown: React.FC<
   const selectedModel = allModels.find((model) => model.id === value)
   const selectedModelCountry = getCountryOfConcern(value)
 
+  // Grouped by provider, in LLM_PROVIDER_ORDER — mirrors the old Mantine
+  // Select `data`/`group` shape, but nested per Base UI Combobox's grouping API.
+  const groupedModels: ModelComboboxGroup[] = Object.entries(
+    enabledProvidersAndModels,
+  )
+    .sort(([providerA], [providerB]) => {
+      const indexA = LLM_PROVIDER_ORDER.indexOf(providerA as ProviderNames)
+      const indexB = LLM_PROVIDER_ORDER.indexOf(providerB as ProviderNames)
+      // Providers not in the order list will be placed at the end
+      if (indexA === -1) return 1
+      if (indexB === -1) return -1
+      return indexA - indexB
+    })
+    .map(([, provider]) => ({
+      value: provider.provider as string,
+      items: (provider.models ?? []).map((model: AnySupportedModel) => ({
+        value: model.id,
+        label: model.name,
+        // @ts-ignore -- this being missing is fine
+        downloadSize: model?.downloadSize,
+        modelId: model.id,
+        selectedModelId: value,
+        modelType: provider.provider,
+        // @ts-ignore -- this being missing is fine
+        vram_required_MB: model.vram_required_MB,
+      })),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  const selectedComboboxItem =
+    groupedModels
+      .flatMap((group) => group.items)
+      .find((item) => item.value === value) ?? null
+
   return (
     <>
-      <Title
-        className={`px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text) md:rounded-lg`}
-        color="white"
-        order={isSmallScreen ? 5 : 4}
+      <div
+        role="heading"
+        aria-level={isSmallScreen ? 5 : 4}
+        className={`${isSmallScreen ? 'heading-h5' : 'heading-h4'} px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text) md:rounded-lg`}
       >
         Model
-      </Title>
+      </div>
 
       <div
         tabIndex={0}
-        className="relative mt-4 flex w-full flex-col items-start overflow-visible px-4"
+        className="relative mt-4 flex w-full flex-col items-start overflow-visible"
       >
-        <Select
-          ref={selectInputRef}
-          className="flex w-full flex-col flex-wrap p-2 text-sm"
-          size="md"
-          placeholder="Select a model"
-          aria-label="Select a model"
-          searchable
-          value={value}
-          onDropdownOpen={() => {
-            setDropdownOpened(true)
-            constrainDropdownHeight()
+        <Combobox
+          items={groupedModels}
+          value={selectedComboboxItem}
+          isItemEqualToValue={(item, val) =>
+            (item as ModelComboboxItem | null)?.value ===
+            (val as ModelComboboxItem | null)?.value
+          }
+          open={dropdownOpened}
+          onOpenChange={(open) => {
+            setDropdownOpened(open)
+            if (open) constrainDropdownHeight()
           }}
-          onDropdownClose={() => setDropdownOpened(false)}
-          onChange={async (modelId) => {
+          onValueChange={async (item) => {
+            const selected = item as ModelComboboxItem | null
+            if (!selected) return
             if (state.webLLMModelIdLoading.isLoading) {
-              setLoadingModelId(modelId)
-              // console.log('model id', modelId)
-              // console.log('loading model id', loadingModelId)
-              // console.log('model is loading', state.webLLMModelIdLoading.id)
+              setLoadingModelId(selected.value)
             } else if (!state.webLLMModelIdLoading.isLoading) {
               setLoadingModelId(null)
             }
-            await onChange(modelId!)
+            await onChange(selected.value)
           }}
-          data={Object.entries(enabledProvidersAndModels)
-            // Sort by LLM_PROVIDER_ORDER
-            .sort(([providerA], [providerB]) => {
-              const indexA = LLM_PROVIDER_ORDER.indexOf(
-                providerA as ProviderNames,
-              )
-              const indexB = LLM_PROVIDER_ORDER.indexOf(
-                providerB as ProviderNames,
-              )
-              // Providers not in the order list will be placed at the end
-              if (indexA === -1) return 1
-              if (indexB === -1) return -1
-              return indexA - indexB
-            })
-            .flatMap(
-              ([_, provider]) =>
-                provider.models?.map((model: AnySupportedModel) => ({
-                  value: model.id,
-                  label: model.name,
-                  // @ts-ignore -- this being missing is fine
-                  downloadSize: model?.downloadSize,
-                  modelId: model.id,
-                  selectedModelId: value,
-                  modelType: provider.provider,
-                  group: provider.provider,
-                  // @ts-ignore -- this being missing is fine
-                  vram_required_MB: model.vram_required_MB,
-                })) || [],
-            )}
-          itemComponent={(props) => (
-            <ModelItem
-              {...props}
-              loadingModelId={loadingModelId}
-              setLoadingModelId={setLoadingModelId}
-            />
-          )}
-          maxDropdownHeight={maxDropdownHeight}
-          zIndex={400}
-          positionDependencies={[maxDropdownHeight]}
-          rightSectionWidth="auto"
-          icon={
-            selectedModel ? (
+        >
+          <ComboboxInputGroup
+            className="w-full cursor-pointer border-none bg-(--modal-button) text-(--modal-button-text) hover:bg-(--modal-button-hover) hover:text-(--modal-button-text-hover)"
+          >
+            {selectedModel && (
               <Image
                 // @ts-ignore -- this being missing is fine
                 src={getModelLogo(selectedModel.provider)}
@@ -603,107 +627,80 @@ const ModelDropdown: React.FC<
                 alt={`${selectedModel.provider} logo`}
                 width={20}
                 height={20}
-                style={{ marginLeft: '4px', borderRadius: '4px' }}
+                aria-hidden="true"
+                style={{ borderRadius: '4px' }}
               />
-            ) : null
-          }
-          rightSection={
+            )}
+            <ComboboxInput
+              ref={selectInputRef}
+              placeholder="Select a model"
+              aria-label="Select a model"
+              className={`${montserrat_paragraph.variable} font-montserratParagraph cursor-pointer ${
+                isSmallScreen ? 'text-xs' : 'text-sm'
+              }`}
+            />
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               {selectedModelCountry && (
-                <Tooltip
-                  multiline
-                  width={280}
-                  withArrow
-                  withinPortal
-                  label={getCountryOfConcernShortMessage(selectedModelCountry)}
-                >
-                  <span
-                    aria-label={`Country of concern warning: ${selectedModelCountry}`}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      pointerEvents: 'auto',
-                    }}
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        aria-label={`Country of concern warning: ${selectedModelCountry}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      />
+                    }
                   >
                     <IconAlertTriangle
                       size="1rem"
                       aria-hidden="true"
                       className="text-yellow-500"
                     />
-                  </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[280px] text-wrap">
+                    {getCountryOfConcernShortMessage(selectedModelCountry)}
+                  </TooltipContent>
                 </Tooltip>
               )}
-              <IconChevronDown
-                size="1rem"
-                aria-hidden="true"
-                className="mr-2 text-(--modal-button-text)"
-              />
+              <ComboboxTrigger className="text-(--modal-button-text)">
+                <IconChevronDown size="1rem" aria-hidden="true" />
+              </ComboboxTrigger>
             </div>
-          }
-          classNames={{
-            root: 'w-full',
-            wrapper: 'w-full',
-            input: `${montserrat_paragraph.variable} font-montserratParagraph ${
-              isSmallScreen ? 'text-xs' : 'text-sm'
-            } w-full`,
-            rightSection: 'pointer-events-none',
-            item: `${montserrat_paragraph.variable} font-montserratParagraph ${
-              isSmallScreen ? 'text-xs' : 'text-sm'
-            }`,
-          }}
-          styles={(theme) => ({
-            input: {
-              cursor: 'pointer',
-              color: 'var(--modal-button-text)',
-              backgroundColor: 'var(--modal-button)',
-              border: 'none',
-              // color: theme.white,
-              // borderRadius: theme.radius.md,
-              // width: '24rem',
-              // [`@media (max-width: 960px)`]: {
-              //   width: '17rem', // Smaller width for small screens
-              // },
-              '&:hover': {
-                color: 'var(--modal-button-text-hover)',
-                backgroundColor: 'var(--modal-button-hover)',
-              },
-            },
-            dropdown: {
-              color: 'var(--background)',
-              backgroundColor: 'var(--foreground-light)',
-              border: '0px',
-              borderRadius: theme.radius.md,
-              marginTop: '2px',
-              boxShadow: theme.shadows.lg,
-              width: '100%',
-              maxWidth: '100%',
-              overflowY: 'auto',
-              zIndex: 400,
-            },
-            item: {
-              color: 'var(--modal-button-text)',
-              backgroundColor: '',
-              borderRadius: theme.radius.md,
-              margin: '2px',
-              '&[data-selected]': {
-                '&': {
-                  color: 'var(--primary)',
-                  backgroundColor: 'transparent',
-                },
-                '&:hover': {
-                  color: 'var(--modal-button-text-hover)',
-                  backgroundColor: 'var(--modal-button-hover)',
-                },
-              },
-              '&[data-hovered]': {
-                color: 'var(--modal-button-text-hover)',
-                backgroundColor: 'var(--modal-button-hover)',
-              },
-            },
-          })}
-          dropdownPosition="flip"
-          withinPortal={false}
-        />
+          </ComboboxInputGroup>
+          <ComboboxContent
+            className="w-full max-w-full rounded-md bg-(--foreground-light) text-(--background) shadow-lg"
+            style={{ maxHeight: `${maxDropdownHeight}px` }}
+          >
+            <ComboboxEmpty>Nothing found</ComboboxEmpty>
+            <ComboboxList>
+              {(group: ModelComboboxGroup) => (
+                <ComboboxGroup key={group.value} items={group.items}>
+                  <ComboboxGroupLabel>{group.value}</ComboboxGroupLabel>
+                  <ComboboxCollection>
+                    {(item: ModelComboboxItem) => (
+                      <ComboboxItem
+                        key={item.value}
+                        value={item}
+                        className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-button-text) data-highlighted:bg-(--modal-button-hover) data-highlighted:text-(--modal-button-text-hover) ${
+                          isSmallScreen ? 'text-xs' : 'text-sm'
+                        }`}
+                      >
+                        <ModelItem
+                          {...item}
+                          chat_ui={chat_ui}
+                          loadingModelId={loadingModelId}
+                          setLoadingModelId={setLoadingModelId}
+                        />
+                      </ComboboxItem>
+                    )}
+                  </ComboboxCollection>
+                </ComboboxGroup>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
       </div>
     </>
   )
@@ -767,9 +764,9 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                 className="w-full opacity-60 transition-colors duration-200 hover:opacity-100"
               >
                 <div className="flex items-center justify-between rounded-md p-2">
-                  <Title className={`pb-1 pl-3 text-sm`} order={5}>
+                  <h5 className="heading-h5 pb-1 pl-3 text-sm">
                     More details about the AI models
-                  </Title>
+                  </h5>
                   <IconChevronDown
                     size={'1em'}
                     aria-hidden="true"
@@ -796,9 +793,8 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                         <div className="space-y-6">
                           {/* Countries of Concern Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               <span
                                 style={{
@@ -814,10 +810,9 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 />
                                 Countries of Concern
                               </span>
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               Models marked with a yellow warning icon originate
                               from countries the U.S. Department of Commerce has
@@ -826,37 +821,33 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                               carry data-handling, supply-chain, or compliance
                               risks. They are disabled by default; admins can
                               still enable them after reviewing the warning.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* NCSA VLM Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               NCSA Hosted Models (100% free)
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               The best free option is the Qwen 2 72B model,
                               hosted by NCSA.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* OpenAI Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               OpenAI
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               OpenAI{' '}
                               <Link
@@ -876,20 +867,18 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                               An OpenAI API key is required, and you may face
                               rate-limit issues until you complete your first
                               billing cycle.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* Azure OpenAI Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               Azure OpenAI
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               Azure OpenAI Service provides enterprise-grade
                               security and regional availability. Check out{' '}
@@ -908,20 +897,18 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 />
                               </Link>{' '}
                               for details on available models and features.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* Anthropic Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               Anthropic
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               Access Claude models through{' '}
                               <Link
@@ -940,20 +927,18 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                               </Link>
                               . Claude excels at complex reasoning and analysis
                               tasks.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* Ollama Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               OpenAI Compatible via Ollama
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               Run various open-source models locally through{' '}
                               <Link
@@ -972,20 +957,18 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                               </Link>
                               . Supports models like Llama 2, Mistral, and more
                               with OpenAI-compatible API.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* On-device LLMs Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               On-device AI with WebLLM
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               We support running some models in your web browser
                               on your device. That&apos;s 100% local, on-device
@@ -1008,20 +991,18 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                               If you see lots of text, it&apos;s working. If you
                               see &quot;webgpu not available on this
                               browser&quot;, it&apos;s not working.
-                            </Text>
+                            </p>
                           </div>
 
                           {/* Coming Soon Section */}
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               Google Gemini
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               We support{' '}
                               <Link
@@ -1039,18 +1020,16 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 />
                               </Link>
                               .
-                            </Text>
+                            </p>
                           </div>
                           <div>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
+                            <p
+                              className={`text-sm ${montserrat_heading.variable} font-montserratHeading mb-2 font-semibold`}
                             >
                               AWS Bedrock
-                            </Text>
-                            <Text
-                              size={'sm'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                            </p>
+                            <p
+                              className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               We support{' '}
                               <Link
@@ -1068,7 +1047,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                                 />
                               </Link>
                               .
-                            </Text>
+                            </p>
                           </div>
                         </div>
                       </div>

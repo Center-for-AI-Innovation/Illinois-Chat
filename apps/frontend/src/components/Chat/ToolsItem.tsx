@@ -60,19 +60,19 @@ export const ToolsItem = ({}) => {
           <div className="flex flex-col"></div>
           {isSmallScreen ? (
             <h5
-              className={`px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+              className={`heading-h5 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
             >
               Tools
             </h5>
           ) : (
             <h3
-              className={`px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+              className={`heading-h3 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
             >
               Tools
             </h3>
           )}
           <div className="flex flex-col items-center justify-center rounded-lg">
-            <div className="relative my-2 w-[90%]">
+            <div className="relative my-3 w-[90%]">
               <IconSearch
                 size={isSmallScreen ? 15 : 20}
                 aria-hidden="true"
@@ -84,7 +84,7 @@ export const ToolsItem = ({}) => {
                 aria-label="Search Tools"
                 value={toolSearch}
                 onChange={handleToolSearchChange}
-                className={`rounded-md border-(--background-dark) bg-(--background-faded) pl-9 text-(--foreground) focus-visible:border-(--background-darker) ${
+                className={`rounded-lg border-(--background-dark) bg-(--background-faded) pl-9 text-(--foreground) focus-visible:border-(--background-darker) ${
                   isSmallScreen ? 'h-7 text-xs' : 'h-8 text-sm'
                 }`}
               />

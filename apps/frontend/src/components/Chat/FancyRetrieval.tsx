@@ -48,14 +48,12 @@ export const FancyRetrieval = () => {
             {isSmallScreen ? (
               <h5
                 className={`${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
-                style={{ color: 'white' }}
               >
                 Fancy Retrieval
               </h5>
             ) : (
               <h4
                 className={`${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
-                style={{ color: 'white' }}
               >
                 Fancy Retrieval
               </h4>

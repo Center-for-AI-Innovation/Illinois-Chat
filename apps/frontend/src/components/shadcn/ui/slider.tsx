@@ -16,11 +16,20 @@ function Slider({
   max = 100,
   marks,
   markLabelClassName,
+  trackClassName,
+  indicatorClassName,
+  thumbClassName,
   ...props
 }: SliderPrimitive.Root.Props & {
   /** Fixed tick labels rendered below the track (Mantine `Slider marks`). */
   marks?: SliderMark[]
   markLabelClassName?: string
+  /** Override the track's background (Mantine `Slider styles.track`). */
+  trackClassName?: string
+  /** Override the filled portion's background (Mantine `Slider styles.bar`). */
+  indicatorClassName?: string
+  /** Override the thumb's border/background (Mantine `Slider styles.thumb`). */
+  thumbClassName?: string
 }) {
   const _values = Array.isArray(value)
     ? value
@@ -45,11 +54,17 @@ function Slider({
       <SliderPrimitive.Control className="relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col">
         <SliderPrimitive.Track
           data-slot="slider-track"
-          className="bg-muted relative grow overflow-hidden rounded-full select-none data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
+          className={cn(
+            'bg-muted relative grow overflow-hidden rounded-full select-none data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5',
+            trackClassName,
+          )}
         >
           <SliderPrimitive.Indicator
             data-slot="slider-range"
-            className="bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
+            className={cn(
+              'bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',
+              indicatorClassName,
+            )}
           />
           {marks?.map((mark) => (
             <span
@@ -67,7 +82,10 @@ function Slider({
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
-            className="border-primary ring-ring/50 block size-4 shrink-0 rounded-full border bg-white shadow-xs transition-[color,box-shadow] select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
+            className={cn(
+              'border-primary ring-ring/50 block size-4 shrink-0 rounded-full border bg-white shadow-xs transition-[color,box-shadow] select-none hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50',
+              thumbClassName,
+            )}
           />
         ))}
       </SliderPrimitive.Control>

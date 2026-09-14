@@ -1,16 +1,10 @@
+import { Button } from '@/components/shadcn/ui/button'
+import { Card } from '@/components/shadcn/ui/card'
 import {
-  Button,
-  Card,
-  Collapse,
-  Flex,
-  Group,
-  Input,
-  List,
-  Paper,
-  Text,
-  Title,
-  useMantineTheme,
-} from '@mantine/core'
+  Collapsible,
+  CollapsibleContent,
+} from '@/components/shadcn/ui/collapsible'
+import { Input } from '@/components/shadcn/ui/input'
 import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import {
   IconBook,
@@ -36,7 +30,6 @@ const ApiKeyManagement = ({
   auth: AuthContextProps
   sidebarCollapsed?: boolean
 }) => {
-  const theme = useMantineTheme()
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
 
   // Get responsive card width classes based on sidebar state
@@ -257,108 +250,55 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
     }
   }
 
-  const styles = {
-    input: {
-      border: '1px solid var(--illinois-storm-light)',
-      backgroundColor: 'var(--illinois-background-dark)',
-      color: 'var(--illinois-white)',
-    },
-    button: {
-      backgroundColor: 'var(--illinois-orange)',
-      color: 'var(--illinois-white)',
-      '&:hover': {
-        backgroundColor: 'var(--illinois-altgeld)',
-      },
-    },
-  }
-
   return (
     <Card
-      withBorder
-      padding="none"
-      radius="xl"
-      className={`mt-[2%] ${cardWidthClasses}`}
+      className={`mt-[2%] ${cardWidthClasses} gap-0 rounded-4xl border py-0 text-base shadow-none ring-0`}
       style={{
         backgroundColor: 'var(--background)',
         borderColor: 'var(--dashboard-border)',
       }}
     >
-      <Flex
-        direction={isSmallScreen ? 'column' : 'row'}
-        style={{ height: '100%' }}
-      >
+      <div className={`flex h-full ${isSmallScreen ? 'flex-col' : 'flex-row'}`}>
         <div
-          style={{
-            flex: isSmallScreen ? '1 1 100%' : '1 1 60%',
-            border: 'None',
-            color: 'white',
-          }}
-          className="min-h-full bg-(--background) text-(--foreground)"
+          className={`min-h-full bg-(--background) text-(--foreground) ${
+            isSmallScreen ? 'flex-[1_1_100%]' : 'flex-[1_1_60%]'
+          }`}
         >
           <div className="w-full border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4 md:px-8">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-(--dashboard-foreground)">
-                <Title
-                  order={2}
-                  className={`${montserrat_heading.variable} font-montserratHeading text-lg sm:text-2xl`}
+                <h2
+                  className={`${montserrat_heading.variable} font-montserratHeading text-lg font-bold sm:text-2xl`}
                 >
                   API Key Management
-                </Title>
-                <Text className="">/</Text>
-                <Title
-                  order={3}
+                </h2>
+                <span>/</span>
+                <h3
                   className={`${
                     montserrat_heading.variable
-                  } font-montserratHeading min-w-0 text-base text-(--illinois-orange) sm:text-xl ${
+                  } font-montserratHeading min-w-0 text-base font-bold text-(--illinois-orange) sm:text-xl ${
                     course_name.length > 40
                       ? 'max-w-[120px] truncate sm:max-w-[300px] lg:max-w-[400px]'
                       : ''
                   }`}
                 >
                   {course_name}
-                </Title>
+                </h3>
               </div>
             </div>
           </div>
-          <div
-            style={{
-              // padding: '1rem',
-              color: 'white',
-              alignItems: 'center',
-            }}
-            className="min-h-full justify-center"
-          >
+          <div className="min-h-full text-(--foreground)">
             <div className="flex h-full flex-col">
-              <Group
-                m="1rem"
-                align="start"
-                variant="column"
-                style={{
-                  justifyContent: 'start',
-                  width: '95%',
-                  alignSelf: 'center',
-                  overflow: 'hidden',
-                }}
+              <div
+                className="m-4 flex flex-col items-start justify-start gap-4 self-center overflow-hidden"
+                style={{ width: '95%' }}
               >
-                <Paper
-                  className="w-full rounded-xl bg-(--dashboard-background-faded) px-4 sm:px-6 md:px-8"
-                  p="md"
-                  sx={{
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <Flex
+                <div className="w-full rounded-xl bg-(--dashboard-background-faded) px-4 py-4 transition-all duration-200 ease-in-out sm:px-6 md:px-8">
+                  <div
                     role="button"
                     tabIndex={0}
                     aria-expanded={insightsOpen}
-                    align="center"
-                    justify="space-between"
-                    sx={{
-                      cursor: 'pointer',
-                      padding: '4px 8px',
-                      borderRadius: '8px',
-                    }}
-                    className="focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--dashboard-button)"
+                    className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-(--dashboard-button)"
                     onClick={() => setInsightsOpen(!insightsOpen)}
                     onKeyDown={(e: React.KeyboardEvent) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -367,7 +307,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                       }
                     }}
                   >
-                    <Flex align="center" gap="md">
+                    <div className="flex items-center gap-4">
                       <IconBook
                         size={24}
                         aria-hidden="true"
@@ -375,14 +315,12 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                           color: 'var(--dashboard-button)',
                         }}
                       />
-                      <Text
-                        size="md"
-                        weight={600}
-                        className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground) select-text`}
+                      <span
+                        className={`${montserrat_paragraph.variable} font-montserratParagraph text-base font-semibold text-(--dashboard-foreground) select-text`}
                       >
                         API Documentation
-                      </Text>
-                    </Flex>
+                      </span>
+                    </div>
                     <div
                       className="transition-transform duration-200"
                       style={{
@@ -397,102 +335,89 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                     >
                       <IconChevronDown size={24} aria-hidden="true" />
                     </div>
-                  </Flex>
+                  </div>
 
-                  <Collapse in={insightsOpen} transitionDuration={200}>
-                    <div className="mt-4 px-2 text-(--dashboard-foreground)">
-                      <Text
-                        size="md"
-                        className={`${montserrat_paragraph.variable} font-montserratParagraph select-text`}
-                      >
-                        This API is <i>stateless</i>, meaning each request is
-                        independent of others. For multi-turn conversations,
-                        simply append new messages to the &apos;messages&apos;
-                        array in the next call.
-                        <List
-                          withPadding
-                          className="mt-2"
-                          spacing="sm"
-                          icon={
-                            <div
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: 'var(--dashboard-foreground)',
-                                marginTop: '8px',
-                              }}
-                            />
-                          }
+                  <Collapsible open={insightsOpen} onOpenChange={setInsightsOpen}>
+                    <CollapsibleContent>
+                      <div className="mt-4 px-2 text-(--dashboard-foreground)">
+                        <div
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph text-base select-text`}
                         >
-                          <List.Item>
-                            <a
-                              className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
-                              href="https://platform.openai.com/docs/api-reference/chat/create"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              OpenAI API documentation
-                              <IconExternalLink
-                                size={18}
+                          This API is <i>stateless</i>, meaning each request is
+                          independent of others. For multi-turn conversations,
+                          simply append new messages to the &apos;messages&apos;
+                          array in the next call.
+                          <ul className="mt-2 list-none space-y-3">
+                            <li className="flex items-start gap-2">
+                              <span
                                 aria-hidden="true"
-                                className="inline-block pl-1"
-                                style={{ position: 'relative', top: '-2px' }}
+                                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-(--dashboard-foreground)"
                               />
-                            </a>
-                          </List.Item>
-                          <List.Item>
-                            <a
-                              className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
-                              href="https://docs.uiuc.chat/api/endpoints"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              UIUC.chat API documentation
-                              <IconExternalLink
-                                size={18}
+                              <a
+                                className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                                href="https://platform.openai.com/docs/api-reference/chat/create"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                OpenAI API documentation
+                                <IconExternalLink
+                                  size={18}
+                                  aria-hidden="true"
+                                  className="relative inline-block -top-0.5 pl-1"
+                                />
+                              </a>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span
                                 aria-hidden="true"
-                                className="inline-block pl-1"
-                                style={{ position: 'relative', top: '-2px' }}
+                                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-(--dashboard-foreground)"
                               />
-                            </a>
-                          </List.Item>
-                        </List>
-                        <Title
-                          className={`px-1 py-2 ${montserrat_paragraph.variable} font-montserratParagraph inline-block select-text`}
-                          size="md"
-                          order={4}
-                          style={{ marginTop: '1.5rem' }}
-                        >
-                          Notes:
-                        </Title>
-                        <List
-                          withPadding
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground)`}
-                          spacing="xs"
-                        >
-                          <List.Item>
-                            NCSA hosted models like Qwen and Llama are hosted by
-                            NCSA and they are free!
-                          </List.Item>
-                          <List.Item>
-                            GPT-4o-mini offers the best price/performance ratio
-                          </List.Item>
-                          <List.Item>
-                            UIUC.chat automatically manages LLM provider keys -
-                            just add them in the LLMs page.
-                          </List.Item>
-                          <List.Item>
-                            For getting only RAG results, set retrieval_only to
-                            true. This will not invoke the LLM.
-                          </List.Item>
-                        </List>
-                      </Text>
-                    </div>
-                  </Collapse>
-                </Paper>
+                              <a
+                                className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                                href="https://docs.uiuc.chat/api/endpoints"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                UIUC.chat API documentation
+                                <IconExternalLink
+                                  size={18}
+                                  aria-hidden="true"
+                                  className="relative inline-block -top-0.5 pl-1"
+                                />
+                              </a>
+                            </li>
+                          </ul>
+                          <h4
+                            className={`mt-6 inline-block px-1 py-2 ${montserrat_paragraph.variable} font-montserratParagraph text-base font-bold select-text`}
+                          >
+                            Notes:
+                          </h4>
+                          <ul
+                            className={`list-disc space-y-2.5 pl-5 ${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground)`}
+                          >
+                            <li>
+                              NCSA hosted models like Qwen and Llama are hosted by
+                              NCSA and they are free!
+                            </li>
+                            <li>
+                              GPT-4o-mini offers the best price/performance ratio
+                            </li>
+                            <li>
+                              UIUC.chat automatically manages LLM provider keys -
+                              just add them in the LLMs page.
+                            </li>
+                            <li>
+                              For getting only RAG results, set retrieval_only to
+                              true. This will not invoke the LLM.
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
 
                 <div
                   style={{
@@ -514,7 +439,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                     />
                   </div>
                 </div>
-              </Group>
+              </div>
             </div>
           </div>
         </div>
@@ -531,105 +456,71 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
         >
           <div className="flex h-full flex-col">
             <div className="flex w-full flex-col items-center px-3 pt-12">
-              <Title
-                className={`px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
-                order={2}
-                style={{ marginBottom: '1rem' }}
+              <h2
+                className={`heading-h2 mb-4 px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Your API Key
-              </Title>
+              </h2>
               {apiKey && (
-                <Input
-                  value={apiKey}
-                  aria-label="Your API Key"
-                  className={`${montserrat_paragraph.variable} font-montserratParagraph mt-4 w-full`}
-                  radius={'md'}
-                  size={'md'}
-                  readOnly
-                  rightSection={
-                    <Button
-                      aria-label="Copy API Key"
-                      onClick={() => handleCopyApiKey(apiKey)}
-                      variant="subtle"
-                      size="sm"
-                      radius={'md'}
-                      className="min-w-20 -translate-x-1 transform rounded-s-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
-                    >
-                      {copiedApiKey ? (
-                        <IconCheck aria-hidden="true" />
-                      ) : (
-                        <IconCopy aria-hidden="true" />
-                      )}
-                    </Button>
-                  }
-                  rightSectionWidth={'auto'}
-                  // className="mt-4 w-full rounded-full"
-                  styles={{
-                    input: {
-                      color: 'var(--foreground)',
-                      backgroundColor: 'var(--background-faded)',
-                      borderColor: 'var(--background-dark)',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      '&:focus': {
-                        borderColor: 'var(--illinois-orange)',
-                      },
-                    },
-                    wrapper: {
-                      width: '100%',
-                    },
-                  }}
-                />
+                <div
+                  className={`relative mt-4 w-full ${montserrat_paragraph.variable} font-montserratParagraph`}
+                >
+                  <Input
+                    value={apiKey}
+                    aria-label="Your API Key"
+                    readOnly
+                    className="w-full truncate rounded-md border-(--background-dark) bg-(--background-faded) pr-24 text-(--foreground) focus-visible:border-(--illinois-orange)"
+                  />
+                  <Button
+                    aria-label="Copy API Key"
+                    onClick={() => handleCopyApiKey(apiKey)}
+                    variant="dashboard"
+                    size="sm"
+                    className="absolute top-1/2 right-0 min-w-20 -translate-y-1/2 rounded-s-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
+                  >
+                    {copiedApiKey ? (
+                      <IconCheck aria-hidden="true" />
+                    ) : (
+                      <IconCopy aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
             {!apiKey && !loading && (
               <Button
                 onClick={handleGenerate}
                 disabled={loading || apiKey !== null}
+                variant="dashboard"
                 size="lg"
-                radius={'xl'}
-                className="min-w-20 self-center rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
-                // w={'60%'}
+                className="min-w-20 self-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
               >
                 Generate API Key
               </Button>
             )}
             {apiKey && !loading && (
-              <>
-                <Group
-                  position="center"
-                  variant="column"
-                  mt="1rem"
-                  mb={'3rem'}
-                  pt={'lg'}
+              <div className="mt-4 mb-12 flex flex-col items-center gap-4 pt-5">
+                <Button
+                  onClick={handleRotate}
+                  disabled={loading || apiKey === null}
+                  variant="dashboard"
+                  className="min-w-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
                 >
-                  <Button
-                    onClick={handleRotate}
-                    disabled={loading || apiKey === null}
-                    size="md"
-                    radius={'xl'}
-                    className="min-w-20 rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
-                    w={'auto'}
-                  >
-                    Rotate API Key
-                  </Button>
-                  <Button
-                    onClick={handleDelete}
-                    disabled={loading || apiKey === null}
-                    size="md"
-                    radius={'xl'}
-                    className="min-w-20 rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
-                    w={'auto'}
-                  >
-                    Delete API Key
-                  </Button>
-                </Group>
-              </>
+                  Rotate API Key
+                </Button>
+                <Button
+                  onClick={handleDelete}
+                  disabled={loading || apiKey === null}
+                  variant="dashboard"
+                  className="min-w-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
+                >
+                  Delete API Key
+                </Button>
+              </div>
             )}
           </div>
         </div>
-      </Flex>
+      </div>
     </Card>
   )
 }

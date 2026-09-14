@@ -73,19 +73,19 @@ export const DocumentGroupsItem = ({}) => {
           <div className="flex flex-col"></div>
           {isSmallScreen ? (
             <h5
-              className={`px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4`}
+              className={`heading-h5 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4`}
             >
               Document Groups
             </h5>
           ) : (
             <h3
-              className={`px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4`}
+              className={`heading-h3 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4`}
             >
               Document Groups
             </h3>
           )}
           <div className="flex flex-col items-center justify-center rounded-lg">
-            <div className="relative my-2 w-[90%]">
+            <div className="relative my-3 w-[90%]">
               <IconSearch
                 size={isSmallScreen ? 15 : 20}
                 aria-hidden="true"
@@ -97,7 +97,7 @@ export const DocumentGroupsItem = ({}) => {
                 aria-label="Search by Document Group"
                 value={documentGroupSearch}
                 onChange={handleDocumentGroupSearchChange}
-                className={`rounded-md border-(--background-dark) bg-(--background-faded) pl-9 text-(--foreground) focus-visible:border-(--background-darker) ${
+                className={`rounded-lg border-(--background-dark) bg-(--background-faded) pl-9 text-(--foreground) focus-visible:border-(--background-darker) ${
                   isSmallScreen ? 'h-7 text-xs' : 'h-8 text-sm'
                 }`}
               />
@@ -179,6 +179,7 @@ export const DocumentGroupsItem = ({}) => {
                               onCheckedChange={() =>
                                 handleToggleChecked(doc_group_obj.id)
                               }
+                              size="sm"
                             />
                           </TooltipTrigger>
                           <TooltipContent>
@@ -196,6 +197,7 @@ export const DocumentGroupsItem = ({}) => {
                             onCheckedChange={() =>
                               handleToggleChecked(doc_group_obj.id)
                             }
+                            size="sm"
                             className={
                               doc_group_obj.checked
                                 ? 'data-checked:bg-(--dashboard-button) data-checked:border-(--dashboard-button)'

@@ -88,8 +88,9 @@ describe('CanvasIngestForm', () => {
     )
 
     // Toggle one option off and back on to cover both branches.
-    await user.click(screen.getByLabelText('Files'))
-    await user.click(screen.getByLabelText('Files'))
+    const filesCheckbox = screen.getByRole('checkbox', { name: 'Files' })
+    await user.click(filesCheckbox)
+    await user.click(filesCheckbox)
 
     const ingestBtn = screen.getByRole('button', {
       name: /Ingest Canvas Content/i,

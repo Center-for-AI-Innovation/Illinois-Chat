@@ -212,6 +212,11 @@ function ComboboxGroup({ className, ...props }: ComboboxPrimitive.Group.Props) {
   )
 }
 
+/** Renders the items of a `<ComboboxGroup items={...}>` — required for grouped lists. */
+function ComboboxCollection({ ...props }: ComboboxPrimitive.Collection.Props) {
+  return <ComboboxPrimitive.Collection {...props} />
+}
+
 function ComboboxGroupLabel({
   className,
   ...props
@@ -254,6 +259,7 @@ export {
   ComboboxChipRemove,
   ComboboxChips,
   ComboboxClear,
+  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxGroup,

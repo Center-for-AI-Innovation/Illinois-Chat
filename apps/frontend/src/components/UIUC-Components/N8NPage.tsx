@@ -1,13 +1,6 @@
-import {
-  Button,
-  Card,
-  Flex,
-  Group,
-  List,
-  Stack,
-  TextInput,
-  Title,
-} from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import { Card } from '@/components/shadcn/ui/card'
+import { Input } from '@/components/shadcn/ui/input'
 import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 
 import {
@@ -274,68 +267,49 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
       >
         <h1 className="sr-only">{course_name} Tools</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
-          <Flex direction="column" align="center" w="100%">
+          <div className="flex w-full flex-col items-center">
             {useIllinoisChatConfig && (
               <Card
-                padding="none"
+                className="p-0"
                 style={{
                   color: 'var(--foreground)',
                   margin: '5%',
                   backgroundColor: 'var(--background)',
                 }}
               >
-                <Title
-                  className={`${montserrat_heading.variable} font-montserratHeading ml-4`}
-                  order={2}
+                <h2
+                  className={`heading-h2 ${montserrat_heading.variable} font-montserratHeading ml-4`}
                 >
                   Coming soon!
-                </Title>
+                </h2>
               </Card>
             )}
             <Card
-              withBorder
-              padding="none"
-              radius="xl"
-              className={`mt-[2%] ${cardWidthClasses}`}
+              className={`mt-[2%] rounded-4xl border p-0 ${cardWidthClasses}`}
               style={{
-                // maxWidth: '90%',
-                // width: '100%',
                 marginTop: '2%',
                 backgroundColor: 'var(--background)',
                 borderColor: 'var(--dashboard-border)',
               }}
             >
-              <Flex className="flex-col md:flex-row">
-                {/* // direction={isSmallScreen ? 'column' : 'row'}> */}
+              <div className="flex flex-col md:flex-row">
                 <div
                   style={{
-                    // flex: isSmallScreen ? '1 1 100%' : '1 1 60%',
-                    border: 'None',
                     color: 'var(--foreground)',
                   }}
                   className="min-h-full flex-[1_1_100%] bg-(--background) md:flex-[1_1_60%]"
                 >
-                  <Group
-                    spacing="lg"
-                    m="1rem"
-                    // align="center"
-                    // style={{ justifyContent: 'center' }}
-                  >
-                    <Title
-                      order={2}
-                      className={`${montserrat_heading.variable} font-montserratHeading ml-4`}
+                  <div className="m-4 flex flex-wrap items-start gap-5">
+                    <h2
+                      className={`heading-h2 ${montserrat_heading.variable} font-montserratHeading ml-4`}
                     >
                       LLM Tool Use &amp; Function Calling
-                    </Title>
-                    <Stack align="start" justify="start">
+                    </h2>
+                    <div className="flex flex-col items-start justify-start gap-3">
                       <div className="flex flex-col lg:flex-row">
-                        <Title
-                          className={`${montserrat_heading.variable} font-montserratHeading flex-[1_1_50%]`}
-                          order={3}
-                          w={'100%'}
-                          ml={'md'}
+                        <h3
+                          className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading ml-4 w-full flex-[1_1_50%] text-left`}
                           style={{
-                            textAlign: 'left',
                             ...(useIllinoisChatConfig && {
                               color: 'var(--illinois-storm-dark)',
                             }),
@@ -357,7 +331,7 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                           </a>
                           beautiful visual workflow editor to create custom
                           functions for your project.
-                        </Title>
+                        </h3>
                         <Button
                           onClick={(event) =>
                             window.open(
@@ -386,14 +360,12 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                           }
                           disableChevronRotation
                           title={
-                            <Title
+                            <h3
                               style={{ margin: '0 auto', textAlign: 'left' }}
-                              order={3}
-                              size={'xl'}
-                              className={`pt-3 pb-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                              className={`pt-3 pb-3 text-2xl font-bold ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               Setup Instructions 🤠
-                            </Title>
+                            </h3>
                           }
                           isLoading={false}
                           error={false}
@@ -401,12 +373,10 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                             !n8nApiKey ? 'setup-instructions' : undefined
                           }
                           content={
-                            <List
-                              type="ordered"
-                              withPadding
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground)`}
+                            <ol
+                              className={`list-decimal space-y-4 pl-6 ${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground)`}
                             >
-                              <List.Item>
+                              <li>
                                 Tool use via LLMs is invite-only to prevent
                                 abuse. Please shoot our admin an email for
                                 access:{' '}
@@ -419,8 +389,8 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                                 >
                                   rohan13@illinois.edu
                                 </a>
-                              </List.Item>
-                              <List.Item>
+                              </li>
+                              <li>
                                 Once you have access, please{' '}
                                 <b>
                                   <a
@@ -436,12 +406,12 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                                   </a>
                                   .
                                 </b>
-                              </List.Item>
-                              <List.Item>
+                              </li>
+                              <li>
                                 Inside n8n,{' '}
                                 <b>create an n8n API key and save it here</b>.
-                              </List.Item>
-                            </List>
+                              </li>
+                            </ol>
                           }
                         />
                       )}
@@ -457,14 +427,12 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                           }
                           disableChevronRotation
                           title={
-                            <Title
+                            <h4
                               style={{ margin: '0 auto', textAlign: 'left' }}
-                              order={4}
-                              size={'xl'}
-                              className={`pt-3 pb-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                              className={`pt-3 pb-3 text-2xl font-bold ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
                               Usage Instructions 🛠️
-                            </Title>
+                            </h4>
                           }
                           isLoading={false}
                           error={false}
@@ -475,17 +443,10 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                           }
                           content={
                             <>
-                              {/* <Title w={'80%'} order={6} pl={'md'} pb={'md'}
-                              className={`${montserrat_paragraph.variable} font-montserratParagraph text-gray-300`}>
-                            Now that you have API Key set
-                            </Title> */}
-                              <List
-                                w={'80%'}
-                                type="ordered"
-                                withPadding
-                                className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground)`}
+                              <ol
+                                className={`w-[80%] list-decimal space-y-2 pl-6 ${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground)`}
                               >
-                                <List.Item>
+                                <li>
                                   Start by creating your first workflow on{' '}
                                   <a
                                     href="https://tools.uiuc.chat/workflows"
@@ -495,55 +456,52 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                                   >
                                     N8N
                                   </a>
-                                </List.Item>
-                                <List.Item>
+                                </li>
+                                <li>
                                   Ensure you have the correct trigger node for
                                   your workflow, check docs for details
-                                </List.Item>
-                                <List.Item>
+                                </li>
+                                <li>
                                   Add the necessary nodes for your workflow
-                                </List.Item>
-                                <List.Item>Save your workflow</List.Item>
-                                <List.Item>
+                                </li>
+                                <li>Save your workflow</li>
+                                <li>
                                   Make sure your workflow is active
-                                </List.Item>
-                                <List.Item>
+                                </li>
+                                <li>
                                   Test your workflow to complete usage
                                   onboarding
-                                </List.Item>
-                                <Title
-                                  order={3}
-                                  className={`${montserrat_heading.variable} font-montserratHeading ps-5 text-center font-semibold`}
+                                </li>
+                              </ol>
+                              <h3
+                                className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading ps-5 text-center`}
+                              >
+                                If your workflow is working as expected,
+                                Congrats! 🚀
+                                <br></br>
+                                Your users can now start using it on the{' '}
+                                <a
+                                  href={`/${course_name}/chat`}
+                                  rel="noopener noreferrer"
+                                  className="text-(--dashboard-button) hover:text-(--dashboard-button-hover)"
+                                  style={{
+                                    textDecoration: 'underline',
+                                  }}
                                 >
-                                  If your workflow is working as expected,
-                                  Congrats! 🚀
-                                  <br></br>
-                                  Your users can now start using it on the{' '}
-                                  <a
-                                    href={`/${course_name}/chat`}
-                                    // target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-(--dashboard-button) hover:text-(--dashboard-button-hover)"
-                                    style={{
-                                      textDecoration: 'underline',
-                                    }}
-                                  >
-                                    Chat Page
-                                  </a>
-                                  !
-                                </Title>
-                              </List>
+                                  Chat Page
+                                </a>
+                                !
+                              </h3>
                             </>
                           }
                         />
                       )}
-                    </Stack>
-                  </Group>
+                    </div>
+                  </div>
                 </div>
                 <div
                   className="flex flex-[1_1_100%] md:flex-[1_1_40%]"
                   style={{
-                    // flex: isSmallScreen ? '1 1 100%' : '1 1 40%',
                     padding: '1rem',
                     backgroundColor: 'var(--dashboard-sidebar-background)',
                     color: 'var(--dashboard-foreground)',
@@ -555,35 +513,27 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                   <div className="flex h-full flex-col justify-center">
                     <div className="flex flex-auto flex-col gap-2 p-2">
                       <div className="pb-4">
-                        <Title
-                          // className={`label ${montserrat.className}`}
-                          className={`${montserrat_heading.variable} font-montserratHeading mb-2 p-0`}
-                          order={3}
+                        <h3
+                          className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading mb-2 p-0`}
                         >
                           Your n8n API Key
-                        </Title>
-                        <TextInput
+                        </h3>
+                        <Input
                           aria-label="n8n API Key"
                           type="password"
-                          description="We use this to run your workflows. You can find your n8n API Key in your n8n account settings."
                           placeholder="Enter your n8n API Key here"
                           value={n8nApiKeyTextbox}
                           onChange={(event) =>
                             setN8nApiKeyTextbox(event.target.value)
                           }
                           disabled
-                          descriptionProps={{
-                            style: { color: 'var(--foreground)' },
-                          }}
-                          styles={{
-                            input: {
-                              color: 'var(--foreground)',
-                              backgroundColor: 'var(--background)',
-                              margin: '1rem 0rem .1rem 0rem',
-                            },
-                          }}
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                          className={`mt-4 mb-0.5 text-(--foreground) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          style={{ backgroundColor: 'var(--background)' }}
                         />
+                        <p className="mt-1 text-sm text-(--foreground)">
+                          We use this to run your workflows. You can find your
+                          n8n API Key in your n8n account settings.
+                        </p>
                         <div className="pt-2" />
                         <Button
                           onClick={(event) => handleSaveApiKey()}
@@ -597,7 +547,7 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                     </div>
                   </div>
                 </div>
-              </Flex>
+              </div>
             </Card>
 
             <div
@@ -605,11 +555,10 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
               className={`mx-auto mt-[2%] items-start rounded-2xl bg-(--background) text-(--foreground) ${cardWidthClasses}`}
               style={{ zIndex: 1 }}
             >
-              <Flex direction="row" justify="space-between">
+              <div className="flex flex-row justify-between">
                 <div className="flex flex-col items-start justify-start">
-                  <Title
-                    order={3}
-                    className={`pt-3 pb-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                  <h3
+                    className={`heading-h3 pt-3 pb-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -617,7 +566,7 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                     }}
                   >
                     Your n8n tools
-                  </Title>
+                  </h3>
                 </div>
                 <div className="flex flex-col items-end justify-center">
                   {/* Can add more buttons here */}
@@ -626,7 +575,7 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
                     Download Conversation History
                   </Button> */}
                 </div>
-              </Flex>
+              </div>
             </div>
 
             <N8nWorkflowsTable
@@ -635,7 +584,7 @@ const MakeToolsPage = ({ course_name }: { course_name: string }) => {
               isEmptyWorkflowTable={isEmptyWorkflowTable}
               sidebarCollapsed={sidebarCollapsed}
             />
-          </Flex>
+          </div>
         </div>
       </main>
 

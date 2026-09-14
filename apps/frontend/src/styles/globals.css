@@ -1747,9 +1747,18 @@ https://icflorescu.github.io/mantine-datatable/examples/records-selection/
 
 @layer base {
   :root {
-    /* HSL versions for Tailwind - WARNING: These override the hex values above */
-    /* Existing components using var(--background) etc. will break if they expect hex values */
-    /* Consider migrating to Tailwind classes or using separate HSL variable names */
+    /* HSL versions for Tailwind's `hsl(var(--foo))` color tokens.
+       NOTE: this block is layered, while the hex `:root`/`.dark` blocks
+       above (and `.dark` below) are unlayered on purpose (see the note at
+       the top of this file). Unlayered CSS always wins the cascade over
+       layered CSS, so for any variable name defined in *both* places
+       (--background, --primary, --muted, --border, etc.) the hex value
+       above wins and these HSL values are dead. Only variable names that
+       are *exclusively* defined here (--card, --popover,
+       --ring-offset-background, --sidebar-foreground/primary/accent/
+       border/ring) actually take effect. Keep `tailwind.config.ts`'s
+       `hsl(...)` wrapping in sync with whichever of these names are truly
+       HSL-only - see the comment on `theme.extend.colors` there. */
     /* Illinois Blue (#13294b) -> hsl(214, 58%, 19%) */
     --foreground: 214 58% 19%;
     /* Illinois White (#ffffff) -> hsl(0, 0%, 100%) */

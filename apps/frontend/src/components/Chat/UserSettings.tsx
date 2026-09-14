@@ -78,18 +78,18 @@ export const UserSettings = () => {
     homeDispatch({ field: 'showModelSettings', value: false })
   }
 
-  const tabTriggerClass = `${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-text) justify-start data-active:bg-(--modal-active) hover:bg-(--modal-active) hover:text-white data-active:text-white whitespace-normal`
+  const tabTriggerClass = `${isSmallScreen ? 'px-2 text-xs' : 'px-4 text-sm'} py-2.5 ${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-text) justify-start data-active:bg-(--modal-active) hover:bg-(--modal-active) hover:text-white data-active:text-white whitespace-normal`
 
   return (
     <Dialog open={opened} onOpenChange={(next) => !next && handleClose()}>
       <DialogContent
         data-settings-modal
         showCloseButton={false}
-        className={`h-[95%] w-[90%] max-w-[800px] gap-0 overflow-hidden rounded-[.25rem] bg-(--modal) text-(--modal-text) md:rounded-lg ${isSmallScreen ? 'p-2' : 'p-4'}`}
+        className={`flex h-[95%] w-[90%] min-w-[800px] max-w-[1000px] flex-col gap-0 overflow-hidden rounded-[.25rem] bg-(--modal) text-(--modal-text) md:rounded-lg ${isSmallScreen ? 'p-2' : 'p-4'}`}
       >
-        <div className="flex w-full items-center justify-between rounded-lg bg-(--modal-dark)">
+        <div className="flex w-full items-center justify-between rounded-lg bg-(--modal-dark) p-4">
           <DialogTitle
-            className={`font-bold ${montserrat_heading.variable} font-montserratHeading`}
+            className={`text-base font-bold ${montserrat_heading.variable} font-montserratHeading`}
           >
             Settings
           </DialogTitle>
@@ -106,9 +106,9 @@ export const UserSettings = () => {
           className={`mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto ${isSmallScreen ? 'p-2' : 'p-4'}`}
         >
           <Tabs orientation="vertical" defaultValue="model">
-            <div className="flex gap-2">
+            <div className="flex w-full">
               <TabsList
-                className={`mt-6 ml-2 h-fit flex-col bg-transparent ${isSmallScreen ? 'w-1/4' : 'w-auto'}`}
+                className={`mt-6 ml-2.5 h-fit flex-col bg-transparent ${isSmallScreen ? 'w-1/4' : 'w-auto'}`}
               >
                 <TabsTrigger value="model" className={tabTriggerClass}>
                   Model
@@ -124,14 +124,17 @@ export const UserSettings = () => {
                 </TabsTrigger>
               </TabsList>
 
-              <Separator orientation="vertical" className="ml-2" />
+              <Separator
+                orientation="vertical"
+                className="ml-3 bg-(--modal-border)"
+              />
 
               <div className="flex-1">
                 <TabsContent value="model" className="pt-2">
                   <div className="flex flex-col">
                     <ModelSelect />
                     <Separator
-                      className={`my-2 self-center ${isSmallScreen ? 'w-[70%]' : 'w-[90%]'}`}
+                      className={`my-2 self-center bg-(--modal-border) ${isSmallScreen ? 'w-[70%]' : 'w-[90%]'}`}
                     />
                     <ModelParams
                       selectedConversation={selectedConversation}
@@ -140,7 +143,7 @@ export const UserSettings = () => {
                       t={t}
                     />
                     <Separator
-                      className={`my-2 self-center ${isSmallScreen ? 'w-[70%]' : 'w-[90%]'}`}
+                      className={`my-2 self-center bg-(--modal-border) ${isSmallScreen ? 'w-[70%]' : 'w-[90%]'}`}
                     />
                     <FancyRetrieval />
                   </div>

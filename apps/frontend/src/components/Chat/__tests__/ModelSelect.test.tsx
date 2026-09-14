@@ -283,7 +283,7 @@ describe('ModelSelect', () => {
       },
     )
 
-    await user.click(screen.getByRole('searchbox', { name: /select a model/i }))
+    await user.click(screen.getByRole('combobox', { name: /select a model/i }))
 
     const listbox = await screen.findByRole('listbox')
     expect(listbox).toBeInTheDocument()

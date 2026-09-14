@@ -1,7 +1,8 @@
-import { Button, Card } from '@mantine/core'
+import { Button, buttonVariants } from '@/components/shadcn/ui/button'
 import { type NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import React, { useState, useEffect, useMemo } from 'react'
 import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
@@ -243,13 +244,9 @@ const Home: NextPage = () => {
               </div>
 
               <Button
+                type="button"
                 tabIndex={0}
-                variant="light"
-                style={{
-                  backgroundColor: 'var(--illinois-orange)',
-                  color: 'var(--illinois-white)',
-                }}
-                radius="sm"
+                className="rounded-sm bg-(--illinois-orange) text-(--illinois-white) hover:bg-(--illinois-orange)/90"
                 onClick={() => {
                   // Use Next.js router to navigate
                   router.push('/chat')
@@ -598,16 +595,12 @@ const Home: NextPage = () => {
                 free, hosted here at Illinois.
               </div>
 
-              <Button
+              <a
                 tabIndex={0}
-                className="mt-8 bg-none focus:bg-(--dashboard-button)"
-                variant="light"
-                style={{
-                  color: 'var(--illinois-white)',
-                  border: '1px solid var(--illinois-white)',
-                }}
-                radius="sm"
-                component="a"
+                className={buttonVariants({
+                  className:
+                    'mt-8 rounded-sm border border-(--illinois-white) bg-none text-(--illinois-white) hover:bg-transparent focus:bg-(--dashboard-button)',
+                })}
                 href="https://docs.uiuc.chat/api"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -620,7 +613,7 @@ const Home: NextPage = () => {
                   className="ml-1"
                   aria-hidden="true"
                 />
-              </Button>
+              </a>
             </div>
 
             <div className="mt-0 sm:mt-0 sm:w-2/3">
@@ -896,29 +889,26 @@ function FlagshipChatbots() {
   return (
     <div className="mr-auto ml-auto grid grid-cols-1 gap-6 sm:grid-cols-3">
       {cards.map((card) => (
-        <Card
+        <Link
           key={card.course_slug}
-          component="a"
           href={`/${card.course_slug}/chat`}
-          // target="_blank"
-          radius="md"
-          className="flex h-56 flex-col"
+          className="flex h-56 flex-col overflow-hidden rounded-md"
           style={{
             color: 'var(--illinois-blue)',
             background: 'var(--illinois-white)',
           }}
         >
-          <Card.Section className="h-12">
+          <div className="h-12">
             <div
               className={`flex items-center px-3 text-sm font-semibold ${montserrat_heading.variable} font-montserratHeading`}
               style={{ height: '100%' }}
             >
               {card.title}
             </div>
-          </Card.Section>
+          </div>
 
           {card.imageSrc && (
-            <Card.Section className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden">
               <div className="h-full w-full">
                 <Image
                   src={card.imageSrc}
@@ -935,10 +925,10 @@ function FlagshipChatbots() {
                   }}
                 />
               </div>
-            </Card.Section>
+            </div>
           )}
 
-          <Card.Section className="h-16 sm:h-20">
+          <div className="h-16 sm:h-20">
             <div className="flex h-full flex-col justify-center px-3 sm:flex-row sm:items-center">
               <div className="line-clamp-2 max-w-full text-xs sm:line-clamp-5">
                 {card.tagline}
@@ -953,8 +943,8 @@ function FlagshipChatbots() {
                 />
               </div>
             </div>
-          </Card.Section>
-        </Card>
+          </div>
+        </Link>
       ))}
     </div>
   )
