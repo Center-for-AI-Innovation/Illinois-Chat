@@ -424,6 +424,11 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     }
   }
 
+  // Remove every occurrence of a snippet from the prompt (String.replace only
+  // removes the first one).
+  const removeAllOccurrences = (text: string, snippet: string) =>
+    text.split(snippet).join('')
+
   // Update system prompt with toggle changes
   const updateSystemPrompt = (updatedFields: Partial<CourseMetadata>) => {
     let newPrompt = baseSystemPrompt
@@ -450,22 +455,17 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       }
     }
 
-    // Handle Disable citations prompt
+    // Handle Disable citations prompt. The prompt always reflects the current
+    // state of the toggle: exactly one of the two citation blocks is present,
+    // and flipping the switch swaps them.
     if (updatedFields.disableCitations !== undefined) {
-      if (updatedFields.disableCitations) {
-        if (!newPrompt.includes(CITATION_GUIDELINES_PROMPT)) {
-          newPrompt = newPrompt.replace(CITATION_GUIDELINES_PROMPT, '')
-        }
-        if (!newPrompt.includes(CITATION_DISABLED_PROMPT)) {
-          newPrompt += CITATION_DISABLED_PROMPT
-        }
-      } else {
-        if (!newPrompt.includes(CITATION_DISABLED_PROMPT)) {
-          newPrompt = newPrompt.replace(CITATION_DISABLED_PROMPT, '')
-        }
-        if (!newPrompt.includes(CITATION_GUIDELINES_PROMPT)) {
-          newPrompt += CITATION_GUIDELINES_PROMPT
-        }
+      const [remove, add] = updatedFields.disableCitations
+        ? [CITATION_GUIDELINES_PROMPT, CITATION_DISABLED_PROMPT]
+        : [CITATION_DISABLED_PROMPT, CITATION_GUIDELINES_PROMPT]
+
+      newPrompt = removeAllOccurrences(newPrompt, remove)
+      if (!newPrompt.includes(add)) {
+        newPrompt += add
       }
     }
 
@@ -971,7 +971,7 @@ CRITICAL: The optimized prompt must:
                     }}
                   />
                   <Title
-                    className={`label ${montserrat_heading.variable} pl-1 pr-0 font-montserratHeading text-[--dashboard-foreground] md:pl-0 md:pr-2`}
+                    className={`py-2 ${montserrat_heading.variable} pl-1 pr-0 font-montserratHeading text-[--dashboard-foreground] md:pl-0 md:pr-2`}
                     order={4}
                   >
                     Prompt Engineering Guide
@@ -1057,7 +1057,7 @@ CRITICAL: The optimized prompt must:
                       </List.Item>
                     </List>
                     <Text
-                      className={`label ${montserrat_paragraph.variable} inline-block select-text font-montserratParagraph`}
+                      className={`px-1 py-2 ${montserrat_paragraph.variable} inline-block select-text font-montserratParagraph`}
                       size="md"
                       style={{ marginTop: '1.5rem' }}
                     >
@@ -1113,7 +1113,7 @@ CRITICAL: The optimized prompt must:
                 <Flex justify="space-between" align="center" mb="md">
                   <Flex align="center" className="-mt-2 gap-4">
                     <Title
-                      className={`label ${montserrat_heading.variable} pl-1 pr-0 font-montserratHeading text-[--dashboard-foreground] md:pl-0 md:pr-2`}
+                      className={`py-2 ${montserrat_heading.variable} pl-1 pr-0 font-montserratHeading text-[--dashboard-foreground] md:pl-0 md:pr-2`}
                       order={4}
                     >
                       System Prompt
@@ -2082,7 +2082,7 @@ CRITICAL: The optimized prompt must:
 
               <Flex align="center" style={{ paddingTop: '15px' }}>
                 <Title
-                  className={`label ${montserrat_heading.variable} mr-[8px] font-montserratHeading`}
+                  className={`px-1 py-2 ${montserrat_heading.variable} mr-[8px] font-montserratHeading`}
                   order={3}
                 >
                   AI Behavior Settings
