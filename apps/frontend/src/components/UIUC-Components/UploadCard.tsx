@@ -335,8 +335,7 @@ export const UploadCard = memo(function UploadCard({
                 </span>
               </p>
               <p
-                className={`mt-0! px-1 py-2 ${montserrat_light.className} pb-0 text-sm`}
-                style={{ marginBottom: '-3px' }}
+                className={`mt-0! px-1 py-2 ${montserrat_light.className} pt-0 text-sm`}
               >
                 Users will likely try these first to get a feel for your bot.
               </p>

@@ -874,7 +874,7 @@ export default function APIKeyInputForm({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main flex min-h-screen min-w-screen flex-col items-center"
+        className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
         <h1 className="sr-only">{projectName} — LLMs — Illinois Chat</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">

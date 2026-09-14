@@ -40,19 +40,13 @@ export function ChatbotsGlobalNav({
 
         <div className="flex items-center gap-1 sm:gap-2">
           {navItems.map((item) => {
-            const isActive = activePath === item.link
             return (
               <Link
                 key={item.link}
                 href={item.link}
-                data-active={isActive}
                 className={`${
                   montserrat_heading.variable
-                } font-montserratHeading flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold text-(--illinois-blue) transition-colors sm:px-4 sm:text-sm dark:text-white ${
-                  isActive
-                    ? 'bg-(--illinois-orange)/10 dark:bg-white/10'
-                    : 'hover:bg-(--illinois-orange)/10 dark:hover:bg-white/10'
-                }`}
+                } font-montserratHeading flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold text-(--illinois-blue) transition-colors sm:px-4 sm:text-sm dark:text-white`}
               >
                 <item.icon size={20} strokeWidth={2} />
                 {item.label}
