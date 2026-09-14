@@ -7,7 +7,7 @@ export interface OpenAICompatibleTool {
       type: 'object'
       properties: {
         [key: string]: {
-          type: 'string' | 'number' | 'Boolean'
+          type: 'string' | 'number' | 'boolean'
           description?: string
           enum?: string[]
         }
@@ -18,7 +18,7 @@ export interface OpenAICompatibleTool {
 }
 
 export interface ToolParameter {
-  type: 'string' | 'textarea' | 'number' | 'Date' | 'DropdownList' | 'Boolean'
+  type: 'string' | 'textarea' | 'number' | 'Date' | 'DropdownList' | 'boolean'
   description: string
   enum?: string[]
 }

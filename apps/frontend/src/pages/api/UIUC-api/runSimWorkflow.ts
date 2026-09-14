@@ -43,6 +43,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'workflow_id and input are required' })
   }
 
+  // `sanitizeSimWorkflowInput` spreads and enumerates the input, so anything
+  // but a plain object would turn a malformed request into a 500.
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return res.status(400).json({ error: 'input must be a JSON object' })
+  }
+
   if (!course_name) {
     return res.status(400).json({ error: 'course_name is required' })
   }
@@ -146,6 +152,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         status: simResponse.status,
         message: errMessage,
       })
+      // Sim's own 401/403 mean the project's key was rejected, not that this
+      // caller failed to authenticate here — forwarding them verbatim reads
+      // as an Illinois Chat login failure. Map them like the listing path.
+      if (simResponse.status === 401 || simResponse.status === 403) {
+        const mapped = simUpstreamErrorResponse(simResponse.status)
+        return res.status(mapped.status).json({ error: mapped.error })
+      }
       return res.status(simResponse.status).json({ error: errMessage })
     }
 

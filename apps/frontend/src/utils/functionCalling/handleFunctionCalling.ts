@@ -302,8 +302,8 @@ export function getOpenAIToolFromUIUCTool(
                   type:
                     param?.type === 'number'
                       ? 'number'
-                      : param?.type === 'Boolean'
-                        ? 'Boolean'
+                      : param?.type === 'boolean'
+                        ? 'boolean'
                         : 'string',
                   description: param?.description,
                   enum: param?.enum,
@@ -312,7 +312,7 @@ export function getOpenAIToolFromUIUCTool(
               },
               {} as {
                 [key: string]: {
-                  type: 'string' | 'number' | 'Boolean'
+                  type: 'string' | 'number' | 'boolean'
                   description?: string
                   enum?: string[]
                 }
@@ -511,7 +511,7 @@ export function getUIUCToolFromSim(workflows: SimWorkflow[]): UIUCTool[] {
             f.type === 'number'
               ? 'number'
               : f.type === 'boolean'
-                ? 'Boolean'
+                ? 'boolean'
                 : 'string',
           description: f.description ?? f.name,
         } satisfies ToolParameter,

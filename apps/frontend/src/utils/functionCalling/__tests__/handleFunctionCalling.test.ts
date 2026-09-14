@@ -29,7 +29,7 @@ describe('handleFunctionCalling utils (browser/jsdom)', () => {
           type: 'object',
           properties: {
             count: { type: 'number', description: 'c' } as any,
-            flag: { type: 'Boolean', description: 'f' } as any,
+            flag: { type: 'boolean', description: 'f' } as any,
             text: { type: 'string', description: 't' } as any,
           },
           required: ['count'],
@@ -47,7 +47,7 @@ describe('handleFunctionCalling utils (browser/jsdom)', () => {
           required: ['count'],
           properties: {
             count: expect.objectContaining({ type: 'number' }),
-            flag: expect.objectContaining({ type: 'Boolean' }),
+            flag: expect.objectContaining({ type: 'boolean' }),
             text: expect.objectContaining({ type: 'string' }),
           },
         }),
@@ -1093,7 +1093,7 @@ describe('handleFunctionCalling Sim edge cases', () => {
 
     expect(tool?.inputParameters?.properties).toMatchObject({
       count: { type: 'number', description: 'count' },
-      flag: { type: 'Boolean', description: 'flag' },
+      flag: { type: 'boolean', description: 'flag' },
       text: { type: 'string', description: 'text' },
     })
   })

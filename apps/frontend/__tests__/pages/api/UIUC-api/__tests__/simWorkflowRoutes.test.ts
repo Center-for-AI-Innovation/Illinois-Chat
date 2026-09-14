@@ -114,6 +114,19 @@ describe('runSimWorkflow handler', () => {
     }
   })
 
+  it('rejects an input that is not a plain object before touching credentials', async () => {
+    for (const input of [null, [], 'str', 42]) {
+      const res = makeRes()
+      await runSimWorkflow(
+        runReq({ workflow_id: 'wf-1', input, course_name: 'cs101' }),
+        res,
+      )
+      expect(res.statusCode).toBe(400)
+      expect(res.body.error).toMatch(/JSON object/)
+    }
+    expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
+  })
+
   it('requires course_name', async () => {
     const res = makeRes()
     await runSimWorkflow(runReq({ workflow_id: 'wf-1', input: {} }), res)
@@ -275,6 +288,33 @@ describe('runSimWorkflow handler', () => {
     await runSimWorkflow(runReq(BODY), res)
     expect(res.statusCode).toBe(400)
     expect(res.body).toEqual({ error: 'Deploy it (NOT_DEPLOYED)' })
+  })
+
+  it("maps Sim's own 401/403 to 502 so they do not read as an app login failure", async () => {
+    for (const status of [401, 403]) {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status,
+          statusText: 'Unauthorized',
+        }),
+      )
+      const res = makeRes()
+      await runSimWorkflow(runReq(BODY), res)
+      expect(res.statusCode).toBe(502)
+      expect(res.body.error).toMatch(/rejected the API key/)
+    }
+
+    // Other upstream statuses still pass through unchanged.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'boom' }), {
+        status: 500,
+        statusText: 'Internal Server Error',
+      }),
+    )
+    const res = makeRes()
+    await runSimWorkflow(runReq(BODY), res)
+    expect(res.statusCode).toBe(500)
+    expect(res.body).toEqual({ error: 'boom' })
   })
 
   it('reports a timeout as 408', async () => {
