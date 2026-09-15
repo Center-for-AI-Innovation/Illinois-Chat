@@ -613,10 +613,10 @@ fi
 # them from init-schema.sql; databases created before the migration get them
 # here, from the migration itself — the one place the DDL lives.
 print_status "Ensuring Sim AI project config columns exist..."
-psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0006_add_sim_columns.sql >/dev/null
-# 0016 converts a plaintext sim_api_key column to the encrypted JSONB
+psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0016_add_sim_columns.sql >/dev/null
+# 0017 converts a plaintext sim_api_key column to the encrypted JSONB
 # envelope; guarded on the column type, so re-running it is a no-op.
-psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0016_encrypt_sim_api_key.sql >/dev/null
+psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0017_encrypt_sim_api_key.sql >/dev/null
 
 print_success "PostgreSQL schema initialized and verified."
 
