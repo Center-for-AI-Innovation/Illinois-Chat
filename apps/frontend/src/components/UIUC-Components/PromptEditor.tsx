@@ -1,27 +1,49 @@
 // PromptEditor.tsx - Shared component for prompt editing
 // Used by both prompt.tsx page and StepPrompt wizard step
 'use client'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  Button,
-  Collapse,
-  Divider,
-  Flex,
-  Group,
-  Image,
-  Indicator,
-  List,
-  MantineTheme,
-  Modal,
-  Paper,
-  Select,
-  Text,
-  Textarea,
-  Title,
-  Tooltip,
-  useMantineTheme,
-} from '@mantine/core'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
+import Image from 'next/image'
 import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
+import { Badge } from '@/components/shadcn/ui/badge'
+import { Button } from '@/components/shadcn/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/shadcn/ui/collapsible'
+import {
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxInputGroup,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from '@/components/shadcn/ui/combobox'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
+import { Separator } from '@/components/shadcn/ui/separator'
+import { Switch } from '@/components/shadcn/ui/switch'
+import { Textarea } from '@/components/shadcn/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import {
   IconAlertTriangle,
   IconAlertTriangleFilled,
@@ -35,12 +57,12 @@ import {
   IconSparkles,
 } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
+import { XIcon } from 'lucide-react'
 import { useDebouncedCallback } from 'use-debounce'
 import { v4 as uuidv4 } from 'uuid'
 import CustomCopyButton from '~/components/Buttons/CustomCopyButton'
 import { getModelLogo } from '~/components/Chat/ModelSelect'
 import { LinkGeneratorModal } from '~/components/Modals/LinkGeneratorModal'
-import { Switch } from '@/components/shadcn/ui/switch'
 import { findDefaultModel } from '~/components/UIUC-Components/api-inputs/LLMsApiKeyInputForm'
 import { type ChatBody } from '~/types/chat'
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -101,6 +123,68 @@ const getProviderFromModel = (
   return selectedOption?.group || ProviderNames.OpenAI
 }
 
+// Restores the `autosize` behavior the Mantine Textarea gave us: grow to fit
+// the content, with the `max-h-*` class doing what `maxRows` used to.
+// Returns a ref for the textarea plus a `height` value to spread into its
+// `style` prop. The height MUST be applied through React's own render output
+// (not written directly to `el.style.height`): this textarea also takes a
+// `style` prop for its font-family, and React re-syncs the whole `style`
+// attribute to match that prop on every re-render, silently wiping out any
+// height set imperatively outside of React the moment something else in this
+// component re-renders (which happens often, unrelated to the prompt text).
+function useAutosizeTextarea(value: string) {
+  const ref = useRef<HTMLTextAreaElement | null>(null)
+  const observerRef = useRef<ResizeObserver | null>(null)
+  const lastWidthRef = useRef<number | null>(null)
+  const [height, setHeight] = useState<number>()
+
+  const resize = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    const next = el.scrollHeight
+    el.style.height = ''
+    lastWidthRef.current = el.clientWidth
+    setHeight(next)
+  }, [])
+
+  // A plain `useRef` + `useEffect([value])` isn't enough here: this
+  // component sets its state in two separate ticks on load (the prompt text
+  // arrives, then `isLoading` flips false one microtask later, in a
+  // `finally` after another awaited fetch). The textarea doesn't exist in
+  // the DOM yet when `value` first changes, and by the time it mounts,
+  // `value` hasn't changed again — so a value-keyed effect never re-fires
+  // against the now-attached element. A callback ref sidesteps the race
+  // entirely by measuring the instant the node actually attaches.
+  const setRef = useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      observerRef.current?.disconnect()
+      observerRef.current = null
+      ref.current = node
+      if (!node) return
+      resize()
+      if (typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(() => {
+          if (node.clientWidth !== lastWidthRef.current) resize()
+        })
+        observer.observe(node)
+        observerRef.current = observer
+      }
+    },
+    [resize],
+  )
+
+  // Re-measure on subsequent value changes (typing, or a swapped-in
+  // optimized prompt) once the element is already mounted.
+  useLayoutEffect(() => {
+    resize()
+  }, [value, resize])
+
+  useEffect(() => () => observerRef.current?.disconnect(), [])
+
+  return { ref: setRef, height }
+}
+
 const isApiKeyRequired = (provider: ProviderNames): boolean => {
   const providersRequiringApiKey = [
     ProviderNames.OpenAI,
@@ -113,7 +197,6 @@ const isApiKeyRequired = (provider: ProviderNames): boolean => {
 }
 
 export const showPromptToast = (
-  theme: MantineTheme,
   title: string,
   message: string,
   isError = false,
@@ -136,11 +219,7 @@ export const showPromptToast = (
   })
 }
 
-export const showToastOnPromptUpdate = (
-  theme: MantineTheme,
-  was_error = false,
-  isReset = false,
-) => {
+export const showToastOnPromptUpdate = (was_error = false, isReset = false) => {
   const title = was_error
     ? 'Error Updating Prompt'
     : isReset
@@ -153,7 +232,7 @@ export const showToastOnPromptUpdate = (
       : 'The system prompt has been updated.'
   const isError = was_error
 
-  showPromptToast(theme, title, message, isError)
+  showPromptToast(title, message, isError)
 }
 
 export const showToastNotification = (
@@ -182,7 +261,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   showHeader = true,
   userEmail,
 }) => {
-  const theme = useMantineTheme()
   const queryClient = useQueryClient()
   const isSmallScreen = useMediaQuery('(max-width: 1280px)')
 
@@ -192,6 +270,8 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     null,
   )
   const [baseSystemPrompt, setBaseSystemPrompt] = useState('')
+  const { ref: systemPromptTextareaRef, height: systemPromptTextareaHeight } =
+    useAutosizeTextarea(baseSystemPrompt)
   const [isRightSideVisible, setIsRightSideVisible] = useState(!isEmbedded)
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [opened, setOpened] = useState(false)
@@ -202,10 +282,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   const closeResetModal = useCallback(() => setResetModalOpened(false), [])
   const [llmProviders, setLLMProviders] = useState<AllLLMProviders | null>(null)
   const [linkGeneratorOpened, setLinkGeneratorOpened] = useState(false)
-  const openLinkGenerator = useCallback(
-    () => setLinkGeneratorOpened(true),
-    [],
-  )
+  const openLinkGenerator = useCallback(() => setLinkGeneratorOpened(true), [])
   const closeLinkGenerator = useCallback(
     () => setLinkGeneratorOpened(false),
     [],
@@ -283,6 +360,24 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
             : [],
         )
     : []
+
+  // Grouped by provider for the model combobox — modelOptions is already
+  // sorted by LLM_PROVIDER_ORDER with same-provider items contiguous, so a
+  // simple adjacent-run grouping preserves that order.
+  const groupedModelOptions = modelOptions.reduce<
+    { value: string; items: ModelOption[] }[]
+  >((groups, option) => {
+    const lastGroup = groups[groups.length - 1]
+    if (lastGroup && lastGroup.value === option.group) {
+      lastGroup.items.push(option)
+    } else {
+      groups.push({ value: option.group, items: [option] })
+    }
+    return groups
+  }, [])
+
+  const selectedModelOption =
+    modelOptions.find((option) => option.value === selectedModel) ?? null
 
   // Fetch course metadata and providers on mount
   useEffect(() => {
@@ -394,9 +489,9 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     }
     if (!success) {
       console.log('Error updating course metadata')
-      showToastOnPromptUpdate(theme, true)
+      showToastOnPromptUpdate(true)
     } else {
-      showToastOnPromptUpdate(theme)
+      showToastOnPromptUpdate()
     }
   }
 
@@ -417,7 +512,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       )
       if (!success) {
         alert('Error resetting system prompt')
-        showToastOnPromptUpdate(theme, true, true)
+        showToastOnPromptUpdate(true, true)
       } else {
         setBaseSystemPrompt(DEFAULT_SYSTEM_PROMPT ?? '')
         setCourseMetadata(updatedCourseMetadata)
@@ -425,7 +520,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
         setDocumentsOnly(false)
         setDisableCitations(false)
         setSystemPromptOnly(false)
-        showToastOnPromptUpdate(theme, false, true)
+        showToastOnPromptUpdate(false, true)
       }
     } else {
       alert('Error resetting system prompt')
@@ -516,7 +611,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     try {
       const success = await callSetCourseMetadata(project_name, updatedMetadata)
       if (!success) {
-        showPromptToast(theme, 'Error', 'Failed to update settings', true)
+        showPromptToast('Error', 'Failed to update settings', true)
         return
       }
 
@@ -585,7 +680,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
 
       if (changes.length > 0) {
         showPromptToast(
-          theme,
           changes.join(' & '),
           'Settings have been saved successfully',
           false,
@@ -593,7 +687,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       }
     } catch (error) {
       console.error('Error updating course settings:', error)
-      showPromptToast(theme, 'Error', 'Failed to update settings', true)
+      showPromptToast('Error', 'Failed to update settings', true)
     }
   }
 
@@ -601,7 +695,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
 
   const handleCheckboxChange = async (updatedFields: PartialCourseMetadata) => {
     if (!courseMetadata || !project_name) {
-      showPromptToast(theme, 'Error', 'Failed to update settings', true)
+      showPromptToast('Error', 'Failed to update settings', true)
       return
     }
 
@@ -659,7 +753,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
         .writeText(defaultPostPrompt)
         .then(() => {
           showPromptToast(
-            theme,
             'Copied',
             'Default post prompt system prompt copied to clipboard',
           )
@@ -667,7 +760,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
         .catch((err) => {
           console.error('Could not copy text: ', err)
           showPromptToast(
-            theme,
             'Error Copying',
             'Could not copy text to clipboard',
             true,
@@ -675,12 +767,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
         })
     } catch (error) {
       console.error('Error fetching default prompt:', error)
-      showPromptToast(
-        theme,
-        'Error Fetching',
-        'Could not fetch default prompt',
-        true,
-      )
+      showPromptToast('Error Fetching', 'Could not fetch default prompt', true)
     }
   }
 
@@ -693,7 +780,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     try {
       if (!llmProviders) {
         showPromptToast(
-          theme,
           'Configuration Error',
           'The Optimize System Prompt feature requires provider configuration to be loaded. Please refresh the page and try again.',
           true,
@@ -704,7 +790,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       const provider = getProviderFromModel(selectedModel, modelOptions)
       if (!llmProviders[provider]?.enabled) {
         showPromptToast(
-          theme,
           `${provider} Required`,
           `The Optimize System Prompt feature requires ${provider} to be enabled. Please enable ${provider} on the LLM page in your course settings to use this feature.`,
           true,
@@ -721,7 +806,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
             !bedrockProvider?.region
           ) {
             showPromptToast(
-              theme,
               `${provider} Credentials Required`,
               `The Optimize System Prompt feature requires AWS credentials (Access Key ID, Secret Access Key, and Region). Please add your AWS credentials on the LLM page in your course settings to use this feature.`,
               true,
@@ -730,7 +814,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
           }
         } else if (!llmProviders[provider]?.apiKey) {
           showPromptToast(
-            theme,
             `${provider} API Key Required`,
             `The Optimize System Prompt feature requires a ${provider} API key. Please add your ${provider} API key on the LLM page in your course settings to use this feature.`,
             true,
@@ -852,7 +935,6 @@ CRITICAL: The optimized prompt must:
       if (!response.ok) {
         const errorData = await response.json()
         showPromptToast(
-          theme,
           'Error',
           errorData.error || 'Failed to optimize prompt',
           true,
@@ -895,7 +977,6 @@ CRITICAL: The optimized prompt must:
     } catch (error) {
       console.error('Error optimizing prompt:', error)
       showPromptToast(
-        theme,
         'Error',
         'Failed to optimize prompt. Please try again.',
         true,
@@ -908,14 +989,16 @@ CRITICAL: The optimized prompt must:
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Text className="text-(--foreground-faded)">Loading...</Text>
+        <p className="text-(--foreground-faded)">Loading...</p>
       </div>
     )
   }
 
   return (
     <div className="prompt-editor">
-      <Flex direction={isSmallScreen || isEmbedded ? 'column' : 'row'}>
+      <div
+        className={`flex ${isSmallScreen || isEmbedded ? 'flex-col' : 'flex-row'}`}
+      >
         {/* Left Side - Main Content */}
         <div
           className={`min-h-full bg-(--background) ${
@@ -925,105 +1008,64 @@ CRITICAL: The optimized prompt must:
           {showHeader && !isEmbedded && (
             <div className="w-full px-4 py-3 sm:px-6 sm:py-4 md:px-8">
               <div className="flex items-center gap-2">
-                <Title
-                  order={2}
-                  className={`${montserrat_heading.variable} font-montserratHeading text-lg text-(--foreground) sm:text-2xl`}
+                <h2
+                  className={`heading-h2 ${montserrat_heading.variable} font-montserratHeading text-lg text-(--foreground) sm:text-2xl`}
                 >
                   Prompting
-                </Title>
-                <Text className="text-(--foreground)">/</Text>
-                <Title
-                  order={3}
-                  className={`${montserrat_heading.variable} font-montserratHeading text-base text-(--illinois-orange) sm:text-xl`}
+                </h2>
+                <span className="text-(--foreground)">/</span>
+                <h3
+                  className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading text-base text-(--illinois-orange) sm:text-xl`}
                 >
                   {project_name}
-                </Title>
+                </h3>
               </div>
             </div>
           )}
 
           <div className={`${isEmbedded ? '' : 'p-4'}`}>
             {/* Prompt Engineering Guide */}
-            <Paper
-              className="w-full rounded-xl bg-(--dashboard-background-faded) px-6"
-              p="md"
-              sx={{
-                transition: 'all 0.2s ease',
-              }}
+            <Collapsible
+              open={insightsOpen}
+              onOpenChange={setInsightsOpen}
+              className="w-full rounded-xl bg-(--dashboard-background-faded) px-6 py-4 transition-all duration-200"
             >
-              <Flex
-                role="button"
-                tabIndex={0}
-                aria-expanded={insightsOpen}
-                align="center"
-                justify="space-between"
-                sx={{
-                  cursor: 'pointer',
-                  borderRadius: '8px',
-                }}
-                className="focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--dashboard-button)"
-                onClick={() => setInsightsOpen(!insightsOpen)}
-                onKeyDown={(e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setInsightsOpen(!insightsOpen)
-                  }
-                }}
+              <CollapsibleTrigger
+                nativeButton={false}
+                render={
+                  <div className="flex w-full cursor-pointer items-center justify-between rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--dashboard-button)" />
+                }
               >
-                <Flex align="center" gap="md">
+                <div className="flex items-center gap-4">
                   <IconBook
                     size={24}
                     aria-hidden="true"
-                    style={{
-                      color: 'var(--dashboard-button)',
-                    }}
+                    className="text-(--dashboard-button)"
                   />
-                  <Title
-                    className={`py-2 ${montserrat_heading.variable} font-montserratHeading pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
-                    order={4}
+                  <h4
+                    className={`heading-h4 py-2 ${montserrat_heading.variable} font-montserratHeading pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
                   >
                     Prompt Engineering Guide
-                  </Title>
-                </Flex>
+                  </h4>
+                </div>
                 <div
-                  className="transition-transform duration-200"
-                  style={{
-                    transform: insightsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                    color: 'var(--dashboard-foreground)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  className={`flex items-center justify-center text-(--dashboard-foreground) transition-transform duration-200 ${
+                    insightsOpen ? 'rotate-180' : 'rotate-0'
+                  }`}
                 >
                   <IconChevronDown size={24} aria-hidden="true" />
                 </div>
-              </Flex>
+              </CollapsibleTrigger>
 
-              <Collapse in={insightsOpen} transitionDuration={200}>
+              <CollapsibleContent>
                 <div className="mt-4 px-2 text-(--dashboard-foreground)">
-                  <Text
-                    size="md"
-                    className={`${montserrat_paragraph.variable} font-montserratParagraph select-text`}
+                  <div
+                    className={`${montserrat_paragraph.variable} font-montserratParagraph text-base select-text`}
                   >
                     For additional insights and best practices on prompt
                     creation, please review:
-                    <List
-                      withPadding
-                      className="mt-2"
-                      spacing="sm"
-                      icon={
-                        <div
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--dashboard-foreground)',
-                            marginTop: '8px',
-                          }}
-                        />
-                      }
-                    >
-                      <List.Item>
+                    <ul className="mt-2 list-none space-y-2 pl-5">
+                      <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-(--dashboard-foreground)">
                         <a
                           className={`text-sm text-(--dashboard-button) transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
                           href="https://platform.openai.com/docs/guides/prompt-engineering"
@@ -1035,15 +1077,11 @@ CRITICAL: The optimized prompt must:
                           <IconExternalLink
                             size={18}
                             aria-hidden="true"
-                            className="inline-block pl-1"
-                            style={{
-                              position: 'relative',
-                              top: '-2px',
-                            }}
+                            className="relative -top-0.5 inline-block pl-1"
                           />
                         </a>
-                      </List.Item>
-                      <List.Item>
+                      </li>
+                      <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-(--dashboard-foreground)">
                         <a
                           className={`text-sm text-(--dashboard-button) transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
                           href="https://docs.anthropic.com/claude/prompt-library"
@@ -1055,644 +1093,356 @@ CRITICAL: The optimized prompt must:
                           <IconExternalLink
                             size={18}
                             aria-hidden="true"
-                            className="inline-block pl-1"
-                            style={{
-                              position: 'relative',
-                              top: '-2px',
-                            }}
+                            className="relative -top-0.5 inline-block pl-1"
                           />
                         </a>
-                      </List.Item>
-                    </List>
-                    <Text
-                      className={`px-1 py-2 ${montserrat_paragraph.variable} font-montserratParagraph inline-block select-text`}
-                      size="md"
-                      style={{ marginTop: '1.5rem' }}
-                    >
-                      The System Prompt provides the foundation for every
-                      conversation in this project. It defines the model&apos;s
-                      role, tone, and behavior. Consider including:
-                      <List
-                        withPadding
-                        className="mt-2 text-(--dashboard-foreground)"
-                        spacing="xs"
-                        icon={
-                          <div
-                            style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: 'var(--dashboard-foreground)',
-                              marginTop: '8px',
-                            }}
-                          />
-                        }
-                      >
-                        <List.Item>Key instructions or examples</List.Item>
-                        <List.Item>A warm welcome message</List.Item>
-                        <List.Item>
-                          Helpful links for further learning
-                        </List.Item>
-                      </List>
-                    </Text>
-                  </Text>
+                      </li>
+                    </ul>
+                  </div>
+                  <div
+                    className={`px-1 py-2 ${montserrat_paragraph.variable} font-montserratParagraph mt-6 inline-block text-base select-text`}
+                  >
+                    The System Prompt provides the foundation for every
+                    conversation in this project. It defines the model&apos;s
+                    role, tone, and behavior. Consider including:
+                    <ul className="mt-2 list-none space-y-1 pl-5 text-(--dashboard-foreground)">
+                      <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-(--dashboard-foreground)">
+                        Key instructions or examples
+                      </li>
+                      <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-(--dashboard-foreground)">
+                        A warm welcome message
+                      </li>
+                      <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-(--dashboard-foreground)">
+                        Helpful links for further learning
+                      </li>
+                    </ul>
+                  </div>
                 </div>
-              </Collapse>
-            </Paper>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* System Prompt Section */}
-            <div
-              style={{
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                background: 'var(--dashboard-background-faded)',
-              }}
-              className="mt-4 rounded-xl px-4 py-6 sm:p-6"
-            >
-              <div
-                style={{
-                  width: '100%',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Flex justify="space-between" align="center" mb="md">
-                  <Flex align="center" className="-mt-2 gap-4">
-                    <Title
-                      className={`py-2 ${montserrat_heading.variable} font-montserratHeading pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
-                      order={4}
-                    >
-                      System Prompt
-                    </Title>
-                    <Select
-                      placeholder="Select model"
-                      aria-label="Select model"
-                      data={modelOptions}
-                      value={selectedModel}
-                      onChange={(value) => setSelectedModel(value || '')}
-                      searchable
-                      radius="md"
-                      maxDropdownHeight={280}
-                      itemComponent={(props: any) => (
-                        <div {...props}>
-                          <Group noWrap style={{ overflow: 'visible' }}>
-                            <div
-                              style={{
-                                width: '100%',
-                                paddingLeft: '4px',
-                                overflow: 'visible',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  overflow: 'visible',
-                                }}
-                              >
-                                <Image
-                                  aria-hidden="true"
-                                  src={getModelLogo(props.modelType)}
-                                  alt={`${props.modelType} logo`}
-                                  width={20}
-                                  height={20}
-                                  style={{
-                                    minWidth: '20px',
-                                    borderRadius: '4px',
-                                    overflow: 'hidden',
-                                  }}
-                                />
-                                <Text size="sm" style={{ marginLeft: '12px' }}>
-                                  {props.label}
-                                </Text>
-                              </div>
-                              {props.downloadSize && (
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    marginTop: '4px',
-                                    marginLeft: '32px',
-                                  }}
-                                >
-                                  <Text size="xs" opacity={0.65}>
-                                    {props.downloadSize}
-                                  </Text>
-                                  {recommendedModelIds.includes(
-                                    props.label,
-                                  ) && (
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                      }}
-                                    >
-                                      <IconSparkles
-                                        size="1rem"
-                                        aria-hidden="true"
-                                        style={{ marginLeft: '8px' }}
-                                      />
-                                      <Text
-                                        size="xs"
-                                        opacity={0.65}
-                                        style={{ marginLeft: '4px' }}
-                                      >
-                                        recommended
-                                      </Text>
-                                    </div>
-                                  )}
-                                  {warningLargeModelIds.includes(
-                                    props.label,
-                                  ) && (
-                                    <div
-                                      style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                      }}
-                                    >
-                                      <IconAlertTriangleFilled
-                                        size="1rem"
-                                        aria-hidden="true"
-                                        style={{ marginLeft: '8px' }}
-                                      />
-                                      <Text
-                                        size="xs"
-                                        opacity={0.65}
-                                        style={{ marginLeft: '4px' }}
-                                      >
-                                        warning, requires large vRAM GPU
-                                      </Text>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </Group>
-                        </div>
+            <div className="mt-4 flex w-full flex-col rounded-xl bg-(--dashboard-background-faded) px-4 py-6 sm:p-6">
+              <div className="mb-4 flex w-full items-center justify-between">
+                <div className="-mt-2 flex items-center gap-4">
+                  <h4
+                    className={`heading-h4 py-2 ${montserrat_heading.variable} font-montserratHeading pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
+                  >
+                    System Prompt
+                  </h4>
+                  <Combobox
+                    items={groupedModelOptions}
+                    value={selectedModelOption}
+                    isItemEqualToValue={(item, val) =>
+                      (item as ModelOption | null)?.value ===
+                      (val as ModelOption | null)?.value
+                    }
+                    onValueChange={(item) => {
+                      const selected = item as ModelOption | null
+                      setSelectedModel(selected?.value || '')
+                    }}
+                  >
+                    <ComboboxInputGroup className="w-[220px] cursor-pointer border-(--button) bg-(--background) text-(--foreground) focus-within:border-(--dashboard-button) sm:w-[240px] md:w-[320px]">
+                      {selectedModelOption && (
+                        <Image
+                          aria-hidden="true"
+                          src={getModelLogo(selectedModelOption.modelType)}
+                          alt={`${selectedModelOption.modelType} logo`}
+                          width={20}
+                          height={20}
+                          className="min-w-5 overflow-hidden rounded"
+                        />
                       )}
-                      styles={(theme) => ({
-                        root: {
-                          width: '320px',
-                          zIndex: 200,
-                          '@media (max-width: 768px)': {
-                            width: '240px',
-                          },
-                          '@media (max-width: 480px)': {
-                            width: '220px',
-                          },
-                        },
-                        input: {
-                          color: 'var(--foreground)',
-                          backgroundColor: 'var(--background)',
-                          borderColor: 'var(--button)',
-                          '&:focus': {
-                            outline: '2px solid var(--dashboard-button)',
-                            outlineOffset: '-2px',
-                          },
-                          fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                          cursor: 'pointer',
-                          minWidth: 0,
-                          flex: '1 1 auto',
-                          height: '36px',
-                          fontSize: '0.9rem',
-                          paddingRight: '30px',
-                          paddingLeft: '36px',
-                          overflow: 'visible',
-                          '@media (max-width: 768px)': {
-                            fontSize: '0.85rem',
-                            height: '34px',
-                          },
-                          '@media (max-width: 480px)': {
-                            fontSize: '0.8rem',
-                            height: '32px',
-                          },
-                        },
-                        dropdown: {
-                          backgroundColor: 'var(--background)',
-                          border: '1px solid var(--background-dark)',
-                          borderRadius: theme.radius.md,
-                          marginTop: '2px',
-                          boxShadow: theme.shadows.xs,
-                          width: '100%',
-                          maxWidth: '100%',
-                          position: 'absolute',
-                          zIndex: 200,
-                          overflow: 'visible',
-                          '@media (max-width: 768px)': {
-                            width: 'auto',
-                            minWidth: '240px',
-                          },
-                        },
-                        item: {
-                          color: 'var(--foreground)',
-                          backgroundColor: 'var(--background)',
-                          borderRadius: theme.radius.md,
-                          margin: '2px',
-                          overflow: 'visible',
-                          '&[data-selected]': {
-                            color: 'var(--foreground)',
-                            backgroundColor: 'transparent',
-                            '&:hover': {
-                              color: 'var(--foreground)',
-                              backgroundColor: 'var(--foreground-faded)',
-                            },
-                          },
-                          '&[data-hovered]': {
-                            color: 'var(--foreground)',
-                            backgroundColor: 'var(--foreground-faded)',
-                          },
-                          fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                          cursor: 'pointer',
-                          whiteSpace: 'normal',
-                          lineHeight: 1.2,
-                          fontSize: '0.9rem',
-                          padding: '8px 12px',
-                          '@media (max-width: 768px)': {
-                            fontSize: '0.85rem',
-                            padding: '6px 10px',
-                          },
-                          '@media (max-width: 480px)': {
-                            fontSize: '0.8rem',
-                            padding: '6px 8px',
-                          },
-                        },
-                        rightSection: {
-                          pointerEvents: 'none',
-                          color: theme.colors.gray[5],
-                          width: '30px',
-                          '@media (max-width: 480px)': {
-                            width: '24px',
-                          },
-                        },
-                      })}
-                      rightSection={
+                      <ComboboxInput
+                        placeholder="Select model"
+                        aria-label="Select model"
+                        className={`${montserrat_paragraph.variable} font-montserratParagraph cursor-pointer text-sm`}
+                      />
+                      <ComboboxTrigger className="text-(--foreground-faded)">
                         <IconChevronDown
                           size={isSmallScreen ? 12 : 14}
                           aria-hidden="true"
-                          style={{ marginRight: '8px' }}
                         />
-                      }
-                      icon={
-                        selectedModel ? (
-                          <Image
-                            aria-hidden="true"
-                            src={getModelLogo(
-                              modelOptions.find(
-                                (opt) => opt.value === selectedModel,
-                              )?.modelType || '',
-                            )}
-                            alt={`${
-                              modelOptions.find(
-                                (opt) => opt.value === selectedModel,
-                              )?.modelType || ''
-                            } logo`}
-                            width={20}
-                            height={20}
-                            style={{
-                              position: 'absolute',
-                              left: '8px',
-                              minWidth: '20px',
-                              borderRadius: '4px',
-                              overflow: 'hidden',
-                            }}
-                          />
-                        ) : null
-                      }
-                      dropdownPosition="bottom"
-                      withinPortal
-                      zIndex={40}
-                    />
-                    <Tooltip
-                      label="The selected model will be used when Optimizing System Prompt"
-                      position="top"
-                      multiline
-                      withArrow
-                      arrowSize={10}
-                      offset={20}
-                      styles={(theme) => ({
-                        tooltip: {
-                          backgroundColor: theme.colors.dark[7],
-                          color: theme.white,
-                          fontSize: '0.875rem',
-                          padding: '0.5rem 0.75rem',
-                          fontFamily: 'var(--font-montserratParagraph)',
-                          maxWidth: '300px',
-                        },
-                        arrow: {
-                          backgroundColor: theme.colors.dark[7],
-                        },
-                      })}
-                    >
-                      <div>
-                        <IconInfoCircle
-                          size={18}
-                          aria-hidden="true"
-                          className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
-                          style={{ cursor: 'pointer' }}
-                        />
-                      </div>
-                    </Tooltip>
-                  </Flex>
+                      </ComboboxTrigger>
+                    </ComboboxInputGroup>
+                    <ComboboxContent className="w-full max-w-full rounded-md border border-(--background-dark) bg-(--background) text-(--foreground) shadow-xs">
+                      <ComboboxEmpty>Nothing found</ComboboxEmpty>
+                      <ComboboxList>
+                        {(group: { value: string; items: ModelOption[] }) => (
+                          <ComboboxGroup key={group.value} items={group.items}>
+                            <ComboboxGroupLabel>
+                              {group.value}
+                            </ComboboxGroupLabel>
+                            <ComboboxCollection>
+                              {(item: ModelOption) => (
+                                <ComboboxItem
+                                  key={item.value}
+                                  value={item}
+                                  className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-(--foreground) data-highlighted:bg-(--foreground-faded)`}
+                                >
+                                  <div className="w-full pl-1">
+                                    <div className="flex items-center">
+                                      <Image
+                                        aria-hidden="true"
+                                        src={getModelLogo(item.modelType)}
+                                        alt={`${item.modelType} logo`}
+                                        width={20}
+                                        height={20}
+                                        className="min-w-5 overflow-hidden rounded"
+                                      />
+                                      <span className="ml-3 text-sm">
+                                        {item.label}
+                                      </span>
+                                    </div>
+                                    {item.downloadSize && (
+                                      <div className="mt-1 ml-8 flex items-center">
+                                        <span className="text-xs opacity-65">
+                                          {item.downloadSize}
+                                        </span>
+                                        {recommendedModelIds.includes(
+                                          item.label,
+                                        ) && (
+                                          <div className="flex items-center">
+                                            <IconSparkles
+                                              size="1rem"
+                                              aria-hidden="true"
+                                              className="ml-2"
+                                            />
+                                            <span className="ml-1 text-xs opacity-65">
+                                              recommended
+                                            </span>
+                                          </div>
+                                        )}
+                                        {warningLargeModelIds.includes(
+                                          item.label,
+                                        ) && (
+                                          <div className="flex items-center">
+                                            <IconAlertTriangleFilled
+                                              size="1rem"
+                                              aria-hidden="true"
+                                              className="ml-2"
+                                            />
+                                            <span className="ml-1 text-xs opacity-65">
+                                              warning, requires large vRAM GPU
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </ComboboxItem>
+                              )}
+                            </ComboboxCollection>
+                          </ComboboxGroup>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                  <Tooltip>
+                    <TooltipTrigger render={<div />}>
+                      <IconInfoCircle
+                        size={18}
+                        aria-hidden="true"
+                        className="cursor-pointer text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[300px] text-wrap">
+                      The selected model will be used when Optimizing System
+                      Prompt
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
 
-                  {!isEmbedded && (
-                    <>
-                      {isRightSideVisible ? (
-                        <Tooltip label="Close Prompt Builder" key="close">
-                          <button
-                            className="cursor-pointer border-none bg-transparent p-0 pl-2"
-                            data-right-sidebar-icon
-                            aria-label="Close Prompt Builder"
-                            onClick={() => setIsRightSideVisible(false)}
-                          >
-                            <IconLayoutSidebarRight
-                              stroke={2}
-                              aria-hidden="true"
-                              className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
+                {!isEmbedded && (
+                  <>
+                    {isRightSideVisible ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              className="cursor-pointer border-none bg-transparent p-0 pl-2"
+                              data-right-sidebar-icon
+                              aria-label="Close Prompt Builder"
+                              onClick={() => setIsRightSideVisible(false)}
                             />
-                          </button>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip label="Open Prompt Builder" key="open">
-                          <button
-                            className="mr-2 cursor-pointer border-none bg-transparent p-0"
-                            data-right-sidebar-icon
-                            aria-label="Open Prompt Builder"
-                            onClick={() => setIsRightSideVisible(true)}
-                          >
-                            <IconLayoutSidebarRightExpand
-                              stroke={2}
-                              aria-hidden="true"
-                              className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
-                            />
-                          </button>
-                        </Tooltip>
-                      )}
-                    </>
-                  )}
-                </Flex>
-
-                <form
-                  className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                  onSubmit={handleSubmitPromptOptimization}
-                >
-                  <Textarea
-                    autosize
-                    minRows={isEmbedded ? 4 : 3}
-                    maxRows={20}
-                    placeholder="Enter the system prompt..."
-                    aria-label="System Prompt"
-                    className="px-1 pt-3 md:px-0"
-                    value={baseSystemPrompt}
-                    onChange={(e) => setBaseSystemPrompt(e.target.value)}
-                    style={{ width: '100%' }}
-                    styles={{
-                      input: {
-                        color: 'var(--foreground)',
-                        backgroundColor: 'var(--background)',
-                        fontFamily: 'var(--font-montserratParagraph)',
-                        '&:focus': { borderColor: 'var(--dashboard-button)' },
-                      },
-                    }}
-                  />
-
-                  <Group mt="md" spacing="sm">
-                    <Button
-                      variant="filled"
-                      radius="md"
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      type="button"
-                      onClick={() => handleSystemPromptSubmit(baseSystemPrompt)}
-                      sx={() => ({
-                        backgroundColor: `var(--dashboard-button) !important`,
-                        border: 'none',
-                        color: '#fff',
-                        padding: '10px 20px',
-                        fontWeight: 600,
-                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          backgroundColor: `var(--dashboard-button-hover) !important`,
-                          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-                        },
-                        '&:active': {
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                        },
-                      })}
-                      style={{ minWidth: 'fit-content' }}
-                    >
-                      Update System Prompt
-                    </Button>
-
-                    <span
-                      style={
-                        {
-                          '--spinner': 'var(--dashboard-button)',
-                        } as React.CSSProperties
-                      }
-                    >
-                      <Button
-                        onClick={handleSubmitPromptOptimization}
-                        disabled={!llmProviders || isOptimizing}
-                        variant="filled"
-                        radius="md"
-                        leftIcon={
-                          isOptimizing ? (
-                            <LoadingSpinner size="sm" />
-                          ) : (
-                            <IconSparkles
-                              stroke={1}
-                              aria-hidden="true"
-                              color="var(--dashboard-button-foreground)"
-                            />
-                          )
-                        }
-                        className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                        sx={() => ({
-                          background: 'var(--dashboard-button) !important',
-                          border: 'none',
-                          color:
-                            'var(--dashboard-button-foreground) !important',
-                          padding: '10px 20px',
-                          fontWeight: 600,
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            background:
-                              'var(--dashboard-button-hover) !important',
-                          },
-                          '&:active': {},
-                          '&:disabled': {
-                            opacity: 0.7,
-                            cursor: 'not-allowed',
-                            transform: 'none',
-                          },
-                        })}
-                        style={{ minWidth: 'fit-content' }}
-                      >
-                        {isOptimizing
-                          ? 'Optimizing...'
-                          : 'Optimize System Prompt'}
-                      </Button>
-                    </span>
-                  </Group>
-                </form>
-              </div>
-            </div>
-
-            {/* Optimization Modal */}
-            <Modal
-              opened={opened}
-              onClose={close}
-              size="xl"
-              title={
-                <Text
-                  className={`${montserrat_heading.variable} font-montserratHeading`}
-                  size="lg"
-                  weight={700}
-                >
-                  Optimized System Prompt
-                </Text>
-              }
-              className={`${montserrat_heading.variable} font-montserratHeading rounded-xl`}
-              centered
-              radius="lg"
-              styles={{
-                title: { marginBottom: '0' },
-                header: {
-                  backgroundColor: 'var(--modal)',
-                  borderBottom: '1px solid var(--modal-border)',
-                  padding: '20px 24px',
-                },
-                content: {
-                  color: 'var(--modal-text)',
-                  backgroundColor: 'var(--modal)',
-                  border: '1px solid #2D2F48',
-                },
-                body: {
-                  padding: '24px',
-                  marginTop: '2%',
-                  paddingTop: '4%',
-                  maxHeight: 'calc(85vh - 76px)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                },
-                close: {
-                  color: 'var(--modal-text)',
-                  border: '0px',
-                  '&:hover': {
-                    color: 'var(--modal)',
-                    backgroundColor: 'var(--dashboard-button)',
-                  },
-                },
-              }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '24px',
-                }}
-              >
-                <Paper
-                  p="md"
-                  radius="md"
-                  style={{
-                    backgroundColor: 'var(--background-faded)',
-                    flex: 1,
-                    overflow: 'auto',
-                    minHeight: '200px',
-                    maxHeight: 'calc(85vh - 200px)',
-                    marginTop: '4px',
-                  }}
-                >
-                  {messages.map((message, i, { length }) => {
-                    if (length - 1 === i && message.role === 'assistant') {
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            padding: '16px',
-                            borderRadius: '8px',
-                            whiteSpace: 'pre-wrap',
-                            color: 'var(--modal-text)',
-                            lineHeight: '1.6',
-                            fontSize: '0.95rem',
-                          }}
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                          }
                         >
-                          {message.content}
-                        </div>
-                      )
-                    }
-                    return null
-                  })}
-                </Paper>
+                          <IconLayoutSidebarRight
+                            stroke={2}
+                            aria-hidden="true"
+                            className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent>Close Prompt Builder</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              className="mr-2 cursor-pointer border-none bg-transparent p-0"
+                              data-right-sidebar-icon
+                              aria-label="Open Prompt Builder"
+                              onClick={() => setIsRightSideVisible(true)}
+                            />
+                          }
+                        >
+                          <IconLayoutSidebarRightExpand
+                            stroke={2}
+                            aria-hidden="true"
+                            className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent>Open Prompt Builder</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </>
+                )}
+              </div>
 
-                <Group position="right" spacing="sm">
+              <form
+                className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                onSubmit={handleSubmitPromptOptimization}
+              >
+                <Textarea
+                  ref={systemPromptTextareaRef}
+                  placeholder="Enter the system prompt..."
+                  aria-label="System Prompt"
+                  className="max-h-96 w-full resize-y overflow-y-auto bg-(--background) px-3 pt-3 text-(--foreground) focus-visible:border-(--dashboard-button)"
+                  style={{
+                    fontFamily: 'var(--font-montserratParagraph)',
+                    height: systemPromptTextareaHeight
+                      ? `${systemPromptTextareaHeight}px`
+                      : undefined,
+                  }}
+                  rows={isEmbedded ? 4 : 3}
+                  value={baseSystemPrompt}
+                  onChange={(e) => setBaseSystemPrompt(e.target.value)}
+                />
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Button
-                    variant="outline"
-                    radius="md"
-                    onClick={close}
-                    className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                    styles={() => ({
-                      root: {
-                        color: 'var(--foreground)',
-                        borderColor: 'var(--background-faded)',
-                        '&:hover': {
-                          backgroundColor: 'var(--background-faded)',
-                        },
-                      },
-                    })}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    radius="md"
-                    className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                    onClick={() => {
-                      const lastMessage = messages[messages.length - 1]
-                      if (lastMessage && lastMessage.role === 'assistant') {
-                        const newSystemPrompt = lastMessage.content
-                        setBaseSystemPrompt(newSystemPrompt)
-                        handleSystemPromptSubmit(newSystemPrompt)
-                      }
-                      close()
-                    }}
-                    sx={() => ({
-                      color: 'var(--dashboard-button-foreground)',
-                      background: 'var(--dashboard-button) !important',
-                      border: 'none',
-                      padding: '10px 20px',
-                      fontWeight: 600,
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        background: 'var(--dashboard-button-hover) !important',
-                      },
-                      '&:active': {
-                        transform: 'translateY(0)',
-                      },
-                    })}
+                    variant="dashboard"
+                    className={`min-w-fit rounded-md px-5 py-2.5 shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-all duration-200 hover:shadow-[0_4px_8px_rgba(0,0,0,0.3)] active:shadow-[0_2px_4px_rgba(0,0,0,0.2)] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                    type="button"
+                    onClick={() => handleSystemPromptSubmit(baseSystemPrompt)}
                   >
                     Update System Prompt
                   </Button>
-                </Group>
-              </div>
-            </Modal>
+
+                  <span
+                    style={
+                      {
+                        '--spinner': 'var(--dashboard-button)',
+                      } as React.CSSProperties
+                    }
+                  >
+                    <Button
+                      onClick={handleSubmitPromptOptimization}
+                      disabled={!llmProviders || isOptimizing}
+                      variant="dashboard"
+                      className={`min-w-fit gap-2 rounded-md px-5 py-2.5 transition-all duration-200 disabled:transform-none disabled:opacity-70 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                    >
+                      {isOptimizing ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        <IconSparkles stroke={1} aria-hidden="true" />
+                      )}
+                      {isOptimizing
+                        ? 'Optimizing...'
+                        : 'Optimize System Prompt'}
+                    </Button>
+                  </span>
+                </div>
+              </form>
+            </div>
+
+            {/* Optimization Modal */}
+            <Dialog open={opened} onOpenChange={(next) => !next && close()}>
+              <DialogContent
+                showCloseButton={false}
+                className={`flex max-h-[85vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-xl border border-[#2D2F48] bg-(--modal) p-0 text-(--modal-text) sm:max-w-[788px] ${montserrat_heading.variable} font-montserratHeading`}
+              >
+                <div className="flex items-center justify-between border-b border-(--modal-border) px-6 py-5">
+                  <DialogTitle className="text-lg font-bold">
+                    Optimized System Prompt
+                  </DialogTitle>
+                  <DialogClose
+                    aria-label="Close"
+                    className="text-(--modal-text) hover:bg-(--dashboard-button) hover:text-(--modal)"
+                  >
+                    <XIcon className="size-4" aria-hidden="true" />
+                  </DialogClose>
+                </div>
+                <div
+                  className="mt-[2%] flex min-h-0 flex-1 flex-col gap-6 p-6 pt-[4%]"
+                  style={{ maxHeight: 'calc(85vh - 76px)' }}
+                >
+                  <div
+                    className="mt-1 min-h-[200px] flex-1 overflow-auto rounded-md bg-(--background-faded) p-4"
+                    style={{ maxHeight: 'calc(85vh - 200px)' }}
+                  >
+                    {messages.map((message, i, { length }) => {
+                      if (length - 1 === i && message.role === 'assistant') {
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              padding: '16px',
+                              borderRadius: '8px',
+                              whiteSpace: 'pre-wrap',
+                              color: 'var(--modal-text)',
+                              lineHeight: '1.6',
+                              fontSize: '0.95rem',
+                            }}
+                            className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                          >
+                            {message.content}
+                          </div>
+                        )
+                      }
+                      return null
+                    })}
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={close}
+                      className={`rounded-md border-(--background-faded) text-(--foreground) hover:bg-(--background-faded) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="dashboard"
+                      className={`rounded-md px-5 py-2.5 transition-all duration-200 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                      onClick={() => {
+                        const lastMessage = messages[messages.length - 1]
+                        if (lastMessage && lastMessage.role === 'assistant') {
+                          const newSystemPrompt = lastMessage.content
+                          setBaseSystemPrompt(newSystemPrompt)
+                          handleSystemPromptSubmit(newSystemPrompt)
+                        }
+                        close()
+                      }}
+                    >
+                      Update System Prompt
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Behavior Settings - shown inline when embedded */}
             {isEmbedded && (
               <div className="mt-6 rounded-xl bg-(--dashboard-background-faded) p-4 sm:p-6">
-                <Title
-                  order={4}
-                  className={`${montserrat_heading.variable} font-montserratHeading mb-4 text-(--foreground)`}
+                <h4
+                  className={`heading-h4 ${montserrat_heading.variable} font-montserratHeading mb-4 text-(--foreground)`}
                 >
                   AI Behavior Settings
-                </Title>
+                </h4>
 
-                <Flex direction="column" gap="md">
+                <div className="flex flex-col gap-4">
                   <Switch
                     size="lg"
                     variant="labeled"
@@ -1784,230 +1534,116 @@ CRITICAL: The optimized prompt must:
                   )}
 
                   {/* Reset Modal for embedded mode */}
-                  <Modal
-                    opened={resetModalOpened}
-                    onClose={closeResetModal}
-                    title={
-                      <Text
-                        className={`${montserrat_heading.variable} font-montserratHeading`}
-                        size="lg"
-                        weight={700}
-                        variant="gradient"
-                        gradient={{
-                          from: 'red',
-                          to: 'white',
-                          deg: 45,
-                        }}
-                      >
-                        Reset Prompting Settings
-                      </Text>
-                    }
-                    centered
-                    radius="md"
-                    size="md"
-                    styles={{
-                      header: {
-                        backgroundColor: '#15162c',
-                        borderBottom: '1px solid #2D2F48',
-                        padding: '20px 24px',
-                        marginBottom: '16px',
-                      },
-                      content: {
-                        backgroundColor: '#15162c',
-                        border: '1px solid #2D2F48',
-                      },
-                      body: {
-                        padding: '0 24px 24px 24px',
-                      },
-                      title: {
-                        marginBottom: '0',
-                      },
-                      close: {
-                        marginTop: '4px',
-                      },
-                    }}
+                  <Dialog
+                    open={resetModalOpened}
+                    onOpenChange={(next) => !next && closeResetModal()}
                   >
-                    <Flex
-                      direction="column"
-                      gap="xl"
-                      style={{ marginTop: '8px' }}
+                    <DialogContent
+                      showCloseButton={false}
+                      className={`gap-0 rounded-md border border-[#2D2F48] bg-(--illinois-purple-dark) p-0 text-white sm:max-w-md ${montserrat_heading.variable} font-montserratHeading`}
                     >
-                      <Flex align="flex-start" gap="md">
-                        <IconAlertTriangle
-                          size={24}
-                          aria-hidden="true"
-                          color={theme.colors.red[5]}
-                          style={{ marginTop: '2px' }}
-                        />
-                        <Text
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          size="sm"
-                          weight={500}
+                      <div className="mb-4 flex items-center justify-between border-b border-[#2D2F48] px-6 py-5">
+                        <DialogTitle
+                          className="bg-clip-text text-lg font-bold text-transparent"
                           style={{
-                            color: 'white',
-                            lineHeight: 1.5,
+                            backgroundImage:
+                              'linear-gradient(45deg, red, white)',
                           }}
                         >
-                          Are you sure you want to reset your system prompt and
-                          all behavior settings to their default values?
-                        </Text>
-                      </Flex>
-
-                      <Divider
-                        style={{
-                          borderColor: 'rgba(255,255,255,0.1)',
-                        }}
-                      />
-
-                      <div>
-                        <Text
-                          size="sm"
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          weight={600}
-                          style={{
-                            color: '#D1D1D1',
-                            marginBottom: '12px',
-                          }}
+                          Reset Prompting Settings
+                        </DialogTitle>
+                        <DialogClose
+                          aria-label="Close"
+                          className="mt-1 text-white"
                         >
-                          This action will:
-                        </Text>
-                        <List
-                          size="sm"
-                          spacing="sm"
-                          style={{ color: '#D1D1D1' }}
-                          icon={
-                            <div
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: 'hsl(0,100%,70%)',
-                                marginTop: '8px',
-                              }}
-                            />
-                          }
-                        >
-                          <List.Item>
-                            Restore the system prompt to the default template
-                          </List.Item>
-                          <List.Item>
-                            Disable Guided Learning, Document-Only mode, and
-                            other custom settings
-                          </List.Item>
-                        </List>
+                          <XIcon className="size-4" aria-hidden="true" />
+                        </DialogClose>
                       </div>
+                      <div className="flex flex-col gap-6 px-6 pb-6">
+                        <div className="flex items-start gap-4">
+                          <IconAlertTriangle
+                            size={24}
+                            aria-hidden="true"
+                            className="mt-0.5 text-red-500"
+                          />
+                          <p
+                            className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm leading-relaxed font-medium text-white`}
+                          >
+                            Are you sure you want to reset your system prompt
+                            and all behavior settings to their default values?
+                          </p>
+                        </div>
 
-                      <Text
-                        size="sm"
-                        style={{ color: '#D1D1D1' }}
-                        className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      >
-                        This cannot be undone. Please confirm you wish to
-                        proceed.
-                      </Text>
+                        <Separator className="bg-white/10" />
 
-                      <Group position="right" mt="md">
-                        <Button
-                          variant="outline"
-                          color="gray"
-                          radius="md"
-                          onClick={closeResetModal}
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          styles={(theme) => ({
-                            root: {
-                              borderColor: theme.colors.gray[6],
-                              color: '#fff',
-                              '&:hover': {
-                                backgroundColor: theme.colors.gray[8],
-                              },
-                            },
-                          })}
+                        <div>
+                          <p
+                            className={`${montserrat_paragraph.variable} font-montserratParagraph mb-3 text-sm font-semibold text-[#D1D1D1]`}
+                          >
+                            This action will:
+                          </p>
+                          <ul className="list-none space-y-2 pl-5 text-sm text-[#D1D1D1]">
+                            <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-red-400">
+                              Restore the system prompt to the default template
+                            </li>
+                            <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-red-400">
+                              Disable Guided Learning, Document-Only mode, and
+                              other custom settings
+                            </li>
+                          </ul>
+                        </div>
+
+                        <p
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-[#D1D1D1]`}
                         >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="filled"
-                          color="red"
-                          radius="md"
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          sx={(theme) => ({
-                            backgroundColor: `${theme.colors.red[8]} !important`,
-                            border: 'none',
-                            color: '#fff',
-                            padding: '10px 20px',
-                            fontWeight: 600,
-                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              backgroundColor: `${theme.colors.red[9]} !important`,
-                              transform: 'translateY(-1px)',
-                              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-                            },
-                            '&:active': {
-                              transform: 'translateY(0)',
-                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                            },
-                          })}
-                          onClick={() => {
-                            resetSystemPrompt()
-                            closeResetModal()
-                          }}
-                        >
-                          Confirm
-                        </Button>
-                      </Group>
-                    </Flex>
-                  </Modal>
+                          This cannot be undone. Please confirm you wish to
+                          proceed.
+                        </p>
+
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={closeResetModal}
+                            className={`rounded-md border-gray-600 text-white hover:bg-gray-800 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="danger"
+                            className={`rounded-md bg-red-800 px-5 py-2.5 shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-all duration-200 hover:bg-red-900 hover:shadow-[0_4px_8px_rgba(0,0,0,0.3)] active:translate-y-0 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                            onClick={() => {
+                              resetSystemPrompt()
+                              closeResetModal()
+                            }}
+                          >
+                            Confirm
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   {/* Action Buttons */}
-                  <Divider my="md" />
-                  <Flex direction="column" gap="md">
+                  <Separator className="my-4" />
+                  <div className="flex flex-col gap-4">
                     <Button
-                      variant="filled"
-                      color="red"
-                      radius="md"
-                      leftIcon={
-                        <IconAlertTriangle size={16} aria-hidden="true" />
-                      }
+                      variant="danger"
+                      className={`gap-2 rounded-md bg-red-800 px-5 py-2.5 transition-all duration-200 hover:bg-red-900 ${montserrat_paragraph.variable} font-montserratParagraph`}
                       onClick={openResetModal}
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      sx={(theme) => ({
-                        backgroundColor: `${theme.colors.red[8]} !important`,
-                        border: 'none',
-                        color: '#fff',
-                        padding: '10px 20px',
-                        fontWeight: 600,
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          backgroundColor: `${theme.colors.red[9]} !important`,
-                        },
-                      })}
                     >
+                      <IconAlertTriangle size={16} aria-hidden="true" />
                       Reset Prompting Settings
                     </Button>
 
                     <Button
-                      variant="filled"
-                      radius="md"
-                      leftIcon={<IconLink size={16} aria-hidden="true" />}
+                      variant="dashboard"
+                      className={`gap-2 rounded-md px-5 py-2.5 transition-all duration-200 ${montserrat_paragraph.variable} font-montserratParagraph`}
                       onClick={openLinkGenerator}
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      sx={() => ({
-                        background: 'var(--dashboard-button) !important',
-                        border: 'none',
-                        color: '#fff',
-                        padding: '10px 20px',
-                        fontWeight: 600,
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          background:
-                            'var(--dashboard-button-hover) !important',
-                        },
-                      })}
                     >
+                      <IconLink size={16} aria-hidden="true" />
                       Generate Share Link
                     </Button>
-                  </Flex>
+                  </div>
 
                   {/* Link Generator Modal for embedded mode */}
                   <LinkGeneratorModal
@@ -2020,7 +1656,7 @@ CRITICAL: The optimized prompt must:
                       systemPromptOnly,
                     }}
                   />
-                </Flex>
+                </div>
               </div>
             )}
           </div>
@@ -2037,40 +1673,22 @@ CRITICAL: The optimized prompt must:
               borderLeft: '1px solid var(--dashboard-border)',
             }}
           >
-            <Flex direction="column" m="1rem" gap="md">
-              <Flex align="flex-start">
-                <Title
-                  className={`${montserrat_heading.variable} font-montserratHeading`}
-                  order={3}
-                  pl="md"
-                  pr="md"
-                  pb="xs"
-                  style={{ alignSelf: 'left', marginLeft: '-11px' }}
+            <div className="m-4 flex flex-col gap-4">
+              <div className="flex items-start">
+                <h3
+                  className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading -ml-[11px] self-start px-4 pt-4 pb-1`}
                 >
                   Document Search Optimization
-                </Title>
-                <Indicator
-                  label={
-                    <Text
-                      className={`${montserrat_heading.variable} font-montserratHeading`}
-                    >
-                      New
-                    </Text>
-                  }
-                  color="var(--dashboard-button)"
-                  size={13}
-                  styles={{
-                    indicator: {
-                      top: '-1.1rem !important',
-                      right: '.25rem !important',
-                    },
-                  }}
-                >
-                  <span
-                    className={`${montserrat_heading.variable} font-montserratHeading`}
-                  ></span>
-                </Indicator>
-              </Flex>
+                </h3>
+                <span className="relative inline-block">
+                  <Badge
+                    className={`${montserrat_heading.variable} font-montserratHeading absolute rounded-md bg-(--dashboard-button) px-1.5 py-0 text-[10px] text-(--dashboard-button-foreground)`}
+                    style={{ top: '-1.1rem', right: '.25rem' }}
+                  >
+                    New
+                  </Badge>
+                </span>
+              </div>
 
               <Switch
                 variant="labeled"
@@ -2086,39 +1704,22 @@ CRITICAL: The optimized prompt must:
                 }}
               />
 
-              <Divider />
+              <Separator />
 
-              <Flex align="center" style={{ paddingTop: '15px' }}>
-                <Title
-                  className={`px-1 py-2 ${montserrat_heading.variable} font-montserratHeading mr-[8px]`}
-                  order={3}
+              <div className="flex items-start pt-[15px]">
+                <h3
+                  className={`heading-h3 px-1 py-2 ${montserrat_heading.variable} font-montserratHeading mr-[8px]`}
                 >
                   AI Behavior Settings
-                </Title>
-                <Indicator
-                  label={
-                    <Text
-                      className={`${montserrat_heading.variable} font-montserratHeading`}
-                    >
-                      New
-                    </Text>
-                  }
-                  color="var(--dashboard-button)"
-                  size={13}
-                  styles={{
-                    indicator: {
-                      top: '-17px !important',
-                      right: '7px !important',
-                    },
-                  }}
+                </h3>
+                <Badge
+                  className={`${montserrat_heading.variable} font-montserratHeading mt-1 rounded-md bg-(--dashboard-button) px-1.5 py-0 text-[10px] text-(--dashboard-button-foreground)`}
                 >
-                  <span
-                    className={`${montserrat_heading.variable} font-montserratHeading`}
-                  ></span>
-                </Indicator>
-              </Flex>
+                  New
+                </Badge>
+              </div>
 
-              <Flex direction="column" gap="md">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                   <Switch
                     variant="labeled"
@@ -2181,251 +1782,125 @@ CRITICAL: The optimized prompt must:
                   />
 
                   {systemPromptOnly && (
-                    <Flex
-                      mt="sm"
-                      direction="column"
-                      gap="xs"
-                      className="mt-[-4px] pl-[82px]"
-                    >
+                    <div className="mt-[-4px] flex flex-col gap-1 pl-[82px]">
                       <CustomCopyButton
                         label="Copy Illinois Chat's internal prompt"
                         tooltip="You can use and customize our default internal prompting to suit your needs. Note, only the specific citation formatting described will work with our citation 'find and replace' system. This provides a solid starting point for defining AI behavior in raw prompt mode."
                         onClick={handleCopyDefaultPrompt}
                       />
-                    </Flex>
+                    </div>
                   )}
 
                   {/* Reset Modal */}
-                  <Modal
-                    opened={resetModalOpened}
-                    onClose={closeResetModal}
-                    title={
-                      <Text
-                        className={`${montserrat_heading.variable} font-montserratHeading`}
-                        size="lg"
-                        weight={700}
-                        variant="gradient"
-                        gradient={{
-                          from: 'red',
-                          to: 'white',
-                          deg: 45,
-                        }}
-                      >
-                        Reset Prompting Settings
-                      </Text>
-                    }
-                    centered
-                    radius="md"
-                    size="md"
-                    styles={{
-                      header: {
-                        backgroundColor: '#15162c',
-                        borderBottom: '1px solid #2D2F48',
-                        padding: '20px 24px',
-                        marginBottom: '16px',
-                      },
-                      content: {
-                        backgroundColor: '#15162c',
-                        border: '1px solid #2D2F48',
-                      },
-                      body: {
-                        padding: '0 24px 24px 24px',
-                      },
-                      title: {
-                        marginBottom: '0',
-                      },
-                      close: {
-                        marginTop: '4px',
-                      },
-                    }}
+                  <Dialog
+                    open={resetModalOpened}
+                    onOpenChange={(next) => !next && closeResetModal()}
                   >
-                    <Flex
-                      direction="column"
-                      gap="xl"
-                      style={{ marginTop: '8px' }}
+                    <DialogContent
+                      showCloseButton={false}
+                      className={`gap-0 rounded-md border border-[#2D2F48] bg-(--illinois-purple-dark) p-0 text-white sm:max-w-md ${montserrat_heading.variable} font-montserratHeading`}
                     >
-                      <Flex align="flex-start" gap="md">
-                        <IconAlertTriangle
-                          size={24}
-                          aria-hidden="true"
-                          color={theme.colors.red[5]}
-                          style={{ marginTop: '2px' }}
-                        />
-                        <Text
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          size="sm"
-                          weight={500}
+                      <div className="mb-4 flex items-center justify-between border-b border-[#2D2F48] px-6 py-5">
+                        <DialogTitle
+                          className="bg-clip-text text-lg font-bold text-transparent"
                           style={{
-                            color: 'white',
-                            lineHeight: 1.5,
+                            backgroundImage:
+                              'linear-gradient(45deg, red, white)',
                           }}
                         >
-                          Are you sure you want to reset your system prompt and
-                          all behavior settings to their default values?
-                        </Text>
-                      </Flex>
-
-                      <Divider
-                        style={{
-                          borderColor: 'rgba(255,255,255,0.1)',
-                        }}
-                      />
-
-                      <div>
-                        <Text
-                          size="sm"
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          weight={600}
-                          style={{
-                            color: '#D1D1D1',
-                            marginBottom: '12px',
-                          }}
+                          Reset Prompting Settings
+                        </DialogTitle>
+                        <DialogClose
+                          aria-label="Close"
+                          className="mt-1 text-white"
                         >
-                          This action will:
-                        </Text>
-                        <List
-                          size="sm"
-                          spacing="sm"
-                          style={{ color: '#D1D1D1' }}
-                          icon={
-                            <div
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: 'hsl(0,100%,70%)',
-                                marginTop: '8px',
-                              }}
-                            />
-                          }
-                        >
-                          <List.Item>
-                            Restore the system prompt to the default template
-                          </List.Item>
-                          <List.Item>
-                            Disable Guided Learning, Document-Only mode, and
-                            other custom settings
-                          </List.Item>
-                        </List>
+                          <XIcon className="size-4" aria-hidden="true" />
+                        </DialogClose>
                       </div>
+                      <div className="flex flex-col gap-6 px-6 pb-6">
+                        <div className="flex items-start gap-4">
+                          <IconAlertTriangle
+                            size={24}
+                            aria-hidden="true"
+                            className="mt-0.5 text-red-500"
+                          />
+                          <p
+                            className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm leading-relaxed font-medium text-white`}
+                          >
+                            Are you sure you want to reset your system prompt
+                            and all behavior settings to their default values?
+                          </p>
+                        </div>
 
-                      <Text
-                        size="sm"
-                        style={{ color: '#D1D1D1' }}
-                        className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      >
-                        This cannot be undone. Please confirm you wish to
-                        proceed.
-                      </Text>
+                        <Separator className="bg-white/10" />
 
-                      <Group position="right" mt="md">
-                        <Button
-                          variant="outline"
-                          color="gray"
-                          radius="md"
-                          onClick={closeResetModal}
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          styles={(theme) => ({
-                            root: {
-                              borderColor: theme.colors.gray[6],
-                              color: '#fff',
-                              '&:hover': {
-                                backgroundColor: theme.colors.gray[8],
-                              },
-                            },
-                          })}
+                        <div>
+                          <p
+                            className={`${montserrat_paragraph.variable} font-montserratParagraph mb-3 text-sm font-semibold text-[#D1D1D1]`}
+                          >
+                            This action will:
+                          </p>
+                          <ul className="list-none space-y-2 pl-5 text-sm text-[#D1D1D1]">
+                            <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-red-400">
+                              Restore the system prompt to the default template
+                            </li>
+                            <li className="relative before:absolute before:top-2 before:-left-4 before:h-1.5 before:w-1.5 before:rounded-full before:bg-red-400">
+                              Disable Guided Learning, Document-Only mode, and
+                              other custom settings
+                            </li>
+                          </ul>
+                        </div>
+
+                        <p
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-[#D1D1D1]`}
                         >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="filled"
-                          color="red"
-                          radius="md"
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          sx={(theme) => ({
-                            backgroundColor: `${theme.colors.red[8]} !important`,
-                            border: 'none',
-                            color: '#fff',
-                            padding: '10px 20px',
-                            fontWeight: 600,
-                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              backgroundColor: `${theme.colors.red[9]} !important`,
-                              transform: 'translateY(-1px)',
-                              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
-                            },
-                            '&:active': {
-                              transform: 'translateY(0)',
-                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                            },
-                          })}
-                          onClick={() => {
-                            resetSystemPrompt()
-                            closeResetModal()
-                          }}
-                        >
-                          Confirm
-                        </Button>
-                      </Group>
-                    </Flex>
-                  </Modal>
+                          This cannot be undone. Please confirm you wish to
+                          proceed.
+                        </p>
+
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={closeResetModal}
+                            className={`rounded-md border-gray-600 text-white hover:bg-gray-800 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="danger"
+                            className={`rounded-md bg-red-800 px-5 py-2.5 shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-all duration-200 hover:bg-red-900 hover:shadow-[0_4px_8px_rgba(0,0,0,0.3)] active:translate-y-0 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                            onClick={() => {
+                              resetSystemPrompt()
+                              closeResetModal()
+                            }}
+                          >
+                            Confirm
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   {/* Reset and Share Link buttons */}
-                  <Flex
-                    direction="column"
-                    mt="md"
-                    justify="flex-start"
-                    gap="md"
-                  >
+                  <div className="mt-4 flex flex-col items-start gap-4">
                     <Button
-                      variant="filled"
-                      color="red"
-                      radius="md"
-                      leftIcon={
-                        <IconAlertTriangle size={16} aria-hidden="true" />
-                      }
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      sx={(theme) => ({
-                        backgroundColor: `${theme.colors.red[8]} !important`,
-                        border: 'none',
-                        color: '#fff',
-                        padding: '10px 20px',
-                        fontWeight: 600,
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          backgroundColor: `${theme.colors.red[9]} !important`,
-                        },
-                        '&:active': {},
-                      })}
+                      variant="danger"
+                      className={`gap-2 rounded-md bg-red-800 px-5 py-2.5 transition-all duration-200 hover:bg-red-900 ${montserrat_paragraph.variable} font-montserratParagraph`}
                       onClick={openResetModal}
                     >
+                      <IconAlertTriangle size={16} aria-hidden="true" />
                       Reset Prompting Settings
                     </Button>
 
                     <Button
-                      variant="filled"
-                      radius="md"
-                      leftIcon={<IconLink size={16} aria-hidden="true" />}
+                      variant="dashboard"
+                      className={`gap-2 rounded-md px-5 py-2.5 transition-all duration-200 ${montserrat_paragraph.variable} font-montserratParagraph`}
                       onClick={openLinkGenerator}
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                      sx={() => ({
-                        background: 'var(--dashboard-button) !important',
-                        border: 'none',
-                        color: '#fff',
-                        padding: '10px 20px',
-                        fontWeight: 600,
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          background:
-                            'var(--dashboard-button-hover) !important',
-                        },
-                        '&:active': {},
-                      })}
                     >
+                      <IconLink size={16} aria-hidden="true" />
                       Generate Share Link
                     </Button>
-                  </Flex>
+                  </div>
                 </div>
 
                 <LinkGeneratorModal
@@ -2438,11 +1913,11 @@ CRITICAL: The optimized prompt must:
                     systemPromptOnly,
                   }}
                 />
-              </Flex>
-            </Flex>
+              </div>
+            </div>
           </div>
         )}
-      </Flex>
+      </div>
     </div>
   )
 }

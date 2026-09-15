@@ -452,7 +452,10 @@ describe('PromptEditor', () => {
       const guideToggle = screen.getByRole('button', {
         name: /Prompt Engineering Guide/i,
       })
+      // Base UI's non-native button semantics match real <button> elements:
+      // Enter activates on keydown, Space activates on keyup.
       fireEvent.keyDown(guideToggle, { key: ' ' })
+      fireEvent.keyUp(guideToggle, { key: ' ' })
 
       await waitFor(() => {
         expect(
@@ -1526,9 +1529,7 @@ describe('showPromptToast', () => {
   it('calls showToast with correct structure', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showPromptToast(theme, 'Test Title', 'Test message', false)
+    showPromptToast('Test Title', 'Test message', false)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1542,9 +1543,7 @@ describe('showPromptToast', () => {
   it('uses error styling when isError is true', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showPromptToast(theme, 'Error Title', 'Error message', true)
+    showPromptToast('Error Title', 'Error message', true)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1558,10 +1557,8 @@ describe('showPromptToast', () => {
   it('calculates auto-close duration based on message length', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
     const longMessage = 'A'.repeat(300)
-    showPromptToast(theme, 'Title', longMessage)
+    showPromptToast('Title', longMessage)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1574,9 +1571,7 @@ describe('showPromptToast', () => {
   it('uses minimum 5000ms for short messages', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showPromptToast(theme, 'Title', 'Hi')
+    showPromptToast('Title', 'Hi')
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1590,9 +1585,7 @@ describe('showToastOnPromptUpdate', () => {
   it('shows success message by default', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showToastOnPromptUpdate(theme)
+    showToastOnPromptUpdate()
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1605,9 +1598,7 @@ describe('showToastOnPromptUpdate', () => {
   it('shows error message when was_error is true', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showToastOnPromptUpdate(theme, true)
+    showToastOnPromptUpdate(true)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1619,9 +1610,7 @@ describe('showToastOnPromptUpdate', () => {
   it('shows reset message when isReset is true', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showToastOnPromptUpdate(theme, false, true)
+    showToastOnPromptUpdate(false, true)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -8,7 +8,6 @@ import {
 } from '@/types/chat'
 import { type Plugin } from '@/types/plugin'
 import { type Prompt } from '@/types/prompt'
-import { Text } from '@mantine/core'
 import {
   IconAlertTriangle,
   IconArrowDown,
@@ -42,7 +41,11 @@ import { PluginSelect } from './PluginSelect'
 import { PromptList } from './PromptList'
 import { VariableModal } from './VariableModal'
 
-import { Tooltip, useMantineTheme } from '@mantine/core'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   showToast,
@@ -809,8 +812,6 @@ export const ChatInput = ({
     }
   }
 
-  const theme = useMantineTheme()
-
   useEffect(() => {
     if (promptListRef.current) {
       promptListRef.current.scrollTop = activePromptIndex * 30
@@ -1424,12 +1425,11 @@ export const ChatInput = ({
 
           {/* Model picker and Agent Mode pill container */}
           <div className="absolute bottom-[.35rem] left-5 -ml-2 flex items-center gap-2">
-            <Text
+            <span
               role="button"
               tabIndex={0}
               aria-label="Chat Settings"
-              size={isSmallScreen ? '10px' : 'xs'}
-              className={`font-montserratHeading ${montserrat_heading.variable} flex items-center gap-1 rounded-full px-3 py-1 wrap-break-word text-(--message-faded) opacity-60 hover:bg-white/20 hover:text-(--message) hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
+              className={`font-montserratHeading ${montserrat_heading.variable} ${isSmallScreen ? 'text-[10px]' : 'text-xs'} flex items-center gap-1 rounded-full px-3 py-1 wrap-break-word text-(--message-faded) opacity-60 hover:bg-white/20 hover:text-(--message) hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
               onClick={handleTextClick}
               onKeyDown={(e: React.KeyboardEvent) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -1447,29 +1447,31 @@ export const ChatInput = ({
                 const country = getCountryOfConcern(activeModelId)
                 if (!country) return null
                 return (
-                  <Tooltip
-                    multiline
-                    width={280}
-                    withArrow
-                    label={getCountryOfConcernShortMessage(country)}
-                  >
-                    <span
-                      aria-label={`Country of concern warning: ${country}`}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        marginLeft: '4px',
-                        opacity: 1,
-                      }}
-                      onClick={(e) => e.stopPropagation()}
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span
+                          aria-label={`Country of concern warning: ${country}`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            marginLeft: '4px',
+                            opacity: 1,
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      }
                     >
                       <IconAlertTriangle
                         size={isSmallScreen ? '12px' : '14px'}
                         stroke={2}
                         aria-hidden="true"
-                        style={{ color: '#f59e0b' }}
+                        className="text-yellow-500"
                       />
-                    </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[280px] text-wrap">
+                      {getCountryOfConcernShortMessage(country)}
+                    </TooltipContent>
                   </Tooltip>
                 )
               })()}
@@ -1483,7 +1485,7 @@ export const ChatInput = ({
                 size={isSmallScreen ? '10px' : '13px'}
                 aria-hidden="true"
               />
-            </Text>
+            </span>
             {/* Agent Mode pill */}
             {agentModeFeatureEnabled &&
             selectedConversation?.model &&
