@@ -188,7 +188,7 @@ describe('resolveSimCredentials', () => {
       reason: 'decrypt_failed',
     })
     expect(hoisted.updateCalls).toHaveLength(0)
-    expect(String(error.mock.calls[0]?.[1])).toMatch(/0016/)
+    expect(String(error.mock.calls[0]?.[1])).toMatch(/0017/)
   })
 
   it('resolveStoredSimApiKey returns null for an absent key', async () => {
@@ -394,7 +394,7 @@ describe('simConfigErrorResponse', () => {
     })
     expect(simConfigErrorResponse('decrypt_failed')).toMatchObject({
       status: 503,
-      error: expect.stringMatching(/ENCRYPTION_MASTER_KEY.*0016/),
+      error: expect.stringMatching(/ENCRYPTION_MASTER_KEY.*0017/),
     })
   })
 
