@@ -76,6 +76,23 @@ const shouldAppendDocumentsOnlyPrompt = (
   )
 }
 
+// The prompt editor writes the citation instructions matching the
+// disableCitations toggle into the saved system prompt so admins can see what
+// the bot is told. Only append them here if they aren't already there, so the
+// model never receives the same block twice.
+const appendCitationInstructions = (
+  systemPrompt: string,
+  courseMetadata?: CourseMetadata,
+): string => {
+  const citationPrompt = courseMetadata?.disableCitations
+    ? CITATION_DISABLED_PROMPT
+    : CITATION_GUIDELINES_PROMPT
+
+  return systemPrompt.includes(citationPrompt.trim())
+    ? systemPrompt
+    : systemPrompt + citationPrompt
+}
+
 const encoding = encodingForModel('gpt-4o')
 
 const joinPromptSections = (sections: Array<string | undefined>): string =>
@@ -621,9 +638,7 @@ const _getSystemPrompt = async ({
     }
 
     // Add prompt for citation instructions
-    systemPrompt += courseMetadata?.disableCitations
-      ? CITATION_DISABLED_PROMPT
-      : CITATION_GUIDELINES_PROMPT
+    systemPrompt = appendCitationInstructions(systemPrompt, courseMetadata)
 
     const agentPrompt =
       conversation.agentModeEnabled &&
@@ -645,9 +660,7 @@ const _getSystemPrompt = async ({
   }
 
   // Add prompt for citation instructions
-  systemPrompt += courseMetadata?.disableCitations
-    ? CITATION_DISABLED_PROMPT
-    : CITATION_GUIDELINES_PROMPT
+  systemPrompt = appendCitationInstructions(systemPrompt, courseMetadata)
 
   // Add math notation instructions
   systemPrompt += `\nWhen responding with equations, use MathJax/KaTeX notation. Equations should be wrapped in either:
