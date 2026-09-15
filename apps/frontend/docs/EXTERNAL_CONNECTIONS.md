@@ -246,10 +246,9 @@ type DatabaseOverrideConfig = {
   // postgres:// or postgresql:// only (schema-enforced on /test and upsert).
   // The frontend opens a per-request client with `max: 1,
   // idle_timeout: 5, prepare: false` — transaction-pooler compatible.
-  // For Supabase, register
-  // the transaction pooler URI (port 6543); session-mode (5432) and direct
-  // (db.<ref>.supabase.co) URIs are accepted but produce a `warning` in the
-  // /test and upsert responses.
+  // For Supabase, register the transaction pooler URI (port 6543);
+  // session-mode (5432) and direct (db.<ref>.supabase.co) URIs are
+  // accepted but produce a `warning` in the /test and upsert responses.
   connection_uri: string
 }
 
