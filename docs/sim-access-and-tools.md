@@ -104,3 +104,79 @@ undeploying a workflow in Sim removes it from every connected project's tool lis
 In chat, users can toggle individual tools on or off per conversation from the settings
 panel's Tools tab; enabled tools are offered to the model automatically when a message
 looks like it needs one.
+
+## 5. Which Sim blocks you can use
+
+Not every block Sim ships is available on this deployment. When you open the block
+picker you will see the core workflow blocks plus a selected set of tools you can
+authenticate yourself. Everything else is hidden on purpose.
+
+### What you can use
+
+**Core workflow blocks** — Agent, API, Condition, Function, Router, Response, Evaluator,
+Guardrails, Human in the Loop, Variables, Wait, Note, Translate, Memory, Knowledge, MCP,
+nested Workflow, Table, Logs, File and Webhook, plus the Schedule, Webhook, RSS, IMAP and
+workspace-event triggers. These need no credentials from anyone. The blocks that call a
+language model — Agent, Router, Evaluator, Translate and Guardrails — take a model
+provider API key that you supply in the block itself.
+
+**Tools you authenticate yourself.** Each takes a key, token or connection string that
+you obtain and paste into the block. Nothing is stored or shared by us.
+
+| Group | Available |
+|---|---|
+| Search and web | Exa, Tavily, Perplexity, Linkup, Serper, Google Search, DuckDuckGo, Wikipedia, ArXiv, Firecrawl |
+| Documents and parsing | Jina, Mistral Parser, Reducto, AWS Textract, LaTeX, Google Books |
+| Vectors and memory | Pinecone, Qdrant, Mem0, Zep, Embeddings |
+| Databases | PostgreSQL, MySQL, SQL Server, MongoDB, Neo4j, ClickHouse, Redis |
+| Messaging and email | SMTP, SendGrid, Resend, Discord, Telegram |
+| Code and repositories | GitHub, GitLab |
+| Media and language | Text to Speech, Speech to Text, Image Generator, ElevenLabs, Google Translate |
+
+Wikipedia, ArXiv, DuckDuckGo and LaTeX need no credential at all. The database blocks
+take your own connection string.
+
+### What is not available, and why
+
+**Vendors that sign you in with a Connect button are switched off for this release.**
+That covers Google Drive, Docs, Sheets, Calendar and Gmail, along with Notion, Jira,
+Confluence, Box, Dropbox, Zoom, Slack, Asana, ClickUp, Monday, HubSpot, Salesforce,
+Linear, Airtable, Microsoft 365 and the rest.
+
+This is a deliberate decision, not a bug, and it is not something you can work around by
+supplying your own credentials. Connecting any of these requires us to register an
+application with that vendor first, under an account the team still has to agree on. Until
+that happens the connection cannot be completed by anyone. We plan to enable a first group
+of these, and the list will grow from there.
+
+**A number of other tools are switched off for now** simply because we started small.
+That includes the cloud infrastructure and security tools such as AWS, SSH, SFTP, Okta and
+1Password. If you need one, ask — expanding the list is a configuration change, not
+development work.
+
+**Some blocks you may have seen before are gone**, because they do not work on this
+deployment or would send data to a service we do not control: Search, Sim Chat, Data
+Enrichment, Connected Accounts, Credential, Pi, A2A, Circleback and Video Generator.
+
+### If something you built stops working
+
+Two things can happen to an existing workflow.
+
+**A workflow that uses a switched-off block fails when it runs.** The error names the
+block and says it is blocked by the server policy. The workflow itself is not modified,
+and it will keep appearing as deployed, so the failure only shows up on execution.
+
+**An agent that had a switched-off vendor attached as a tool keeps running, but quietly
+stops using that tool.** There is no error in this case. If an agent used to read from
+Notion and simply no longer does, this is the most likely reason. Check the agent's
+attached tools.
+
+In Illinois Chat, either case surfaces mid-conversation rather than as a missing tool,
+because the tool list is built from what is deployed in Sim.
+
+### Asking for a block to be added
+
+Open an issue on the Illinois Chat repository describing the block you need and what you
+are building with it. Adding a tool you authenticate yourself is a small configuration
+change. Adding a Connect-button vendor depends on registering an application with that
+vendor first, so it takes longer.
