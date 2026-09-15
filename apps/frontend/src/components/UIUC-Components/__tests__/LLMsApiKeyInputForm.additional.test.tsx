@@ -4,6 +4,38 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
+// The default-model picker is a Base UI combobox (not a native <select>):
+// open it, then click the option by its visible label.
+async function chooseModel(
+  user: ReturnType<typeof userEvent.setup>,
+  optionLabel: string,
+  comboboxIndex = 0,
+) {
+  const comboboxes = screen.getAllByLabelText('Select a model')
+  await user.click(comboboxes[comboboxIndex]!)
+  await user.click(await screen.findByRole('option', { name: optionLabel }))
+}
+
+// Opens the combobox and reads back the visible option values (grouped
+// listbox rendering means options aren't nested inside the input element, so
+// this can't use `within(select)` the way a native <select> mock could).
+// Returns [] once the popup has settled with no options (e.g. "Nothing
+// found"), rather than timing out like `findAllByRole` would.
+async function getVisibleModelOptionValues(
+  user: ReturnType<typeof userEvent.setup>,
+  comboboxIndex = 0,
+) {
+  const comboboxes = screen.getAllByLabelText('Select a model')
+  await user.click(comboboxes[comboboxIndex]!)
+  await waitFor(() => {
+    expect(
+      screen.queryAllByRole('option').length > 0 ||
+        screen.queryByText('Nothing found'),
+    ).toBeTruthy()
+  })
+  return screen.queryAllByRole('option').map((o) => o.textContent)
+}
+
 // ---------------------------------------------------------------------------
 // Hoisted mocks – must be declared before any vi.mock() that references them
 // ---------------------------------------------------------------------------
@@ -32,29 +64,6 @@ vi.mock('@/hooks/queries/useUpdateProjectLLMProviders', () => ({
 vi.mock('~/utils/toastUtils', () => ({
   showToast: vi.fn(),
 }))
-
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    Select: (props: any) => (
-      <label>
-        <span>{props.placeholder ?? 'Select'}</span>
-        <select
-          aria-label={props.placeholder ?? 'Select'}
-          value={props.value ?? ''}
-          onChange={(e) => props.onChange?.(e.target.value)}
-        >
-          {(props.data ?? []).map((opt: { value: string; label: string }) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    ),
-  }
-})
 
 vi.mock('~/components/Layout/SettingsLayout', () => ({
   __esModule: true,
@@ -274,12 +283,12 @@ describe('ModelItem', () => {
   it('renders model label and provider logo', () => {
     const { container } = renderWithProviders(
       <ModelItem
+        value="gpt-4o"
         label="GPT-4o"
         modelId="gpt-4o"
         selectedModelId="gpt-4o"
         modelType="OpenAI"
         vram_required_MB={0}
-        loadingModelId={null}
       />,
     )
 
@@ -289,19 +298,22 @@ describe('ModelItem', () => {
     expect(img).toHaveAttribute('alt', 'OpenAI logo')
   })
 
-  it('renders without crashing when loadingModelId is set', () => {
+  it('renders a country-of-concern warning for a flagged model', () => {
     renderWithProviders(
       <ModelItem
-        label="Claude 3"
-        modelId="claude-3"
+        value="deepseek-chat"
+        label="DeepSeek Chat"
+        modelId="deepseek-chat"
         selectedModelId={undefined}
-        modelType="Anthropic"
+        modelType="OpenAICompatible"
         vram_required_MB={0}
-        loadingModelId="claude-3"
       />,
     )
 
-    expect(screen.getByText('Claude 3')).toBeInTheDocument()
+    expect(screen.getByText('DeepSeek Chat')).toBeInTheDocument()
+    expect(
+      screen.getByLabelText(/Country of concern warning/i),
+    ).toBeInTheDocument()
   })
 })
 
@@ -566,14 +578,12 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
     )
 
     // Select a different model
-    await user.selectOptions(
-      screen.getByLabelText('Select a model'),
-      'claude-3',
-    )
+    await chooseModel(user, 'Claude 3')
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalled())
   })
 
-  it('filters out disabled providers from the dropdown', () => {
+  it('filters out disabled providers from the dropdown', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -608,15 +618,14 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).not.toContain('claude-3')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).not.toContain('Claude 3')
   })
 
-  it('filters out disabled models within an enabled provider', () => {
+  it('filters out disabled models within an enabled provider', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -644,12 +653,10 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).not.toContain('gpt-3.5')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).not.toContain('GPT-3.5')
   })
 
   it('does not render dropdown when no providers are loaded', () => {
@@ -701,7 +708,7 @@ describe('LLMsApiKeyInputForm – form submission callbacks', () => {
     )
 
     // Trigger form submit by selecting a different default model
-    await user.selectOptions(screen.getByLabelText('Select a model'), 'gpt-4o')
+    await chooseModel(user, 'GPT-4o')
 
     await waitFor(() => {
       expect(showToast).toHaveBeenCalledWith(
@@ -749,7 +756,7 @@ describe('LLMsApiKeyInputForm – form submission callbacks', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    await user.selectOptions(screen.getByLabelText('Select a model'), 'gpt-4o')
+    await chooseModel(user, 'GPT-4o')
 
     await waitFor(() => {
       expect(showToast).toHaveBeenCalledWith(
@@ -811,7 +818,8 @@ describe('LLMsApiKeyInputForm – loading state', () => {
 // LLMsApiKeyInputForm – multiple enabled providers
 // ===========================================================================
 describe('LLMsApiKeyInputForm – multiple providers', () => {
-  it('shows models from multiple enabled providers in dropdown', () => {
+  it('shows models from multiple enabled providers in dropdown', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -859,16 +867,15 @@ describe('LLMsApiKeyInputForm – multiple providers', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).toContain('claude-3')
-    expect(optionValues).toContain('gemini-pro')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).toContain('Claude 3')
+    expect(optionLabels).toContain('Gemini Pro')
   })
 
-  it('skips providers with enabled=true but no enabled models', () => {
+  it('skips providers with enabled=true but no enabled models', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -904,12 +911,10 @@ describe('LLMsApiKeyInputForm – multiple providers', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).not.toContain('claude-3')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).not.toContain('Claude 3')
   })
 })
 
@@ -995,7 +1000,8 @@ describe('LLMsApiKeyInputForm – edge cases', () => {
     expect(screen.getByText('Closed source LLMs')).toBeInTheDocument()
   })
 
-  it('handles all providers disabled with empty dropdown', () => {
+  it('handles all providers disabled with empty dropdown', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders() // all disabled by default
 
@@ -1004,10 +1010,9 @@ describe('LLMsApiKeyInputForm – edge cases', () => {
     )
 
     // The dropdown renders but has no model options
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).queryAllByRole('option')
+    const optionLabels = await getVisibleModelOptionValues(user)
     // No options should be present when all providers are disabled
-    expect(options).toHaveLength(0)
+    expect(optionLabels).toHaveLength(0)
   })
 })
 
@@ -1044,7 +1049,7 @@ describe('LLMsApiKeyInputForm – full page form submit', () => {
     expect(selects.length).toBeGreaterThanOrEqual(1)
 
     // Select a model from the first dropdown to trigger submission
-    await user.selectOptions(selects[0]!, 'gpt-4o')
+    await chooseModel(user, 'GPT-4o', 0)
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalled())
   })
 })

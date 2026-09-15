@@ -5,6 +5,18 @@ import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
+// The default-model picker is a Base UI combobox (not a native <select>):
+// open it, then click the option by its visible label.
+async function chooseModel(
+  user: ReturnType<typeof userEvent.setup>,
+  optionLabel: string,
+  comboboxIndex = 0,
+) {
+  const comboboxes = screen.getAllByLabelText('Select a model')
+  await user.click(comboboxes[comboboxIndex]!)
+  await user.click(await screen.findByRole('option', { name: optionLabel }))
+}
+
 const mocks = vi.hoisted(() => ({
   query: {
     data: null as any,
@@ -29,29 +41,6 @@ vi.mock('@/hooks/queries/useUpdateProjectLLMProviders', () => ({
 vi.mock('~/utils/toastUtils', () => ({
   showToast: vi.fn(),
 }))
-
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    Select: (props: any) => (
-      <label>
-        <span>{props.placeholder ?? 'Select'}</span>
-        <select
-          aria-label={props.placeholder ?? 'Select'}
-          value={props.value ?? ''}
-          onChange={(e) => props.onChange?.(e.target.value)}
-        >
-          {(props.data ?? []).map((opt: { value: string; label: string }) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    ),
-  }
-})
 
 vi.mock('../GlobalFooter', () => ({
   default: () => <div data-testid="footer" />,
@@ -167,7 +156,7 @@ describe('LLMsApiKeyInputForm', () => {
 
     renderWithProviders((<LLMsApiKeyInputForm course_name="CS101" />) as any)
 
-    await user.selectOptions(screen.getByLabelText('Select a model'), 'gpt-4o')
+    await chooseModel(user, 'GPT-4o')
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalled())
   })
 

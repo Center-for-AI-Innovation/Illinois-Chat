@@ -670,7 +670,7 @@ const ModelDropdown: React.FC<
             </div>
           </ComboboxInputGroup>
           <ComboboxContent
-            className="w-full max-w-full rounded-md bg-(--foreground-light) text-(--background) shadow-lg"
+            className="rounded-md bg-(--foreground-light) text-(--background) shadow-lg"
             style={{ maxHeight: `${maxDropdownHeight}px` }}
           >
             <ComboboxEmpty>Nothing found</ComboboxEmpty>

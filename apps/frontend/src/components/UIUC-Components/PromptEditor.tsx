@@ -1165,7 +1165,7 @@ CRITICAL: The optimized prompt must:
                         />
                       </ComboboxTrigger>
                     </ComboboxInputGroup>
-                    <ComboboxContent className="w-full max-w-full rounded-md border border-(--background-dark) bg-(--background) text-(--foreground) shadow-xs">
+                    <ComboboxContent className="rounded-md border border-(--background-dark) bg-(--background) text-(--foreground) shadow-xs">
                       <ComboboxEmpty>Nothing found</ComboboxEmpty>
                       <ComboboxList>
                         {(group: { value: string; items: ModelOption[] }) => (
