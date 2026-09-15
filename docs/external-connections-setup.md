@@ -20,7 +20,7 @@ Deeper reference material lives with the apps:
 - Feature overview: [`apps/backend/docs/features/external-connections.md`](../apps/backend/docs/features/external-connections.md)
 - Full config reference (all fields, multi-collection search, post-processors):
   [`apps/backend/docs/developers/external-connections-config.md`](../apps/backend/docs/developers/external-connections-config.md)
-- Frontend architecture (ConnectionManager, caching, SSRF-guarded probes):
+- Frontend architecture (ConnectionManager, connection lifecycle, SSRF-guarded probes):
   [`apps/frontend/docs/EXTERNAL_CONNECTIONS.md`](../apps/frontend/docs/EXTERNAL_CONNECTIONS.md)
 
 ## Prerequisites
@@ -177,8 +177,9 @@ is stored verbatim; no automatic port rewriting is done.
 - **Embeddings**: ingest and retrieval use the project's `embedding` config
   (provider must be in `ALLOWED_EMBEDDING_PROVIDERS`, default
   `openai,ollama`); otherwise the environment default.
-- Config changes take effect immediately for new requests (the API
-  invalidates the per-project cache on every successful write).
+- Config changes take effect on the next request in every service.
+  Nothing is cached: each request reads the project's row and builds the
+  connections it needs, so there is no invalidation step and no restart.
 
 ## Keeping existing external stores up to date
 
