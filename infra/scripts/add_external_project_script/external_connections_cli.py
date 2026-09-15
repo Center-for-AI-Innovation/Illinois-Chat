@@ -132,7 +132,9 @@ def _env_int(var: str, *, positive: bool = True) -> int | None:
     try:
         parsed = int(value)
     except ValueError:
-        raise SystemExit(f"[error] {var} must be an integer, got {value!r}.")
+        raise SystemExit(
+            f"[error] {var} must be an integer, got {value!r}."
+        ) from None
     if positive and parsed <= 0:
         raise SystemExit(f"[error] {var} must be a positive integer, got {parsed}.")
     return parsed
@@ -198,35 +200,73 @@ def _reject_duplicate_names(entries: list[dict]) -> None:
         seen.add(entry["name"])
 
 
+# Characters that can only appear in a JSON value, never in a bare collection
+# name. Seeing one in the comma form means the operator wrote JSON that did
+# not start with `[` or `{` (e.g. an array with the brackets left off).
+_JSON_ONLY_CHARS = set('{}[]":')
+_JSON_HINT = (
+    'Write per-collection configs as a JSON array of objects, e.g. '
+    '[{"name": "pubmed-articles", "top_n": 50}], or a plain comma-separated '
+    "list of names, e.g. pubmed-articles,us-patents."
+)
+
+
 def _parse_qdrant_collections(raw: str) -> list[dict]:
     """Parse EXT_QDRANT_COLLECTIONS into `qdrant_config.collections` entries.
 
     Accepts either:
       - a comma-separated list of names: `pubmed-articles,us-patents`
-      - a JSON array of entry objects for per-collection configs:
-        `[{"name": "pubmed-articles", "top_n": 50, "use_filter": false,
-           "processor": "pubmed"}]`
+      - a JSON array for per-collection configs. Entries are objects
+        (`[{"name": "pubmed-articles", "top_n": 50, "use_filter": false,
+           "processor": "pubmed"}]`); a bare string entry is shorthand for
+        `{"name": ...}`.
 
     The server-side schema requires each entry to be an object with a `name`
-    (bare strings are rejected), so the comma form is expanded here.
+    (bare strings are rejected), so both shorthands are expanded here.
+    Anything that looks like JSON but is not an array — a bare object, an
+    array with the brackets left off — is rejected instead of being split on
+    commas into nonsense names.
     """
     raw = raw.strip()
-    if raw.startswith("["):
+    if not raw:
+        return []
+    if raw[0] in "[{":
         try:
             entries = json.loads(raw)
         except json.JSONDecodeError as e:
-            raise SystemExit(f"[error] EXT_QDRANT_COLLECTIONS is not valid JSON: {e}")
-        if not isinstance(entries, list) or not all(
-            isinstance(entry, dict) for entry in entries
-        ):
             raise SystemExit(
-                "[error] EXT_QDRANT_COLLECTIONS JSON must be an array of objects, "
-                'e.g. [{"name": "pubmed-articles", "top_n": 50}]'
+                f"[error] EXT_QDRANT_COLLECTIONS is not valid JSON: {e}. {_JSON_HINT}"
+            ) from None
+        if isinstance(entries, dict):
+            raise SystemExit(
+                "[error] EXT_QDRANT_COLLECTIONS is a single JSON object; wrap it in "
+                f"an array: [{raw}]"
             )
-        entries = [_validate_collection_entry(e, i) for i, e in enumerate(entries)]
-        _reject_duplicate_names(entries)
-        return entries
-    entries = [{"name": name.strip()} for name in raw.split(",") if name.strip()]
+        if not isinstance(entries, list):
+            raise SystemExit(
+                f"[error] EXT_QDRANT_COLLECTIONS JSON must be an array. {_JSON_HINT}"
+            )
+        normalized: list[dict] = []
+        for index, entry in enumerate(entries):
+            if isinstance(entry, str):
+                entry = {"name": entry}
+            if not isinstance(entry, dict):
+                raise SystemExit(
+                    f"[error] EXT_QDRANT_COLLECTIONS[{index}] must be an object "
+                    f"(or a bare name string), got {entry!r}. {_JSON_HINT}"
+                )
+            normalized.append(_validate_collection_entry(entry, index))
+        _reject_duplicate_names(normalized)
+        return normalized
+
+    names = [name.strip() for name in raw.split(",") if name.strip()]
+    for name in names:
+        if _JSON_ONLY_CHARS & set(name):
+            raise SystemExit(
+                f"[error] EXT_QDRANT_COLLECTIONS entry {name!r} looks like a fragment "
+                f"of JSON, not a collection name. {_JSON_HINT}"
+            )
+    entries = [{"name": name} for name in names]
     _reject_duplicate_names(entries)
     return entries
 
