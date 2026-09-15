@@ -1,9 +1,18 @@
 """
-ConnectionManager: Singleton service for dynamic per-project connection resolution.
+ConnectionManager: Per-project connection resolution.
 
 Resolves S3, Postgres, and Qdrant connections on a per-project basis.
 Projects without external configs use the default (env-based) connections.
-Connections and decrypted configs are cached with TTL to avoid per-request overhead.
+
+Nothing is cached (issue #228). Every call reads the project's row from
+`project_external_connections`, decrypts the fields it needs, and builds the
+client it returns. A cached config or client is only correct until someone
+edits the project's connection, and the previous TTL-based caches (5 min for
+configs, 30 min for live clients) had no cross-process invalidation: a config
+change took up to 30 minutes to reach this service. Resolving per request
+removes that window. Connection cost is delegated to the external database's
+own pooler, so external engines use a NullPool exactly like the host engines
+in `database/sql.py`.
 
 This module is **read-only**. CRUD for `project_external_connections` lives in
 the Next.js frontend (`uiuc-chat-frontend`
@@ -15,16 +24,13 @@ Do not re-add write helpers to this service.
 
 import logging
 import os
-import threading
-from contextlib import contextmanager
 
 import boto3
 from botocore.config import Config
-from cachetools import TTLCache
 from injector import inject
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 
 from ai_ta_backend.database.sql import SQLDatabase
@@ -34,103 +40,42 @@ from ai_ta_backend.utils.crypto import decrypt_config
 
 logger = logging.getLogger(__name__)
 
-# Sentinel indicating "no external config; use defaults"
-_NO_EXTERNAL = object()
-
-# Cache TTLs in seconds
-_CONFIG_TTL = 300  # 5 minutes for decrypted configs
-_CONNECTION_TTL = 1800  # 30 minutes for live connections
-
-
-class DisposingTTLCache(TTLCache):
-    """TTLCache that disposes SQLAlchemy engines on TTL expiry / size eviction.
-
-    A plain TTLCache silently drops evicted engines, leaking their pooled
-    connections until GC. dispose() is idempotent and safe with checked-out
-    connections (they keep working and are discarded on return), so explicit
-    invalidate() double-dispose is harmless.
-    """
-
-    def popitem(self):
-        key, engine = super().popitem()
-        self._dispose(engine)
-        return key, engine
-
-    def expire(self, time=None):
-        expired = super().expire(time)
-        for _, engine in expired:
-            self._dispose(engine)
-        return expired
-
-    @staticmethod
-    def _dispose(engine):
-        try:
-            engine.dispose()
-        except Exception:
-            logger.warning("Engine dispose on cache eviction failed", exc_info=True)
-
 
 class ConnectionManager:
-    """Resolves per-project infrastructure connections with caching."""
+    """Resolves per-project infrastructure connections."""
 
     @inject
-    def __init__(self, sql_db: SQLDatabase, vector_db: VectorDatabase, aws: AWSStorage):
+    def __init__(self, sql_db: SQLDatabase, aws: AWSStorage):
         self._sql_db = sql_db
-        self._vector_db = vector_db
         self._aws = aws
-
-        # Caches: project_name -> value. Each resource has its own cache so
-        # eviction of one (e.g. an S3 client) never affects another type.
-        self._config_cache = TTLCache(maxsize=256, ttl=_CONFIG_TTL)
-        self._engine_cache = DisposingTTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-        self._sql_db_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-        self._qdrant_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-        self._vdb_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-        self._s3_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-        # Dedicated caches for pgvector handles so they share no key
-        # space with the SQLDatabase / Qdrant wrappers above.
-        self._pgvector_store_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-        self._pgvector_vdb_cache = TTLCache(maxsize=64, ttl=_CONNECTION_TTL)
-
-        # Per-project locks to prevent duplicate connection creation
-        self._locks: dict[str, threading.Lock] = {}
-        self._master_lock = threading.Lock()
 
         # Default connection params from env (for projects without external config)
         self._default_qdrant_collection = os.environ.get("QDRANT_COLLECTION_NAME", "")
         self._default_s3_bucket = os.environ.get("S3_BUCKET_NAME", "")
 
-    def _get_lock(self, project_name: str) -> threading.Lock:
-        with self._master_lock:
-            if project_name not in self._locks:
-                self._locks[project_name] = threading.Lock()
-            return self._locks[project_name]
-
     # ── Config Resolution ──
 
     def _get_config(self, project_name: str) -> dict | None:
-        """Get decrypted external config for a project. Returns None if no external config."""
-        if project_name in self._config_cache:
-            cached = self._config_cache[project_name]
-            return None if cached is _NO_EXTERNAL else cached
+        """Read the external config row for a project. None if there is none.
 
-        row = self._sql_db.getExternalConnection(project_name)
-        if not row:
-            self._config_cache[project_name] = _NO_EXTERNAL
-            return None
+        `getExternalConnection` filters on `is_active`, so a deactivated row
+        reads as absent and the project falls back to the env defaults.
+        """
+        return self._sql_db.getExternalConnection(project_name)
 
-        self._config_cache[project_name] = row
-        return row
-
-    def _get_decrypted_field(self, project_name: str, field: str) -> dict | None:
-        """Get a specific decrypted config field (s3_config, database_config, qdrant_config)."""
-        config = self._get_config(project_name)
+    @staticmethod
+    def _decrypt_field(config: dict | None, field: str) -> dict | None:
+        """Decrypt one field of an already-read config row."""
         if not config:
             return None
         encrypted_blob = config.get(field)
         if not encrypted_blob:
             return None
         return decrypt_config(encrypted_blob)
+
+    def _get_decrypted_field(self, project_name: str, field: str) -> dict | None:
+        """Get a specific decrypted config field (s3_config, database_config, qdrant_config)."""
+        return self._decrypt_field(self._get_config(project_name), field)
 
     # ── Database Resolution ──
     #
@@ -168,50 +113,19 @@ class ConnectionManager:
         if not db_config:
             return self._sql_db
 
-        # Check cache for an existing SQLDatabase wrapper
-        if project_name in self._sql_db_cache:
-            return self._sql_db_cache[project_name]
+        return SQLDatabase(engine=self._create_engine(project_name, db_config))
 
-        engine = self._get_or_create_engine(project_name, db_config)
-        project_sql_db = SQLDatabase(engine=engine)
-        self._sql_db_cache[project_name] = project_sql_db
-        return project_sql_db
+    @staticmethod
+    def _create_engine(project_name: str, db_config: dict):
+        """Build an engine for a project's external Postgres.
 
-    @contextmanager
-    def get_db_session(self, project_name: str):
-        """Get a SQLAlchemy session bound to the project's documents DB.
-
-        Uses the project's external DB if configured, otherwise the host main
-        DB. Intended for document-scoped writes (ingest pipeline). For
-        host-only data, use `get_sql_db().get_session()` directly.
+        NullPool: the engine lives for one request, so pooling here would hold
+        sockets open past its usefulness. Connection reuse is the external
+        database pooler's job (the documented setup is a Supabase transaction
+        pooler), and this matches the host engines in `database/sql.py`.
         """
-        sql_db = self.get_documents_sql_db(project_name)
-        with sql_db.get_session() as session:
-            yield session
-
-    def _get_or_create_engine(self, project_name: str, db_config: dict):
-        if project_name in self._engine_cache:
-            return self._engine_cache[project_name]
-
-        lock = self._get_lock(f"engine:{project_name}")
-        with lock:
-            # Double-check after acquiring lock
-            if project_name in self._engine_cache:
-                return self._engine_cache[project_name]
-
-            connection_uri = db_config["connection_uri"]
-            logger.info(f"Creating external DB engine for project: {project_name}")
-            # Small pool: the budget is shared with the frontend's pool against
-            # the same external DB (Supabase session-mode poolers cap at ~15).
-            engine = create_engine(
-                connection_uri,
-                pool_size=3,
-                max_overflow=2,
-                pool_recycle=1800,
-                pool_pre_ping=True,
-            )
-            self._engine_cache[project_name] = engine
-            return engine
+        logger.info(f"Creating external DB engine for project: {project_name}")
+        return create_engine(db_config["connection_uri"], poolclass=NullPool)
 
     # ── Vector Engine Resolution ──
     #
@@ -237,102 +151,52 @@ class ConnectionManager:
             return "qdrant"
         return "pgvector"
 
-    def get_pgvector_store(self, project_name: str | None = None):
-        """Return the PgVectorStore for the project's documents pg.
-
-        When ``project_name`` has a ``database_config`` set, the store is
-        bound to the per-project external Postgres engine; otherwise the
-        host singleton is returned. Imported lazily so deployments running
-        pure-Qdrant don't pay the psycopg2 import cost.
-        """
-        if project_name is not None:
-            db_config = self._get_decrypted_field(project_name, "database_config")
-            if db_config:
-                cached = self._pgvector_store_cache.get(project_name)
-                if cached is not None:
-                    return cached
-                # Double-checked locking — matches `_get_or_create_engine`
-                # style so concurrent first-time callers don't construct
-                # two stores against the same engine.
-                lock = self._get_lock(f"pgvector:{project_name}")
-                with lock:
-                    cached = self._pgvector_store_cache.get(project_name)
-                    if cached is not None:
-                        return cached
-                    from ai_ta_backend.database.vector_store import PgVectorStore
-
-                    engine = self._get_or_create_engine(project_name, db_config)
-                    store = PgVectorStore(engine=engine)
-                    self._pgvector_store_cache[project_name] = store
-                    return store
-
-        # Host pgvector singleton — synchronized to avoid concurrent
-        # construction creating two stores on the first hit.
-        with self._master_lock:
-            if not hasattr(self, "_pgvector_store") or self._pgvector_store is None:
-                from ai_ta_backend.database.vector_store import get_vector_store
-                self._pgvector_store = get_vector_store()
-        return self._pgvector_store
-
     def get_vector_db(self, project_name: str) -> "VectorDatabase":
         """Return a VectorDatabase for the project.
 
         - ``qdrant_config`` present → VectorDatabase wired to that Qdrant.
         - Otherwise → VectorDatabase wired to pgvector (per-project pg when
-          ``database_config`` is present, else host pg). All existing
-          VectorDatabase methods (execute_search, delete, upsert, etc.)
-          dispatch internally.
+          ``database_config`` is present, else the host store, which the
+          VectorDatabase resolves lazily). All existing VectorDatabase
+          methods (execute_search, delete, upsert, etc.) dispatch internally.
         """
-        qdrant_config = self._get_decrypted_field(project_name, "qdrant_config")
+        config = self._get_config(project_name)
+
+        qdrant_config = self._decrypt_field(config, "qdrant_config")
         if qdrant_config:
-            if project_name in self._vdb_cache:
-                return self._vdb_cache[project_name]
-            lock = self._get_lock(f"qdrant-vdb:{project_name}")
-            with lock:
-                if project_name in self._vdb_cache:
-                    return self._vdb_cache[project_name]
-                client = self._get_or_create_qdrant(project_name, qdrant_config)
-                vdb = VectorDatabase(
-                    qdrant_client=client, qdrant_config=qdrant_config
-                )
-                self._vdb_cache[project_name] = vdb
-                return vdb
-
-        # pgvector path — bind to per-project pg if database_config is set,
-        # otherwise the host singleton. Double-checked locking mirrors the
-        # Qdrant path so concurrent first-time callers share one VectorDatabase.
-        if project_name in self._pgvector_vdb_cache:
-            return self._pgvector_vdb_cache[project_name]
-        lock = self._get_lock(f"pgvector-vdb:{project_name}")
-        with lock:
-            if project_name in self._pgvector_vdb_cache:
-                return self._pgvector_vdb_cache[project_name]
-            store = self.get_pgvector_store(project_name)
-            vdb = VectorDatabase(pgvector_store=store)
-            self._pgvector_vdb_cache[project_name] = vdb
-            return vdb
-
-    def _get_or_create_qdrant(
-        self, project_name: str, qdrant_config: dict
-    ) -> QdrantClient:
-        if project_name in self._qdrant_cache:
-            return self._qdrant_cache[project_name]
-
-        lock = self._get_lock(f"qdrant:{project_name}")
-        with lock:
-            if project_name in self._qdrant_cache:
-                return self._qdrant_cache[project_name]
-
-            logger.info(f"Creating external Qdrant client for project: {project_name}")
-            client = QdrantClient(
-                url=qdrant_config["url"],
-                api_key=qdrant_config["api_key"],
-                port=int(qdrant_config["port"]),
-                https=qdrant_config.get("https", False),
-                timeout=20,
+            return VectorDatabase(
+                qdrant_client=self._create_qdrant(project_name, qdrant_config),
+                qdrant_config=qdrant_config,
             )
-            self._qdrant_cache[project_name] = client
-            return client
+
+        db_config = self._decrypt_field(config, "database_config")
+        return VectorDatabase(
+            pgvector_store=self._create_pgvector_store(project_name, db_config)
+        )
+
+    def _create_pgvector_store(self, project_name: str | None, db_config: dict | None):
+        """Per-project PgVectorStore, or None for the host store.
+
+        Returning None lets ``VectorDatabase.pgvector_store`` resolve the host
+        singleton lazily, so pure-Qdrant deployments never import psycopg2.
+        The import stays inside the function for the same reason.
+        """
+        if not db_config:
+            return None
+        from ai_ta_backend.database.vector_store import PgVectorStore
+
+        return PgVectorStore(engine=self._create_engine(project_name, db_config))
+
+    @staticmethod
+    def _create_qdrant(project_name: str, qdrant_config: dict) -> QdrantClient:
+        logger.info(f"Creating external Qdrant client for project: {project_name}")
+        return QdrantClient(
+            url=qdrant_config["url"],
+            api_key=qdrant_config["api_key"],
+            port=int(qdrant_config["port"]),
+            https=qdrant_config.get("https", False),
+            timeout=20,
+        )
 
     # ── S3 Client Resolution ──
 
@@ -345,61 +209,30 @@ class ConnectionManager:
         if not s3_config:
             return self._aws, self._default_s3_bucket
 
-        aws = self._get_or_create_s3(project_name, s3_config)
+        aws = self._create_s3(project_name, s3_config)
         bucket_name = s3_config.get("bucket_name", self._default_s3_bucket)
         return aws, bucket_name
 
-    def _get_or_create_s3(self, project_name: str, s3_config: dict) -> AWSStorage:
-        if project_name in self._s3_cache:
-            return self._s3_cache[project_name]
-
-        lock = self._get_lock(f"s3:{project_name}")
-        with lock:
-            if project_name in self._s3_cache:
-                return self._s3_cache[project_name]
-
-            logger.info(f"Creating external S3 client for project: {project_name}")
-            endpoint_url = s3_config.get("endpoint_url")
-            region = s3_config.get("region")
-            client_kwargs = dict(
-                aws_access_key_id=s3_config["aws_access_key_id"],
-                aws_secret_access_key=s3_config["aws_secret_access_key"],
-                endpoint_url=endpoint_url,
-                config=Config(s3={"addressing_style": "path"}) if endpoint_url else None,
-            )
-            if region:
-                client_kwargs["region_name"] = region
-            client = boto3.client("s3", **client_kwargs)
-            aws = AWSStorage(s3_client=client)
-            self._s3_cache[project_name] = aws
-            return aws
-
-    # ── Cache Invalidation ───────────────────────────────────────────
-
-    def invalidate(self, project_name: str):
-        """Invalidate all cached connections and configs for a project.
-        Call this when a project's external connection config is created/updated/deleted.
-        """
-        self._config_cache.pop(project_name, None)
-        self._sql_db_cache.pop(project_name, None)
-        self._pgvector_store_cache.pop(project_name, None)
-
-        # Dispose engine if cached (releases pooled connections)
-        engine = self._engine_cache.pop(project_name, None)
-        if engine is not None:
-            try:
-                engine.dispose()
-            except Exception as e:
-                logger.warning(f"Error disposing engine for {project_name}: {e}")
-
-        self._qdrant_cache.pop(project_name, None)
-        self._vdb_cache.pop(project_name, None)
-        self._pgvector_vdb_cache.pop(project_name, None)
-        self._s3_cache.pop(project_name, None)
-
-        logger.info(f"Invalidated all cached connections for project: {project_name}")
+    @staticmethod
+    def _create_s3(project_name: str, s3_config: dict) -> AWSStorage:
+        logger.info(f"Creating external S3 client for project: {project_name}")
+        endpoint_url = s3_config.get("endpoint_url")
+        region = s3_config.get("region")
+        client_kwargs = dict(
+            aws_access_key_id=s3_config["aws_access_key_id"],
+            aws_secret_access_key=s3_config["aws_secret_access_key"],
+            endpoint_url=endpoint_url,
+            config=Config(s3={"addressing_style": "path"}) if endpoint_url else None,
+        )
+        if region:
+            client_kwargs["region_name"] = region
+        # A fresh Session per client: boto3's default module-level session is
+        # not thread-safe, and clients are now built per request across the
+        # gunicorn thread pool.
+        client = boto3.session.Session().client("s3", **client_kwargs)
+        return AWSStorage(s3_client=client)
 
     # NOTE: Connection-testing endpoints live in the Next.js frontend
     # (uiuc-chat-frontend src/utils/projectConnections/tester.ts). The
     # backend never probes third-party endpoints on behalf of the UI; it
-    # only resolves cached configs for runtime dispatch.
+    # only resolves configs for runtime dispatch.
