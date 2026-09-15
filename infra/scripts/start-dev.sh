@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# The Sim stack is appended after argument parsing unless --no-sim is given.
 COMPOSE=(docker compose --project-directory . -f infra/docker/docker-compose.dev.yaml)
 QDRANT_COLLECTION_NAME="${QDRANT_COLLECTION_NAME:-illinois_chat}"
 QDRANT_VECTOR_SIZE="${QDRANT_VECTOR_SIZE:-4096}"
@@ -82,6 +83,51 @@ ensure_encryption_master_key() {
 		printf 'ENCRYPTION_MASTER_KEY="%s"\n' "$ENCRYPTION_MASTER_KEY" >>.env
 	fi
 	print_success "ENCRYPTION_MASTER_KEY written to .env"
+}
+
+# Sim's secrets have no defaults in docker-compose.sim.yaml — a working
+# default would be a published key, and API_ENCRYPTION_KEY is what encrypts
+# stored Sim API keys. Generate per-deployment values on first run and persist
+# them, the same way ENCRYPTION_MASTER_KEY is handled.
+ensure_sim_secrets() {
+	local name value
+	for name in SIM_POSTGRES_PASSWORD SIM_API_ENCRYPTION_KEY SIM_BETTER_AUTH_SECRET SIM_ENCRYPTION_KEY SIM_INTERNAL_API_SECRET SIM_KEYCLOAK_CLIENT_SECRET; do
+		eval "value=\${$name:-}"
+		# The literal below shipped as the .env.template default for the OIDC
+		# client secret; an existing .env still carrying it is treated as unset
+		# so every deployment ends up with its own secret.
+		if [ -n "$value" ] && [ "$value" != "simai-local-secret" ]; then
+			continue
+		fi
+		if [ "$name" = "SIM_API_ENCRYPTION_KEY" ]; then
+			# Sim validates this one as exactly 64 hex characters.
+			value="$(openssl rand -hex 32)"
+		else
+			value="$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-40)"
+		fi
+		export "$name=$value"
+		if grep -q "^${name}=" .env; then
+			sed -i.bak "s|^${name}=.*|${name}=\"${value}\"|" .env
+			rm -f .env.bak
+		else
+			printf '%s="%s"\n' "$name" "$value" >>.env
+		fi
+		echo "[INFO] Generated ${name} into .env"
+		case "$name" in
+		SIM_ENCRYPTION_KEY | SIM_API_ENCRYPTION_KEY)
+			echo "[WARNING] ${name} was not set, so a new one was generated. Anything Sim already encrypted under a previous value cannot be decrypted with it — re-enter secrets stored inside Sim workflows if this stack has existing data."
+			;;
+		SIM_BETTER_AUTH_SECRET)
+			echo "[WARNING] SIM_BETTER_AUTH_SECRET was not set, so a new one was generated. Existing Sim sessions are invalidated; sign in again."
+			;;
+		SIM_POSTGRES_PASSWORD)
+			echo "[WARNING] SIM_POSTGRES_PASSWORD was not set, so a new one was generated. An existing sim-db volume keeps its old password; reset it or wipe the volume if Sim cannot connect."
+			;;
+		SIM_KEYCLOAK_CLIENT_SECRET)
+			echo "[WARNING] SIM_KEYCLOAK_CLIENT_SECRET was unset or still the published default, so a new one was generated. sim-keycloak-setup updates the Keycloak client and sim-sso-setup re-registers Sim's SSO provider with it on this start."
+			;;
+		esac
+	done
 }
 
 ensure_local_app_envs() {
@@ -192,6 +238,7 @@ ensure_local_app_envs() {
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_KEYCLOAK_REALM" "illinois_chat_realm"
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_KEYCLOAK_CLIENT_ID" "illinois_chat"
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG" "True"
+	append_env_if_missing "${frontend_env}" "SIM_API_BASE_URL" "http://localhost:3010"
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_SIGNING_KEY" ""
 	append_env_if_missing "$frontend_env" "SUPER_ADMIN_EMAILS" ""
 	append_env_if_missing "$frontend_env" "NEXT_PUBLIC_SUPER_ADMIN_EMAILS" ""
@@ -239,6 +286,9 @@ show_usage() {
 	echo "                    (recreates the database schema as part of the reset)"
 	echo "  --create-schema   Create the database schema on an empty database"
 	echo "                    (required on first run; reruns never need it)"
+	echo "  --no-sim          Start without the Sim AI tool stack (six fewer"
+	echo "                    services; Sim containers from a previous run are"
+	echo "                    left untouched)"
 	echo "  --help            Show this help message"
 	echo ""
 	echo "Examples:"
@@ -250,6 +300,7 @@ show_usage() {
 # Parse command line arguments
 CLEAN_MODE=false
 CREATE_SCHEMA=false
+WITH_SIM=true
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
@@ -259,6 +310,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--create-schema)
 		CREATE_SCHEMA=true
+		shift
+		;;
+	--no-sim)
+		WITH_SIM=false
 		shift
 		;;
 	--help | -h)
@@ -276,6 +331,10 @@ done
 if [ "$CLEAN_MODE" = true ] && [ "$CREATE_SCHEMA" = true ]; then
 	print_error "--clean and --create-schema cannot be used together (--clean already recreates the schema on the fresh database)."
 	exit 1
+fi
+
+if [ "$WITH_SIM" = true ]; then
+	COMPOSE+=(-f infra/docker/docker-compose.sim.yaml)
 fi
 
 echo "Starting UIUC.chat Development Environment"
@@ -367,9 +426,25 @@ else
 fi
 
 ensure_encryption_master_key
+if [ "$WITH_SIM" = true ]; then
+	ensure_sim_secrets
+	if [ -z "${SIM_APPROVAL_ADMIN_EMAIL:-}" ]; then
+		print_error "SIM_APPROVAL_ADMIN_EMAIL is not set in .env. It names the account that bootstraps as Sim platform admin, so it must be chosen per deployment. Set it (or pass --no-sim)."
+		exit 1
+	fi
+	if [ -n "${SIM_SSO_DOMAIN:-}" ] && ! printf %s "$SIM_SSO_DOMAIN" | grep -Eq '^[a-z0-9-]+(\.[a-z0-9-]+)+$'; then
+		print_error "SIM_SSO_DOMAIN must be exactly one registrable domain (e.g. illinois.edu), not a list. Sim denies every SSO sign-in when it cannot normalise this value to a single domain."
+		exit 1
+	fi
+fi
 ensure_local_app_envs
 
 # Start Docker Compose services
+if [ "$WITH_SIM" = true ]; then
+	print_status "Pulling Sim AI images..."
+	"${COMPOSE[@]}" pull simstudio sim-realtime sim-migrations
+fi
+
 print_status "Starting Docker Compose services..."
 "${COMPOSE[@]}" up -d
 
@@ -393,12 +468,54 @@ wait_for_healthy() {
 	print_success "✓ ${service} is healthy"
 }
 
+wait_for_completed() {
+	local service="$1"
+	local timeout="${2:-240}"
+	local elapsed=0
+
+	print_status "Waiting for ${service} to complete..."
+	while true; do
+		local container_id state exit_code
+		container_id="$("${COMPOSE[@]}" ps -aq "$service")"
+		if [ -n "$container_id" ]; then
+			state="$(docker inspect -f '{{.State.Status}}' "$container_id")"
+			exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$container_id")"
+			if [ "$state" = "exited" ] && [ "$exit_code" = "0" ]; then
+				print_success "✓ ${service} completed"
+				return
+			fi
+			if [ "$state" = "exited" ]; then
+				print_error "✗ ${service} exited with code ${exit_code}"
+				"${COMPOSE[@]}" logs "$service"
+				exit 1
+			fi
+		fi
+
+		if [ "$elapsed" -ge "$timeout" ]; then
+			print_error "✗ ${service} did not complete within ${timeout}s"
+			"${COMPOSE[@]}" logs "$service"
+			exit 1
+		fi
+		sleep 3
+		elapsed=$((elapsed + 3))
+	done
+}
+
 wait_for_healthy postgres-illinois-chat
 wait_for_healthy postgres-keycloak
 wait_for_healthy qdrant
 wait_for_healthy minio
 wait_for_healthy rabbitmq
 wait_for_healthy keycloak 240
+if [ "$WITH_SIM" = true ]; then
+	wait_for_healthy sim-db
+	wait_for_completed sim-migrations 300
+	wait_for_completed sim-approval-setup 120
+	wait_for_completed sim-keycloak-setup 180
+	wait_for_completed sim-sso-setup 180
+	wait_for_healthy sim-realtime
+	wait_for_healthy simstudio 300
+fi
 
 print_success "All essential containers are running and healthy!"
 
@@ -490,6 +607,16 @@ if [ "$verify_ok" != true ]; then
 	print_error "Database schema verification failed. See errors above."
 	exit 1
 fi
+
+# The sim columns are part of the app schema whether or not the Sim stack
+# runs (the frontend's typed selects reference them). Fresh databases get
+# them from init-schema.sql; databases created before the migration get them
+# here, from the migration itself — the one place the DDL lives.
+print_status "Ensuring Sim AI project config columns exist..."
+psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0006_add_sim_columns.sql >/dev/null
+# 0016 converts a plaintext sim_api_key column to the encrypted JSONB
+# envelope; guarded on the column type, so re-running it is a no-op.
+psql_main -v ON_ERROR_STOP=1 -f - <apps/frontend/src/db/migrations/0016_encrypt_sim_api_key.sql >/dev/null
 
 print_success "PostgreSQL schema initialized and verified."
 
@@ -597,7 +724,7 @@ fi
 
 MINIO_CONTAINER="$("${COMPOSE[@]}" ps -q minio)"
 if [ -n "$MINIO_CONTAINER" ]; then
-	docker run --rm --entrypoint /bin/sh --network "container:${MINIO_CONTAINER}" minio/mc:RELEASE.2024-06-12T14-34-03Z \
+	docker run --rm --entrypoint /bin/sh --network "container:${MINIO_CONTAINER}" quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z \
 		-c "mc alias set local http://localhost:${DOCKER_INTERNAL_MINIO_API_PORT:-10000} '${AWS_ACCESS_KEY_ID}' '${AWS_SECRET_ACCESS_KEY}' >/dev/null && mc mb -p local/uiuc-chat >/dev/null 2>&1 || true"
 	print_success "✓ MinIO bucket 'uiuc-chat' is ready"
 else
@@ -621,6 +748,9 @@ echo "   - MinIO Console: localhost:${PUBLIC_MINIO_DASHBOARD_PORT:-9001}"
 echo "   - RabbitMQ: localhost:5672"
 echo "   - RabbitMQ Management: localhost:15672"
 echo "   - Keycloak: localhost:8080"
+echo "   - Sim AI: localhost:${SIM_APP_PORT:-3010}"
+echo "   - Sim realtime: localhost:${SIM_REALTIME_PORT:-3011}"
+echo "   - Sim pgvector: localhost:${SIM_POSTGRES_PORT:-55432}"
 echo ""
 echo "📚 Development infrastructure ready:"
 echo "   - Qdrant collection '${QDRANT_COLLECTION_NAME}' ready"
