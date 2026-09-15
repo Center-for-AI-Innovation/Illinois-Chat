@@ -87,7 +87,7 @@ function pruneConfigCache(now: number): void {
 }
 
 /**
- * Rewrite a legacy `{ plaintext }` row as an encrypted envelope. Migration 0016
+ * Rewrite a legacy `{ plaintext }` row as an encrypted envelope. Migration 0017
  * could only wrap the old text values; this finishes the job the first time a
  * project's key is read. The UPDATE is matched on the exact value read, so it
  * is a no-op if an admin saved a different key in the meantime, and it never
@@ -120,7 +120,7 @@ async function reencryptLegacySimApiKey(
  * Turn the stored `sim_api_key` column into the plaintext key. Throws when the
  * value cannot be read — an undecryptable envelope (rotated
  * ENCRYPTION_MASTER_KEY) or an unexpected shape (a bare string means migration
- * 0016 has not been applied) — so callers can report the misconfiguration
+ * 0017 has not been applied) — so callers can report the misconfiguration
  * rather than "not configured".
  */
 export async function resolveStoredSimApiKey(
@@ -136,7 +136,7 @@ export async function resolveStoredSimApiKey(
     return field.plaintext
   }
   throw new Error(
-    'projects.sim_api_key has an unexpected shape; apply migration 0016_encrypt_sim_api_key',
+    'projects.sim_api_key has an unexpected shape; apply migration 0017_encrypt_sim_api_key',
   )
 }
 
@@ -233,7 +233,7 @@ export function simConfigErrorResponse(reason: SimConfigError): {
       return {
         status: 503,
         error:
-          'Stored Sim API key could not be read (check ENCRYPTION_MASTER_KEY and that migration 0016 is applied); re-enter it on the Tools page',
+          'Stored Sim API key could not be read (check ENCRYPTION_MASTER_KEY and that migration 0017 is applied); re-enter it on the Tools page',
       }
     case 'not_configured':
     default:
