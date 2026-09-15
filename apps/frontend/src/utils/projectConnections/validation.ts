@@ -43,8 +43,9 @@ export const databaseConfigSchema = z.object({
  *
  * Session-mode pooler connections (port 5432 on `*.pooler.supabase.com`) pin
  * one server session per client connection and cap out around 15 sessions —
- * easily exhausted by the frontend + backend pools. Direct connections
- * (`db.<ref>.supabase.co`) bypass the pooler entirely (IPv6-only, low
+ * easily exhausted, since connections are opened per request (the frontend
+ * uses `max: 1` per request, the backend and worker a NullPool). Direct
+ * connections (`db.<ref>.supabase.co`) bypass the pooler entirely (IPv6-only, low
  * max_connections). Both work, but the transaction pooler (port 6543) is the
  * right runtime choice; the app is transaction-mode compatible (frontend uses
  * `prepare: false`, backend psycopg2 makes no named prepared statements).

@@ -3,7 +3,6 @@
 
 import type { NextApiRequest } from 'next'
 import type { ZodError } from 'zod'
-import { connectionManager } from '~/utils/connectionManager'
 
 export interface RequestMeta {
   source_ip: string | null
@@ -36,16 +35,5 @@ export function formatZodError(err: ZodError): {
       path: i.path.join('.'),
       message: i.message,
     })),
-  }
-}
-
-export async function invalidateForProject(projectName: string): Promise<void> {
-  try {
-    await connectionManager.invalidate(projectName)
-  } catch (e) {
-    console.warn(
-      `[projectConnections] cache invalidation failed for ${projectName}:`,
-      e,
-    )
   }
 }

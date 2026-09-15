@@ -81,10 +81,10 @@ The `s3_config` block supports either AWS S3 or any S3-compatible storage such a
 
 | Field            | Type   | Required | Description                                                                                                      |
 | ---------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| `connection_uri` | string | **Yes**  | Full PostgreSQL connection URI (`postgres://` or `postgresql://` only). The engine is created with `pool_size=3`, `max_overflow=2`, `pool_recycle=1800`. |
+| `connection_uri` | string | **Yes**  | Full PostgreSQL connection URI (`postgres://` or `postgresql://` only). The engine is created per request with `poolclass=NullPool`; connection reuse is the external database pooler's job. |
 
 {% hint style="info" %}
-**Supabase:** register the **transaction pooler** URI (port 6543, `<region>.pooler.supabase.com`). Session mode (port 5432) pins one server session per client connection and caps at ~15 sessions, which the frontend + backend pools can exhaust; direct connections (`db.<ref>.supabase.co`) bypass the pooler. Non-transaction Supabase URIs are accepted with a warning. The stack is transaction-mode compatible: psycopg2 issues no named prepared statements, and the frontend opens its pools with `prepare: false`.
+**Supabase:** register the **transaction pooler** URI (port 6543, `<region>.pooler.supabase.com`). This matters more now that connections are opened per request: session mode (port 5432) pins one server session per client connection and caps at ~15 sessions, which concurrent requests can exhaust; direct connections (`db.<ref>.supabase.co`) bypass the pooler entirely. Non-transaction Supabase URIs are accepted with a warning. The stack is transaction-mode compatible: psycopg2 issues no named prepared statements, and the frontend opens its per-request client with `prepare: false`.
 {% endhint %}
 
 ### Scope of the External SQL Connection
@@ -284,18 +284,22 @@ Every post-processor maps collection-specific fields to these standard fields:
 Collections **without** a `processor` key return results as-is, with no field transformation. The processor only runs on collections that explicitly set the `processor` field in their multi-collection config entry.
 {% endhint %}
 
-## Connection Caching and Lifecycle
+## Connection Lifecycle
 
-The platform caches connections to minimize overhead:
+Nothing is cached. Every request reads the project's row from
+`project_external_connections`, decrypts the fields it needs, and builds the
+clients it uses.
 
-| Cache                        | TTL         | What's Cached                                   |
-| ---------------------------- | ----------- | ------------------------------------------------ |
-| Decrypted config             | 5 minutes   | Decrypted external connection configs            |
-| Live connections             | 30 minutes  | SQLAlchemy engines, Qdrant clients, S3 clients   |
-
-* **Creating, updating, or deleting** a connection config **immediately invalidates** all caches for that project.
-* DB engine disposal on invalidation releases pooled connections.
-* Per-project locking prevents duplicate connection creation during concurrent requests.
+* **Creating, updating, deleting, or deactivating** a connection config takes
+  effect on the next request in every service. There is no invalidation step
+  and no restart.
+* SQLAlchemy engines for external Postgres use `poolclass=NullPool`, matching
+  the host engines. Connection reuse is delegated to the external database's
+  own pooler, which is why the Supabase transaction pooler (port 6543) is the
+  documented choice.
+* S3 clients are built from a fresh `boto3.session.Session()`: the default
+  module-level session is not thread-safe, and clients are now constructed per
+  request across the gunicorn thread pool.
 
 ## Environment Variables
 

@@ -88,9 +88,9 @@ There is no `VECTOR_ENGINE` environment switch — the row alone decides.
 ## How It Works (read path)
 
 1. **Configs are created and updated by the frontend** (see "Where CRUD lives" above). Each config block is encrypted with AES-256-GCM before being stored in JSONB.
-2. **This backend resolves connections at runtime.** On every query or ingest job, `ConnectionManager` reads the project's row from `project_external_connections` and routes traffic to the right infrastructure. Only rows where `is_active = true` are honored -- this is enforced in both the web backend and the ingest worker, so toggling `is_active` flips behavior everywhere. Configs are cached (5 min TTL) and connections are cached (30 min TTL).
+2. **This backend resolves connections at runtime.** On every query or ingest job, `ConnectionManager` reads the project's row from `project_external_connections` and routes traffic to the right infrastructure. Only rows where `is_active = true` are honored -- this is enforced in both the web backend and the ingest worker, so toggling `is_active` flips behavior everywhere. Nothing is cached: the row is read and the clients are built per request, so a config change takes effect on the next request.
 3. **Decryption** uses the same `ENCRYPTION_MASTER_KEY` env var the frontend used to encrypt. The two services MUST share this key.
-4. **Cache invalidation across services** is the frontend's responsibility for its own caches; this backend's `ConnectionManager` currently relies on its 5-minute TTL for changes the frontend writes. A cross-service Redis pub/sub channel is on the roadmap (frontend issue).
+4. **No cross-service invalidation is needed.** Every service resolves per request, so a config the frontend writes is visible to the backend and the ingest worker on their next request or job. Connection cost is delegated to the external database's own pooler; external engines use a `NullPool`, matching the host engines.
 
 ## Security
 
