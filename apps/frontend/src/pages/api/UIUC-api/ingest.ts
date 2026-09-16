@@ -39,12 +39,19 @@ const handler = async (
 
     const s3_filepath = `courses/${courseName}/${uniqueFileName}`
 
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    }
+    // Optional on the backend, which fails open when the var is unset, so an
+    // un-upgraded deployment keeps working.
+    if (process.env.INGEST_API_KEY) {
+      headers.Authorization = `Bearer ${process.env.INGEST_API_KEY}`
+    }
+
     const response = await fetch(`${process.env.INGEST_URL}`, {
       method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         course_name: courseName,
         readable_filename: readableFilename,
