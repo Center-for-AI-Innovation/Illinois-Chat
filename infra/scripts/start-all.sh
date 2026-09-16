@@ -107,6 +107,31 @@ ensure_encryption_master_key() {
 	success "ENCRYPTION_MASTER_KEY written to .env"
 }
 
+# Bearer tokens shared between the services: CRAWLEE_API_KEY guards POST /crawl
+# (the crawler fails closed without it, so nothing crawls) and INGEST_API_KEY
+# guards POST /ingest. Neither can ship with a default — a published default is
+# no protection — so generate them once into .env, like ENCRYPTION_MASTER_KEY.
+ensure_shared_api_keys() {
+	local name value
+	for name in CRAWLEE_API_KEY INGEST_API_KEY; do
+		eval "value=\${$name:-}"
+		if [ -n "$value" ]; then
+			continue
+		fi
+		log "Generating $name (shared between the frontend, crawler, and backend)"
+		value="$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-40)"
+		eval "$name=\$value"
+		export "$name"
+		if grep -q "^${name}=" .env; then
+			sed -i.bak "s|^${name}=.*|${name}=\"${value}\"|" .env
+			rm -f .env.bak
+		else
+			printf '%s="%s"\n' "$name" "$value" >>.env
+		fi
+		success "$name written to .env"
+	done
+}
+
 # Sim's secrets have no defaults in docker-compose.sim.yaml — a working
 # default would be a published key, and API_ENCRYPTION_KEY is what encrypts
 # stored Sim API keys. Generate per-deployment values on first run and persist
@@ -153,6 +178,8 @@ ensure_sim_secrets() {
 }
 
 ensure_encryption_master_key
+# Unconditional: the crawler needs CRAWLEE_API_KEY whether or not Sim is running.
+ensure_shared_api_keys
 
 if [ "$with_sim" = true ]; then
 	ensure_sim_secrets

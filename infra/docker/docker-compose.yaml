@@ -84,21 +84,17 @@ services:
       - ./data:/data
     ports:
       - "${CRAWLEE_PORT:-3345}:3000"
-    env_file:
-      - .env
+    # No env_file and no AWS/MinIO variables: the crawler does not write to object
+    # storage. It reports crawled PDFs to /ingest as a URL and the ingest worker
+    # downloads them into the bucket it resolved for the project.
     environment:
       INGEST_URL: http://backend:8001/ingest
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_KEY: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET: ${AWS_SECRET_ACCESS_KEY}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-uiuc-chat}
-      MINIO_ENDPOINT: http://minio:9000
+      INGEST_API_KEY: ${INGEST_API_KEY:-}
+      CRAWLEE_API_KEY: ${CRAWLEE_API_KEY}
       PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /pw-browsers/chrome
     depends_on:
       backend:
         condition: service_started
-      minio-init:
-        condition: service_completed_successfully
 
   postgres-illinois-chat:
     # pgvector-enabled Postgres — required by the embeddings table and the
@@ -231,7 +227,9 @@ services:
       # backend
       RAILWAY_URL: "http://backend:8001"
       INGEST_URL: "http://backend:8001/ingest"
+      INGEST_API_KEY: ${INGEST_API_KEY:-}
       CRAWLEE_API_URL: "http://crawlee:3000/crawl"
+      CRAWLEE_API_KEY: ${CRAWLEE_API_KEY}
       #redis
       REDIS_URL: "redis://default:${INGEST_REDIS_PASSWORD}@redis:6379"
       # Server-side Keycloak URL (for container-to-container communication)
@@ -304,6 +302,12 @@ services:
       REDIS_URL: "redis://default:${INGEST_REDIS_PASSWORD}@redis:6379"
       RABBITMQ_URL: "amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672"
       DEFAULT_COURSE_ADMINS: ${DEFAULT_COURSE_ADMINS:-}
+      # Bearer token required on POST /ingest. Fail-open: unset leaves the endpoint
+      # open, so enable it only once the frontend and crawler are sending it.
+      INGEST_API_KEY: ${INGEST_API_KEY:-}
+      # Used by ai_ta_backend/utils/rerun_webcrawl_for_project.py.
+      CRAWLEE_API_URL: http://crawlee:3000/crawl
+      CRAWLEE_API_KEY: ${CRAWLEE_API_KEY}
       POSTGRES_ENDPOINT: postgres-illinois-chat
       POSTGRES_PORT: 5432
       POSTGRES_DATABASE: ${POSTGRES_DATABASE:-postgres}
