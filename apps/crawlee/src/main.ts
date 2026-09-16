@@ -1,33 +1,19 @@
-// uploadToS3.ts
 import express, { Request, Response } from 'express';
 import { crawl } from './api/crawlee.js';
+import { requireCrawleeApiKey } from './api/auth.js';
 import healthRoute from './api/health.js'; // Import your health route
-
-import cors from 'cors';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
 
-// const corsOptions = {
-//     origin: 'https://uiuc.chat',
-// };
-
-// app.use(cors()); // Enable CORS for all routes and origins
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    if (req.method === 'OPTIONS') {
-        res.header('Access-Control-Allow-Methods', 'PUT, POST, PATCH, DELETE, GET');
-        res.status(200).json({});
-    } else {
-        next();
-    }
-});
-// app.use(cors(corsOptions)); // only certain routes
+// No CORS middleware: /crawl is a server-to-server endpoint called by the
+// frontend's API route and the backend's backfill script, never by a browser.
+// The blanket `Access-Control-Allow-Origin: *` that used to live here invited
+// exactly the cross-origin calls the bearer check below now rejects.
 app.use(express.json());
 
-app.post('/crawl', async (req: Request, res: Response) => {
+app.post('/crawl', requireCrawleeApiKey, async (req: Request, res: Response) => {
     console.log('in /crawl. req.body:', req.body)
     try {
         // const { url, scrapeStrategy, match, exclude, maxPagesToCrawl, courseName, maxTokens, maxConcurrency, maxRequestsPerMinute } = req.body.params;
