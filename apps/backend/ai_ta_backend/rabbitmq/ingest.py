@@ -1361,7 +1361,7 @@ class Ingest:
                 # by reporting neither success nor failure. main_ingest's guard is
                 # `if success_fail_dict['failure_ingest']:`, so None writes no
                 # documents_failed row while the in-progress row is still cleaned up.
-                logging.warning(f"SKIP-PDF-URL (not_a_pdf): url={url} content-type={e.detail}")
+                logging.warning(f"SKIP-PDF-URL (not_a_pdf): url={url} {e.detail}")
                 return {"success_ingest": None, "failure_ingest": None}
             logging.error(f"PDF fetch failed for {url}: {e}")
             return {"success_ingest": None, "failure_ingest": {"s3_path": "", "error": e.as_error_message()}}
