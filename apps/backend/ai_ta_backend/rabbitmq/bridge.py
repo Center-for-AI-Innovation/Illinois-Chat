@@ -28,8 +28,10 @@ logging.basicConfig(level=logging.INFO)
 
 # Optional bearer-token auth. When INGEST_API_KEY is set (recommended for a
 # public/internet-facing deployment), callers must send
-# `Authorization: Bearer <INGEST_API_KEY>`. Crawlee already sends this header
-# (its BEAM_API_KEY must equal INGEST_API_KEY). If unset, the endpoint is open.
+# `Authorization: Bearer <INGEST_API_KEY>`. The Flask backend's own /ingest route
+# honours the same variable, and every caller (frontend UIUC-api/ingest.ts, the
+# Crawlee HTML and PDF paths) sends the header when it is set. If unset, the
+# endpoint is open.
 INGEST_API_KEY = os.getenv("INGEST_API_KEY")
 
 app = Flask(__name__)

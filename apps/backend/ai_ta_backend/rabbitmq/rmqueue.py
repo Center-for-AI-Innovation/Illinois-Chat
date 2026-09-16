@@ -79,7 +79,12 @@ class Queue:
         doc_progress_payload = models.DocumentsInProgress(
             s3_path=s3_path_value,
             readable_filename=inputs['readable_filename'],
-            course_name=inputs['course_name']
+            course_name=inputs['course_name'],
+            # Columns have always existed but were never written, so the crash-path
+            # failure rows worker.py builds from this record had url=None. Also lets
+            # the in-progress view show which URL a crawled PDF is being fetched from.
+            url=inputs.get('url'),
+            base_url=inputs.get('base_url'),
         )
         # Route the status row to the project's documents DB (external when the
         # project has database_config, else host) so the worker can fetch it by
