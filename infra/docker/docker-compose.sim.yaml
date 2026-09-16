@@ -36,7 +36,7 @@ services:
       # An unset or empty value means UNRESTRICTED, so the full list is the compose default
       # rather than living only in .env. Re-verify the ids after any image digest bump:
       # upstream later canonicalizes versions, which would silently widen this list.
-      # See docs/sim-access-and-tools.md section 5.
+      # See docs/sim-developer-guide.md section 5.
       ALLOWED_INTEGRATIONS: ${SIM_ALLOWED_INTEGRATIONS:-agent,api,condition,function,response,router_v2,evaluator,guardrails,human_in_the_loop,variables,wait,note,translate,memory,knowledge,mcp,workflow_input,table,logs_v2,file_v5,webhook_request,generic_webhook,schedule,rss,imap,sim_workspace_event,deployments,exa,tavily,perplexity,linkup,serper,google_search,duckduckgo,wikipedia,arxiv,firecrawl,jina,mistral_parse_v3,reducto_v2,textract_v2,latex,google_books,pinecone,qdrant,mem0,zep,embeddings,postgresql,mysql,mssql,mongodb,neo4j,clickhouse,redis,smtp,sendgrid,resend,discord,telegram,github_v2,gitlab,tts,stt_v2,image_generator_v2,elevenlabs,google_translate}
     depends_on:
       sim-db:

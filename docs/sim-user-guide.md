@@ -1,9 +1,12 @@
-# Sim AI: Signing In, Approval, and Project Tools
+# Sim AI user guide
 
 Illinois Chat uses [Sim AI](https://sim.ai) as its tool platform: workflows built and
 deployed in a Sim workspace become tools that chatbots can call during a conversation.
-This guide covers how to get access to Sim, how admin approval works, and how to wire a
-Sim workspace into an Illinois Chat project.
+This guide covers how to get access to Sim, how admin approval works, how to wire a Sim
+workspace into an Illinois Chat project, and which blocks you can use.
+
+If you maintain the deployment rather than build tools with it, read the
+[Sim developer guide](sim-developer-guide.md) instead.
 
 ## 1. Signing in to Sim with your Illinois identity (Keycloak SSO)
 
@@ -180,3 +183,36 @@ Open an issue on the Illinois Chat repository describing the block you need and 
 are building with it. Adding a tool you authenticate yourself is a small configuration
 change. Adding a Connect-button vendor depends on registering an application with that
 vendor first, so it takes longer.
+
+## 6. Learning more about Sim itself
+
+Everything above is specific to our deployment. For how Sim works in general — writing
+prompts, wiring blocks together, testing a workflow — use Sim's own documentation:
+
+- [Build your first workflow](https://docs.sim.ai/introduction) — the starting point.
+- [Blocks reference](https://docs.sim.ai/workflows/blocks/agent) — what each core block
+  does. Agent, API, Condition, Function, Router and Response are the ones you will use
+  most, and all are available here.
+- [Connecting blocks](https://docs.sim.ai/workflows/connections) — how data flows from one
+  block into the next.
+- [Variables and secrets](https://docs.sim.ai/platform/credentials) — storing an API key
+  once and referencing it as `{{KEY}}` instead of pasting it into every block.
+- [Triggers](https://docs.sim.ai/workflows/triggers/start) — how a workflow starts. For
+  Illinois Chat tools the start trigger matters most: the inputs you declare on it become
+  the tool's parameters, and a workflow whose inputs have no descriptions is skipped by
+  discovery rather than published with a guessed signature.
+- [Integrations](https://docs.sim.ai/integrations/firecrawl) — one page per tool block,
+  listing its operations and the inputs each needs.
+
+**One caveat when reading those pages.** Sim's documentation tracks their latest release,
+while this deployment runs a pinned, slightly older version. Most of it applies unchanged,
+but two things differ often enough to watch for:
+
+- **A block or feature described there may not exist here yet.** If the block picker does
+  not show something the docs mention, it is either newer than our version or not on the
+  allowed list in section 5.
+- **Anything about billing, hosted keys or "Sim Cloud" does not apply.** This is a
+  self-hosted instance. Where the docs say Sim supplies a key for you, you supply your own.
+
+If a page describes something you need and it is not available here, open an issue on the
+Illinois Chat repository rather than working around it.

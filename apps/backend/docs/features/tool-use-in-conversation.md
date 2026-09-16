@@ -12,7 +12,7 @@ You can create your own tools for the LLM to use seamlessly during a conversatio
 
 Tools are Sim AI workflows. Sim is a visual workflow builder that ships with the Illinois Chat stack and shares its Keycloak login, so any workflow you build and deploy in your Sim workspace can be exposed to a chatbot as a tool.
 
-The full walkthrough, from signing in to Sim through connecting a workspace to a project, lives in [Sim AI: Signing In, Approval, and Project Tools](../../../../docs/sim-access-and-tools.md).
+The full walkthrough, from signing in to Sim through connecting a workspace to a project, lives in the [Sim AI user guide](../../../../docs/sim-user-guide.md).
 
 ## Usage - Write your own tool
 
