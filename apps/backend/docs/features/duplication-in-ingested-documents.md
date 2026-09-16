@@ -6,6 +6,16 @@ description: Description of the duplication logic used in the document ingest pi
 
 There are 2 pathways to ingest new documents into your project - direct file upload and web scrape. We have a content-based matching logic in place to check if the incoming document is already present in the system.&#x20;
 
+Crawled PDFs get one extra, earlier check. Because the ingest worker now fetches
+those PDFs over the network, it first asks whether this project already has a
+document with **exactly** this URL; if so it logs `SKIP-PDF-URL
+(already_ingested)` and returns without downloading anything. Within a single
+crawl the crawler also keeps a seen-set, so a handbook linked from every page of
+a site is enqueued once rather than dozens of times. Neither check replaces the
+content-based logic below, which still runs for the PDFs that do get downloaded.
+Note that the URL match is exact, so an updated PDF at the same URL is not
+re-ingested, and `?v=2` counts as a different document.
+
 The check if performed after the text extraction step in the pipeline and is as follows:&#x20;
 
 * First, Supabase is queried based on either `s3_path` (if direct upload) or `url` (if web scrape).
