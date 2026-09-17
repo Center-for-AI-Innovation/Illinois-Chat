@@ -95,7 +95,7 @@ const switchContainerVariants = cva(
 
 interface SwitchProps
   extends
-    Omit<SwitchPrimitives.Root.Props, 'onCheckedChange'>,
+    Omit<SwitchPrimitives.Root.Props, 'onCheckedChange' | 'defaultChecked'>,
     VariantProps<typeof switchVariants> {
   /** Show ON/OFF labels on track */
   showLabels?: boolean
@@ -112,6 +112,14 @@ interface SwitchProps
   /** Fired with the next checked value */
   onCheckedChange?: (checked: boolean) => void
 }
+
+// Base UI latches controlled-vs-uncontrolled on the first render: a `checked`
+// that starts out `undefined` (form data still loading, for example) leaves the
+// switch uncontrolled for its whole lifetime, so it ignores every later
+// `checked` value and its track stays stuck in the off position while the
+// labels and thumb icon below show the real value. Always hand Base UI a
+// boolean so the switch is controlled from the very first render.
+const toChecked = (checked: boolean | undefined) => checked ?? false
 
 const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
   (
@@ -134,12 +142,13 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
   ) => {
     // Only wrap in container when there's actually a label or tooltip to show
     const hasLabelOrTooltip = !!(label || tooltip)
+    const isChecked = toChecked(checked)
 
     const switchElement = (
       <SwitchPrimitives.Root
         className={cn(switchVariants({ variant, size }), className)}
         disabled={disabled}
-        checked={checked}
+        checked={isChecked}
         onCheckedChange={(value) => onCheckedChange?.(value)}
         onClick={(e) => e.stopPropagation()}
         {...props}
@@ -151,7 +160,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
             <span
               className={cn(
                 switchTrackLabelVariants({ size, position: 'on' }),
-                checked
+                isChecked
                   ? 'text-white opacity-100 dark:text-[var(--illinois-blue)]'
                   : 'opacity-0',
               )}
@@ -161,7 +170,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
             <span
               className={cn(
                 switchTrackLabelVariants({ size, position: 'off' }),
-                !checked
+                !isChecked
                   ? 'text-gray-400 opacity-100 dark:text-gray-300'
                   : 'opacity-0',
               )}
@@ -173,7 +182,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
 
         <SwitchPrimitives.Thumb className={cn(switchThumbVariants({ size }))}>
           {showThumbIcon &&
-            (checked ? (
+            (isChecked ? (
               <IconCheck
                 size={12}
                 className={cn(
@@ -205,7 +214,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         onClick={(e) => {
           if (disabled) return
           e.preventDefault()
-          onCheckedChange?.(!checked)
+          onCheckedChange?.(!isChecked)
         }}
       >
         {switchElement}
