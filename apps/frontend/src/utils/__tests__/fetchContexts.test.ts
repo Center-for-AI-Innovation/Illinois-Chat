@@ -23,7 +23,14 @@ describe('fetchContexts (browser/jsdom)', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
 
-    await fetchContexts('CS225', 'binary trees', 2000, ['lectures'], 'conv-1', 10)
+    await fetchContexts(
+      'CS225',
+      'binary trees',
+      2000,
+      ['lectures'],
+      'conv-1',
+      10,
+    )
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [, init] = fetchSpy.mock.calls[0] ?? []
