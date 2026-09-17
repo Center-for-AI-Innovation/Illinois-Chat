@@ -23,7 +23,6 @@ import { ToolsItem } from './ToolsItem'
 import { ModelParams } from './ModelParams'
 import { useTranslation } from 'react-i18next'
 import { prebuiltAppConfig } from '~/utils/modelProviders/ConfigWebLLM'
-import * as webllm from '@mlc-ai/web-llm'
 import { type WebllmModel, webLLMModels } from '~/utils/modelProviders/WebLLM'
 import { XIcon } from 'lucide-react'
 
@@ -51,6 +50,7 @@ export const UserSettings = () => {
   const close = useCallback(() => setOpened(false), [])
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const loadModelCache = async () => {
+    const webllm = await import('@mlc-ai/web-llm')
     for (const model of webLLMModels) {
       const theCachedModel = await webllm.hasModelInCache(model.name, appConfig)
       if (theCachedModel) {

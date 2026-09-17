@@ -73,7 +73,6 @@ import { type OpenAIModelID } from '~/utils/modelProviders/types/openai'
 import type ChatUI from '~/utils/modelProviders/WebLLM'
 import { webLLMModels } from '~/utils/modelProviders/WebLLM'
 import { ContextWithMetadata } from '~/types/chat'
-import { modelSupportsTools } from '~/utils/modelProviders/capabilities'
 import {
   COUNTRY_OF_CONCERN_INFO_URL,
   getCountryOfConcern,
@@ -1057,7 +1056,7 @@ export const ChatInput = ({
           {/* Chat input and preview container */}
           <div
             ref={chatInputContainerRef}
-            className="chat-input-container m-0 w-full resize-none  p-0"
+            className="chat-input-container m-0 w-full resize-none p-0"
             onClick={() => textareaRef.current?.focus()}
             style={{
               ...chatInputContainerStyle,
@@ -1344,7 +1343,7 @@ export const ChatInput = ({
               <button
                 type="button"
                 aria-label="Send message"
-                className="absolute top-1/2 right-2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-[white/30] p-2 opacity-50 hover:opacity-100"
+                className="absolute top-1/2 right-2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-white/30 p-2 opacity-50 hover:opacity-100"
                 onClick={handleSend}
                 style={{ pointerEvents: 'auto' }}
               >
@@ -1489,8 +1488,9 @@ export const ChatInput = ({
             {/* Agent Mode pill */}
             {agentModeFeatureEnabled &&
             selectedConversation?.model &&
-            llmProviders &&
-            modelSupportsTools(selectedConversation.model, llmProviders) ? (
+            !webLLMModels.some(
+              (m) => m.id === selectedConversation?.model?.id,
+            ) ? (
               <button
                 className={`rounded-full px-3 py-1 text-xs transition-colors md:text-sm ${
                   agentModeEnabled
