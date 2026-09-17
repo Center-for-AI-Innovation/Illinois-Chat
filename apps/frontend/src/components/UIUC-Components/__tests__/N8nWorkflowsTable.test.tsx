@@ -9,51 +9,21 @@ vi.mock('~/utils/toastUtils', () => ({
   showToast: vi.fn(),
 }))
 
-vi.mock('mantine-datatable', () => ({
-  DataTable: ({
-    records = [],
-    columns = [],
-    onPageChange,
-    page,
-    totalRecords,
-  }: any) => (
-    <div>
-      <div data-testid="datatable-meta">
-        page:{page} total:{totalRecords} records:{records.length}
-      </div>
-      <button type="button" onClick={() => onPageChange?.(2)}>
-        next-page
-      </button>
-      <div data-testid="datatable">
-        {records.map((r: any) => (
-          <div key={String(r.id ?? r.name)}>
-            {columns.map((c: any) => (
-              <div key={String(c.accessor ?? c.title)}>
-                {typeof c.render === 'function'
-                  ? c.render(r)
-                  : String(r?.[c.accessor] ?? '')}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  ),
+const PAGE_SIZE = 25
+
+// One extra record beyond a single page so pagination is actually exercised.
+const records = Array.from({ length: PAGE_SIZE + 1 }, (_, i) => ({
+  id: `w${i + 1}`,
+  name: i === 0 ? 'Workflow A' : `Workflow ${i + 1}`,
+  active: i === 0,
+  tags: i === 0 ? [{ name: 't1' }, { name: 't2' }] : [],
+  createdAt: new Date(2024, 0, PAGE_SIZE + 1 - i).toISOString(),
+  updatedAt: new Date(2024, 0, PAGE_SIZE + 2 - i).toISOString(),
 }))
 
 vi.mock('~/utils/functionCalling/handleFunctionCalling', () => ({
   useFetchAllWorkflows: () => ({
-    data: [
-      {
-        id: 'w1',
-        name: 'Workflow A',
-        active: true,
-        enabled: true,
-        tags: [{ name: 't1' }, { name: 't2' }],
-        createdAt: '2024-01-02T03:04:05Z',
-        updatedAt: '2024-01-03T03:04:05Z',
-      },
-    ],
+    data: records,
     isLoading: false,
     isSuccess: true,
     isError: false,
@@ -98,11 +68,14 @@ describe('N8nWorkflowsTable', () => {
     expect(
       await screen.findByText(/These tools can be automatically invoked/i),
     ).toBeInTheDocument()
-    expect(screen.getByTestId('datatable')).toBeInTheDocument()
+
+    // Sorted by createdAt desc, so "Workflow A" (the most recent) is on page 1.
+    expect(screen.getByText('Workflow A')).toBeInTheDocument()
+    expect(screen.getByText('t1, t2')).toBeInTheDocument()
 
     // Toggle switch triggers mutate with id + checked
-    const checkbox = screen.getByRole('switch')
-    await user.click(checkbox)
+    const switches = screen.getAllByRole('switch')
+    await user.click(switches[0]!)
     expect(mutateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'w1', checked: false }),
     )
@@ -117,8 +90,39 @@ describe('N8nWorkflowsTable', () => {
       }),
     )
 
-    // Pagination callback wired
-    await user.click(screen.getByRole('button', { name: /next-page/i }))
-    expect(screen.getByTestId('datatable-meta')).toHaveTextContent('page:2')
+    // Pagination is wired to the real footer: with PAGE_SIZE + 1 records
+    // there are 2 pages, and page 2 holds exactly the oldest record.
+    expect(screen.getByText(`1–${PAGE_SIZE} of ${records.length}`)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /next page/i }))
+    expect(
+      screen.getByText(`${PAGE_SIZE + 1}–${records.length} of ${records.length}`),
+    ).toBeInTheDocument()
+    expect(screen.getByText(`Workflow ${PAGE_SIZE + 1}`)).toBeInTheDocument()
+  })
+
+  it('shows a loading state while fetching', async () => {
+    vi.resetModules()
+    vi.doMock('~/utils/functionCalling/handleFunctionCalling', () => ({
+      useFetchAllWorkflows: () => ({
+        data: undefined,
+        isLoading: true,
+        isSuccess: false,
+        isError: false,
+        refetch: vi.fn(),
+      }),
+    }))
+    const { N8nWorkflowsTable: LoadingTable } = await import(
+      '../N8nWorkflowsTable'
+    )
+
+    renderWithProviders(
+      <LoadingTable
+        n8nApiKey="key"
+        course_name="CS101"
+        isEmptyWorkflowTable={false}
+      />,
+    )
+
+    expect(await screen.findByRole('status')).toBeInTheDocument()
   })
 })

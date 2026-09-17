@@ -1,54 +1,8 @@
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { FileUpload } from '../UploadNotification'
-
-vi.mock('@mantine/hooks', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    useMediaQuery: () => false,
-  }
-})
-
-// Store the latest onDrop handler so custom tests can call it with arbitrary files.
-let capturedOnDrop: ((files: File[]) => void) | undefined
-
-vi.mock('@mantine/dropzone', () => {
-  const Dropzone = ({ children, onDrop, loading }: any) => {
-    capturedOnDrop = onDrop
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() =>
-            onDrop?.([
-              new File(['hello'], 'My File.pdf', { type: 'application/pdf' }),
-            ])
-          }
-        >
-          trigger-drop
-        </button>
-        <div data-testid="dropzone-loading">{String(!!loading)}</div>
-        {children}
-      </div>
-    )
-  }
-  const Accept = ({ children }: any) => <div>{children}</div>
-  Accept.displayName = 'Dropzone.Accept'
-  Dropzone.Accept = Accept
-
-  const Reject = ({ children }: any) => <div>{children}</div>
-  Reject.displayName = 'Dropzone.Reject'
-  Dropzone.Reject = Reject
-
-  const Idle = ({ children }: any) => <div>{children}</div>
-  Idle.displayName = 'Dropzone.Idle'
-  Dropzone.Idle = Idle
-  return { Dropzone }
-})
 
 vi.mock('~/utils/apiUtils', async (importOriginal) => {
   const actual: any = await importOriginal()
@@ -56,6 +10,18 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
 })
 
 vi.mock('uuid', () => ({ v4: () => 'uuid-1' }))
+
+/** Simulates a real browser drop of `files` onto the dropzone. */
+function dropFiles(files: File[]) {
+  fireEvent.drop(screen.getByTestId('dropzone'), {
+    dataTransfer: { files },
+  })
+}
+
+/** The single-file drop the old mocked "trigger-drop" button used to simulate. */
+function dropDefaultFile() {
+  dropFiles([new File(['hello'], 'My File.pdf', { type: 'application/pdf' })])
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -161,7 +127,6 @@ function activeDocument(
 describe('LargeDropzone', () => {
   afterEach(() => {
     vi.restoreAllMocks()
-    capturedOnDrop = undefined
   })
 
   // -----------------------------------------------------------------------
@@ -206,11 +171,76 @@ describe('LargeDropzone', () => {
   })
 
   // -----------------------------------------------------------------------
+  // Drag visual state
+  // -----------------------------------------------------------------------
+
+  it('shows the "Drop files here" message while dragging over the dropzone', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    render(<LargeDropzone {...defaultProps()} />)
+
+    const dropzone = screen.getByTestId('dropzone')
+    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+
+    fireEvent.dragEnter(dropzone)
+    expect(screen.getByText('Drop files here')).toBeInTheDocument()
+    expect(screen.queryByText('Upload materials')).not.toBeInTheDocument()
+
+    fireEvent.dragLeave(dropzone)
+    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+  })
+
+  it('stays in the dragging state while the cursor crosses a child element', async () => {
+    // dragenter/dragleave fire on every element boundary crossed, including
+    // children inside the dropzone (e.g. the icon or hint text) — a naive
+    // "dragleave -> not dragging" handler would flicker the visual state
+    // every time the cursor passes over one of those children while still
+    // over the dropzone overall.
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    render(<LargeDropzone {...defaultProps()} />)
+
+    const dropzone = screen.getByTestId('dropzone')
+    const child = screen.getByText(/Drag.*drop files or a whole folder here/i)
+
+    // Enter the dropzone, then cross onto a child element (enter fires on
+    // the child too), then leave the child (dragleave fires on the child,
+    // NOT the dropzone as a whole).
+    fireEvent.dragEnter(dropzone)
+    fireEvent.dragEnter(child)
+    fireEvent.dragLeave(child)
+
+    // Still logically over the dropzone — must not have reverted.
+    expect(screen.getByText('Drop files here')).toBeInTheDocument()
+
+    // Actually leaving the dropzone still resets the state correctly.
+    fireEvent.dragLeave(dropzone)
+    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+  })
+
+  it('does not enter the dragging state when disabled', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    render(<LargeDropzone {...defaultProps({ isDisabled: true })} />)
+
+    fireEvent.dragEnter(screen.getByTestId('dropzone'))
+
+    expect(
+      screen.getByText(/Enter an available project name above/i),
+    ).toBeInTheDocument()
+  })
+
+  // -----------------------------------------------------------------------
   // New course upload + redirect
   // -----------------------------------------------------------------------
 
   it('uploads + ingests files for a new course and redirects to dashboard', async () => {
-    const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
     const { callSetCourseMetadata } = await import('~/utils/apiUtils')
 
@@ -245,7 +275,7 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
+    dropDefaultFile()
 
     await waitFor(() => expect(callSetCourseMetadata).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 300))
@@ -274,7 +304,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
     // Trigger onDrop with an audio file
-    capturedOnDrop?.([new File(['data'], 'song.mp3', { type: 'audio/mpeg' })])
+    dropFiles([new File(['data'], 'song.mp3', { type: 'audio/mpeg' })])
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Audio and video files are not supported at this time.',
@@ -292,7 +322,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    capturedOnDrop?.([new File(['data'], 'clip.mp4', { type: 'video/mp4' })])
+    dropFiles([new File(['data'], 'clip.mp4', { type: 'video/mp4' })])
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Audio and video files are not supported at this time.',
@@ -309,7 +339,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps()} />)
 
     // File with generic MIME type but audio extension
-    capturedOnDrop?.([
+    dropFiles([
       new File(['data'], 'track.flac', { type: 'application/octet-stream' }),
     ])
 
@@ -327,7 +357,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    capturedOnDrop?.([new File(['data'], 'movie.mkv', { type: '' })])
+    dropFiles([new File(['data'], 'movie.mkv', { type: '' })])
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Audio and video files are not supported at this time.',
@@ -344,7 +374,7 @@ describe('LargeDropzone', () => {
     const setUploadFiles = vi.fn()
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    capturedOnDrop?.([new File(['data'], 'notes.txt', { type: 'text/plain' })])
+    dropFiles([new File(['data'], 'notes.txt', { type: 'text/plain' })])
 
     // Wait for the async ingestFiles to begin
     await waitFor(() => expect(setUploadFiles).toHaveBeenCalled())
@@ -356,7 +386,6 @@ describe('LargeDropzone', () => {
   // -----------------------------------------------------------------------
 
   it('sets file status to error and skips ingest when uploadToS3 fails', async () => {
-    const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
     mockTimers()
 
@@ -379,7 +408,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
+    dropDefaultFile()
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -395,7 +424,6 @@ describe('LargeDropzone', () => {
   }, 10000)
 
   it('sets file status to error when ingest API throws', async () => {
-    const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
     mockTimers()
 
@@ -416,7 +444,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
+    dropDefaultFile()
 
     await waitFor(() => {
       const errorCall = setUploadFiles.mock.calls.find((call: any[]) => {
@@ -439,7 +467,6 @@ describe('LargeDropzone', () => {
   // -----------------------------------------------------------------------
 
   it('does not navigate away after uploading to an existing course', async () => {
-    const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
 
     const push = vi.fn(async () => {})
@@ -456,7 +483,7 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
+    dropDefaultFile()
 
     // Non-new-course does NOT call refreshOrRedirect inside ingestFiles,
     // so push should not be called for /chat in this path
@@ -482,7 +509,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    capturedOnDrop?.([
+    dropFiles([
       new File(['a'], 'doc1.pdf', { type: 'application/pdf' }),
       new File(['b'], 'doc2.docx', {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -515,7 +542,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    capturedOnDrop?.([
+    dropFiles([
       new File(['a'], 'doc.pdf', { type: 'application/pdf' }),
       new File(['b'], 'song.wav', { type: 'audio/wav' }),
     ])
@@ -1337,7 +1364,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    capturedOnDrop?.([
+    dropFiles([
       new File(['data'], 'My File (2024).pdf', { type: 'application/pdf' }),
     ])
 
@@ -1361,7 +1388,6 @@ describe('LargeDropzone', () => {
   // -----------------------------------------------------------------------
 
   it('uses fallback metadata when courseMetadata is falsy for new course', async () => {
-    const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
     const { callSetCourseMetadata } = await import('~/utils/apiUtils')
 
@@ -1381,7 +1407,7 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
+    dropDefaultFile()
 
     await waitFor(() => expect(callSetCourseMetadata).toHaveBeenCalled())
 
@@ -1398,7 +1424,6 @@ describe('LargeDropzone', () => {
   // -----------------------------------------------------------------------
 
   it('shows loading state during upload', async () => {
-    const user = userEvent.setup()
     const { default: LargeDropzone } = await import('../LargeDropzone')
     mockTimers()
 
@@ -1429,14 +1454,21 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    const loadingIndicator = screen.getByTestId('dropzone-loading')
-    expect(loadingIndicator.textContent).toBe('false')
+    expect(screen.getByTestId('dropzone').getAttribute('aria-busy')).toBe(
+      'false',
+    )
+    expect(
+      screen.queryByTestId('dropzone-loading-overlay'),
+    ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /trigger-drop/i }))
+    dropDefaultFile()
 
     await waitFor(() => {
-      expect(screen.getByTestId('dropzone-loading').textContent).toBe('true')
+      expect(screen.getByTestId('dropzone').getAttribute('aria-busy')).toBe(
+        'true',
+      )
     })
+    expect(screen.getByTestId('dropzone-loading-overlay')).toBeInTheDocument()
 
     // Cleanup - resolve the hanging promise
     if (resolveUpload) resolveUpload()

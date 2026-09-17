@@ -485,6 +485,20 @@
 }
 
 /*
+ * Document-group combobox ("Select Group"): the shadcn combobox already draws
+ * its own focus indicator (`focus-within:border-ring` plus a 3px
+ * around the first. Suppress the outline on the input group and its text
+ * input only — the chips' remove buttons have no ring of their own and keep
+ * the global one. Higher specificity than the `*:focus-visible` rule above,
+ * so it wins without needing to be declared later.
+ */
+[data-slot='combobox-input-group'].doc-group-multiselect:focus-visible,
+[data-slot='combobox-input-group'].doc-group-multiselect:focus-within,
+.doc-group-multiselect [data-slot='combobox-input']:focus-visible {
+  outline: none !important;
+}
+
+/*
  * Chat input area: suppress the default outline so the parent container's
  * rounded box-shadow serves as the focus indicator (WCAG 2.4.7).
  */

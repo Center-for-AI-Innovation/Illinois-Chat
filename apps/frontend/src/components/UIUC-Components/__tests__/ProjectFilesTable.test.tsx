@@ -23,87 +23,6 @@ vi.mock('axios', () => ({
   },
 }))
 
-vi.mock('mantine-datatable', () => ({
-  DataTable: (props: any) => {
-    const records = props.records ?? []
-    const columns = props.columns ?? []
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() =>
-            props.onSortStatusChange?.({
-              ...props.sortStatus,
-              direction: props.sortStatus?.direction === 'asc' ? 'desc' : 'asc',
-            })
-          }
-        >
-          sort-toggle
-        </button>
-        <button
-          type="button"
-          onClick={() => props.onSelectedRecordsChange?.([records[0]])}
-        >
-          select-first
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            props.onSelectedRecordsChange?.(
-              Array.from({ length: 101 }).map((_, i) => ({ id: i + 1 })),
-            )
-          }
-        >
-          select-many
-        </button>
-        <div>
-          {columns.map((col: any, idx: number) => (
-            <div key={idx}>{col.filter ?? null}</div>
-          ))}
-        </div>
-        <div>
-          {records.length === 0 ? (props.noRecordsIcon ?? null) : null}
-          {records.map((record: any, index: number) => (
-            <div key={record.id ?? record.s3_path ?? record.url ?? index}>
-              {columns.map((col: any, cIdx: number) => (
-                <div key={cIdx}>
-                  {col.render
-                    ? col.render(record, index)
-                    : (record[col.accessor] ?? null)}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  },
-}))
-
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    MultiSelect: (props: any) => (
-      <div>
-        <div aria-label="multiselect-kind">{props.sx ? 'row' : 'bulk'}</div>
-        <div aria-label="multiselect-value">
-          {(props.value ?? []).join(',')}
-        </div>
-        <button
-          type="button"
-          onClick={() => props.onChange?.([...(props.value ?? []), 'Group B'])}
-        >
-          {props.sx ? 'set-groups-row' : 'set-groups-bulk'}
-        </button>
-        <button type="button" onClick={() => props.onChange?.([])}>
-          {props.sx ? 'clear-groups-row' : 'clear-groups-bulk'}
-        </button>
-      </div>
-    ),
-  }
-})
-
 vi.mock('@/hooks/queries/useFetchDocumentGroups', () => ({
   useFetchDocumentGroups: () => ({
     data: [
@@ -117,16 +36,18 @@ vi.mock('@/hooks/queries/useFetchDocumentGroups', () => ({
   }),
 }))
 
+const appendToDocGroupMutate = vi.fn(async () => undefined)
 vi.mock('@/hooks/queries/useAppendToDocGroup', () => ({
   useAppendToDocGroup: () => ({
-    mutate: vi.fn(async () => undefined),
+    mutate: appendToDocGroupMutate,
     isPending: false,
   }),
 }))
 
+const removeFromDocGroupMutate = vi.fn(async () => undefined)
 vi.mock('@/hooks/queries/useDeleteFromDocGroup', () => ({
   useDeleteFromDocGroup: () => ({
-    mutate: vi.fn(async () => undefined),
+    mutate: removeFromDocGroupMutate,
     isPending: false,
   }),
 }))
@@ -144,7 +65,7 @@ vi.mock('~/utils/handleExport', () => ({
 }))
 
 describe('ProjectFilesTable', () => {
-  it('renders success tab, filters/sorts, views and deletes documents, and opens export modal', async () => {
+  it('renders success tab, filters/sorts, assigns groups, views and deletes documents, and opens export modal', async () => {
     const user = userEvent.setup()
     vi.spyOn(console, 'debug').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -205,11 +126,24 @@ describe('ProjectFilesTable', () => {
     expect(await screen.findByText(/Success/i)).toBeInTheDocument()
     expect(await screen.findByText(/file1-/i)).toBeInTheDocument()
 
-    // Row-level document group change path.
-    await user.click(screen.getByRole('button', { name: /set-groups-row/i }))
+    // Row-level document group change path: open the in-cell combobox and
+    // pick the other group.
+    const rowGroupCombobox = screen.getByRole('combobox', {
+      name: 'Assign document groups',
+    })
+    await user.click(rowGroupCombobox)
+    await user.click(await screen.findByRole('option', { name: 'Group B' }))
 
-    // Filter (updates queryKey and triggers refetch).
-    await user.type(screen.getByLabelText('File Name'), 'hello')
+    await waitFor(() => expect(appendToDocGroupMutate).toHaveBeenCalled())
+
+    // Close the combobox popup: Base UI marks the rest of the page
+    // `aria-hidden` while it is open, which hides the header from `getByRole`.
+    await user.keyboard('{Escape}')
+
+    // Filter (updates queryKey and triggers refetch). The input lives behind
+    // the column's funnel-icon popover, matching the Mantine original.
+    await user.click(screen.getByRole('button', { name: 'Filter by File Name' }))
+    await user.type(await screen.findByLabelText('File Name'), 'hello')
     await waitFor(() =>
       expect(
         fetchSpy.mock.calls.some(([url]) =>
@@ -218,8 +152,13 @@ describe('ProjectFilesTable', () => {
       ).toBe(true),
     )
 
-    // Sort (updates queryKey and triggers refetch).
-    await user.click(screen.getByRole('button', { name: /sort-toggle/i }))
+    // Close the filter popover before going after the sort control, so its
+    // overlay is not sitting on top of the header row.
+    await user.keyboard('{Escape}')
+
+    // Sort (updates queryKey and triggers refetch) — the sort button, not
+    // the filter popover's trigger, which is named "Filter by File Name".
+    await user.click(screen.getByRole('button', { name: /^File Name/ }))
     await waitFor(() =>
       expect(
         fetchSpy.mock.calls.some(([url]) =>
@@ -233,12 +172,16 @@ describe('ProjectFilesTable', () => {
     await user.click(screen.getByRole('button', { name: /view document/i }))
     await waitFor(() => expect(openSpy).toHaveBeenCalled())
 
-    // Select and open bulk multi-select; exercise group-change handler.
-    await user.click(screen.getByRole('button', { name: /select-first/i }))
+    // Select the row, open the bulk multi-select, and assign a group.
+    await user.click(screen.getByRole('checkbox', { name: /select document/i }))
     await user.click(
       screen.getByRole('button', { name: /Add Document to Groups/i }),
     )
-    await user.click(screen.getByRole('button', { name: /set-groups-bulk/i }))
+    const bulkGroupCombobox = screen.getByRole('combobox', {
+      name: 'Filter by document group',
+    })
+    await user.click(bulkGroupCombobox)
+    await user.click(await screen.findByRole('option', { name: 'Group B' }))
 
     // Delete action opens modal.
     await user.click(screen.getByRole('button', { name: /Delete document/i }))
@@ -265,22 +208,19 @@ describe('ProjectFilesTable', () => {
     const { showToast } = await import('~/utils/toastUtils')
     ;(showToast as any).mockClear()
 
+    const manyDocs = Array.from({ length: 101 }).map((_, i) => ({
+      id: i + 1,
+      readable_filename: `f${i + 1}.txt`,
+      s3_path: `cs101/f${i + 1}.txt`,
+      url: '',
+      base_url: '',
+      created_at: new Date().toISOString(),
+      doc_groups: [],
+    }))
+
     server.use(
       http.get('*/api/materialsTable/fetchProjectMaterials*', async () => {
-        return HttpResponse.json({
-          final_docs: [
-            {
-              id: 1,
-              readable_filename: 'f.txt',
-              s3_path: 'cs101/f.txt',
-              url: '',
-              base_url: '',
-              created_at: new Date().toISOString(),
-              doc_groups: [],
-            },
-          ],
-          total_count: 1,
-        })
+        return HttpResponse.json({ final_docs: manyDocs, total_count: 101 })
       }),
       http.get('*/api/materialsTable/fetchFailedDocuments*', async () => {
         return HttpResponse.json({
@@ -305,16 +245,23 @@ describe('ProjectFilesTable', () => {
       { homeContext: { dispatch: vi.fn() } },
     )
 
+    await screen.findByText('f1.txt')
+
     await user.click(
-      await screen.findByRole('button', { name: /select-many/i }),
+      screen.getByRole('checkbox', {
+        name: /select all documents on this page/i,
+      }),
     )
-    const deleteLabels = await screen.findAllByText(/Delete 101/i)
-    await user.click(deleteLabels[0]!.closest('button') as HTMLElement)
+
+    const deleteButton = await screen.findByRole('button', {
+      name: /Delete 101 selected records/i,
+    })
+    await user.click(deleteButton)
 
     expect(showToast as any).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Selection Limit Exceeded' }),
     )
-  })
+  }, 20_000)
 
   it('renders failed tab and shows error details modal via "Read more"', async () => {
     const user = userEvent.setup()

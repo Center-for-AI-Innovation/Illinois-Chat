@@ -1,14 +1,21 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 
-import { Switch, Text } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { DataTable } from 'mantine-datatable'
+import { Switch } from '@/components/shadcn/ui/switch'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/ui/table'
 import { type UIUCTool } from '~/types/chat'
 import { useFetchAllWorkflows } from '~/utils/functionCalling/handleFunctionCalling'
 import { showToast } from '~/utils/toastUtils'
 import { LoadingSpinner } from './LoadingSpinner'
+import { TablePaginationFooter } from './TablePaginationFooter'
 
 const PAGE_SIZE = 25
 
@@ -17,18 +24,6 @@ interface N8nWorkflowsTableProps {
   course_name: string
   isEmptyWorkflowTable: boolean
   sidebarCollapsed?: boolean
-  // fetchWorkflows: (
-  //   limit?: number,
-  //   pagination?: boolean,
-  // ) => Promise<WorkflowRecord[]>
-}
-
-const dataTableTitleStyles = {
-  color: 'var(--table-header)',
-}
-
-const dataTableCellsStyles = {
-  color: 'var(--foreground)',
 }
 
 export const N8nWorkflowsTable = ({
@@ -48,8 +43,6 @@ export const N8nWorkflowsTable = ({
   const {
     data: records,
     isLoading: isLoadingRecords,
-    isSuccess: isSuccess,
-    isError: isErrorTools,
     refetch: refetchWorkflows,
   } = useFetchAllWorkflows(course_name, n8nApiKey, 20, 'true', true)
 
@@ -66,16 +59,7 @@ export const N8nWorkflowsTable = ({
 
       return data
     },
-
-    onMutate: (variables) => {
-      // A mutation is about to happen!
-
-      // Optionally return a context containing data to use when for example rolling back
-      return { id: 1 }
-    },
-    onError: (error, variables, context) => {
-      // An error happened!
-      console.log(`Error happened ${error}`)
+    onError: (error) => {
       showToast({
         title: 'Error with activation',
         message: (error as Error).message,
@@ -83,12 +67,7 @@ export const N8nWorkflowsTable = ({
         autoClose: 12000,
       })
     },
-    onSuccess: (data, variables, context) => {
-      // Boom baby!
-      console.log(`success`, data)
-    },
-    onSettled: (data, error, variables, context) => {
-      // Error or success... doesn't matter!
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: ['tools', n8nApiKey],
       })
@@ -100,59 +79,13 @@ export const N8nWorkflowsTable = ({
     refetchWorkflows()
   }, [n8nApiKey])
 
-  // Fix mantine-datatable aria-allowed-attr violations
-  useEffect(() => {
-    const fixAriaAttrs = () => {
-      const container = document.querySelector('.n8n_workflows_table')
-      if (!container) return
-      // Remove invalid aria-expanded from non-interactive elements
-      container
-        .querySelectorAll('[aria-expanded]:not(button):not([role="button"])')
-        .forEach((el) => el.removeAttribute('aria-expanded'))
-      // Remove deprecated aria-haspopup from non-interactive elements
-      container
-        .querySelectorAll('[aria-haspopup]:not(button):not([role="button"])')
-        .forEach((el) => el.removeAttribute('aria-haspopup'))
-      // Fix "No records found" text contrast (including inner spans)
-      container
-        .querySelectorAll(
-          '.mantine-datatable-empty-state, .mantine-datatable-empty-state *',
-        )
-        .forEach((el) => {
-          ;(el as HTMLElement).style.color = 'var(--foreground)'
-        })
-      // Fix SVG role issues - decorative SVGs should be hidden from assistive tech
-      container.querySelectorAll('svg').forEach((svg) => {
-        svg.setAttribute('aria-hidden', 'true')
-      })
-    }
-    const timer = setTimeout(fixAriaAttrs, 100)
-    return () => clearTimeout(timer)
-  }, [records, isLoadingRecords, page])
-
   const startIndex = (page - 1) * PAGE_SIZE
   const endIndex = startIndex + PAGE_SIZE
 
-  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth >= 1000)
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsWideScreen(window.innerWidth >= 1000)
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const dataTableStyle = {
-    //    width: isWideScreen ? '85%' : '92%',
-  }
-
-  let currentRecords
-  let sortedRecords
+  let currentRecords: UIUCTool[] | undefined
 
   if (records && records.length !== 0) {
-    sortedRecords = [...records].sort((a, b) => {
+    const sortedRecords = [...records].sort((a, b) => {
       const dateA = new Date(a.createdAt as string)
       const dateB = new Date(b.createdAt as string)
       return dateB.getTime() - dateA.getTime()
@@ -160,162 +93,114 @@ export const N8nWorkflowsTable = ({
     currentRecords = (sortedRecords as UIUCTool[]).slice(startIndex, endIndex)
   }
 
+  const visibleRecords = isEmptyWorkflowTable ? [] : (currentRecords ?? [])
+
   return (
     <>
-      {/* <Title
-        order={3}
-        // w={}
-        // size={'xl'}
-        className={`pb-3 pt-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
-      >
-        Your n8n tools
-      </Title> */}
-      <Text
-        // w={isWideScreen ? '85%' : '92%'}
-        className={`pb-2 text-(--dashboard-foreground) ${widthClasses}`}
-      >
+      <p className={`pb-2 text-(--dashboard-foreground) ${widthClasses}`}>
         These tools can be automatically invoked by the LLM to fetch additional
         data to answer user questions on the{' '}
         <a
           href={`/${course_name}/chat`}
-          // target="_blank"
           rel="noopener noreferrer"
-          className="text-(--dashboard-button) hover:text-(--dashboard-button-hover)"
-          style={{
-            textDecoration: 'underline',
-          }}
+          className="text-(--dashboard-button) underline hover:text-(--dashboard-button-hover)"
         >
           chat page
         </a>
         .
-      </Text>
+      </p>
 
-      {/* dataTable styling options https://icflorescu.github.io/mantine-datatable/examples/overriding-the-default-styles/  */}
       <div className={`n8n_workflows_table ${widthClasses}`}>
-        <DataTable
-          aria-label="n8n workflows"
-          height={500}
-          styles={{
-            pagination: {
-              backgroundColor: 'var(--background)',
-            },
-          }}
-          rowStyle={(row, index) => {
-            return index % 2 === 0
-              ? { backgroundColor: 'var(--background)' }
-              : { backgroundColor: 'var(--background-faded)' }
-          }}
-          sx={{
-            color: 'var(--foreground)',
-            backgroundColor: 'var(--background)',
-          }}
-          withColumnBorders
-          borderColor="var(--table-border)"
-          rowBorderColor="var(--table-border)"
-          withBorder={false}
-          fetching={isLoadingRecords}
-          customLoader={<LoadingSpinner />}
-          // keyField="id"
-          records={isEmptyWorkflowTable ? [] : (currentRecords as UIUCTool[])}
-          /* //just testing the output, safe to remove in the future
-        records={[{
-          "id": "1323addd-a4ac-4dd2-8de2-6f934969a0f1",
-          "name": "Feest, Bogan and Herzog",
-          "streetAddress": "21716 Ratke Drive",
-          "city": "Stromanport",
-          "state": "WY",
-          "missionStatement": "Innovate bricks-and-clicks metrics."
-        }]}
-*/
-          columns={[
-            // { titleStyle: dataTableTitleStyles, accessor: 'id', width: 175 },
-            {
-              titleStyle: dataTableTitleStyles,
-              cellsStyle: dataTableCellsStyles,
-              accessor: 'name',
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              cellsStyle: dataTableCellsStyles,
-              accessor: 'enabled',
-              width: 100,
-              render: (record, index) => (
-                <Switch
-                  // @ts-ignore -- for some reason N8N returns "active" and we use "enabled" but I can't get them to agree
-                  checked={!!record.active}
-                  aria-label={`Enable ${record.name || 'workflow'}`}
-                  onChange={(event) => {
-                    mutate_active_flows.mutate({
-                      id: record.id,
-                      checked: event.target.checked,
-                    })
-                  }}
-                  size="sm"
-                  className="cursor-pointer"
-                  styles={(theme) => ({
-                    track: {
-                      backgroundColor: record.enabled
-                        ? 'var(--dashboard-button) !important'
-                        : 'transparent',
-                      borderColor: record.enabled
-                        ? 'var(--dashboard-button) !important'
-                        : 'var(--foreground-faded)',
-                    },
-                    label: {
-                      color: 'var(--dashboard-foreground)',
-                      fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                    },
-                  })}
-                />
-              ),
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              cellsStyle: dataTableCellsStyles,
-              accessor: 'tags',
-              render: (record, index) => {
-                return record.tags
-                  ? record.tags.map((tag) => tag.name).join(', ')
-                  : ''
-              },
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              cellsStyle: dataTableCellsStyles,
-              accessor: 'createdAt',
-              // textAlign: 'left',
-              render: (record, index) => {
-                const { createdAt } = record as { createdAt: string }
-                return dayjs(createdAt).format('MMM D YYYY, h:mm A')
-              },
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              cellsStyle: dataTableCellsStyles,
-              accessor: 'updatedAt',
-              // textAlign: 'left',
-              render: (record, index) => {
-                const { updatedAt } = record as { updatedAt: string }
-                return dayjs(updatedAt).format('MMM D YYYY, h:mm A')
-              },
-            },
-          ]}
-          // totalRecords={records.length}
+        <div className="max-h-[500px] overflow-auto rounded-md border border-(--table-border)">
+          <Table aria-label="n8n workflows">
+            <TableHeader className="sticky top-0 z-10 bg-(--background)">
+              <TableRow>
+                <TableHead className="text-(--table-header)">Name</TableHead>
+                <TableHead className="w-25 text-(--table-header)">
+                  Enabled
+                </TableHead>
+                <TableHead className="text-(--table-header)">Tags</TableHead>
+                <TableHead className="text-(--table-header)">
+                  Created At
+                </TableHead>
+                <TableHead className="text-(--table-header)">
+                  Updated At
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingRecords ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center">
+                    <LoadingSpinner />
+                  </TableCell>
+                </TableRow>
+              ) : visibleRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="py-8 text-center whitespace-normal text-(--foreground)"
+                  >
+                    No records found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                visibleRecords.map((record, index) => {
+                  const active = (record as { active?: boolean }).active
+                  return (
+                    <TableRow
+                      key={record.id}
+                      className={
+                        index % 2 === 0
+                          ? 'bg-(--background)'
+                          : 'bg-(--background-faded)'
+                      }
+                    >
+                      <TableCell className="whitespace-normal break-words text-(--foreground)">
+                        {record.name}
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          variant="labeled"
+                          size="sm"
+                          checked={!!active}
+                          aria-label={`Enable ${record.name || 'workflow'}`}
+                          onCheckedChange={(checked) => {
+                            mutate_active_flows.mutate({
+                              id: record.id,
+                              checked,
+                            })
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="whitespace-normal break-words text-(--foreground)">
+                        {record.tags
+                          ? record.tags.map((tag) => tag.name).join(', ')
+                          : ''}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-(--foreground)">
+                        {dayjs(record.createdAt).format('MMM D YYYY, h:mm A')}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-(--foreground)">
+                        {record.updatedAt
+                          ? dayjs(record.updatedAt).format(
+                              'MMM D YYYY, h:mm A',
+                            )
+                          : ''}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationFooter
+          page={page}
           totalRecords={records?.length || 0}
           recordsPerPage={PAGE_SIZE}
-          page={page}
-          onPageChange={(p) => setPage(p)}
-          // 👇 uncomment the next line to use a custom pagination size
-          // paginationSize="md"
-          // 👇 uncomment the next line to use a custom loading text
-          loadingText="Loading..."
-          // 👇 uncomment the next line to display a custom text when no records were found
-          noRecordsText="No records found"
-          // 👇 uncomment the next line to use a custom pagination text
-          // paginationText={({ from, to, totalRecords }) => `Records ${from} - ${to} of ${totalRecords}`}
-          // 👇 uncomment the next lines to use custom pagination colors
-          // paginationActiveBackgroundColor="green"
-          // paginationActiveTextColor="#e6e348"
+          onPageChange={setPage}
+          className="bg-(--background)"
         />
       </div>
     </>
