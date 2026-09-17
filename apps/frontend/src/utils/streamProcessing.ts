@@ -8,7 +8,7 @@ import { runAnthropicChat } from '~/app/utils/anthropic'
 import { runOllamaChat } from '~/app/utils/ollama'
 import { runVLLM } from '~/app/utils/vllm'
 import { runOpenAICompatibleChat } from '~/app/utils/openaiCompatible'
-import { fetchContexts, fetchMQRContexts } from '~/utils/fetchContexts'
+import { fetchContexts } from '~/utils/fetchContexts'
 import { fetchImageDescription } from '~/utils/fetchImageDescription'
 import {
   type ChatApiBody,
@@ -454,24 +454,14 @@ export const handleContextSearch = async (
   }
   if (courseName !== 'gpt4') {
     const token_limit = selectedConversation.model.tokenLimit
-    const useMQRetrieval = false
-
-    const curr_contexts = useMQRetrieval
-      ? await fetchMQRContexts(
-          courseName,
-          searchQuery,
-          token_limit,
-          documentGroups,
-          '',
-        )
-      : await fetchContexts(
-          courseName,
-          searchQuery,
-          token_limit,
-          documentGroups,
-          '',
-          topN,
-        )
+    const curr_contexts = await fetchContexts(
+      courseName,
+      searchQuery,
+      token_limit,
+      documentGroups,
+      '',
+      topN,
+    )
 
     message.contexts = curr_contexts as ContextWithMetadata[]
     return curr_contexts as ContextWithMetadata[]
