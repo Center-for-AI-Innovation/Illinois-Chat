@@ -228,7 +228,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="course-page-main min-w-screen flex min-h-screen flex-col items-center">
+      <main className="course-page-main flex min-h-screen w-full flex-col items-center">
         <div className="items-left flex w-full flex-col justify-center py-0">
           <Flex direction="column" align="center" w="100%">
             {/* Config card */}
@@ -244,19 +244,19 @@ const SimPage = ({ course_name }: { course_name: string }) => {
             >
               <Flex className="flex-col md:flex-row">
                 <div
-                  className="min-h-full flex-[1_1_100%] bg-[--background] md:flex-[1_1_60%]"
+                  className="min-h-full flex-[1_1_100%] bg-(--background) md:flex-[1_1_60%]"
                   style={{ color: 'var(--foreground)' }}
                 >
                   <Group spacing="lg" m="1rem">
                     <Title
                       order={2}
-                      className={`${montserrat_heading.variable} ml-4 font-montserratHeading`}
+                      className={`${montserrat_heading.variable} font-montserratHeading ml-4`}
                     >
                       LLM Tool Use &amp; Function Calling
                     </Title>
                     <Stack align="start" justify="start">
                       <Title
-                        className={`${montserrat_heading.variable} flex-[1_1_50%] font-montserratHeading`}
+                        className={`${montserrat_heading.variable} font-montserratHeading flex-[1_1_50%]`}
                         order={5}
                         w="100%"
                         ml="md"
@@ -267,7 +267,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                           href="https://www.sim.ai"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`text-[--dashboard-button] hover:text-[--dashboard-button-hover] ${montserrat_heading.variable} font-montserratHeading`}
+                          className={`text-(--dashboard-button) hover:text-(--dashboard-button-hover) ${montserrat_heading.variable} font-montserratHeading`}
                         >
                           Sim AI{' '}
                           <IconExternalLink
@@ -299,7 +299,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                     <div className="card-body" style={{ padding: '.5rem' }}>
                       <div className="pb-4">
                         <Title
-                          className={`label ${montserrat_heading.variable} mb-2 p-0 font-montserratHeading`}
+                          className={`label ${montserrat_heading.variable} font-montserratHeading mb-2 p-0`}
                           order={3}
                         >
                           Sim AI Configuration
@@ -360,7 +360,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                         <div className="pt-3" />
                         <Button
                           onClick={handleSave}
-                          className="rounded-lg bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover]"
+                          className="rounded-lg bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover)"
                           disabled={isSaving}
                         >
                           {isSaving ? 'Saving...' : 'Save'}
@@ -384,13 +384,13 @@ const SimPage = ({ course_name }: { course_name: string }) => {
 
             {/* Discovered workflows table */}
             <div
-              className={`mx-auto mt-[2%] items-start rounded-2xl bg-[--background] text-[--foreground] ${cardWidthClasses}`}
+              className={`mx-auto mt-[2%] items-start rounded-2xl bg-(--background) text-(--foreground) ${cardWidthClasses}`}
               style={{ zIndex: 1 }}
             >
               <Flex direction="row" justify="space-between" align="center">
                 <Title
                   order={3}
-                  className={`pb-3 pt-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
+                  className={`pt-3 pb-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
                 >
                   Deployed Sim AI Workflows
                 </Title>
@@ -438,7 +438,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
             >
               {!hasSavedConfig && (
                 <Text
-                  className={`${montserrat_paragraph.variable} p-4 font-montserratParagraph`}
+                  className={`${montserrat_paragraph.variable} font-montserratParagraph p-4`}
                   style={{ color: 'var(--foreground)', opacity: 0.7 }}
                 >
                   Enter your Sim AI API Key and Workspace ID above to discover
@@ -447,7 +447,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
               )}
               {hasSavedConfig && isError && (
                 <Text
-                  className={`${montserrat_paragraph.variable} p-4 font-montserratParagraph`}
+                  className={`${montserrat_paragraph.variable} font-montserratParagraph p-4`}
                   color="red"
                 >
                   {workflowsError instanceof Error && workflowsError.message
@@ -460,7 +460,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                 workflows &&
                 workflows.length === 0 && (
                   <Text
-                    className={`${montserrat_paragraph.variable} p-4 font-montserratParagraph`}
+                    className={`${montserrat_paragraph.variable} font-montserratParagraph p-4`}
                     style={{ color: 'var(--foreground)', opacity: 0.7 }}
                   >
                     No deployed workflows found. Deploy a workflow in Sim AI to
