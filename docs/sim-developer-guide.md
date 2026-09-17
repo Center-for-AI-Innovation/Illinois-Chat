@@ -111,9 +111,12 @@ The user guide covers the admin workflow.
 
 ## 5. The block whitelist
 
-`ALLOWED_INTEGRATIONS` in the Sim compose file restricts which block types users may place
-in a workflow. The full list ships as the compose default; `.env.template` carries only a
-commented marker. The allowed set is documented for builders in section 5 of the user guide.
+`ALLOWED_INTEGRATIONS` restricts which block types users may place in a workflow. Its value
+comes from `ALLOWED_INTEGRATIONS` in `.env`, which is where the list lives and the only
+place it lives; `.env.template` ships the full 67 ids. `infra/docker/docker-compose.sim.yaml`
+passes it through with `:?` and no default, so a missing or blank value stops the Sim stack
+instead of silently unrestricting it. The allowed set is documented for builders in section 5
+of the user guide.
 
 **Six properties, all verified against the source at our pinned commit.** Do not assume the
 public documentation applies — it describes a newer release that behaves differently:
@@ -128,16 +131,35 @@ public documentation applies — it describes a newer release that behaves diffe
 - **A denied vendor attached as an agent tool is dropped silently.** The error is swallowed;
   the agent runs without that tool and nobody sees an error. Expect this as a support
   report, not a crash.
-- **A value Sim receives as empty means unrestricted**, so it fails open. Leaving
-  `SIM_ALLOWED_INTEGRATIONS` blank in `.env` is safe because the compose default applies,
-  but deleting the compose key removes the restriction entirely.
+- **A value Sim receives as empty means unrestricted**, so it fails open. This is why the
+  compose key uses `${ALLOWED_INTEGRATIONS:?…}` rather than a default: blanking the
+  variable, or deleting the compose key, would otherwise remove the restriction with no
+  visible sign. Changing that `:?` back to `:-` reintroduces exactly that hazard.
+- **The value replaces the list wholesale — there is no merge.** Setting the variable to a
+  single id (say `google`) does not add that block; it denies everything else, core blocks
+  included. Allowing something new means appending its id to the existing line.
 
 ### Changing the list
 
-Edit the default in `infra/docker/docker-compose.sim.yaml` and recreate the service. Before
-committing, confirm the value has no duplicates and the expected field count, and that every
-id exists in the running image's block registry. To roll back, comment the key out and
-recreate — clearing the `.env` variable does nothing.
+Edit `ALLOWED_INTEGRATIONS` in `.env` and recreate the `simstudio` service. Update
+`.env.template` in the same commit — it is the copy every new deployment starts from, and the
+two drifting apart is the failure this layout exists to prevent.
+
+Before committing, confirm the value has no duplicates and the expected field count, and that
+every id exists in the running image's block registry:
+
+```bash
+# field count and duplicates
+awk -F'"' '/^ALLOWED_INTEGRATIONS=/{n=split($2,a,","); print n" ids"}' .env
+awk -F'"' '/^ALLOWED_INTEGRATIONS=/{split($2,a,","); for (i in a) print a[i]}' .env | sort | uniq -d
+
+# every id exists as a block type in the pinned image
+docker run --rm --entrypoint sh <sim-image-id> -c \
+  'grep -rhoE "type:\"[a-z0-9_]+\"" /app | sed -E "s/type:\"(.*)\"/\1/" | sort -u'
+```
+
+There is no rollback-by-commenting-out any more: the stack will not start without the
+variable. To genuinely lift the restriction you must set it to every id you want allowed.
 
 Two things this variable **cannot** do: disable MCP tools or custom tools. Those are
 permission-group settings with no environment equivalent. `ALLOWED_MCP_DOMAINS` restricts
