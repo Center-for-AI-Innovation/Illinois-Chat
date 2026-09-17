@@ -85,7 +85,7 @@ export const UserSettings = () => {
       <DialogContent
         data-settings-modal
         showCloseButton={false}
-        className={`flex h-[95%] w-[90%] min-w-[800px] max-w-[1000px] flex-col gap-0 overflow-hidden rounded-[.25rem] bg-(--modal) text-(--modal-text) md:rounded-lg ${isSmallScreen ? 'p-2' : 'p-4'}`}
+        className={`flex h-[95%] w-[90%] max-w-[1000px] min-w-0 flex-col gap-0 overflow-hidden rounded-[.25rem] bg-(--modal) text-(--modal-text) md:rounded-lg lg:min-w-[800px] ${isSmallScreen ? 'p-2' : 'p-4'}`}
       >
         <div className="flex w-full items-center justify-between rounded-lg bg-(--modal-dark) p-4">
           <DialogTitle
@@ -113,10 +113,7 @@ export const UserSettings = () => {
                 <TabsTrigger value="model" className={tabTriggerClass}>
                   Model
                 </TabsTrigger>
-                <TabsTrigger
-                  value="documentGroups"
-                  className={tabTriggerClass}
-                >
+                <TabsTrigger value="documentGroups" className={tabTriggerClass}>
                   Document Groups
                 </TabsTrigger>
                 <TabsTrigger value="tools" className={tabTriggerClass}>

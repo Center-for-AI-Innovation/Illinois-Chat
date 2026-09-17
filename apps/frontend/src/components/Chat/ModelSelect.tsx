@@ -98,27 +98,6 @@ export function getModelDropdownMaxHeight({
   return Math.min(cap, Math.max(Math.min(floor, cap), available))
 }
 
-/**
- * The dropdown's max height is emitted as rem against a hardcoded 16, so a raw
- * pixel value would grow with the user's root font size. Pre-scale it so the
- * emitted rem resolves back to the pixel height we measured.
- */
-export function toRemScaledDropdownHeight(
-  pxHeight: number,
-  rootFontSizePx: number,
-): number {
-  const rootFontSize = rootFontSizePx > 0 ? rootFontSizePx : 16
-  return (pxHeight * 16) / rootFontSize
-}
-
-function getRootFontSizePx(): number {
-  if (typeof window === 'undefined') return 16
-  const parsed = Number.parseFloat(
-    window.getComputedStyle(document.documentElement).fontSize,
-  )
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16
-}
-
 export function getModelDropdownBoundaryRect(
   triggerEl: HTMLElement,
 ): Pick<DOMRect, 'top' | 'bottom'> {
@@ -466,9 +445,7 @@ const ModelDropdown: React.FC<
           Math.max(MODEL_DROPDOWN_MIN_PX, measuredViewportHeight - 200),
         )
 
-    setMaxDropdownHeight(
-      toRemScaledDropdownHeight(availablePx, getRootFontSizePx()),
-    )
+    setMaxDropdownHeight(availablePx)
   }, [viewportHeight])
 
   useEffect(() => {

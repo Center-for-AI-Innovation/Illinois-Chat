@@ -44,7 +44,7 @@ export const IntermediateStateAccordion = ({
           }}
         >
           <AccordionTrigger
-            className={`rounded-lg py-0 hover:bg-transparent hover:no-underline ${montserrat_paragraph.variable} font-montserratHeading text-sm font-bold`}
+            className={`rounded-lg py-0 hover:bg-transparent hover:no-underline ${montserrat_paragraph.variable} font-montserratParagraph text-sm font-bold`}
             style={{
               textShadow: '0 0 0px' /* 10px */,
               color: 'var(--dashboard-foreground)',

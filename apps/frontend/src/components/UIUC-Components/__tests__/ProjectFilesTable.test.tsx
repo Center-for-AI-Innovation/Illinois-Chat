@@ -265,6 +265,165 @@ describe('ProjectFilesTable', () => {
     )
   }, 20_000)
 
+  it('keeps the selection after a refetch hands back freshly built records', async () => {
+    // react-query returns new objects on every refetch, so selection tracked by
+    // object identity silently desyncs from the checkboxes the first time the
+    // table refreshes.
+    const user = userEvent.setup()
+
+    const docs = [
+      {
+        id: 1,
+        readable_filename: 'alpha.txt',
+        s3_path: 'cs101/alpha.txt',
+        url: '',
+        base_url: '',
+        created_at: new Date().toISOString(),
+        doc_groups: [],
+      },
+      {
+        id: 2,
+        readable_filename: 'beta.txt',
+        s3_path: 'cs101/beta.txt',
+        url: '',
+        base_url: '',
+        created_at: new Date().toISOString(),
+        doc_groups: [],
+      },
+    ]
+
+    server.use(
+      // Each response is re-serialised, so the rows arrive as new objects.
+      http.get('*/api/materialsTable/fetchProjectMaterials*', async () =>
+        HttpResponse.json({ final_docs: docs, total_count: 2 }),
+      ),
+      http.get('*/api/materialsTable/fetchFailedDocuments*', async () =>
+        HttpResponse.json({
+          final_docs: [],
+          total_count: 0,
+          recent_fail_count: 0,
+        }),
+      ),
+    )
+
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard' }
+    const { ProjectFilesTable } = await import('../ProjectFilesTable')
+    renderWithProviders(
+      <ProjectFilesTable
+        course_name="CS101"
+        tabValue="success"
+        onTabChange={vi.fn()}
+        setFailedCount={vi.fn()}
+        failedCount={0}
+      />,
+      { homeContext: { dispatch: vi.fn() } },
+    )
+
+    await screen.findByText('alpha.txt')
+
+    const rowCheckbox = screen.getByRole('checkbox', {
+      name: /select document 1/i,
+    })
+    await user.click(rowCheckbox)
+    await screen.findByRole('button', { name: /Delete 1 selected record/i })
+
+    await user.click(
+      screen.getByRole('button', { name: /refresh documents table/i }),
+    )
+
+    // The row is still checked and the count has not drifted.
+    await waitFor(() => {
+      expect(
+        screen.getByRole('checkbox', { name: /select document 1/i }),
+      ).toBeChecked()
+    })
+    expect(
+      screen.getByRole('button', { name: /Delete 1 selected record/i }),
+    ).toBeInTheDocument()
+
+    // Unchecking must still clear it rather than append a duplicate.
+    await user.click(
+      screen.getByRole('checkbox', { name: /select document 1/i }),
+    )
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /Delete \d+ selected record/i }),
+      ).not.toBeInTheDocument()
+    })
+  }, 20_000)
+
+  it('marks the header checkbox indeterminate when only some rows are selected', async () => {
+    const user = userEvent.setup()
+
+    const docs = [1, 2].map((id) => ({
+      id,
+      readable_filename: `doc${id}.txt`,
+      s3_path: `cs101/doc${id}.txt`,
+      url: '',
+      base_url: '',
+      created_at: new Date().toISOString(),
+      doc_groups: [],
+    }))
+
+    server.use(
+      http.get('*/api/materialsTable/fetchProjectMaterials*', async () =>
+        HttpResponse.json({ final_docs: docs, total_count: 2 }),
+      ),
+      http.get('*/api/materialsTable/fetchFailedDocuments*', async () =>
+        HttpResponse.json({
+          final_docs: [],
+          total_count: 0,
+          recent_fail_count: 0,
+        }),
+      ),
+    )
+
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard' }
+    const { ProjectFilesTable } = await import('../ProjectFilesTable')
+    renderWithProviders(
+      <ProjectFilesTable
+        course_name="CS101"
+        tabValue="success"
+        onTabChange={vi.fn()}
+        setFailedCount={vi.fn()}
+        failedCount={0}
+      />,
+      { homeContext: { dispatch: vi.fn() } },
+    )
+
+    await screen.findByText('doc1.txt')
+
+    const selectAll = screen.getByRole('checkbox', {
+      name: /select all documents on this page/i,
+    })
+    expect(selectAll).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /select document 1/i }),
+    )
+
+    // Partial selection must not read as "all selected" — to a screen reader or
+    // visually, where a lone check mark is indistinguishable from fully checked.
+    await waitFor(() => {
+      expect(selectAll).toHaveAttribute('aria-checked', 'mixed')
+    })
+    expect(selectAll).toHaveAttribute('data-indeterminate')
+    // jsdom does not evaluate Tailwind, so assert the swap is wired rather than
+    // which glyph paints: a distinct minus exists and the check is class-hidden
+    // whenever the root is indeterminate.
+    expect(selectAll.querySelector('.lucide-minus')).toBeInTheDocument()
+    expect(selectAll.querySelector('.lucide-check')).toHaveClass(
+      'group-data-indeterminate:hidden',
+    )
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /select document 2/i }),
+    )
+    await waitFor(() => {
+      expect(selectAll).toHaveAttribute('aria-checked', 'true')
+    })
+  }, 20_000)
+
   it('renders failed tab and shows error details modal via "Read more"', async () => {
     const user = userEvent.setup()
 

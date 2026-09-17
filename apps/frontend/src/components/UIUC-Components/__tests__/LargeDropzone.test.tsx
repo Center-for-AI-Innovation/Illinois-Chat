@@ -1,6 +1,6 @@
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { FileUpload } from '../UploadNotification'
 
@@ -11,16 +11,24 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
 
 vi.mock('uuid', () => ({ v4: () => 'uuid-1' }))
 
-/** Simulates a real browser drop of `files` onto the dropzone. */
-function dropFiles(files: File[]) {
-  fireEvent.drop(screen.getByTestId('dropzone'), {
-    dataTransfer: { files },
+/**
+ * Simulates a real browser drop of `files` onto the dropzone. The drop handler
+ * walks `dataTransfer` asynchronously so folders can be expanded, so callers
+ * have to await this before asserting on anything it kicked off.
+ */
+async function dropFiles(files: File[], items?: unknown[]) {
+  await act(async () => {
+    fireEvent.drop(screen.getByTestId('dropzone'), {
+      dataTransfer: { files, ...(items ? { items } : {}) },
+    })
   })
 }
 
 /** The single-file drop the old mocked "trigger-drop" button used to simulate. */
-function dropDefaultFile() {
-  dropFiles([new File(['hello'], 'My File.pdf', { type: 'application/pdf' })])
+async function dropDefaultFile() {
+  await dropFiles([
+    new File(['hello'], 'My File.pdf', { type: 'application/pdf' }),
+  ])
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +283,7 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    dropDefaultFile()
+    await dropDefaultFile()
 
     await waitFor(() => expect(callSetCourseMetadata).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 300))
@@ -304,7 +312,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
     // Trigger onDrop with an audio file
-    dropFiles([new File(['data'], 'song.mp3', { type: 'audio/mpeg' })])
+    await dropFiles([new File(['data'], 'song.mp3', { type: 'audio/mpeg' })])
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Audio and video files are not supported at this time.',
@@ -322,7 +330,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    dropFiles([new File(['data'], 'clip.mp4', { type: 'video/mp4' })])
+    await dropFiles([new File(['data'], 'clip.mp4', { type: 'video/mp4' })])
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Audio and video files are not supported at this time.',
@@ -339,7 +347,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps()} />)
 
     // File with generic MIME type but audio extension
-    dropFiles([
+    await dropFiles([
       new File(['data'], 'track.flac', { type: 'application/octet-stream' }),
     ])
 
@@ -357,7 +365,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    dropFiles([new File(['data'], 'movie.mkv', { type: '' })])
+    await dropFiles([new File(['data'], 'movie.mkv', { type: '' })])
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Audio and video files are not supported at this time.',
@@ -374,7 +382,7 @@ describe('LargeDropzone', () => {
     const setUploadFiles = vi.fn()
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    dropFiles([new File(['data'], 'notes.txt', { type: 'text/plain' })])
+    await dropFiles([new File(['data'], 'notes.txt', { type: 'text/plain' })])
 
     // Wait for the async ingestFiles to begin
     await waitFor(() => expect(setUploadFiles).toHaveBeenCalled())
@@ -408,7 +416,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    dropDefaultFile()
+    await dropDefaultFile()
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -444,7 +452,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    dropDefaultFile()
+    await dropDefaultFile()
 
     await waitFor(() => {
       const errorCall = setUploadFiles.mock.calls.find((call: any[]) => {
@@ -483,7 +491,7 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    dropDefaultFile()
+    await dropDefaultFile()
 
     // Non-new-course does NOT call refreshOrRedirect inside ingestFiles,
     // so push should not be called for /chat in this path
@@ -509,7 +517,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    dropFiles([
+    await dropFiles([
       new File(['a'], 'doc1.pdf', { type: 'application/pdf' }),
       new File(['b'], 'doc2.docx', {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -542,7 +550,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    dropFiles([
+    await dropFiles([
       new File(['a'], 'doc.pdf', { type: 'application/pdf' }),
       new File(['b'], 'song.wav', { type: 'audio/wav' }),
     ])
@@ -551,6 +559,70 @@ describe('LargeDropzone', () => {
       'Audio and video files are not supported at this time.',
     )
     expect(setUploadFiles).not.toHaveBeenCalled()
+  })
+
+  it('expands a dropped folder into its nested files', async () => {
+    // `dataTransfer.files` flattens a dropped directory into one zero-byte
+    // entry, so the folder's contents only survive if the drop handler walks
+    // the entry API instead.
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    const setUploadFiles = vi.fn()
+    const fileEntry = (file: File) => ({
+      isFile: true,
+      isDirectory: false,
+      file: (onSuccess: (f: File) => void) => onSuccess(file),
+    })
+    // readEntries drains in batches and must return [] to terminate.
+    let batchesRead = 0
+    const directoryEntry = {
+      isFile: false,
+      isDirectory: true,
+      createReader: () => ({
+        readEntries: (onSuccess: (entries: unknown[]) => void) => {
+          batchesRead += 1
+          onSuccess(
+            batchesRead === 1
+              ? [
+                  fileEntry(
+                    new File(['a'], 'nested1.pdf', {
+                      type: 'application/pdf',
+                    }),
+                  ),
+                  fileEntry(
+                    new File(['b'], 'nested2.txt', { type: 'text/plain' }),
+                  ),
+                ]
+              : [],
+          )
+        },
+      }),
+    }
+
+    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+
+    await dropFiles(
+      // What the browser puts in `.files` for a folder drop: one empty stub.
+      [new File([], 'my-folder', { type: '' })],
+      [{ kind: 'file', webkitGetAsEntry: () => directoryEntry }],
+    )
+
+    await waitFor(() => {
+      expect(setUploadFiles).toHaveBeenCalled()
+    })
+
+    const addCall = setUploadFiles.mock.calls.find((call: any[]) => {
+      if (typeof call[0] !== 'function') return false
+      const added = call[0]([])
+      return (
+        added.length === 2 &&
+        added.some((f: FileUpload) => f.name === 'nested1.pdf') &&
+        added.some((f: FileUpload) => f.name === 'nested2.txt')
+      )
+    })
+    expect(addCall).toBeDefined()
   })
 
   // -----------------------------------------------------------------------
@@ -1364,7 +1436,7 @@ describe('LargeDropzone', () => {
 
     render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
 
-    dropFiles([
+    await dropFiles([
       new File(['data'], 'My File (2024).pdf', { type: 'application/pdf' }),
     ])
 
@@ -1407,7 +1479,7 @@ describe('LargeDropzone', () => {
       />,
     )
 
-    dropDefaultFile()
+    await dropDefaultFile()
 
     await waitFor(() => expect(callSetCourseMetadata).toHaveBeenCalled())
 
@@ -1461,7 +1533,7 @@ describe('LargeDropzone', () => {
       screen.queryByTestId('dropzone-loading-overlay'),
     ).not.toBeInTheDocument()
 
-    dropDefaultFile()
+    await dropDefaultFile()
 
     await waitFor(() => {
       expect(screen.getByTestId('dropzone').getAttribute('aria-busy')).toBe(

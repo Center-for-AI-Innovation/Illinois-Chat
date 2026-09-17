@@ -21,6 +21,73 @@ const POLL_INTERVAL_MS = 5000
 
 const isActiveDocument = (file: FileUpload) => isActiveUpload(file, 'document')
 
+// `DataTransfer.files` flattens a dropped folder into a single zero-byte entry,
+// so directories have to be walked through the entry API to reach their files.
+type DroppedEntry = {
+  isFile: boolean
+  isDirectory: boolean
+  file: (onSuccess: (file: File) => void, onError?: () => void) => void
+  createReader: () => {
+    readEntries: (
+      onSuccess: (entries: DroppedEntry[]) => void,
+      onError?: () => void,
+    ) => void
+  }
+}
+
+const readEntryFiles = async (entry: DroppedEntry): Promise<File[]> => {
+  if (entry.isFile) {
+    const file = await new Promise<File | null>((resolve) => {
+      entry.file(
+        (f) => resolve(f),
+        () => resolve(null),
+      )
+    })
+    return file ? [file] : []
+  }
+
+  if (!entry.isDirectory) return []
+
+  const reader = entry.createReader()
+  const files: File[] = []
+  // readEntries returns a partial batch (100 in Chrome) and must be re-read
+  // until it comes back empty.
+  for (;;) {
+    const batch = await new Promise<DroppedEntry[]>((resolve) => {
+      reader.readEntries(
+        (entries) => resolve(entries),
+        () => resolve([]),
+      )
+    })
+    if (batch.length === 0) break
+    for (const child of batch) {
+      files.push(...(await readEntryFiles(child)))
+    }
+  }
+  return files
+}
+
+export const collectDroppedFiles = async (
+  dataTransfer: DataTransfer,
+): Promise<File[]> => {
+  const flatFiles = Array.from(dataTransfer.files ?? [])
+  // webkitGetAsEntry must run before this handler yields; the item list is
+  // cleared as soon as the drop event finishes dispatching.
+  const entries = Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === 'file')
+    .map((item) =>
+      typeof item.webkitGetAsEntry === 'function'
+        ? (item.webkitGetAsEntry() as DroppedEntry | null)
+        : null,
+    )
+    .filter((entry): entry is DroppedEntry => entry !== null)
+
+  if (entries.length === 0) return flatFiles
+
+  const nested = await Promise.all(entries.map(readEntryFiles))
+  return nested.flat()
+}
+
 export function LargeDropzone({
   courseName,
   current_user_email,
@@ -316,7 +383,13 @@ export function LargeDropzone({
     dragCounterRef.current = 0
     setIsDragging(false)
     if (interactionDisabled) return
-    handleFiles(Array.from(event.dataTransfer.files))
+    collectDroppedFiles(event.dataTransfer)
+      .then((files) => {
+        if (files.length > 0) handleFiles(files)
+      })
+      .catch((error) => {
+        console.error('Error reading dropped items:', error)
+      })
   }
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {

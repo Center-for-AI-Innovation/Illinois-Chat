@@ -103,31 +103,6 @@ describe('getModelDropdownMaxHeight', () => {
   })
 })
 
-describe('toRemScaledDropdownHeight', () => {
-  it('passes pixel heights through unchanged at a 16px root font', async () => {
-    const { toRemScaledDropdownHeight } = await import('../ModelSelect')
-
-    expect(toRemScaledDropdownHeight(332, 16)).toBe(332)
-  })
-
-  it('shrinks the value so a larger root font still resolves to the measured pixels', async () => {
-    const { toRemScaledDropdownHeight } = await import('../ModelSelect')
-
-    // The height is emitted as `value / 16` rem, so at a 20px root the prop must be pre-scaled:
-    // 265.6 / 16 = 16.6rem, and 16.6rem * 20px = 332px.
-    const scaled = toRemScaledDropdownHeight(332, 20)
-    expect(scaled).toBeCloseTo(265.6)
-    expect((scaled / 16) * 20).toBeCloseTo(332)
-  })
-
-  it('falls back to 16px for a bogus root font size', async () => {
-    const { toRemScaledDropdownHeight } = await import('../ModelSelect')
-
-    expect(toRemScaledDropdownHeight(332, 0)).toBe(332)
-    expect(toRemScaledDropdownHeight(332, Number.NaN)).toBe(332)
-  })
-})
-
 describe('ModelSelect', () => {
   it('renders and toggles the details accordion', async () => {
     const user = userEvent.setup()

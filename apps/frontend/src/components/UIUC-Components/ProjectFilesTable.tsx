@@ -72,6 +72,21 @@ const PAGE_SIZE = 100
 // refetches immediately, which also restarts this countdown.
 const TABLE_REFRESH_INTERVAL_MS = 5 * 60_000
 
+/*
+ * react-query hands back freshly constructed objects on every refetch, so
+ * selection has to be tracked by a stable key (mantine-datatable used its
+ * `idAccessor`) rather than by object identity, or the checkboxes desync from
+ * `selectedRecords` the first time the table refreshes.
+ */
+const getRecordKey = (record: CourseDocument): string | number | null =>
+  record.id ?? record.s3_path ?? record.url ?? null
+
+const isSameRecord = (a: CourseDocument, b: CourseDocument): boolean => {
+  const aKey = getRecordKey(a)
+  const bKey = getRecordKey(b)
+  return aKey !== null && bKey !== null ? aKey === bKey : a === b
+}
+
 type SortDirection = 'asc' | 'desc'
 interface SortStatus {
   columnAccessor: string
@@ -554,10 +569,14 @@ export function ProjectFilesTable({
   const allSelectableChecked =
     tabValue !== 'failed' &&
     records.length > 0 &&
-    records.every((record) => selectedRecords.includes(record))
+    records.every((record) =>
+      selectedRecords.some((selected) => isSameRecord(selected, record)),
+    )
   const someSelected =
     tabValue !== 'failed' &&
-    records.some((record) => selectedRecords.includes(record)) &&
+    records.some((record) =>
+      selectedRecords.some((selected) => isSameRecord(selected, record)),
+    ) &&
     !allSelectableChecked
 
   const handleSelectedRecordsChange = (
@@ -587,9 +606,10 @@ export function ProjectFilesTable({
   }
 
   const toggleRecordSelected = (record: CourseDocument, checked: boolean) => {
-    const next = checked
-      ? [...selectedRecords, record]
-      : selectedRecords.filter((r) => r !== record)
+    const without = selectedRecords.filter(
+      (selected) => !isSameRecord(selected, record),
+    )
+    const next = checked ? [...without, record] : without
     handleSelectedRecordsChange(next)
   }
 
@@ -756,8 +776,8 @@ export function ProjectFilesTable({
                                 final_docs: oldData.final_docs.map(
                                   (doc: CourseDocument) => {
                                     if (
-                                      selectedRecords.some(
-                                        (sr) => sr.id === doc.id,
+                                      selectedRecords.some((sr) =>
+                                        isSameRecord(sr, doc),
                                       )
                                     ) {
                                       let updatedDocGroups = [
@@ -1050,7 +1070,9 @@ export function ProjectFilesTable({
                 </TableRow>
               ) : (
                 records.map((record, index) => {
-                  const isSelected = selectedRecords.includes(record)
+                  const isSelected = selectedRecords.some((selected) =>
+                    isSameRecord(selected, record),
+                  )
                   return (
                     <TableRow
                       key={record.id ?? record.s3_path ?? record.url ?? index}
