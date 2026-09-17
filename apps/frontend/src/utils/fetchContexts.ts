@@ -121,6 +121,7 @@ export const fetchContexts = async (
             token_limit,
             doc_groups,
             conversation_id,
+            top_n,
           }),
         },
       )
