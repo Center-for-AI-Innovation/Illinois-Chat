@@ -1288,7 +1288,7 @@ export const ChatInput = ({
             <div className="relative flex w-full items-center">
               {/* File upload button */}
               <button
-                className="dark:bg-opacity-50 mr-2 flex items-center justify-center rounded-full p-2 text-neutral-100 opacity-60 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-100 dark:hover:text-neutral-200"
+                className="mr-2 flex items-center justify-center rounded-full p-2 text-neutral-100 opacity-60 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-200/50 dark:hover:text-light-200"
                 onClick={() => fileUploadRef.current?.click()}
                 type="button"
                 title="Upload files"
@@ -1343,7 +1343,7 @@ export const ChatInput = ({
               <button
                 type="button"
                 aria-label="Send message"
-                className="absolute top-1/2 right-2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-[white/30] p-2 opacity-50 hover:opacity-100"
+                className="absolute top-1/2 right-2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-white/30 p-2 opacity-50 hover:opacity-100"
                 onClick={handleSend}
                 style={{ pointerEvents: 'auto' }}
               >
