@@ -1055,7 +1055,7 @@ export const ChatInput = ({
           {/* Chat input and preview container */}
           <div
             ref={chatInputContainerRef}
-            className="chat-input-container m-0 w-full resize-none  p-0"
+            className="chat-input-container m-0 w-full resize-none p-0"
             onClick={() => textareaRef.current?.focus()}
             style={{
               ...chatInputContainerStyle,
@@ -1287,7 +1287,7 @@ export const ChatInput = ({
             <div className="relative flex w-full items-center">
               {/* File upload button */}
               <button
-                className="mr-2 flex items-center justify-center rounded-full p-2 text-neutral-100 opacity-60 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-200/50 dark:hover:text-light-200"
+                className="dark:hover:text-light-200 mr-2 flex items-center justify-center rounded-full p-2 text-neutral-100 opacity-60 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-200/50"
                 onClick={() => fileUploadRef.current?.click()}
                 type="button"
                 title="Upload files"
