@@ -180,3 +180,6 @@ pip-selfcheck.json
 
 # macOS
 .DS_Store
+
+# Node dependencies anywhere in the repo
+node_modules/

@@ -103,12 +103,5 @@ export default {
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  plugins: [
-    require('tailwindcss-animate'),
-    // Backports v4's built-in container queries to Tailwind 3.x, so the
-    // regenerated shadcn components can keep using `@container/<name>` and
-    // `@<size>/<name>:` variants (see field.tsx) instead of viewport breakpoints.
-    require('@tailwindcss/container-queries'),
-    require('daisyui'),
-  ],
+  plugins: [require('tailwindcss-animate')],
 } satisfies Config

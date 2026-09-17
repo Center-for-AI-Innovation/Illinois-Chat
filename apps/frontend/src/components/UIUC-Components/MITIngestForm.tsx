@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Text, Card, Button, Input, Image } from '@mantine/core'
 import { IconArrowRight } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
@@ -16,13 +16,16 @@ import { type QueryClient } from '@tanstack/react-query'
 export default function MITIngestForm({
   project_name,
   setUploadFiles,
+  queryClient,
 }: {
   project_name: string
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }): JSX.Element {
-  const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [isUrlValid, setIsUrlValid] = useState(false)
+  const delayedInvalidateRef = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined)
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
   const [open, setOpen] = useState(false)
@@ -79,6 +82,19 @@ export default function MITIngestForm({
               file.name === url ? { ...file, status: 'complete' } : file,
             ),
           )
+          // Refresh the documents table now, and once more shortly after:
+          // the download API can resolve before all rows land in the DB.
+          void queryClient.invalidateQueries({
+            queryKey: ['documents', project_name],
+          })
+          if (delayedInvalidateRef.current) {
+            clearTimeout(delayedInvalidateRef.current)
+          }
+          delayedInvalidateRef.current = setTimeout(() => {
+            void queryClient.invalidateQueries({
+              queryKey: ['documents', project_name],
+            })
+          }, 10_000)
         } else {
           // downloadMITCourse returned null, treat as error
           setUploadFiles((prevFiles) =>
@@ -86,6 +102,9 @@ export default function MITIngestForm({
               file.name === url ? { ...file, status: 'error' } : file,
             ),
           )
+          void queryClient.invalidateQueries({
+            queryKey: ['failedDocuments', project_name],
+          })
         }
       } catch (error) {
         console.error('Error during MIT course import:', error)
@@ -94,6 +113,9 @@ export default function MITIngestForm({
             file.name === url ? { ...file, status: 'error' } : file,
           ),
         )
+        void queryClient.invalidateQueries({
+          queryKey: ['failedDocuments', project_name],
+        })
       }
     } else {
       alert('Invalid URL (please include https://)')
@@ -105,12 +127,12 @@ export default function MITIngestForm({
   })
 
   useEffect(() => {
-    if (url && url.length > 0 && validateUrl(url)) {
-      setIsUrlUpdated(true)
-    } else {
-      setIsUrlUpdated(false)
+    return () => {
+      if (delayedInvalidateRef.current) {
+        clearTimeout(delayedInvalidateRef.current)
+      }
     }
-  }, [url])
+  }, [])
 
   return (
     <motion.div layout>
@@ -121,7 +143,6 @@ export default function MITIngestForm({
           if (!isOpen) {
             setUrl('')
             setIsUrlValid(false)
-            setIsUrlUpdated(false)
             setMaxUrls('50')
           }
         }}
@@ -129,13 +150,13 @@ export default function MITIngestForm({
         <DialogTrigger
           tabIndex={0}
           nativeButton={false}
-          className="focus:bg-[--dashboard-background-dark]"
+          className="focus:bg-(--dashboard-background-dark)"
           render={
             <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
               style={{ height: '100%' }}
             >
-              <div className="-ml-2 mb-2 flex items-center justify-between">
+              <div className="mb-2 -ml-2 flex items-center justify-between">
                 <div className="flex items-center space-x-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full">
                     <Image
@@ -150,11 +171,11 @@ export default function MITIngestForm({
                 </div>
               </div>
 
-              <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
+              <Text className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content from MIT OpenCourseWare, including lecture notes,
                 assignments, and course materials.
               </Text>
-              <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
+              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
                   size={16}
@@ -166,7 +187,7 @@ export default function MITIngestForm({
           }
         />
 
-        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto !rounded-2xl border-0 bg-[--modal] px-4 py-6 text-[--modal-text] sm:px-6">
+        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto rounded-2xl! border-0 bg-(--modal) px-4 py-6 text-(--modal-text) sm:px-6">
           <DialogHeader>
             <DialogTitle className="mb-4 text-left text-xl font-bold">
               Ingest MIT Course
@@ -175,13 +196,13 @@ export default function MITIngestForm({
           <div className="">
             <div className="">
               <div>
-                <div className="break-words text-sm sm:text-base">
-                  <Text className="mb-2 text-sm font-semibold text-[--illinois-orange]">
+                <div className="text-sm wrap-break-word sm:text-base">
+                  <Text className="mb-2 text-sm font-semibold text-(--illinois-orange)">
                     Coming soon: MIT ingest is temporarily unavailable.
                   </Text>
                   <strong>For MIT Open Course Ware</strong>, just enter a URL
                   like{' '}
-                  <code className="inline-flex items-center rounded-md bg-[--illinois-orange] px-2 py-1 font-mono text-xs text-[--illinois-white] sm:text-sm">
+                  <code className="inline-flex items-center rounded-md bg-(--illinois-orange) px-2 py-1 font-mono text-xs text-(--illinois-white) sm:text-sm">
                     ocw.mit.edu/courses/ANY_COURSE
                   </code>
                   ,<br />
@@ -194,7 +215,7 @@ export default function MITIngestForm({
                         'https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017'
                       }
                       onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      className="text-[--dashboard-button]"
+                      className="text-(--dashboard-button)"
                     >
                       https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017
                     </NextLink>
@@ -247,7 +268,7 @@ export default function MITIngestForm({
             <Button
               onClick={handleIngest}
               disabled
-              className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
+              className="h-11 w-full rounded-xl bg-(--dashboard-button) text-(--dashboard-button-foreground) transition-colors hover:bg-(--dashboard-button-hover) disabled:bg-(--background-faded) disabled:text-(--background-dark)"
             >
               Ingest MIT Course
             </Button>

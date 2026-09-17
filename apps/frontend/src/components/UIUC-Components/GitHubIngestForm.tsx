@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Text, Card, Button, Input, createStyles } from '@mantine/core'
 import {
-  IconAlertCircle,
   IconBrandGithub,
   IconWorldDownload,
   IconArrowRight,
@@ -17,22 +16,21 @@ import {
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
 // import { Checkbox } from '@radix-ui/react-checkbox'
-import { notifications } from '@mantine/notifications'
+import { showToast } from '~/utils/toastUtils'
 import axios from 'axios'
-import { Montserrat } from 'next/font/google'
 import { type FileUpload } from './UploadNotification'
 import Link from 'next/link'
 import { type QueryClient } from '@tanstack/react-query'
-const montserrat_med = Montserrat({
-  weight: '500',
-  subsets: ['latin'],
-})
+import { useGatedIngestPoller } from '~/hooks/useGatedIngestPoller'
+const POLL_INTERVAL_MS = 3000
 export default function GitHubIngestForm({
   project_name,
+  uploadFiles,
   setUploadFiles,
   queryClient,
 }: {
   project_name: string
+  uploadFiles: FileUpload[]
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }): JSX.Element {
@@ -115,7 +113,6 @@ export default function GitHubIngestForm({
       },
     },
   }))
-  const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [isUrlValid, setIsUrlValid] = useState(false)
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
@@ -159,7 +156,7 @@ export default function GitHubIngestForm({
       }
       setUploadFiles((prevFiles) => [...prevFiles, newFile])
       try {
-        const response = await scrapeWeb(
+        await scrapeWeb(
           url,
           project_name,
           maxUrls.trim() !== '' ? parseInt(maxUrls) : 50,
@@ -182,25 +179,27 @@ export default function GitHubIngestForm({
     await new Promise((resolve) => setTimeout(resolve, 8000))
   }
 
-  useEffect(() => {
-    if (url && url.length > 0 && validateUrl(url)) {
-      setIsUrlUpdated(true)
-    } else {
-      setIsUrlUpdated(false)
-    }
-  }, [url])
-
-  useEffect(() => {
-    const checkIngestStatus = async () => {
-      const response = await fetch(
-        `/api/materialsTable/docsInProgress?course_name=${project_name}`,
-      )
-      const data = await response.json()
-      const docsResponse = await fetch(
-        `/api/materialsTable/successDocs?course_name=${project_name}`,
-      )
-      const docsData = await docsResponse.json()
-
+  // Poll ingest status only while GitHub ingests are in flight, sending the
+  // tracked repo URLs as a server-side filter so the endpoints never return
+  // the whole documents table.
+  useGatedIngestPoller({
+    courseName: project_name,
+    uploadFiles,
+    setUploadFiles,
+    queryClient,
+    type: 'github',
+    intervalMs: POLL_INTERVAL_MS,
+    // Filter on the repo URLs of ALL tracked base entries regardless of their
+    // status (base entries are the ones without a `url` field): child rows
+    // carry the base's base_url, so this returns every row the matching below
+    // needs — including children still resolving after the base went terminal.
+    buildFilter: (files) => ({
+      base_urls: files
+        .filter((file) => file.type === 'github' && !file.url)
+        .map((file) => file.name)
+        .filter((baseUrl) => baseUrl.length > 0),
+    }),
+    applyStatus: (status, currentFiles) => {
       // Helper function to organize docs by base URL
       const organizeDocsByBaseUrl = (
         docs: Array<{ base_url: string; url: string }>,
@@ -233,8 +232,8 @@ export default function GitHubIngestForm({
             return { ...file, status: 'ingesting' as const }
           } else if (file.status === 'ingesting') {
             if (!isStillIngesting) {
-              const isInCompletedDocs = docsData?.documents?.some(
-                (doc: { url: string }) => doc.url === file.url,
+              const isInCompletedDocs = status.completed.some(
+                (doc) => doc.url === file.url,
               )
 
               if (isInCompletedDocs) {
@@ -249,31 +248,23 @@ export default function GitHubIngestForm({
         })
       }
 
-      // Helper function to create new file entries for additional URLs
+      // Helper function to create new file entries for additional URLs.
+      // Every key of baseUrlMap comes from an in-progress doc, so anything it
+      // yields is by definition still ingesting.
       const createAdditionalFileEntries = (
         baseUrlMap: Map<string, Set<string>>,
         currentFiles: FileUpload[],
-        docsInProgress: Array<{ base_url: string; readable_filename: string }>,
       ) => {
         const newFiles: FileUpload[] = []
 
         baseUrlMap.forEach((urls, baseUrl) => {
           // Only process if we have this base URL in our current files
           if (currentFiles.some((file) => file.name === baseUrl)) {
-            const matchingDoc = docsInProgress.find(
-              (doc) => doc.base_url === baseUrl,
-            )
-
-            const isStillIngesting = matchingDoc !== undefined
-
             urls.forEach((url) => {
-              if (
-                !currentFiles.some((file) => file.url === url) &&
-                matchingDoc
-              ) {
+              if (!currentFiles.some((file) => file.url === url)) {
                 newFiles.push({
                   name: url,
-                  status: isStillIngesting ? 'ingesting' : 'complete',
+                  status: 'ingesting',
                   type: 'github',
                   url: url,
                 })
@@ -285,35 +276,23 @@ export default function GitHubIngestForm({
         return newFiles
       }
 
-      setUploadFiles((prev) => {
-        const matchingDocsInProgress =
-          data?.documents?.filter((doc: { base_url: string }) =>
-            prev.some((file) => file.name === doc.base_url),
-          ) || []
+      const matchingDocsInProgress = status.inProgress.filter((doc) =>
+        currentFiles.some((file) => file.name === doc.base_url),
+      )
 
-        const baseUrlMap = organizeDocsByBaseUrl(matchingDocsInProgress)
+      const additionalFiles = createAdditionalFileEntries(
+        organizeDocsByBaseUrl(matchingDocsInProgress),
+        currentFiles,
+      )
 
-        const additionalFiles = createAdditionalFileEntries(
-          baseUrlMap,
-          prev,
-          matchingDocsInProgress,
-        )
+      const updatedFiles = updateExistingFiles(
+        currentFiles,
+        matchingDocsInProgress,
+      )
 
-        const updatedFiles = updateExistingFiles(prev, matchingDocsInProgress)
-
-        return [...updatedFiles, ...additionalFiles]
-      })
-
-      await queryClient.invalidateQueries({
-        queryKey: ['documents', project_name],
-      })
-    }
-
-    const interval = setInterval(checkIngestStatus, 3000)
-    return () => {
-      clearInterval(interval)
-    }
-  }, [project_name])
+      return [...updatedFiles, ...additionalFiles]
+    },
+  })
 
   // if (isLoading) {
   //   return <Skeleton height={200} width={330} radius={'lg'} />
@@ -340,34 +319,11 @@ export default function GitHubIngestForm({
     } catch (error: any) {
       console.error('Error during web scraping:', error)
 
-      notifications.show({
-        id: 'error-notification',
-        withCloseButton: true,
-        closeButtonProps: { color: 'red' },
-        onClose: () => console.log('error unmounted'),
-        onOpen: () => console.log('error mounted'),
+      showToast({
+        title: 'Error during web scraping. Please try again.',
+        message: error.message,
+        type: 'error',
         autoClose: 12000,
-        title: (
-          <Text size={'lg'} className={`${montserrat_med.className}`}>
-            {'Error during web scraping. Please try again.'}
-          </Text>
-        ),
-        message: (
-          <Text className={`${montserrat_med.className} text-neutral-200`}>
-            {error.message}
-          </Text>
-        ),
-        color: 'red',
-        radius: 'lg',
-        icon: <IconAlertCircle aria-hidden="true" />,
-        className: 'my-notification-class',
-        style: {
-          backgroundColor: 'rgba(42,42,64,0.3)',
-          backdropFilter: 'blur(10px)',
-          borderLeft: '5px solid red',
-        },
-        withBorder: true,
-        loading: false,
       })
       throw error // Re-throw so handleIngest can update file status to 'error'
     }
@@ -382,7 +338,6 @@ export default function GitHubIngestForm({
           if (!isOpen) {
             setUrl('')
             setIsUrlValid(false)
-            setIsUrlUpdated(false)
             setMaxUrls('50')
           }
         }}
@@ -390,13 +345,13 @@ export default function GitHubIngestForm({
         <DialogTrigger
           tabIndex={0}
           nativeButton={false}
-          className="focus:bg-[--dashboard-background-dark]"
+          className="focus:bg-(--dashboard-background-dark)"
           render={
             <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
               style={{ height: '100%' }}
             >
-              <div className="-ml-2 mb-2 flex items-center justify-between">
+              <div className="mb-2 -ml-2 flex items-center justify-between">
                 <div className="flex items-center space-x-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full">
                     <IconBrandGithub className="h-8 w-8" aria-hidden="true" />
@@ -404,11 +359,11 @@ export default function GitHubIngestForm({
                   <Text className="text-xl font-semibold">GitHub</Text>
                 </div>
               </div>
-              <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
+              <Text className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content from GitHub repositories, including
                 documentation, code, and README files.
               </Text>
-              <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
+              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
                   size={16}
@@ -420,7 +375,7 @@ export default function GitHubIngestForm({
           }
         />
 
-        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto !rounded-2xl border-0 bg-[--modal] px-4 py-6 text-[--modal-text] sm:px-6">
+        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto rounded-2xl! border-0 bg-(--modal) px-4 py-6 text-(--modal-text) sm:px-6">
           <DialogHeader>
             <DialogTitle className="mb-4 text-left text-xl font-bold">
               Ingest GitHub Website
@@ -429,7 +384,7 @@ export default function GitHubIngestForm({
           <div className="">
             <div className="">
               <div>
-                <div className="break-words text-sm sm:text-base">
+                <div className="text-sm wrap-break-word sm:text-base">
                   <strong>For GitHub</strong>, just enter a URL like{' '}
                   <code className={classes.codeStyledText}>
                     github.com/USER/REPO
@@ -441,7 +396,7 @@ export default function GitHubIngestForm({
                       rel="noreferrer"
                       href={'https://github.com/langchain-ai/langchain'}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[--dashboard-button]"
+                      className="text-(--dashboard-button)"
                     >
                       https://github.com/langchain-ai/langchain
                     </Link>
@@ -486,7 +441,7 @@ export default function GitHubIngestForm({
             <Button
               onClick={handleIngest}
               disabled={!isUrlValid}
-              className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
+              className="h-11 w-full rounded-xl bg-(--dashboard-button) text-(--dashboard-button-foreground) transition-colors hover:bg-(--dashboard-button-hover) disabled:bg-(--background-faded) disabled:text-(--background-dark)"
             >
               Ingest the Website
             </Button>

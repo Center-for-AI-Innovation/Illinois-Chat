@@ -22,12 +22,10 @@ import {
   useMantineTheme,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
-import { notifications } from '@mantine/notifications'
 import {
   IconAlertTriangle,
   IconAlertTriangleFilled,
   IconBook,
-  IconCheck,
   IconChevronDown,
   IconExternalLink,
   IconInfoCircle,
@@ -67,6 +65,7 @@ import {
   type AnySupportedModel,
 } from '~/utils/modelProviders/LLMProvider'
 import { type AnthropicModel } from '~/utils/modelProviders/types/anthropic'
+import { showToast } from '~/utils/toastUtils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -128,45 +127,12 @@ export const showPromptToast = (
     Math.min(15000, message.length * durationPerChar),
   )
 
-  notifications.show({
-    withCloseButton: true,
-    autoClose: duration,
+  showToast({
     title: title,
     message: message,
-    icon:
-      icon ||
-      (isError ? (
-        <IconAlertTriangle aria-hidden="true" />
-      ) : (
-        <IconCheck aria-hidden="true" />
-      )),
-    styles: {
-      root: {
-        backgroundColor: 'var(--notification)', // Dark background to match the page
-        borderColor: isError ? '#E53935' : 'var(--notification-border)', // Red for errors,  for success
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderRadius: '8px', // Added rounded corners
-      },
-      title: {
-        color: 'var(--notification-title)', // White text for the title
-        fontWeight: 600,
-      },
-      description: {
-        color: 'var(--notification-message)', // Light gray text for the message
-      },
-      closeButton: {
-        color: 'var(--notification-title)', // White color for the close button
-        borderRadius: '4px', // Added rounded corners to close button
-        '&:hover': {
-          backgroundColor: 'rgba(255, 255, 255, 0.1)', // Subtle hover effect
-        },
-      },
-      icon: {
-        backgroundColor: 'transparent', // Transparent background for the icon
-        color: isError ? '#E53935' : 'var(--notification-title)', // Icon color matches the border
-      },
-    },
+    type: isError ? 'error' : 'success',
+    autoClose: duration,
+    ...(icon ? { icon } : {}),
   })
 }
 
@@ -202,43 +168,11 @@ export const showToastNotification = (
     Math.min(15000, message.length * durationPerChar),
   )
 
-  notifications.show({
-    withCloseButton: true,
-    autoClose: duration,
+  showToast({
     title: title,
     message: message,
-    icon: isError ? (
-      <IconAlertTriangle aria-hidden="true" />
-    ) : (
-      <IconCheck aria-hidden="true" />
-    ),
-    styles: {
-      root: {
-        backgroundColor: 'var(--notification)',
-        borderColor: isError ? '#E53935' : 'var(--notification-border)',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderRadius: '8px',
-      },
-      title: {
-        color: 'var(--notification-title)',
-        fontWeight: 600,
-      },
-      description: {
-        color: 'var(--notification-message)',
-      },
-      closeButton: {
-        color: 'var(--notification-title)',
-        borderRadius: '4px',
-        '&:hover': {
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        },
-      },
-      icon: {
-        backgroundColor: 'transparent',
-        color: isError ? '#E53935' : 'var(--notification-title)',
-      },
-    },
+    type: isError ? 'error' : 'success',
+    autoClose: duration,
   })
 }
 
@@ -490,6 +424,11 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     }
   }
 
+  // Remove every occurrence of a snippet from the prompt (String.replace only
+  // removes the first one).
+  const removeAllOccurrences = (text: string, snippet: string) =>
+    text.split(snippet).join('')
+
   // Update system prompt with toggle changes
   const updateSystemPrompt = (updatedFields: Partial<CourseMetadata>) => {
     let newPrompt = baseSystemPrompt
@@ -516,22 +455,17 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       }
     }
 
-    // Handle Disable citations prompt
+    // Handle Disable citations prompt. The prompt always reflects the current
+    // state of the toggle: exactly one of the two citation blocks is present,
+    // and flipping the switch swaps them.
     if (updatedFields.disableCitations !== undefined) {
-      if (updatedFields.disableCitations) {
-        if (!newPrompt.includes(CITATION_GUIDELINES_PROMPT)) {
-          newPrompt = newPrompt.replace(CITATION_GUIDELINES_PROMPT, '')
-        }
-        if (!newPrompt.includes(CITATION_DISABLED_PROMPT)) {
-          newPrompt += CITATION_DISABLED_PROMPT
-        }
-      } else {
-        if (!newPrompt.includes(CITATION_DISABLED_PROMPT)) {
-          newPrompt = newPrompt.replace(CITATION_DISABLED_PROMPT, '')
-        }
-        if (!newPrompt.includes(CITATION_GUIDELINES_PROMPT)) {
-          newPrompt += CITATION_GUIDELINES_PROMPT
-        }
+      const [remove, add] = updatedFields.disableCitations
+        ? [CITATION_GUIDELINES_PROMPT, CITATION_DISABLED_PROMPT]
+        : [CITATION_DISABLED_PROMPT, CITATION_GUIDELINES_PROMPT]
+
+      newPrompt = removeAllOccurrences(newPrompt, remove)
+      if (!newPrompt.includes(add)) {
+        newPrompt += add
       }
     }
 
@@ -966,7 +900,7 @@ CRITICAL: The optimized prompt must:
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Text className="text-[--foreground-faded]">Loading...</Text>
+        <Text className="text-(--foreground-faded)">Loading...</Text>
       </div>
     )
   }
@@ -976,7 +910,7 @@ CRITICAL: The optimized prompt must:
       <Flex direction={isSmallScreen || isEmbedded ? 'column' : 'row'}>
         {/* Left Side - Main Content */}
         <div
-          className={`min-h-full bg-[--background] ${
+          className={`min-h-full bg-(--background) ${
             isEmbedded ? 'w-full' : 'flex-[1_1_60%]'
           }`}
         >
@@ -985,14 +919,14 @@ CRITICAL: The optimized prompt must:
               <div className="flex items-center gap-2">
                 <Title
                   order={2}
-                  className={`${montserrat_heading.variable} font-montserratHeading text-lg text-[--foreground] sm:text-2xl`}
+                  className={`${montserrat_heading.variable} font-montserratHeading text-lg text-(--foreground) sm:text-2xl`}
                 >
                   Prompting
                 </Title>
-                <Text className="text-[--foreground]">/</Text>
+                <Text className="text-(--foreground)">/</Text>
                 <Title
                   order={3}
-                  className={`${montserrat_heading.variable} font-montserratHeading text-base text-[--illinois-orange] sm:text-xl`}
+                  className={`${montserrat_heading.variable} font-montserratHeading text-base text-(--illinois-orange) sm:text-xl`}
                 >
                   {project_name}
                 </Title>
@@ -1003,7 +937,7 @@ CRITICAL: The optimized prompt must:
           <div className={`${isEmbedded ? '' : 'p-4'}`}>
             {/* Prompt Engineering Guide */}
             <Paper
-              className="w-full rounded-xl bg-[--dashboard-background-faded] px-6"
+              className="w-full rounded-xl bg-(--dashboard-background-faded) px-6"
               p="md"
               sx={{
                 transition: 'all 0.2s ease',
@@ -1019,7 +953,7 @@ CRITICAL: The optimized prompt must:
                   cursor: 'pointer',
                   borderRadius: '8px',
                 }}
-                className="focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[--dashboard-button]"
+                className="focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--dashboard-button)"
                 onClick={() => setInsightsOpen(!insightsOpen)}
                 onKeyDown={(e: React.KeyboardEvent) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -1037,7 +971,7 @@ CRITICAL: The optimized prompt must:
                     }}
                   />
                   <Title
-                    className={`label ${montserrat_heading.variable} pl-1 pr-0 font-montserratHeading text-[--dashboard-foreground] md:pl-0 md:pr-2`}
+                    className={`py-2 ${montserrat_heading.variable} font-montserratHeading pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
                     order={4}
                   >
                     Prompt Engineering Guide
@@ -1058,10 +992,10 @@ CRITICAL: The optimized prompt must:
               </Flex>
 
               <Collapse in={insightsOpen} transitionDuration={200}>
-                <div className="mt-4 px-2 text-[--dashboard-foreground]">
+                <div className="mt-4 px-2 text-(--dashboard-foreground)">
                   <Text
                     size="md"
-                    className={`${montserrat_paragraph.variable} select-text font-montserratParagraph`}
+                    className={`${montserrat_paragraph.variable} font-montserratParagraph select-text`}
                   >
                     For additional insights and best practices on prompt
                     creation, please review:
@@ -1083,7 +1017,7 @@ CRITICAL: The optimized prompt must:
                     >
                       <List.Item>
                         <a
-                          className={`text-sm text-[--dashboard-button] transition-colors duration-200 hover:text-[--dashboard-button-hover] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          className={`text-sm text-(--dashboard-button) transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
                           href="https://platform.openai.com/docs/guides/prompt-engineering"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1103,7 +1037,7 @@ CRITICAL: The optimized prompt must:
                       </List.Item>
                       <List.Item>
                         <a
-                          className={`text-sm text-[--dashboard-button] transition-colors duration-200 hover:text-[--dashboard-button-hover] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          className={`text-sm text-(--dashboard-button) transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
                           href="https://docs.anthropic.com/claude/prompt-library"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1123,7 +1057,7 @@ CRITICAL: The optimized prompt must:
                       </List.Item>
                     </List>
                     <Text
-                      className={`label ${montserrat_paragraph.variable} inline-block select-text font-montserratParagraph`}
+                      className={`px-1 py-2 ${montserrat_paragraph.variable} font-montserratParagraph inline-block select-text`}
                       size="md"
                       style={{ marginTop: '1.5rem' }}
                     >
@@ -1132,7 +1066,7 @@ CRITICAL: The optimized prompt must:
                       role, tone, and behavior. Consider including:
                       <List
                         withPadding
-                        className="mt-2 text-[--dashboard-foreground]"
+                        className="mt-2 text-(--dashboard-foreground)"
                         spacing="xs"
                         icon={
                           <div
@@ -1179,7 +1113,7 @@ CRITICAL: The optimized prompt must:
                 <Flex justify="space-between" align="center" mb="md">
                   <Flex align="center" className="-mt-2 gap-4">
                     <Title
-                      className={`label ${montserrat_heading.variable} pl-1 pr-0 font-montserratHeading text-[--dashboard-foreground] md:pl-0 md:pr-2`}
+                      className={`py-2 ${montserrat_heading.variable} font-montserratHeading pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
                       order={4}
                     >
                       System Prompt
@@ -1447,7 +1381,7 @@ CRITICAL: The optimized prompt must:
                         <IconInfoCircle
                           size={18}
                           aria-hidden="true"
-                          className="text-[--foreground-faded] transition-colors duration-200 hover:text-[--foreground]"
+                          className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
                           style={{ cursor: 'pointer' }}
                         />
                       </div>
@@ -1467,7 +1401,7 @@ CRITICAL: The optimized prompt must:
                             <IconLayoutSidebarRight
                               stroke={2}
                               aria-hidden="true"
-                              className="text-[--foreground-faded] transition-colors duration-200 hover:text-[--foreground]"
+                              className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
                             />
                           </button>
                         </Tooltip>
@@ -1482,7 +1416,7 @@ CRITICAL: The optimized prompt must:
                             <IconLayoutSidebarRightExpand
                               stroke={2}
                               aria-hidden="true"
-                              className="text-[--foreground-faded] transition-colors duration-200 hover:text-[--foreground]"
+                              className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
                             />
                           </button>
                         </Tooltip>
@@ -1612,7 +1546,7 @@ CRITICAL: The optimized prompt must:
                   Optimized System Prompt
                 </Text>
               }
-              className={`${montserrat_heading.variable} rounded-xl font-montserratHeading`}
+              className={`${montserrat_heading.variable} font-montserratHeading rounded-xl`}
               centered
               radius="lg"
               styles={{
@@ -1742,10 +1676,10 @@ CRITICAL: The optimized prompt must:
 
             {/* Behavior Settings - shown inline when embedded */}
             {isEmbedded && (
-              <div className="mt-6 rounded-xl bg-[--dashboard-background-faded] p-4 sm:p-6">
+              <div className="mt-6 rounded-xl bg-(--dashboard-background-faded) p-4 sm:p-6">
                 <Title
                   order={4}
-                  className={`${montserrat_heading.variable} mb-4 font-montserratHeading text-[--foreground]`}
+                  className={`${montserrat_heading.variable} font-montserratHeading mb-4 text-(--foreground)`}
                 >
                   AI Behavior Settings
                 </Title>
@@ -2148,7 +2082,7 @@ CRITICAL: The optimized prompt must:
 
               <Flex align="center" style={{ paddingTop: '15px' }}>
                 <Title
-                  className={`label ${montserrat_heading.variable} mr-[8px] font-montserratHeading`}
+                  className={`px-1 py-2 ${montserrat_heading.variable} font-montserratHeading mr-[8px]`}
                   order={3}
                 >
                   AI Behavior Settings

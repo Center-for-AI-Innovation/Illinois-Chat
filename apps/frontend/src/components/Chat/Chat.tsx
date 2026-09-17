@@ -1,10 +1,6 @@
 // src/components/Chat/Chat.tsx
 import { Button, Text } from '@mantine/core'
-import {
-  IconAlertCircle,
-  IconArrowRight,
-  IconSettings,
-} from '@tabler/icons-react'
+import { IconArrowRight, IconSettings } from '@tabler/icons-react'
 import { useTranslation } from 'next-i18next/pages'
 import {
   type MutableRefObject,
@@ -51,13 +47,10 @@ interface Props {
   documentExists: boolean | null
 }
 
-import { notifications } from '@mantine/notifications'
 import type * as webllm from '@mlc-ai/web-llm'
-import { MLCEngine } from '@mlc-ai/web-llm'
 import { useQueryClient } from '@tanstack/react-query'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { motion } from 'framer-motion'
-import { Montserrat } from 'next/font/google'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
@@ -83,6 +76,7 @@ import ChatUI, {
   type WebllmModel,
   webLLMModels,
 } from '~/utils/modelProviders/WebLLM'
+import { waitForWebLLMEngine } from '~/utils/modelProviders/waitForWebLLMEngine'
 import {
   State,
   getOpenAIKey,
@@ -93,11 +87,7 @@ import {
 import { createLogConversationPayload } from '@/hooks/__internal__/conversation'
 import { useRunAgent } from '@/hooks/queries/useRunAgent'
 import { runServerAgentMode } from './runServerAgentMode'
-
-const montserrat_med = Montserrat({
-  weight: '500',
-  subsets: ['latin'],
-})
+import { showToast } from '~/utils/toastUtils'
 
 const DEFAULT_DOCUMENT_GROUP = {
   id: 'DocGroup-all',
@@ -129,7 +119,25 @@ export const Chat = memo(
       // /CS-125/dashboard --> CS-125
       return router.asPath.slice(1).split('/')[0] as string
     }
-    const [chat_ui] = useState(new ChatUI(new MLCEngine()))
+    const [chat_ui, setChatUi] = useState<ChatUI | null>(null)
+    // The send path can start while the dynamic import below is still in
+    // flight, holding a closure over a stale `null` chat_ui. This ref always
+    // points at the latest instance so waitForWebLLMEngine can see it resolve.
+    const chatUiRef = useRef<ChatUI | null>(null)
+
+    useEffect(() => {
+      let cancelled = false
+      import('@mlc-ai/web-llm').then(({ MLCEngine }) => {
+        if (!cancelled) {
+          const ui = new ChatUI(new MLCEngine())
+          chatUiRef.current = ui
+          setChatUi(ui)
+        }
+      })
+      return () => {
+        cancelled = true
+      }
+    }, [])
 
     const [inputContent, setInputContent] = useState<string>('')
 
@@ -193,6 +201,11 @@ export const Chat = memo(
 
     useEffect(() => {
       const loadModel = async () => {
+        // Wait for the dynamic import to construct chat_ui; this effect
+        // re-runs when it lands (chat_ui is a dependency). Without this guard
+        // the null instance dispatched a spurious loading-true/loading-false
+        // flash before the real load began.
+        if (!chat_ui) return
         if (selectedConversation?.model && !chat_ui.isModelLoading()) {
           homeDispatch({
             field: 'webLLMModelIdLoading',
@@ -742,23 +755,27 @@ export const Chat = memo(
                   (model) => model.name === selectedConversation.model.name,
                 )
               ) {
-                // WebLLM model handling remains the same
-                while (chat_ui.isModelLoading() === true) {
-                  await new Promise((resolve) => setTimeout(resolve, 10))
-                }
-                try {
-                  rewriteResponse = await chat_ui.runChatCompletion(
-                    queryRewriteBody,
-                    getCurrentPageName(),
-                    courseMetadata,
-                  )
-                } catch (error) {
-                  errorToast({
-                    title: 'Error running query rewrite',
-                    message:
-                      (error as Error).message ||
-                      'An unexpected error occurred',
-                  })
+                // Wait for the lazy import to construct the engine, then for
+                // model loading. On timeout, skip the rewrite — the send path
+                // below falls back to the original query.
+                const engine = await waitForWebLLMEngine(
+                  () => chatUiRef.current,
+                )
+                if (engine) {
+                  try {
+                    rewriteResponse = await engine.runChatCompletion(
+                      queryRewriteBody,
+                      getCurrentPageName(),
+                      courseMetadata,
+                    )
+                  } catch (error) {
+                    errorToast({
+                      title: 'Error running query rewrite',
+                      message:
+                        (error as Error).message ||
+                        'An unexpected error occurred',
+                    })
+                  }
                 }
               } else {
                 // Direct call to routeModelRequest instead of going through the API route
@@ -976,15 +993,13 @@ export const Chat = memo(
               updatedConversation,
               getOpenAIKey(llmProviders, courseMetadata, apiKey),
               courseName,
-              undefined,
-              llmProviders,
             )
             homeDispatch({ field: 'isRouting', value: false })
 
             if (uiucToolsToRun.length > 0) {
               homeDispatch({ field: 'isRunningTool', value: true })
 
-              // Execute N8N tools
+              // Execute Sim tools
               await handleToolCall(
                 uiucToolsToRun,
                 updatedConversation,
@@ -1047,12 +1062,23 @@ export const Chat = memo(
             (model) => model.name === selectedConversation.model.name,
           )
         ) {
-          // Is WebLLM model
-          while (chat_ui.isModelLoading() == true) {
-            await new Promise((resolve) => setTimeout(resolve, 10))
+          // Is WebLLM model. Wait for the lazy import to construct the
+          // engine, then for model loading; without the engine there is
+          // nothing to run against, so surface that instead of letting an
+          // undefined response flow into the stream handler.
+          const engine = await waitForWebLLMEngine(() => chatUiRef.current)
+          if (!engine) {
+            homeDispatch({ field: 'loading', value: false })
+            homeDispatch({ field: 'messageIsStreaming', value: false })
+            errorToast({
+              title: 'Model still initializing',
+              message:
+                'The on-device WebLLM engine has not finished initializing. Please try again in a moment.',
+            })
+            return
           }
           try {
-            response = await chat_ui.runChatCompletion(
+            response = await engine.runChatCompletion(
               finalChatBody,
               getCurrentPageName(),
               courseMetadata,
@@ -1792,7 +1818,7 @@ export const Chat = memo(
     const renderIntroductoryStatements = () => {
       return (
         <div className="chat_welcome xs:mx-2 mt-4 max-w-3xl gap-3 px-4 last:mb-2 sm:mx-4 md:mx-auto lg:mx-auto">
-          <div className="backdrop-filter-[blur(10px)] rounded-lg bg-[--welcome-background] p-6">
+          <div className="rounded-lg bg-(--welcome-background) p-6 backdrop-filter-[blur(10px)]">
             <Text
               className={`mb-2 text-lg ${montserrat_heading.variable} font-montserratHeading`}
               style={{ whiteSpace: 'pre-wrap' }}
@@ -1801,7 +1827,7 @@ export const Chat = memo(
                   courseMetadata?.course_intro_message
                     ?.replace(
                       /(https?:\/\/([^\s]+))/g,
-                      '<a href="https://$1" target="_blank" rel="noopener noreferrer" class="text-[--link] hover:underline hover:text-[--link-hover]">$2</a>',
+                      '<a href="https://$1" target="_blank" rel="noopener noreferrer" class="text-(--link) hover:underline hover:text-(--link-hover)">$2</a>',
                     )
                     ?.replace(
                       /href="https:\/\/(https?:\/\/)/g,
@@ -1811,7 +1837,7 @@ export const Chat = memo(
             />
 
             <h4
-              className={`text-md mb-2 text-[--welcome-foreground] ${montserrat_paragraph.variable} font-montserratParagraph`}
+              className={`text-md mb-2 text-(--welcome-foreground) ${montserrat_paragraph.variable} font-montserratParagraph`}
             >
               {getCurrentPageName() === 'cropwizard-2.0' && (
                 <CropwizardLicenseDisclaimer />
@@ -1828,7 +1854,7 @@ export const Chat = memo(
                     key={index}
                     role="button"
                     tabIndex={0}
-                    className="w-full rounded-lg hover:cursor-pointer hover:bg-[--welcome-button-hover] hover:text-[--background]"
+                    className="w-full rounded-lg hover:cursor-pointer hover:bg-(--welcome-button-hover) hover:text-(--background)"
                     onClick={() => {
                       setInputContent('') // First clear the input
                       setTimeout(() => {
@@ -1851,7 +1877,7 @@ export const Chat = memo(
                     <Button
                       variant="link"
                       tabIndex={-1}
-                      className={`text-md h-auto p-2 font-bold leading-relaxed text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph`}
+                      className={`text-md h-auto p-2 leading-relaxed font-bold text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph`}
                     >
                       <IconArrowRight
                         size={25}
@@ -1866,9 +1892,9 @@ export const Chat = memo(
           </div>
           <div
             // This is critical to keep the scrolling proper. We need padding below the messages for the chat bar to sit.
-            // className="h-[162px] bg-gradient-to-b from-[#1a1a2e] via-[#2A2A40] to-[#15162c]"
-            // className="h-[162px] bg-gradient-to-t from-transparent to-[rgba(14,14,21,0.4)]"
-            // className="h-[162px] bg-gradient-to-b dark:from-[#2e026d] dark:via-[#15162c] dark:to-[#15162c]"
+            // className="h-[162px] bg-linear-to-b from-[#1a1a2e] via-[#2A2A40] to-[#15162c]"
+            // className="h-[162px] bg-linear-to-t from-transparent to-[rgba(14,14,21,0.4)]"
+            // className="h-[162px] bg-linear-to-b dark:from-[#2e026d] dark:via-[#15162c] dark:to-[#15162c]"
             className="h-[162px]"
             ref={messagesEndRef}
           />
@@ -2062,31 +2088,31 @@ export const Chat = memo(
         </Head>
 
         <SourcesSidebarProvider>
-          <div className="overflow-wrap relative flex h-full w-full flex-col overflow-hidden bg-[--background] text-[--foreground]">
+          <div className="overflow-wrap relative flex h-full w-full flex-col overflow-hidden bg-(--background) text-(--foreground)">
             {/*
             <div className="justify-center" style={{ height: '40px' }}>
               <ChatNavbar bannerUrl={bannerUrl as string} isgpt4={true} />
             </div>
 */}
             {permission == 'edit' ? (
-              <div className="group absolute right-4 top-4 z-20">
+              <div className="group absolute top-4 right-4 z-20">
                 <button
                   aria-label="Admin Dashboard"
-                  className="rounded-md border border-[--dashboard-border] bg-transparent p-[.35rem] text-[--foreground] hover:border-[--dashboard-button] hover:bg-transparent hover:text-[--dashboard-button]"
+                  className="rounded-md border border-(--dashboard-border) bg-transparent p-[.35rem] text-(--foreground) hover:border-(--dashboard-button) hover:bg-transparent hover:text-(--dashboard-button)"
                   onClick={() => {
                     if (courseName) router.push(`/${courseName}/dashboard`)
                   }}
                 >
                   <IconSettings stroke={1.5} size={20} aria-hidden="true" />
                 </button>
-                <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded bg-[--background-faded] px-2 py-1 text-sm text-[--foreground] opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="pointer-events-none absolute top-full right-0 z-50 mt-2 rounded bg-(--background-faded) px-2 py-1 text-sm whitespace-nowrap text-(--foreground) opacity-0 transition-opacity group-hover:opacity-100">
                   Admin Dashboard
                 </div>
               </div>
             ) : null}
 
             <div
-              className="relative max-w-full flex-1 overflow-y-auto overflow-x-hidden pb-32"
+              className="relative max-w-full flex-1 overflow-x-hidden overflow-y-auto pb-32"
               tabIndex={0}
               role="region"
               aria-label="Chat messages"
@@ -2145,11 +2171,11 @@ export const Chat = memo(
                           loading,
                           selectedConversation,
                         ) && <ChatLoader />}
-                        {/*                          className="h-[162px] bg-gradient-to-t from-transparent to-[rgba(14,14,14,0.4)]"
+                        {/*                          className="h-[162px] bg-linear-to-t from-transparent to-[rgba(14,14,14,0.4)]"
 //safe to remove in the future- left here in case we want the gradient in dark mode (in light mode, it really sticks
  */}
                         <div
-                          className="h-[162px] bg-gradient-to-t from-transparent to-[var(--chat-background)]"
+                          className="h-[162px] bg-linear-to-t from-transparent to-(--chat-background)"
                           ref={messagesEndRef}
                         />
                       </>
@@ -2160,7 +2186,7 @@ export const Chat = memo(
             </div>
 
             {/* ChatInput moved outside scroll container and positioned at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 z-10">
+            <div className="absolute right-0 bottom-0 left-0 z-10">
               <ChatInput
                 stopConversationRef={stopConversationRef}
                 textareaRef={textareaRef}
@@ -2184,7 +2210,7 @@ export const Chat = memo(
                   return userId
                 })()}
                 courseName={courseName}
-                chat_ui={chat_ui}
+                chat_ui={chat_ui ?? undefined}
                 agentModeFeatureEnabled={
                   courseMetadata?.agent_mode_enabled === true
                 }
@@ -2205,39 +2231,10 @@ export function errorToast({
   title: string
   message: string
 }) {
-  notifications.show({
-    id: 'error-notification-reused',
-    withCloseButton: true,
-    closeButtonProps: { color: 'red' },
-    onClose: () => console.log('error unmounted'),
-    onOpen: () => console.log('error mounted'),
+  showToast({
+    title,
+    message,
+    type: 'error',
     autoClose: 12000,
-    title: (
-      <Text
-        size={'lg'}
-        className={`${montserrat_med.className} font-bold text-[--notification-title]`}
-      >
-        {title}
-      </Text>
-    ),
-    message: (
-      <Text
-        className={`${montserrat_med.className} text-[--notification-message]`}
-      >
-        {message}
-      </Text>
-    ),
-    color: '',
-    radius: 'lg',
-    icon: <IconAlertCircle color="#fff" aria-hidden="true" />,
-    className: 'my-notification-class',
-    style: {
-      backgroundColor: 'var(--notification)',
-      backdropFilter: 'blur(10px)',
-      borderColor: 'var(--notification-border)',
-      borderLeft: '5px solid var(--notification-highlight)',
-    },
-    withBorder: true,
-    loading: false,
   })
 }

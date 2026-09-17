@@ -1,5 +1,4 @@
 // Web Scrape
-import { notifications } from '@mantine/notifications'
 import {
   Button,
   Input,
@@ -14,7 +13,6 @@ import {
   List,
 } from '@mantine/core'
 import {
-  IconAlertCircle,
   IconHome,
   IconSitemap,
   IconSubtask,
@@ -28,12 +26,7 @@ import { useMediaQuery } from '@mantine/hooks'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { LoadingSpinner } from './LoadingSpinner'
-import { Montserrat } from 'next/font/google'
-
-const montserrat_med = Montserrat({
-  weight: '500',
-  subsets: ['latin'],
-})
+import { showToast } from '~/utils/toastUtils'
 
 interface WebScrapeProps {
   is_new_course: boolean
@@ -135,7 +128,7 @@ export const WebScrape = ({
       } else if (url.includes('ocw.mit.edu')) {
         data = downloadMITCourse(url, courseName, 'local_dir') // no await -- do in background
 
-        showToast()
+        showWebScrapeStartedToast()
       } else if (url.includes('canvas.illinois.edu/courses/')) {
         const response = await fetch('/api/UIUC-api/ingestCanvas', {
           method: 'POST',
@@ -195,18 +188,18 @@ export const WebScrape = ({
     if (!maxUrls) {
       errors.maxUrls = {
         error: true,
-        message: 'Please provide an input for Max URLs',
+        message: 'Please provide an input for Max Pages',
       }
     } else if (!/^\d+$/.test(maxUrls)) {
       // Using regex to ensure the entire string is a number
       errors.maxUrls = {
         error: true,
-        message: 'Max URLs should be a valid number',
+        message: 'Max Pages should be a valid number',
       }
     } else if (parseInt(maxUrls) < 1 || parseInt(maxUrls) > 500) {
       errors.maxUrls = {
         error: true,
-        message: 'Max URLs should be between 1 and 500',
+        message: 'Max Pages should be between 1 and 500',
       }
     }
 
@@ -214,42 +207,15 @@ export const WebScrape = ({
     return !Object.values(errors).some((error) => error.error)
   }
 
-  const showToast = () => {
-    return (
-      // docs: https://mantine.dev/others/notifications/
-
-      notifications.show({
-        id: 'web-scrape-toast',
-        withCloseButton: true,
-        onClose: () => console.log('unmounted'),
-        onOpen: () => console.log('mounted'),
-        autoClose: 15000,
-        // position="top-center",
-        title: 'Web scraping started',
-        message:
-          "It'll scrape in the background, just wait for the results to show up in your project (~3 minutes total).\nThis feature is stable but the web is a messy place. If you have trouble, I'd love to fix it. Just shoot me an email: rohan13@illinois.edu.",
-        icon: <IconWorldDownload />,
-        styles: {
-          root: {
-            backgroundColor: 'var(--modal-background)',
-            borderColor: 'var(--modal-border)',
-          },
-          title: {
-            color: 'var(--modal-text)',
-          },
-          description: {
-            color: 'var(--modal-text)',
-          },
-          closeButton: {
-            color: 'var(--modal-button)',
-            '&:hover': {
-              color: 'var(--modal-button-hover)',
-            },
-          },
-        },
-        loading: false,
-      })
-    )
+  const showWebScrapeStartedToast = () => {
+    showToast({
+      type: 'info',
+      autoClose: 15000,
+      title: 'Web scraping started',
+      message:
+        "It'll scrape in the background, just wait for the results to show up in your project (~3 minutes total).\nThis feature is stable but the web is a messy place. If you have trouble, I'd love to fix it. Just shoot me an email: rohan13@illinois.edu.",
+      icon: <IconWorldDownload size={16} />,
+    })
   }
 
   const scrapeWeb = async (
@@ -277,34 +243,11 @@ export const WebScrape = ({
     } catch (error: any) {
       console.error('Error during web scraping:', error)
 
-      notifications.show({
-        id: 'error-notification',
-        withCloseButton: true,
-        closeButtonProps: { color: 'red' },
-        onClose: () => console.log('error unmounted'),
-        onOpen: () => console.log('error mounted'),
+      showToast({
+        type: 'error',
         autoClose: 12000,
-        title: (
-          <Text size={'lg'} className={`${montserrat_med.className}`}>
-            {'Error during web scraping. Please try again.'}
-          </Text>
-        ),
-        message: (
-          <Text className={`${montserrat_med.className} text-neutral-200`}>
-            {error.message}
-          </Text>
-        ),
-        color: 'red',
-        radius: 'lg',
-        icon: <IconAlertCircle />,
-        className: 'my-notification-class',
-        style: {
-          backgroundColor: 'rgba(42,42,64,0.3)',
-          backdropFilter: 'blur(10px)',
-          borderLeft: '5px solid red',
-        },
-        withBorder: true,
-        loading: false,
+        title: 'Error during web scraping. Please try again.',
+        message: error.message,
       })
       throw error
     }
@@ -344,13 +287,13 @@ export const WebScrape = ({
     <>
       <Title
         order={3}
-        className={`w-full text-center ${montserrat_heading.variable} pt-4 font-montserratHeading`}
+        className={`w-full text-center ${montserrat_heading.variable} font-montserratHeading pt-4`}
       >
         OR
       </Title>
       <Title
         order={4}
-        className={`w-full text-center ${montserrat_heading.variable} mt-4 font-montserratHeading`}
+        className={`w-full text-center ${montserrat_heading.variable} font-montserratHeading mt-4`}
       >
         Web scrape any website that allows it
       </Title>
@@ -361,7 +304,7 @@ export const WebScrape = ({
             icon={icon}
             aria-label="Enter URL to scrape"
             // I can't figure out how to change the background colors.
-            className={`mt-4 w-[80%] min-w-[20rem] disabled:bg-[--background-faded] lg:w-[75%]`}
+            className={`mt-4 w-[80%] min-w-80 disabled:bg-(--background-faded) lg:w-[75%]`}
             // wrapperProps={{ borderRadius: 'xl' }}
             // styles={{ input: { backgroundColor: '#1A1B1E' } }}
             styles={{
@@ -435,13 +378,13 @@ export const WebScrape = ({
                 radius={'xl'}
                 className={`rounded-s-md ${
                   isUrlUpdated
-                    ? 'bg-[--dashboard-button]'
-                    : 'border-[--dashboard-button]'
-                } overflow-ellipsis text-ellipsis p-2 ${
+                    ? 'bg-(--dashboard-button)'
+                    : 'border-(--dashboard-button)'
+                } p-2 text-ellipsis ${
                   isUrlUpdated
-                    ? 'text-[--dashboard-button-foreground]'
-                    : 'text-[--dashboard-button-foreground]'
-                } min-w-[5rem] -translate-x-1 transform hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+                    ? 'text-(--dashboard-button-foreground)'
+                    : 'text-(--dashboard-button-foreground)'
+                } min-w-20 -translate-x-1 transform hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
                 w={`${isSmallScreen ? 'auto' : 'auto'}`}
                 disabled={isDisabled}
               >
@@ -476,7 +419,7 @@ export const WebScrape = ({
             icon={icon}
             aria-label="Enter URL to scrape"
             // I can't figure out how to change the background colors.
-            className={`mt-4 w-[80%] min-w-[20rem] disabled:bg-[--background-faded] lg:w-[75%]`}
+            className={`mt-4 w-[80%] min-w-80 disabled:bg-(--background-faded) lg:w-[75%]`}
             // wrapperProps={{ borderRadius: 'xl' }}
             // styles={{ input: { backgroundColor: '#1A1B1E' } }}
             styles={{
@@ -550,13 +493,13 @@ export const WebScrape = ({
                 radius={'xl'}
                 className={`rounded-s-md ${
                   isUrlUpdated
-                    ? 'bg-[--dashboard-button]'
-                    : 'border-[--dashboard-button]'
-                } overflow-ellipsis text-ellipsis p-2 ${
+                    ? 'bg-(--dashboard-button)'
+                    : 'border-(--dashboard-button)'
+                } p-2 text-ellipsis ${
                   isUrlUpdated
-                    ? 'text-[--dashboard-button-foreground]'
-                    : 'text-[--dashboard-button-foreground]'
-                } min-w-[5rem] -translate-x-1 transform hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+                    ? 'text-(--dashboard-button-foreground)'
+                    : 'text-(--dashboard-button-foreground)'
+                } min-w-20 -translate-x-1 transform hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
                 w={`${isSmallScreen ? 'auto' : 'auto'}`}
                 disabled={isDisabled}
               >
@@ -569,12 +512,12 @@ export const WebScrape = ({
           {/* Detailed web ingest form */}
 
           <form
-            className="w-[80%] min-w-[20rem] lg:w-[75%]"
+            className="w-[80%] min-w-80 lg:w-[75%]"
             onSubmit={(event) => {
               event.preventDefault()
             }}
           >
-            <div className="pb-2 pt-2">
+            <div className="pt-2 pb-2">
               <Tooltip
                 multiline
                 w={400}
@@ -590,12 +533,12 @@ export const WebScrape = ({
                     style={{ color: '#C1C2C5', fontSize: '16px' }}
                     className={`${montserrat_heading.variable} font-montserratHeading`}
                   >
-                    Max URLs (1 to 500)
+                    Max Pages (1 to 500)
                   </Text>
                   <TextInput
                     styles={{ input: { backgroundColor: '#1A1B1E' } }}
                     name="maximumUrls"
-                    aria-label="Max URLs (1 to 500)"
+                    aria-label="Max Pages (1 to 500)"
                     radius="md"
                     placeholder="Default 50"
                     value={maxUrls}
@@ -643,7 +586,7 @@ export const WebScrape = ({
                       For more detail{' '}
                       <a
                         className={
-                          'text-[--dashboard-button] hover:text-[--dashboard-button-hover]'
+                          'text-(--dashboard-button) hover:text-(--dashboard-button-hover)'
                         }
                         href="https://docs.uiuc.chat/features/web-crawling-details"
                         target="_blank"

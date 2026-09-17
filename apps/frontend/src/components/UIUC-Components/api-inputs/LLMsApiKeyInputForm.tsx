@@ -11,13 +11,7 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import {
-  IconAlertCircle,
-  IconAlertTriangleFilled,
-  IconCheck,
-  IconX,
-} from '@tabler/icons-react'
+import { IconAlertTriangleFilled, IconX } from '@tabler/icons-react'
 import {
   type CountryOfConcern,
   getCountryOfConcern,
@@ -57,6 +51,7 @@ import {
   type WebLLMProvider,
 } from '~/utils/modelProviders/LLMProvider'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
+import { showToast } from '~/utils/toastUtils'
 import { Skeleton } from '@/components/shadcn/ui/skeleton'
 import { GetCurrentPageName } from '../CanViewOnlyCourse'
 import { CountryOfConcernModal } from './CountryOfConcernModal'
@@ -142,7 +137,7 @@ export const APIKeyInput = ({
             field.form.handleSubmit()
           }}
           type="submit"
-          className="text-[--foreground-faded] hover:bg-[--dashboard-button] hover:text-[--dashboard-button-foreground] hover:text-[white]"
+          className="text-(--foreground-faded) hover:bg-(--dashboard-button) hover:text-(--dashboard-button-foreground) hover:text-[white]"
           style={{ marginLeft: '8px' }}
         >
           <IconX size={12} aria-hidden="true" />
@@ -165,7 +160,7 @@ export const APIKeyInput = ({
         <div>
           <Button
             compact
-            className="bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover]"
+            className="bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover)"
             onClick={() => {
               field.form.handleSubmit()
             }}
@@ -250,7 +245,7 @@ const NewModelDropdown: React.FC<{
         Select default model
       </label>
       <Select
-        className="menu z-[30] w-full"
+        className="z-30 flex w-full flex-col flex-wrap p-2 text-sm"
         size="md"
         aria-label="Select default model"
         aria-labelledby="default-model-label"
@@ -732,17 +727,17 @@ export default function APIKeyInputForm({
       >
         <div>
           {/* Default Model Section */}
-          <div className="rounded-lg border border-[--dashboard-border] bg-[--dashboard-sidebar-background] p-4">
-            <h4 className="text-lg font-bold text-[--foreground]">
+          <div className="rounded-lg border border-(--dashboard-border) bg-(--dashboard-sidebar-background) p-4">
+            <h4 className="text-lg font-bold text-(--foreground)">
               Default Model
             </h4>
-            <p className="mb-3 text-sm text-[--foreground-faded]">
+            <p className="mb-3 text-sm text-(--foreground-faded)">
               Choose the default model for your chatbot. Users can still
               override this default.
             </p>
             <div className="flex justify-center">
               {isLoadingLLMProviders ? (
-                <Skeleton className="h-10 w-full rounded-md bg-[--dashboard-background-faded]" />
+                <Skeleton className="h-10 w-full rounded-md bg-(--dashboard-background-faded)" />
               ) : llmProviders ? (
                 <NewModelDropdown
                   value={findDefaultModel(llmProviders) as AnySupportedModel}
@@ -769,10 +764,10 @@ export default function APIKeyInputForm({
           </div>
 
           {/* Open source LLMs */}
-          <h4 className="mt-6 text-lg font-bold text-[--foreground]">
+          <h4 className="mt-6 text-lg font-bold text-(--foreground)">
             Open source LLMs
           </h4>
-          <p className="mb-3 text-sm text-[--foreground-faded]">
+          <p className="mb-3 text-sm text-(--foreground-faded)">
             Your weights, your rules.
           </p>
           <Flex
@@ -805,10 +800,10 @@ export default function APIKeyInputForm({
             />
           </Flex>
 
-          <h4 className="mt-6 text-lg font-bold text-[--foreground]">
+          <h4 className="mt-6 text-lg font-bold text-(--foreground)">
             Closed source LLMs
           </h4>
-          <p className="mb-3 text-sm text-[--foreground-faded]">
+          <p className="mb-3 text-sm text-(--foreground-faded)">
             The best performers, but you gotta pay their prices and follow their
             rules.
           </p>
@@ -879,7 +874,7 @@ export default function APIKeyInputForm({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main min-w-screen flex min-h-screen flex-col items-center"
+        className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
         <h1 className="sr-only">{projectName} — LLMs — Illinois Chat</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
@@ -901,9 +896,9 @@ export default function APIKeyInputForm({
                 <div
                   style={{
                     border: 'None',
-                    color: 'text-[--foreground]',
+                    color: 'text-(--foreground)',
                   }}
-                  className="min-h-full flex-[1_1_100%] bg-[--background] md:flex-[1_1_70%]"
+                  className="min-h-full flex-[1_1_100%] bg-(--background) md:flex-[1_1_70%]"
                 >
                   <Flex
                     gap="md"
@@ -915,13 +910,13 @@ export default function APIKeyInputForm({
                     <Title
                       order={2}
                       align="left"
-                      className={`pl-4 pr-2 pt-4 ${montserrat_heading.variable} font-montserratHeading text-[--foreground]`}
+                      className={`pt-4 pr-2 pl-4 ${montserrat_heading.variable} font-montserratHeading text-(--foreground)`}
                     >
                       {/* API Keys: Add LLMs to your Chatbot */}
                       Configure LLM Providers for your Chatbot
                     </Title>
                     <Title
-                      className={`${montserrat_heading.variable} flex-[1_1_50%] font-montserratHeading text-[--foreground]`}
+                      className={`${montserrat_heading.variable} font-montserratHeading flex-[1_1_50%] text-(--foreground)`}
                       order={3}
                       px={18}
                       ml={'md'}
@@ -949,13 +944,13 @@ export default function APIKeyInputForm({
                         >
                           <>
                             <Title
-                              className={`${montserrat_heading.variable} mt-4 font-montserratHeading text-[--foreground]`}
+                              className={`${montserrat_heading.variable} font-montserratHeading mt-4 text-(--foreground)`}
                               order={3}
                             >
                               Closed source LLMs
                             </Title>
                             <Text
-                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-[--foreground-faded]`}
+                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground-faded)`}
                               size="md"
                             >
                               The best performers, but you gotta pay their
@@ -1019,13 +1014,13 @@ export default function APIKeyInputForm({
                               />
                             </Flex>
                             <Title
-                              className={`-mb-3 ${montserrat_heading.variable} mt-4 font-montserratHeading text-[--foreground]`}
+                              className={`-mb-3 ${montserrat_heading.variable} font-montserratHeading mt-4 text-(--foreground)`}
                               order={3}
                             >
                               Open source LLMs
                             </Title>
                             <Text
-                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-[--foreground-faded]`}
+                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground-faded)`}
                               size="md"
                             >
                               Your weights, your rules.
@@ -1086,11 +1081,11 @@ export default function APIKeyInputForm({
                       : '1px solid var(--dashboard-border)',
                   }}
                 >
-                  <div className="card flex h-full flex-col justify-center">
-                    <div className="card-body" style={{ padding: '.5rem' }}>
+                  <div className="flex h-full flex-col justify-center">
+                    <div className="flex flex-auto flex-col gap-2 p-2">
                       <div className="pb-4">
                         <Title
-                          className={`label ${montserrat_heading.variable} font-montserratHeading`}
+                          className={`px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
                           order={3}
                         >
                           Default Model
@@ -1107,7 +1102,7 @@ export default function APIKeyInputForm({
                         <br />
                         <div className="flex justify-center">
                           {isLoadingLLMProviders ? (
-                            <Skeleton className="h-10 w-full rounded-md bg-[--dashboard-background-faded]" />
+                            <Skeleton className="h-10 w-full rounded-md bg-(--dashboard-background-faded)" />
                           ) : llmProviders ? (
                             <NewModelDropdown
                               value={
@@ -1268,46 +1263,11 @@ export const showConfirmationToast = ({
   isError?: boolean
   autoClose?: number
 }) => {
-  notifications.show({
-    id: 'success-toast',
-    withCloseButton: true,
-    onClose: () => console.log('unmounted'),
-    onOpen: () => console.log('mounted'),
-    autoClose: autoClose,
+  showToast({
     title: title,
     message: message,
-    color: isError ? 'red' : 'green',
-    radius: 'lg',
-    icon: isError ? <IconAlertCircle /> : <IconCheck />,
-    className: 'my-notification-class',
-    styles: {
-      root: {
-        backgroundColor: 'var(--notification)', // Dark background to match the page
-        borderColor: isError ? '#E53935' : 'var(--notification-border)', // Red for errors,  for success
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderRadius: '8px', // Added rounded corners
-      },
-      title: {
-        color: 'var(--notification-title)', // White text for the title
-        fontWeight: 600,
-      },
-      description: {
-        color: 'var(--notification-message)', // Light gray text for the message
-      },
-      closeButton: {
-        color: 'var(--notification-title)', // White color for the close button
-        borderRadius: '4px', // Added rounded corners to close button
-        '&:hover': {
-          backgroundColor: 'rgba(255, 255, 255, 0.1)', // Subtle hover effect
-        },
-      },
-      icon: {
-        backgroundColor: 'transparent', // Transparent background for the icon
-        color: isError ? '#E53935' : 'var(--notification-title)', // Icon color matches the border
-      },
-    },
-    loading: false,
+    type: isError ? 'error' : 'success',
+    autoClose: autoClose,
   })
 }
 ModelItem.displayName = 'ModelItem'

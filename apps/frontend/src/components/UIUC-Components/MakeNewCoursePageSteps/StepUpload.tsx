@@ -16,12 +16,14 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 
 interface StepUploadProps {
   project_name: string
+  uploadFiles: FileUpload[]
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   courseMetadata?: CourseMetadata
 }
 
 const StepUpload = ({
   project_name,
+  uploadFiles,
   setUploadFiles,
   courseMetadata,
 }: StepUploadProps) => {
@@ -62,7 +64,7 @@ const StepUpload = ({
         {/* step content - core step information */}
         <div className="step_content">
           {/* Import section */}
-          <h3 className="mb-3 mt-6 text-base font-semibold text-[--foreground]">
+          <h3 className="mt-6 mb-3 text-base font-semibold text-(--foreground)">
             Import from URLs & Platforms
           </h3>
           <SimpleGrid
@@ -81,12 +83,14 @@ const StepUpload = ({
 
             <WebsiteIngestForm
               project_name={project_name}
+              uploadFiles={uploadFiles}
               setUploadFiles={setUploadFiles}
               queryClient={queryClient}
             />
 
             <GitHubIngestForm
               project_name={project_name}
+              uploadFiles={uploadFiles}
               setUploadFiles={setUploadFiles}
               queryClient={queryClient}
             />
@@ -101,16 +105,17 @@ const StepUpload = ({
           </SimpleGrid>
 
           {/* Upload section */}
-          <h3 className="mb-3 mt-6 text-base font-semibold text-[--foreground]">
+          <h3 className="mt-6 mb-3 text-base font-semibold text-(--foreground)">
             Upload Files
           </h3>
           <LargeDropzone
             courseName={project_name}
             current_user_email={auth.user?.profile.email || ''}
-            redirect_to_gpt_4={false}
             isDisabled={false}
             is_new_course={false}
+            uploadFiles={uploadFiles}
             setUploadFiles={setUploadFiles}
+            queryClient={queryClient}
             courseMetadata={courseMetadata || defaultMetadata}
             auth={auth}
           />

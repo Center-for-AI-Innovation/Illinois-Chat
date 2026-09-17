@@ -18,6 +18,7 @@
 * [CropWizard](cropwizard/README.md)
   * [CropWizard Documents](cropwizard/cropwizard-documents.md)
   * [Pest Detection Tool](cropwizard/pest-detection-tool.md)
+  * [Seasonal Characterization Tool (SCE)](cropwizard/seasonal-characterization-tool.md)
   * [CropWizard Document License Information](cropwizard/cropwizard-document-license-information.md)
 
 ## API
@@ -34,6 +35,7 @@
 
 * [Developer Quickstart](developers/developer-quickstart.md)
 * [External Connections Config](developers/external-connections-config.md)
+* [Lightweight Ingest via the HTTP Bridge](developers/lightweight-ingest-bridge.md)
 
 ## MIGRATION
 

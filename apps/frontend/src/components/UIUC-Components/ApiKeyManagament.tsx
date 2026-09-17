@@ -12,7 +12,6 @@ import {
   useMantineTheme,
 } from '@mantine/core'
 import { useClipboard, useMediaQuery } from '@mantine/hooks'
-import { showNotification } from '@mantine/notifications'
 import {
   IconBook,
   IconCheck,
@@ -25,6 +24,7 @@ import { useEffect, useState } from 'react'
 import { type AuthContextProps } from 'react-oidc-context'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
+import { showErrorToast, showSuccessToast } from '~/utils/toastUtils'
 import APIRequestBuilder from './APIRequestBuilder'
 
 const ApiKeyManagement = ({
@@ -197,11 +197,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
         const data = await response.json()
         setApiKey(data.apiKey)
       } else {
-        showNotification({
-          title: 'Error',
-          message: 'Failed to fetch API key.',
-          color: 'red',
-        })
+        showErrorToast('Failed to fetch API key.', 'Error')
       }
       setLoading(false)
     }
@@ -223,16 +219,9 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
     if (response.ok) {
       const data = await response.json()
       setApiKey(data.apiKey)
-      showNotification({
-        title: 'Success',
-        message: 'API key generated successfully.',
-      })
+      showSuccessToast('API key generated successfully.', 'Success')
     } else {
-      showNotification({
-        title: 'Error',
-        message: 'Failed to generate API key.',
-        color: 'red',
-      })
+      showErrorToast('Failed to generate API key.', 'Error')
     }
   }
 
@@ -247,16 +236,9 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
     if (response.ok) {
       const data = await response.json()
       setApiKey(data.newApiKey)
-      showNotification({
-        title: 'Success',
-        message: 'API key rotated successfully.',
-      })
+      showSuccessToast('API key rotated successfully.', 'Success')
     } else {
-      showNotification({
-        title: 'Error',
-        message: 'Failed to rotate API key.',
-        color: 'red',
-      })
+      showErrorToast('Failed to rotate API key.', 'Error')
     }
   }
 
@@ -270,16 +252,9 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
 
     if (response.ok) {
       setApiKey(null)
-      showNotification({
-        title: 'Success',
-        message: 'API key deleted successfully.',
-      })
+      showSuccessToast('API key deleted successfully.', 'Success')
     } else {
-      showNotification({
-        title: 'Error',
-        message: 'Failed to delete API key.',
-        color: 'red',
-      })
+      showErrorToast('Failed to delete API key.', 'Error')
     }
   }
 
@@ -319,11 +294,11 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
             border: 'None',
             color: 'white',
           }}
-          className="min-h-full bg-[--background] text-[--foreground]"
+          className="min-h-full bg-(--background) text-(--foreground)"
         >
           <div className="w-full border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4 md:px-8">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-[--dashboard-foreground]">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-(--dashboard-foreground)">
                 <Title
                   order={2}
                   className={`${montserrat_heading.variable} font-montserratHeading text-lg sm:text-2xl`}
@@ -335,7 +310,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                   order={3}
                   className={`${
                     montserrat_heading.variable
-                  } min-w-0 font-montserratHeading text-base text-[--illinois-orange] sm:text-xl ${
+                  } font-montserratHeading min-w-0 text-base text-(--illinois-orange) sm:text-xl ${
                     course_name.length > 40
                       ? 'max-w-[120px] truncate sm:max-w-[300px] lg:max-w-[400px]'
                       : ''
@@ -354,7 +329,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
             }}
             className="min-h-full justify-center"
           >
-            <div className="card flex h-full flex-col">
+            <div className="flex h-full flex-col">
               <Group
                 m="1rem"
                 align="start"
@@ -367,7 +342,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                 }}
               >
                 <Paper
-                  className="w-full rounded-xl bg-[--dashboard-background-faded] px-4 sm:px-6 md:px-8"
+                  className="w-full rounded-xl bg-(--dashboard-background-faded) px-4 sm:px-6 md:px-8"
                   p="md"
                   sx={{
                     transition: 'all 0.2s ease',
@@ -384,7 +359,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                       padding: '4px 8px',
                       borderRadius: '8px',
                     }}
-                    className="focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[--dashboard-button]"
+                    className="focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--dashboard-button)"
                     onClick={() => setInsightsOpen(!insightsOpen)}
                     onKeyDown={(e: React.KeyboardEvent) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -404,7 +379,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                       <Text
                         size="md"
                         weight={600}
-                        className={`${montserrat_paragraph.variable} select-text font-montserratParagraph text-[--dashboard-foreground]`}
+                        className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground) select-text`}
                       >
                         API Documentation
                       </Text>
@@ -426,10 +401,10 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                   </Flex>
 
                   <Collapse in={insightsOpen} transitionDuration={200}>
-                    <div className="mt-4 px-2 text-[--dashboard-foreground]">
+                    <div className="mt-4 px-2 text-(--dashboard-foreground)">
                       <Text
                         size="md"
-                        className={`${montserrat_paragraph.variable} select-text font-montserratParagraph`}
+                        className={`${montserrat_paragraph.variable} font-montserratParagraph select-text`}
                       >
                         This API is <i>stateless</i>, meaning each request is
                         independent of others. For multi-turn conversations,
@@ -453,7 +428,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                         >
                           <List.Item>
                             <a
-                              className={`text-sm text-[--dashboard-button] underline transition-colors duration-200 hover:text-[--dashboard-button-hover] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                              className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
                               href="https://platform.openai.com/docs/api-reference/chat/create"
                               target="_blank"
                               rel="noopener noreferrer"
@@ -470,7 +445,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                           </List.Item>
                           <List.Item>
                             <a
-                              className={`text-sm text-[--dashboard-button] underline transition-colors duration-200 hover:text-[--dashboard-button-hover] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                              className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
                               href="https://docs.uiuc.chat/api/endpoints"
                               target="_blank"
                               rel="noopener noreferrer"
@@ -487,7 +462,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                           </List.Item>
                         </List>
                         <Title
-                          className={`label ${montserrat_paragraph.variable} inline-block select-text font-montserratParagraph`}
+                          className={`px-1 py-2 ${montserrat_paragraph.variable} font-montserratParagraph inline-block select-text`}
                           size="md"
                           order={4}
                           style={{ marginTop: '1.5rem' }}
@@ -496,7 +471,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                         </Title>
                         <List
                           withPadding
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph text-[--dashboard-foreground]`}
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground)`}
                           spacing="xs"
                         >
                           <List.Item>
@@ -555,10 +530,10 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
               : '1px solid var(--dashboard-border)',
           }}
         >
-          <div className="card flex h-full flex-col">
+          <div className="flex h-full flex-col">
             <div className="flex w-full flex-col items-center px-3 pt-12">
               <Title
-                className={`label ${montserrat_heading.variable} font-montserratHeading`}
+                className={`px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
                 order={2}
                 style={{ marginBottom: '1rem' }}
               >
@@ -568,7 +543,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                 <Input
                   value={apiKey}
                   aria-label="Your API Key"
-                  className={`${montserrat_paragraph.variable} mt-4 w-full font-montserratParagraph`}
+                  className={`${montserrat_paragraph.variable} font-montserratParagraph mt-4 w-full`}
                   radius={'md'}
                   size={'md'}
                   readOnly
@@ -579,7 +554,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                       variant="subtle"
                       size="sm"
                       radius={'md'}
-                      className="min-w-[5rem] -translate-x-1 transform rounded-s-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                      className="min-w-20 -translate-x-1 transform rounded-s-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
                     >
                       {copiedApiKey ? (
                         <IconCheck aria-hidden="true" />
@@ -615,7 +590,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                 disabled={loading || apiKey !== null}
                 size="lg"
                 radius={'xl'}
-                className="min-w-[5rem] self-center rounded-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                className="min-w-20 self-center rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
                 // w={'60%'}
               >
                 Generate API Key
@@ -635,7 +610,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                     disabled={loading || apiKey === null}
                     size="md"
                     radius={'xl'}
-                    className="min-w-[5rem] rounded-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                    className="min-w-20 rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
                     w={'auto'}
                   >
                     Rotate API Key
@@ -645,7 +620,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                     disabled={loading || apiKey === null}
                     size="md"
                     radius={'xl'}
-                    className="min-w-[5rem] rounded-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+                    className="min-w-20 rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
                     w={'auto'}
                   >
                     Delete API Key

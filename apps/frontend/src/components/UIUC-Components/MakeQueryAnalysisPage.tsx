@@ -58,7 +58,7 @@ const useStyles = createStyles((theme: MantineTheme) => ({
     cursor: 'pointer',
     transition: 'background-color 0.2s ease-in-out',
     height: '48px',
-    /* border-1 border-[--dashboard-button] hover:bg-[--dashboard-button-hover] hover:border-[--dashboard-button-hover] */
+    /* border border-(--dashboard-button) hover:bg-(--dashboard-button-hover) hover:border-(--dashboard-button-hover) */
 
     '&:hover': {
       color: 'var(--dashboard-button-foreground)',
@@ -438,14 +438,14 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="course-page-main min-w-screen flex min-h-screen flex-col items-center"
+          className="course-page-main flex min-h-screen w-full flex-col items-center"
         >
           <h1 className="sr-only">{course_name} Analytics</h1>
           <div className="items-left flex w-full flex-col justify-center py-0">
             <Flex direction="column" align="center" w="100%">
               <div className="pt-5"></div>
               <div
-                className="w-[96%] rounded-3xl bg-[--background] md:w-full 2xl:w-[95%]"
+                className="w-[96%] rounded-3xl bg-(--background) md:w-full 2xl:w-[95%]"
                 style={{
                   // width: '98%',
                   display: 'flex',
@@ -466,13 +466,13 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   <Title
                     order={3}
                     align="left"
-                    className={`px-4 text-[--dashboard-foreground] ${montserrat_heading.variable} font-montserratHeading`}
+                    className={`px-4 text-(--dashboard-foreground) ${montserrat_heading.variable} font-montserratHeading`}
                     style={{ flexGrow: 2 }}
                   >
                     Usage Overview
                   </Title>
                   <Button
-                    className={`${montserrat_paragraph.variable} font-montserratParagraph ${classes.downloadButton} w-full bg-[--dashboard-button] px-2 text-sm hover:bg-[--dashboard-button-hover] sm:w-auto sm:px-4 sm:text-base`}
+                    className={`${montserrat_paragraph.variable} font-montserratParagraph ${classes.downloadButton} w-full bg-(--dashboard-button) px-2 text-sm hover:bg-(--dashboard-button-hover) sm:w-auto sm:px-4 sm:text-base`}
                     rightIcon={
                       isLoading ? (
                         <LoadingSpinner size="sm" />
@@ -493,7 +493,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                 </div>
 
                 {/* Project Analytics Dashboard - Using all-time stats */}
-                <div className="my-6 w-[95%] rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground]">
+                <div className="my-6 w-[95%] rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground)">
                   <div className="mb-6">
                     <Title
                       order={4}
@@ -513,7 +513,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   {/* Main Stats Grid with Integrated Weekly Trends */}
                   <div className={`grid gap-6 ${statsGridClasses}`}>
                     {/* Conversations Card */}
-                    <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
                           <Text size="sm" weight={500} mb={1}>
@@ -526,10 +526,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                             All-time chat sessions
                           </Text>
                         </div>
-                        <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                        <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                           <IconMessageCircle2
                             size={24}
-                            className="text-[--dashboard-stat]"
+                            className="text-(--dashboard-stat)"
                             aria-hidden="true"
                           />
                         </div>
@@ -539,7 +539,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                           <Text
                             size="xl"
                             weight={700}
-                            className="flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
+                            className="flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-white"
                           >
                             {courseStats?.total_conversations?.toLocaleString() ||
                               '0'}
@@ -605,7 +605,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     </div>
 
                     {/* Users Card */}
-                    <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
                           <Text size="sm" weight={500} mb={1}>
@@ -618,10 +618,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                             All-time unique participants
                           </Text>
                         </div>
-                        <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                        <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                           <IconUsers
                             size={24}
-                            className="text-[--dashboard-stat]"
+                            className="text-(--dashboard-stat)"
                             aria-hidden="true"
                           />
                         </div>
@@ -631,7 +631,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                           <Text
                             size="xl"
                             weight={700}
-                            className="flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
+                            className="flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-white"
                           >
                             {courseStats?.total_users?.toLocaleString() || '0'}
                           </Text>
@@ -695,7 +695,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     </div>
 
                     {/* Messages Card */}
-                    <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
                           <Text size="sm" weight={500} mb={1}>
@@ -708,10 +708,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                             Total exchanges
                           </Text>
                         </div>
-                        <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                        <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                           <IconMessage2
                             size={24}
-                            className="text-[--dashboard-stat]"
+                            className="text-(--dashboard-stat)"
                             aria-hidden="true"
                           />
                         </div>
@@ -721,7 +721,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                           <Text
                             size="xl"
                             weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
+                            className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-white"
                           >
                             {courseStats?.total_messages?.toLocaleString() ||
                               '0'}
@@ -810,7 +810,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
 
                     <div className={`grid gap-6 ${statsGridClasses}`}>
                       {/* Average Conversations per User */}
-                      <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-3 flex items-center justify-between">
                           <div>
                             <Text size="sm" weight={500} mb={1}>
@@ -823,10 +823,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                               Average engagement frequency
                             </Text>
                           </div>
-                          <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                          <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                             <IconMessageCircle2
                               size={24}
-                              className="text-[--dashboard-stat]"
+                              className="text-(--dashboard-stat)"
                               aria-hidden="true"
                             />
                           </div>
@@ -835,7 +835,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                           <Text
                             size="xl"
                             weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
+                            className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-white"
                           >
                             {courseStats?.avg_conversations_per_user?.toFixed(
                               1,
@@ -851,7 +851,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Average Messages per User */}
-                      <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-3 flex items-center justify-between">
                           <div>
                             <Text size="sm" weight={500} mb={1}>
@@ -864,10 +864,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                               Average interaction depth
                             </Text>
                           </div>
-                          <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                          <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                             <IconMessage2
                               size={24}
-                              className="text-[--dashboard-stat]"
+                              className="text-(--dashboard-stat)"
                               aria-hidden="true"
                             />
                           </div>
@@ -876,7 +876,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                           <Text
                             size="xl"
                             weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
+                            className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-white"
                           >
                             {courseStats?.avg_messages_per_user?.toFixed(1) ||
                               '0'}
@@ -891,7 +891,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Average Messages per Conversation */}
-                      <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-3 flex items-center justify-between">
                           <div>
                             <Text size="sm" weight={500} mb={1}>
@@ -904,10 +904,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                               Average conversation length
                             </Text>
                           </div>
-                          <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                          <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                             <IconChartBar
                               size={24}
-                              className="text-[--dashboard-stat]"
+                              className="text-(--dashboard-stat)"
                               aria-hidden="true"
                             />
                           </div>
@@ -916,7 +916,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                           <Text
                             size="xl"
                             weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
+                            className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-white"
                           >
                             {courseStats?.avg_messages_per_conversation?.toFixed(
                               1,
@@ -937,7 +937,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                 {/* Charts Section - Using filtered stats */}
                 <div className="grid w-[95%] grid-cols-1 gap-6 pb-10 lg:grid-cols-2">
                   {/* Date Range Selector - Always visible */}
-                  <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200 lg:col-span-2">
+                  <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200 lg:col-span-2">
                     <div className="flex items-center justify-between">
                       <div>
                         <Title order={4}>Conversation Visualizations</Title>
@@ -1083,7 +1083,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   </div>
 
                   {!hasConversationData ? (
-                    <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
                       <Title
                         order={4}
                         className={`${montserrat_heading.variable} font-montserratHeading`}
@@ -1098,7 +1098,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   ) : (
                     <>
                       {/* Model Usage Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
                         <Title order={4} mb="md" align="left">
                           Model Usage Distribution
                         </Title>
@@ -1114,7 +1114,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Conversations Per Day Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
                         <Title order={4} mb="md" align="left">
                           Conversations Per Day
                         </Title>
@@ -1130,7 +1130,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Combined Hour/Weekday Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-4 flex items-center justify-between">
                           <div>
                             <Title order={4}>
@@ -1204,7 +1204,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Heatmap Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
                         <Title order={4} mb="md" align="left">
                           Conversations Per Day and Hour
                         </Title>
@@ -1234,14 +1234,13 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   )
 }
 
-import { IconCheck, IconCloudDownload } from '@tabler/icons-react'
+import { IconCloudDownload } from '@tabler/icons-react'
 
-import { notifications } from '@mantine/notifications'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { showToast } from '~/utils/toastUtils'
 import { CannotEditCourse } from './CannotEditCourse'
 import GlobalFooter from './GlobalFooter'
 
-import Link from 'next/link'
 import NomicDocumentMap from './NomicDocumentsMap'
 
 async function fetchCourseMetadata(course_name: string) {
@@ -1279,46 +1278,14 @@ async function fetchCourseMetadata(course_name: string) {
 }
 
 const showToastOnFileDeleted = (theme: MantineTheme, was_error = false) => {
-  return (
-    // docs: https://mantine.dev/others/notifications/
-
-    notifications.show({
-      id: 'file-deleted-from-materials',
-      withCloseButton: true,
-      onClose: () => console.log('unmounted'),
-      onOpen: () => console.log('mounted'),
-      autoClose: 5000,
-      // position="top-center",
-      title: was_error ? 'Error deleting file' : 'Deleting file...',
-      message: was_error
-        ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
-        : 'The file is being deleted in the background.',
-      icon: <IconCheck aria-hidden="true" />,
-      // className: 'my-notification-class',
-      styles: {
-        root: {
-          backgroundColor: was_error ? 'var(--error)' : 'var(--notification)',
-          borderColor: was_error
-            ? 'var(--error)'
-            : 'var(--notification-border)',
-        },
-        title: {
-          color: 'var(--notification-title)',
-        },
-        description: {
-          color: 'var(--notification-message)',
-        },
-        closeButton: {
-          color: 'var(--text-foreground-faded)',
-          '&:hover': {
-            color: 'var(--text-foreground)',
-            backgroundColor: 'var(--text-background-faded)',
-          },
-        },
-      },
-      loading: false,
-    })
-  )
+  return showToast({
+    autoClose: 5000,
+    title: was_error ? 'Error deleting file' : 'Deleting file...',
+    message: was_error
+      ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
+      : 'The file is being deleted in the background.',
+    type: was_error ? 'error' : 'success',
+  })
 }
 
 export default MakeQueryAnalysisPage
@@ -1329,47 +1296,11 @@ export const showToastOnUpdate = (
   isReset = false,
   message: string,
 ) => {
-  return notifications.show({
-    id: 'convo-or-documents-export',
-    withCloseButton: true,
-    closeButtonProps: { color: 'green' },
-    onClose: () => console.log('error unmounted'),
-    onOpen: () => console.log('error mounted'),
+  return showToast({
     autoClose: 30000,
-    title: (
-      <Text size={'lg'} className={`${montserrat_heading.className}`}>
-        {message}
-      </Text>
-    ),
-    message: (
-      <Text className={`${montserrat_paragraph.className}`}>
-        Check{' '}
-        <Link
-          href={
-            'https://docs.uiuc.chat/features/bulk-export-documents-or-conversation-history'
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            textDecoration: 'underline',
-            color: 'var(--dashboard-button)',
-          }}
-        >
-          our docs
-        </Link>{' '}
-        for example code to process this data.
-      </Text>
-    ),
-    color: 'green',
-    radius: 'lg',
-    icon: <IconCheck aria-hidden="true" />,
-    className: 'my-notification-class',
-    style: {
-      backgroundColor: 'rgba(42,42,64,0.6)',
-      backdropFilter: 'blur(10px)',
-      borderLeft: '5px solid green',
-    },
-    withBorder: true,
-    loading: false,
+    title: message,
+    message:
+      'Check our docs (https://docs.uiuc.chat/features/bulk-export-documents-or-conversation-history) for example code to process this data.',
+    type: 'success',
   })
 }

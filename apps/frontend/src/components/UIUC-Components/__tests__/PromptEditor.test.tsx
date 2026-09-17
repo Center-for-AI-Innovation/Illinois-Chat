@@ -21,8 +21,12 @@ vi.mock('~/utils/apiUtils', () => ({
   fetchCourseMetadata: (...args: any[]) => mockFetchCourseMetadata(...args),
 }))
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: { show: vi.fn() },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 vi.mock('~/components/Buttons/CustomCopyButton', () => ({
@@ -344,7 +348,7 @@ describe('PromptEditor', () => {
 
     it('shows error toast when callSetCourseMetadata fails', async () => {
       mockCallSetCourseMetadata.mockResolvedValueOnce(false)
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
 
       await renderPromptEditor()
 
@@ -358,7 +362,7 @@ describe('PromptEditor', () => {
       fireEvent.click(updateButtons[0]!)
 
       await waitFor(() => {
-        expect(notifications.show).toHaveBeenCalledWith(
+        expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({
             title: 'Error Updating Prompt',
           }),
@@ -368,7 +372,7 @@ describe('PromptEditor', () => {
 
     it('shows success toast when prompt is updated successfully', async () => {
       mockCallSetCourseMetadata.mockResolvedValueOnce(true)
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
 
       await renderPromptEditor()
 
@@ -382,7 +386,7 @@ describe('PromptEditor', () => {
       fireEvent.click(updateButtons[0]!)
 
       await waitFor(() => {
-        expect(notifications.show).toHaveBeenCalledWith(
+        expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({
             title: 'Prompt Updated Successfully',
           }),
@@ -748,10 +752,119 @@ describe('PromptEditor', () => {
       )
     })
 
+    it('swaps the citation blocks in the prompt as Hide citations is toggled', async () => {
+      const user = userEvent.setup()
+      const { CITATION_DISABLED_PROMPT, CITATION_GUIDELINES_PROMPT } =
+        await import('~/utils/app/const')
+
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'You are a helpful assistant.',
+          disableCitations: false,
+        }),
+      })
+
+      const label = 'Hide citations in chat responses'
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeInTheDocument()
+      })
+      const promptValue = () =>
+        (screen.getByLabelText('System Prompt') as HTMLTextAreaElement).value
+
+      // Toggle on: the no-citation block is present, the guidelines are not.
+      await user.click(screen.getByLabelText(label))
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeChecked()
+      })
+      expect(promptValue()).toContain(CITATION_DISABLED_PROMPT)
+      expect(promptValue()).not.toContain(CITATION_GUIDELINES_PROMPT)
+
+      // Toggle off: the no-citation block is gone, replaced by the guidelines.
+      await user.click(screen.getByLabelText(label))
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).not.toBeChecked()
+      })
+      expect(promptValue()).not.toContain(CITATION_DISABLED_PROMPT)
+      expect(promptValue()).toContain(CITATION_GUIDELINES_PROMPT)
+
+      // The admin's own text survives both flips.
+      expect(promptValue()).toContain('You are a helpful assistant.')
+    })
+
+    it('does not accumulate citation blocks over repeated toggling', async () => {
+      const user = userEvent.setup()
+      const { CITATION_DISABLED_PROMPT, CITATION_GUIDELINES_PROMPT } =
+        await import('~/utils/app/const')
+
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'You are a helpful assistant.',
+          disableCitations: false,
+        }),
+      })
+
+      const label = 'Hide citations in chat responses'
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeInTheDocument()
+      })
+
+      for (let i = 0; i < 3; i++) {
+        await user.click(screen.getByLabelText(label))
+        await waitFor(() => {
+          expect(screen.getByLabelText(label)).toBeChecked()
+        })
+        await user.click(screen.getByLabelText(label))
+        await waitFor(() => {
+          expect(screen.getByLabelText(label)).not.toBeChecked()
+        })
+      }
+
+      const value = (
+        screen.getByLabelText('System Prompt') as HTMLTextAreaElement
+      ).value
+      expect(value.split(CITATION_GUIDELINES_PROMPT).length - 1).toBe(1)
+      expect(value).not.toContain(CITATION_DISABLED_PROMPT)
+    })
+
+    it('saves the prompt with the citation block matching the toggle', async () => {
+      const user = userEvent.setup()
+      const { CITATION_DISABLED_PROMPT } = await import('~/utils/app/const')
+
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'You are a helpful assistant.',
+          disableCitations: false,
+        }),
+      })
+
+      const label = 'Hide citations in chat responses'
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByLabelText(label))
+
+      await waitFor(
+        () => {
+          expect(mockCallSetCourseMetadata).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+              disableCitations: true,
+              system_prompt: `You are a helpful assistant.${CITATION_DISABLED_PROMPT}`,
+            }),
+          )
+        },
+        { timeout: 2000 },
+      )
+    })
+
     it('shows error toast when settings save fails', async () => {
       const user = userEvent.setup()
       mockCallSetCourseMetadata.mockResolvedValueOnce(false)
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
 
       await renderPromptEditor({
         isEmbedded: true,
@@ -766,7 +879,7 @@ describe('PromptEditor', () => {
 
       await waitFor(
         () => {
-          expect(notifications.show).toHaveBeenCalledWith(
+          expect(showToast).toHaveBeenCalledWith(
             expect.objectContaining({
               title: expect.stringContaining('Error'),
             }),
@@ -1067,7 +1180,7 @@ describe('PromptEditor', () => {
         }),
       )
 
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
       const user = userEvent.setup()
       await renderPromptEditor()
 
@@ -1084,7 +1197,7 @@ describe('PromptEditor', () => {
 
       await waitFor(
         () => {
-          expect(notifications.show).toHaveBeenCalledWith(
+          expect(showToast).toHaveBeenCalledWith(
             expect.objectContaining({
               title: expect.stringContaining('Error'),
             }),
@@ -1111,7 +1224,7 @@ describe('PromptEditor', () => {
         }),
       )
 
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
       const user = userEvent.setup()
       await renderPromptEditor({ providers: disabledProviders })
 
@@ -1129,7 +1242,7 @@ describe('PromptEditor', () => {
 
         await waitFor(
           () => {
-            expect(notifications.show).toHaveBeenCalled()
+            expect(showToast).toHaveBeenCalled()
           },
           { timeout: 3000 },
         )
@@ -1153,7 +1266,7 @@ describe('PromptEditor', () => {
         }),
       )
 
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
       const user = userEvent.setup()
       await renderPromptEditor({ providers: noKeyProviders })
 
@@ -1170,7 +1283,7 @@ describe('PromptEditor', () => {
 
       await waitFor(
         () => {
-          expect(notifications.show).toHaveBeenCalledWith(
+          expect(showToast).toHaveBeenCalledWith(
             expect.objectContaining({
               title: expect.stringContaining('API Key Required'),
             }),
@@ -1278,7 +1391,7 @@ describe('PromptEditor', () => {
         configurable: true,
       })
 
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
       const user = userEvent.setup()
       await renderPromptEditor({
         isEmbedded: true,
@@ -1295,7 +1408,7 @@ describe('PromptEditor', () => {
         // Either clipboard is called, or the success/error toast fires
         const wasCalled =
           writeTextSpy.mock.calls.length > 0 ||
-          vi.mocked(notifications.show).mock.calls.length > 0
+          vi.mocked(showToast).mock.calls.length > 0
         expect(wasCalled).toBe(true)
       })
     })
@@ -1310,7 +1423,7 @@ describe('PromptEditor', () => {
         }),
       )
 
-      const { notifications } = await import('@mantine/notifications')
+      const { showToast } = await import('~/utils/toastUtils')
       const user = userEvent.setup()
       await renderPromptEditor({
         isEmbedded: true,
@@ -1324,7 +1437,7 @@ describe('PromptEditor', () => {
       await user.click(screen.getByTestId('custom-copy-button'))
 
       await waitFor(() => {
-        expect(notifications.show).toHaveBeenCalledWith(
+        expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({
             title: expect.stringContaining('Error'),
           }),
@@ -1410,46 +1523,47 @@ describe('PromptEditor', () => {
 })
 
 describe('showPromptToast', () => {
-  it('calls notifications.show with correct structure', async () => {
+  it('calls showToast with correct structure', async () => {
     const { showPromptToast } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     showPromptToast(theme, 'Test Title', 'Test message', false)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Test Title',
         message: 'Test message',
-        withCloseButton: true,
+        type: 'success',
       }),
     )
   })
 
   it('uses error styling when isError is true', async () => {
     const { showPromptToast } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     showPromptToast(theme, 'Error Title', 'Error message', true)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Error Title',
         message: 'Error message',
+        type: 'error',
       }),
     )
   })
 
   it('calculates auto-close duration based on message length', async () => {
     const { showPromptToast } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     const longMessage = 'A'.repeat(300)
     showPromptToast(theme, 'Title', longMessage)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         // 300 * 50 = 15000, capped at 15000
         autoClose: 15000,
@@ -1459,12 +1573,12 @@ describe('showPromptToast', () => {
 
   it('uses minimum 5000ms for short messages', async () => {
     const { showPromptToast } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     showPromptToast(theme, 'Title', 'Hi')
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         autoClose: 5000,
       }),
@@ -1475,12 +1589,12 @@ describe('showPromptToast', () => {
 describe('showToastOnPromptUpdate', () => {
   it('shows success message by default', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     showToastOnPromptUpdate(theme)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Prompt Updated Successfully',
         message: 'The system prompt has been updated.',
@@ -1490,12 +1604,12 @@ describe('showToastOnPromptUpdate', () => {
 
   it('shows error message when was_error is true', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     showToastOnPromptUpdate(theme, true)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Error Updating Prompt',
       }),
@@ -1504,12 +1618,12 @@ describe('showToastOnPromptUpdate', () => {
 
   it('shows reset message when isReset is true', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     const theme = { colors: { gray: [] } } as any
     showToastOnPromptUpdate(theme, false, true)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Prompt Reset to Default',
         message: 'The system prompt has been reset to default settings.',
@@ -1521,29 +1635,30 @@ describe('showToastOnPromptUpdate', () => {
 describe('showToastNotification', () => {
   it('shows a notification with provided title and message', async () => {
     const { showToastNotification } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     showToastNotification('My Title', 'My Message')
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'My Title',
         message: 'My Message',
-        withCloseButton: true,
+        type: 'success',
       }),
     )
   })
 
-  it('uses error icon when isError is true', async () => {
+  it('uses error type when isError is true', async () => {
     const { showToastNotification } = await import('../PromptEditor')
-    const { notifications } = await import('@mantine/notifications')
+    const { showToast } = await import('~/utils/toastUtils')
 
     showToastNotification('Error', 'Something failed', true)
 
-    expect(notifications.show).toHaveBeenCalledWith(
+    expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Error',
         message: 'Something failed',
+        type: 'error',
       }),
     )
   })

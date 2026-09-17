@@ -101,10 +101,9 @@ When `qdrant_config` is **not** set, embeddings also live on the external DB (th
 | `doc_groups`                                         | `project_stats`              |
 | `documents_doc_groups`                               | `llm-convo-monitor`          |
 | `embeddings` *(when `qdrant_config` is not set)*     | `pre_authorized_api_keys`    |
-|                                                      | `n8n_workflows`              |
 |                                                      | `project_external_connections` (the routing table itself) |
 
-The external DB schema must therefore provide the six document-side tables (five plus `embeddings` when running on pgvector). Conversation history, project metadata, stats dashboards, API key resolution, and workflow locks all read/write the host DB.
+The external DB schema must therefore provide the six document-side tables (five plus `embeddings` when running on pgvector). Conversation history, project metadata, stats dashboards, and API key resolution all read/write the host DB.
 
 ### External Postgres provisioning (pgvector projects)
 
@@ -152,6 +151,7 @@ Every Qdrant config has one required collection (`default_collection`). All inge
 | `https`                      | boolean | No       | Whether to use HTTPS. Default: `false`.                                                                         |
 | `collections`                | array   | No       | Additional collections to fan out searches across. See [Optional `collections`](#optional-collections-fan-out-search) below. |
 | `skip_quantization_rescore`  | boolean | No       | Skip quantization rescore during search. Default: `true`.                                                       |
+| `apply_course_filter`        | boolean | No       | Whether search constrains payload `course_name`. Default: `true`. Set to `false` for shared corpora (pubmed, patents, …) that are not partitioned by project. Distinct from per-collection `use_filter`, which drops the entire search filter. |
 | `embedding`                  | object  | No       | **Deprecated.** Use the top-level `embedding_config` column instead. Still honored as a fallback when no top-level config is present. See [Embedding Provider Config](#embedding-provider-config) below. |
 
 ### Optional: `collections` (fan-out search)
@@ -201,7 +201,7 @@ Add `collections` when your project needs to search across multiple Qdrant colle
 | ------------ | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`       | string  | **Yes**  | Qdrant collection name                                                                                                                                   |
 | `top_n`      | integer | No       | Maximum results to retrieve from this collection. Defaults to the request-level `top_n` (typically 100).                                                 |
-| `use_filter` | boolean | No       | Whether to apply the course-name filter to this collection. Default: `true`. Set to `false` for shared collections not partitioned by course/project.    |
+| `use_filter` | boolean | No       | Whether to apply the search filter (`conversation_id` / `doc_groups` / optional `course_name`) to this collection. Default: `true`. Set to `false` for shared collections that should be searched unfiltered. Distinct from `apply_course_filter`, which only drops the `course_name` constraint. |
 | `processor`  | string  | No       | Post-processor key for normalizing results. One of: `pubmed`, `patents`, `ncbi_books`, `clinical_trials`. See [Post-Processors](#post-processors-for-vector-search) below. |
 
 #### Top-Level Fan-Out Settings

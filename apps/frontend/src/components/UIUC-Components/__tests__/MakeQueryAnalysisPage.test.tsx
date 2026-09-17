@@ -3,14 +3,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
-  showNotification: vi.fn(),
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 vi.mock('~/utils/downloadConversationHistory', () => ({
@@ -186,6 +184,18 @@ describe('MakeQueryAnalysisPage', () => {
       (await import('~/utils/downloadConversationHistory')) as any
     ).downloadConversationHistory
     await waitFor(() => expect(downloadConversationHistory).toHaveBeenCalled())
+
+    // The download handler surfaces the result via the sonner-backed toast.
+    const { showToast } = (await import('~/utils/toastUtils')) as any
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'ok',
+          type: 'success',
+          autoClose: 30000,
+        }),
+      ),
+    )
   })
 
   it('logs an error when course metadata fetch fails', async () => {

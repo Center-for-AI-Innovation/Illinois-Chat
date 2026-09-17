@@ -20,6 +20,10 @@ import {
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
 import {
+  getProjectNameError,
+  PROJECT_NAME_MAX_LENGTH,
+} from '~/utils/projectName'
+import {
   CHATBOT_PROJECT_TYPES,
   COMMON_ORGANIZATIONS,
   type ChatbotProjectType,
@@ -70,8 +74,11 @@ const StepCreate = ({
     onUpdateDescription(projectDescription)
   }, [projectDescription])
 
+  const nameError = getProjectNameError(projectName)
+
   const getNameStatus = (): FormInputStatus => {
     if (!projectName) return 'default'
+    if (nameError) return 'error'
     if (isCheckingAvailability) return 'loading'
     if (isCourseAvailable) return 'success'
     return 'error'
@@ -89,9 +96,9 @@ const StepCreate = ({
         <TooltipProvider>
           <Tooltip
             open={
-              !isCheckingAvailability &&
-              isCourseAvailable === false &&
-              projectName.length > 0
+              projectName.length > 0 &&
+              (nameError !== null ||
+                (!isCheckingAvailability && isCourseAvailable === false))
             }
           >
             <TooltipTrigger
@@ -107,11 +114,20 @@ const StepCreate = ({
                   disabled={!is_new_course}
                   autoFocus
                   status={getNameStatus()}
+                  maxLength={PROJECT_NAME_MAX_LENGTH}
                   rightSlot={
-                    isCheckingAvailability ? (
+                    nameError && projectName ? (
+                      <span role="status">
+                        <XCircle
+                          className="size-4 text-red-500"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Name is invalid</span>
+                      </span>
+                    ) : isCheckingAvailability ? (
                       <span role="status">
                         <LoaderCircle
-                          className="size-4 animate-spin text-[--foreground-faded]"
+                          className="size-4 animate-spin text-(--foreground-faded)"
                           aria-hidden="true"
                         />
                         <span className="sr-only">
@@ -148,7 +164,8 @@ const StepCreate = ({
               side="right"
               className="border-red-500 bg-red-500 text-white"
             >
-              This name is already taken. Please choose a different name.
+              {nameError ??
+                'This name is already taken. Please choose a different name.'}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -157,10 +174,10 @@ const StepCreate = ({
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="step-create-project-type"
-              className="text-sm font-medium text-[--foreground]"
+              className="text-sm font-medium text-(--foreground)"
             >
               Project Type{' '}
-              <span className="font-normal text-[--foreground-faded]">
+              <span className="font-normal text-(--foreground-faded)">
                 (optional)
               </span>
             </label>
@@ -189,7 +206,7 @@ const StepCreate = ({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-[--foreground-faded]">
+            <p className="text-xs text-(--foreground-faded)">
               Helps people find your bot in the hub.
             </p>
           </div>
@@ -197,10 +214,10 @@ const StepCreate = ({
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="step-create-organization"
-              className="text-sm font-medium text-[--foreground]"
+              className="text-sm font-medium text-(--foreground)"
             >
               Organization{' '}
-              <span className="font-normal text-[--foreground-faded]">
+              <span className="font-normal text-(--foreground-faded)">
                 (optional)
               </span>
             </label>
@@ -227,7 +244,7 @@ const StepCreate = ({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-[--foreground-faded]">
+            <p className="text-xs text-(--foreground-faded)">
               The college, department, or group running this bot.
             </p>
           </div>

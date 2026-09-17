@@ -22,12 +22,10 @@ import {
 } from '@mantine/core'
 import { Button } from '@/components/shadcn/ui/button'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
-import { notifications } from '@mantine/notifications'
 import {
   IconAlertTriangle,
   IconAlertTriangleFilled,
   IconBook,
-  IconCheck,
   IconChevronDown,
   IconExternalLink,
   IconInfoCircle,
@@ -68,6 +66,7 @@ import {
   type AnySupportedModel,
 } from '~/utils/modelProviders/LLMProvider'
 import { type AnthropicModel } from '~/utils/modelProviders/types/anthropic'
+import { showToast } from '~/utils/toastUtils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -129,39 +128,12 @@ export const showPromptToast = (
     Math.min(15000, message.length * durationPerChar),
   )
 
-  notifications.show({
-    withCloseButton: true,
-    autoClose: duration,
+  showToast({
     title: title,
     message: message,
-    icon: icon || (isError ? <IconAlertTriangle /> : <IconCheck />),
-    styles: {
-      root: {
-        backgroundColor: 'var(--notification)', // Dark background to match the page
-        borderColor: isError ? '#E53935' : 'var(--notification-border)', // Red for errors,  for success
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderRadius: '8px', // Added rounded corners
-      },
-      title: {
-        color: 'var(--notification-title)', // White text for the title
-        fontWeight: 600,
-      },
-      description: {
-        color: 'var(--notification-message)', // Light gray text for the message
-      },
-      closeButton: {
-        color: 'var(--notification-title)', // White color for the close button
-        borderRadius: '4px', // Added rounded corners to close button
-        '&:hover': {
-          backgroundColor: 'rgba(255, 255, 255, 0.1)', // Subtle hover effect
-        },
-      },
-      icon: {
-        backgroundColor: 'transparent', // Transparent background for the icon
-        color: isError ? '#E53935' : 'var(--notification-title)', // Icon color matches the border
-      },
-    },
+    type: isError ? 'error' : 'success',
+    autoClose: duration,
+    ...(icon ? { icon } : {}),
   })
 }
 
@@ -197,39 +169,11 @@ export const showToastNotification = (
     Math.min(15000, message.length * durationPerChar),
   )
 
-  notifications.show({
-    withCloseButton: true,
-    autoClose: duration,
+  showToast({
     title: title,
     message: message,
-    icon: isError ? <IconAlertTriangle /> : <IconCheck />,
-    styles: {
-      root: {
-        backgroundColor: 'var(--notification)',
-        borderColor: isError ? '#E53935' : 'var(--notification-border)',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderRadius: '8px',
-      },
-      title: {
-        color: 'var(--notification-title)',
-        fontWeight: 600,
-      },
-      description: {
-        color: 'var(--notification-message)',
-      },
-      closeButton: {
-        color: 'var(--notification-title)',
-        borderRadius: '4px',
-        '&:hover': {
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        },
-      },
-      icon: {
-        backgroundColor: 'transparent',
-        color: isError ? '#E53935' : 'var(--notification-title)',
-      },
-    },
+    type: isError ? 'error' : 'success',
+    autoClose: duration,
   })
 }
 
@@ -914,7 +858,7 @@ CRITICAL: The optimized prompt must:
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Text className="text-[--foreground-faded]">Loading...</Text>
+        <Text className="text-(--foreground-faded)">Loading...</Text>
       </div>
     )
   }
@@ -924,7 +868,7 @@ CRITICAL: The optimized prompt must:
       <Flex direction={isSmallScreen || isEmbedded ? 'column' : 'row'}>
         {/* Left Side - Main Content */}
         <div
-          className={`min-h-full bg-[--background] ${
+          className={`min-h-full bg-(--background) ${
             isEmbedded ? 'w-full' : 'flex-[1_1_60%]'
           }`}
         >
@@ -933,14 +877,14 @@ CRITICAL: The optimized prompt must:
               <div className="flex items-center gap-2">
                 <Title
                   order={2}
-                  className={`text-lg text-[--foreground] sm:text-2xl`}
+                  className={`text-lg text-(--foreground) sm:text-2xl`}
                 >
                   Prompting
                 </Title>
-                <Text className="text-[--foreground]">/</Text>
+                <Text className="text-(--foreground)">/</Text>
                 <Title
                   order={3}
-                  className={`text-base text-[--illinois-orange] sm:text-xl`}
+                  className={`text-base text-(--illinois-orange) sm:text-xl`}
                 >
                   {project_name}
                 </Title>
@@ -951,7 +895,7 @@ CRITICAL: The optimized prompt must:
           <div className={`${isEmbedded ? '' : 'p-4'}`}>
             {/* Prompt Engineering Guide */}
             <Paper
-              className="w-full rounded-xl bg-[--dashboard-background-faded] px-6"
+              className="w-full rounded-xl bg-(--dashboard-background-faded) px-6"
               p="md"
               sx={{
                 transition: 'all 0.2s ease',
@@ -976,7 +920,7 @@ CRITICAL: The optimized prompt must:
                     }}
                   />
                   <Title
-                    className={`label pl-1 pr-0 text-[--dashboard-foreground] md:pl-0 md:pr-2`}
+                    className={`py-2 pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
                     order={4}
                   >
                     Prompt Engineering Guide
@@ -997,7 +941,7 @@ CRITICAL: The optimized prompt must:
               </Flex>
 
               <Collapse in={insightsOpen} transitionDuration={200}>
-                <div className="mt-4 px-2 text-[--dashboard-foreground]">
+                <div className="mt-4 px-2 text-(--dashboard-foreground)">
                   <Text size="md" className={`select-text`}>
                     For additional insights and best practices on prompt
                     creation, please review:
@@ -1019,7 +963,7 @@ CRITICAL: The optimized prompt must:
                     >
                       <List.Item>
                         <a
-                          className={`text-sm text-[--dashboard-button] transition-colors duration-200 hover:text-[--dashboard-button-hover]`}
+                          className={`text-sm text-(--dashboard-button) transition-colors duration-200 hover:text-(--dashboard-button-hover)`}
                           href="https://platform.openai.com/docs/guides/prompt-engineering"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1038,7 +982,7 @@ CRITICAL: The optimized prompt must:
                       </List.Item>
                       <List.Item>
                         <a
-                          className={`text-sm text-[--dashboard-button] transition-colors duration-200 hover:text-[--dashboard-button-hover]`}
+                          className={`text-sm text-(--dashboard-button) transition-colors duration-200 hover:text-(--dashboard-button-hover)`}
                           href="https://docs.anthropic.com/claude/prompt-library"
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1057,7 +1001,7 @@ CRITICAL: The optimized prompt must:
                       </List.Item>
                     </List>
                     <Text
-                      className={`label inline-block select-text`}
+                      className={`inline-block px-1 py-2 select-text`}
                       size="md"
                       style={{ marginTop: '1.5rem' }}
                     >
@@ -1066,7 +1010,7 @@ CRITICAL: The optimized prompt must:
                       role, tone, and behavior. Consider including:
                       <List
                         withPadding
-                        className="mt-2 text-[--dashboard-foreground]"
+                        className="mt-2 text-(--dashboard-foreground)"
                         spacing="xs"
                         icon={
                           <div
@@ -1113,7 +1057,7 @@ CRITICAL: The optimized prompt must:
                 <Flex justify="space-between" align="center" mb="md">
                   <Flex align="center" className="-mt-2 gap-4">
                     <Title
-                      className={`label pl-1 pr-0 text-[--dashboard-foreground] md:pl-0 md:pr-2`}
+                      className={`py-2 pr-0 pl-1 text-(--dashboard-foreground) md:pr-2 md:pl-0`}
                       order={4}
                     >
                       System Prompt
@@ -1437,7 +1381,7 @@ CRITICAL: The optimized prompt must:
                       <div>
                         <IconInfoCircle
                           size={18}
-                          className="text-[--foreground-faded] transition-colors duration-200 hover:text-[--foreground]"
+                          className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
                           style={{ cursor: 'pointer' }}
                         />
                       </div>
@@ -1456,7 +1400,7 @@ CRITICAL: The optimized prompt must:
                               tabIndex={0}
                               aria-label="Close Prompt Builder"
                               stroke={2}
-                              className="text-[--foreground-faded] transition-colors duration-200 hover:text-[--foreground]"
+                              className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
                               onClick={() => setIsRightSideVisible(false)}
                             />
                           </div>
@@ -1469,7 +1413,7 @@ CRITICAL: The optimized prompt must:
                           >
                             <IconLayoutSidebarRightExpand
                               stroke={2}
-                              className="text-[--foreground-faded] transition-colors duration-200 hover:text-[--foreground]"
+                              className="text-(--foreground-faded) transition-colors duration-200 hover:text-(--foreground)"
                               onClick={() => setIsRightSideVisible(true)}
                             />
                           </div>
@@ -1637,8 +1581,8 @@ CRITICAL: The optimized prompt must:
 
             {/* Behavior Settings - shown inline when embedded */}
             {isEmbedded && (
-              <div className="mt-6 rounded-xl bg-[--dashboard-background-faded] p-4 sm:p-6">
-                <Title order={4} className={`mb-4 text-[--foreground]`}>
+              <div className="mt-6 rounded-xl bg-(--dashboard-background-faded) p-4 sm:p-6">
+                <Title order={4} className={`mb-4 text-(--foreground)`}>
                   AI Behavior Settings
                 </Title>
 
@@ -1945,7 +1889,7 @@ CRITICAL: The optimized prompt must:
               <Divider />
 
               <Flex align="center" style={{ paddingTop: '15px' }}>
-                <Title className={`label mr-[8px]`} order={3}>
+                <Title className={`mr-[8px] px-1 py-2`} order={3}>
                   AI Behavior Settings
                 </Title>
                 <Indicator
