@@ -56,15 +56,6 @@ vi.mock('~/components/UIUC-Components/runAuthCheck', () => ({
   get_user_permission: vi.fn(async () => 'admin'),
 }))
 
-vi.mock('mantine-datatable', () => ({
-  DataTable: (props: any) =>
-    React.createElement(
-      'div',
-      { 'data-testid': 'datatable' },
-      props?.records?.length ?? 0,
-    ),
-}))
-
 vi.mock('recharts', () => {
   const Stub = (name: string) => {
     const Component = (props: any) =>

@@ -141,8 +141,10 @@ describe('ProjectFilesTable', () => {
     await user.keyboard('{Escape}')
 
     // Filter (updates queryKey and triggers refetch). The input lives behind
-    // the column's funnel-icon popover, matching the Mantine original.
-    await user.click(screen.getByRole('button', { name: 'Filter by File Name' }))
+    // the column's funnel-icon popover.
+    await user.click(
+      screen.getByRole('button', { name: 'Filter by File Name' }),
+    )
     await user.type(await screen.findByLabelText('File Name'), 'hello')
     await waitFor(() =>
       expect(

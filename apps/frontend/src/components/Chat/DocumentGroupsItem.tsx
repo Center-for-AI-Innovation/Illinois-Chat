@@ -103,7 +103,6 @@ export const DocumentGroupsItem = ({}) => {
               />
             </div>
 
-            {/* unable to use this until v7 of mantine since we can't control the hover color              highlightOnHover */}
             <Table
               aria-label="Document groups configuration"
               className="w-[90%] text-(--modal-text)"
@@ -168,9 +167,7 @@ export const DocumentGroupsItem = ({}) => {
                       {doc_group_obj.adminDisabled ? (
                         <Tooltip>
                           <TooltipTrigger
-                            render={
-                              <span style={{ display: 'inline-flex' }} />
-                            }
+                            render={<span style={{ display: 'inline-flex' }} />}
                           >
                             <Switch
                               checked={doc_group_obj.checked}
@@ -200,8 +197,8 @@ export const DocumentGroupsItem = ({}) => {
                             size="sm"
                             className={
                               doc_group_obj.checked
-                                ? 'data-checked:bg-(--dashboard-button) data-checked:border-(--dashboard-button)'
-                                : 'data-unchecked:bg-(--dashboard-background-dark) data-unchecked:border-(--dashboard-background-dark)'
+                                ? 'data-checked:border-(--dashboard-button) data-checked:bg-(--dashboard-button)'
+                                : 'data-unchecked:border-(--dashboard-background-dark) data-unchecked:bg-(--dashboard-background-dark)'
                             }
                           />
                         </span>

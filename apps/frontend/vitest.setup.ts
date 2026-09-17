@@ -131,7 +131,7 @@ if (
   ;(window as any).PointerEvent = PointerEventPolyfill
 }
 
-// Mantine uses ResizeObserver in various components (SegmentedControl, charts, etc.).
+// Several components (charts, resizable panels) rely on ResizeObserver.
 if (typeof window !== 'undefined' && !('ResizeObserver' in window)) {
   class ResizeObserver {
     observe() {}

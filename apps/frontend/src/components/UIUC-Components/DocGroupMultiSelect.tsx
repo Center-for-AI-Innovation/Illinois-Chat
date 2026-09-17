@@ -38,9 +38,8 @@ interface DocGroupMultiSelectProps {
 
 /**
  * A searchable, multi-select, create-on-type combobox for assigning document
- * groups — the shadcn/Base UI replacement for Mantine's
- * `<MultiSelect searchable creatable>`. Base UI's combobox has no built-in
- * `creatable` concept, so it's hand-built here: a synthesized sentinel item
+ * groups. Base UI's combobox has no built-in `creatable` concept, so
+ * create-on-type is hand-built here: a synthesized sentinel item
  * is appended to the filtered list whenever the query has no exact match,
  * and selecting it creates (and immediately selects) a plain string entry
  * instead of leaking the sentinel object out through `onChange`.
@@ -58,10 +57,11 @@ export function DocGroupMultiSelect({
   const [query, setQuery] = React.useState('')
 
   const selectedItems: DocGroupComboboxItem[] = value.map(
-    (name) => data.find((option) => option.value === name) ?? {
-      value: name,
-      label: name,
-    },
+    (name) =>
+      data.find((option) => option.value === name) ?? {
+        value: name,
+        label: name,
+      },
   )
 
   const trimmed = query.trim()

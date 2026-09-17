@@ -123,8 +123,8 @@ const getProviderFromModel = (
   return selectedOption?.group || ProviderNames.OpenAI
 }
 
-// Restores the `autosize` behavior the Mantine Textarea gave us: grow to fit
-// the content, with the `max-h-*` class doing what `maxRows` used to.
+// Autosizing textarea: grows to fit its content, with the `max-h-*` class
+// capping how far it can grow.
 // Returns a ref for the textarea plus a `height` value to spread into its
 // `style` prop. The height MUST be applied through React's own render output
 // (not written directly to `el.style.height`): this textarea also takes a

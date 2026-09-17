@@ -19,7 +19,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/shadcn/ui/tooltip'
-import { IconAlertTriangleFilled, IconChevronDown, IconX } from '@tabler/icons-react'
+import {
+  IconAlertTriangleFilled,
+  IconChevronDown,
+  IconX,
+} from '@tabler/icons-react'
 import {
   type CountryOfConcern,
   getCountryOfConcern,
@@ -228,8 +232,8 @@ const NewModelDropdown: React.FC<{
     await onChange(next)
   }
 
-  // Grouped by provider, in LLM_PROVIDER_ORDER — mirrors the old Mantine
-  // Select `data`/`group` shape, nested per Base UI Combobox's grouping API.
+  // Grouped by provider, in LLM_PROVIDER_ORDER, nested per Base UI
+  // Combobox's grouping API.
   const groupedModels: ModelComboboxGroup[] = Object.entries(
     enabledProvidersAndModels,
   )

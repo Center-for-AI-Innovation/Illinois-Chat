@@ -938,11 +938,8 @@ describe('PromptEditor', () => {
       // Click Cancel in the modal
       const cancelButtons = screen.getAllByRole('button', { name: /Cancel/i })
       const modalCancel =
-        cancelButtons.find(
-          (btn) =>
-            btn.closest('[class*="Modal"]') ||
-            btn.closest('.mantine-Modal-body'),
-        ) ?? cancelButtons[0]!
+        cancelButtons.find((btn) => btn.closest('[class*="Modal"]')) ??
+        cancelButtons[0]!
       await user.click(modalCancel)
 
       await waitFor(() => {

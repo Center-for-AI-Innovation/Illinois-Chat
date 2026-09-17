@@ -68,9 +68,8 @@ import Link from 'next/link'
 import { usePostHog } from 'posthog-js/react'
 import { useEffect, useRef, useState } from 'react'
 
-// Illinois-orange outline link + icon button (were the Mantine createStyles
-// `link` / `menuIcon` entries). Colors kept as --illinois-orange /
-// --dashboard-button CSS vars. See docs/mantine-retirement-styles-notes.md.
+// Illinois-orange outline link + icon button. Colors come from the
+// --illinois-orange / --dashboard-button CSS variables.
 const orangeOutlineBtn =
   'flex h-[2.2rem] min-w-[100px] cursor-pointer items-center justify-center rounded-md border border-(--illinois-orange) bg-white px-3 text-sm font-bold text-(--illinois-orange) transition-colors duration-100 hover:bg-[rgb(255_95_5/0.05)] focus:outline-solid focus:outline-2 focus:outline-(--dashboard-button)'
 const orangeIconBtn =

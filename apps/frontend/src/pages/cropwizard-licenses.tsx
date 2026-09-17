@@ -8,9 +8,8 @@ const CropwizardLicenses: NextPage = () => {
   return (
     <>
       <MainPageBackground>
-        {/* was Mantine <Title order={2}>. The app's MantineProvider theme overrides
-            h2 to fontSize 2.2rem + headings.fontFamily 'Montserrat' (weight 700, lh 1.35),
-            NOT Mantine's 1.625rem default. Matches chat.illinois.edu exactly. */}
+        {/* h2 is pinned to 2.2rem / Montserrat 700 / line-height 1.35 to match
+            chat.illinois.edu exactly. */}
         <h2
           className={`${montserrat_heading.variable} font-montserratHeading text-[2.2rem] leading-[1.35] font-bold`}
         >

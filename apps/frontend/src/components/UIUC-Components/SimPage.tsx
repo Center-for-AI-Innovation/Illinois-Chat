@@ -498,8 +498,8 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                       {workflows.map((tool, index) => (
                         <TableRow
                           key={tool.id}
-                          // Mantine's <Table striped> tinted alternate rows;
-                          // the shadcn table only draws separators.
+                          // The shadcn table only draws separators, so the
+                          // alternate-row tint is applied here.
                           className={
                             index % 2 === 0
                               ? 'bg-(--background)'

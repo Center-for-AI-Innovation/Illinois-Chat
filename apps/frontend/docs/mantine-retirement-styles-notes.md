@@ -275,3 +275,29 @@ Verification: full suite green — 290 files, 2468 tests (up from 289/2460; the 
 New `SimPage.test.tsx` (2 tests): the config form renders with all three inputs label-associated and the stored-key mask, routing badge and workflows table populated; and a failing save surfaces the server's error message through an error toast — that second one guards the `!upsertRes.ok` check, since `fetch` does not reject on 4xx and the success toast sits directly below it.
 
 Verification: `grep @mantine` → 0. `npm run typecheck` clean. Full suite 290 files / 2599 tests pass. `npm run test:a11y` 60/60.
+
+## Step 5 — teardown (Mantine uninstalled)
+
+- **`_app.tsx`** — `MantineProvider` and its whole theme object removed. Nothing depended on the theme: the heading scale it defined was already ported to `.heading-h1`–`.heading-h6` in `globals.css`, and the `colors` map only aliased CSS variables that are read directly everywhere else.
+- **`renderWithProviders.tsx`** — `MantineProvider` dropped from the test wrapper; `ThemeProvider` now wraps `HomeContext` directly.
+- **Five dead test mocks removed** — `@mantine/core`'s `Burger`/`Transition` stubs in `axe-audit.a11y.test.tsx`, `ChatNavbar.test.tsx` and `ChatNavbar.a11y.test.tsx`, the `mantine-datatable` `DataTable` stub in `smokeAllComponents.shared.tsx`, and a `MantineProvider` wrapper in `__tests__/pages/__tests__/landingPage.test.tsx`. That last one lives in the top-level `__tests__/` tree rather than `src/`, so every earlier `grep` in this document — all of which were scoped to `src/` — missed it; it only surfaced when the package was physically uninstalled and vitest failed to resolve the import. Worth remembering that this repo has two test roots.
+- **`globals.css`** — all remaining `.mantine-*` rules deleted (Modal reflow, the `.project_files_table` datatable hacks, the form-label contrast rule). Comment-only references elsewhere were kept: they document what replaced what.
+- **`package.json`** — the nine `@mantine/*` packages, `mantine-datatable` and `@emotion/react` all uninstalled.
+
+**`clsx` was a phantom dependency.** `src/components/shadcn/lib/utils.ts` imports it directly, but it was never declared — it only existed in `node_modules` as a transitive of Mantine/emotion. Uninstalling Mantine took it with it and broke every shadcn component at once. Now declared explicitly. `tailwind-merge` and `class-variance-authority`, the other two `cn`/variant deps, were already declared correctly.
+
+**`npm uninstall` left `node_modules` in a broken state** (`vitest/config` unresolvable, then `ENOTEMPTY` on `node_modules/next` for every repair attempt). `npm ci` fixed it. Side effect worth knowing: this killed the dev server that was running on :3000.
+
+### The `@layer` restoration — attempted, reverted, still open
+
+Preflight and the utilities **remain unlayered**. Re-layering them was attempted as the final teardown step and **visibly broke the app**; the change was reverted after a browser check.
+
+The reasoning behind the attempt was that the unlayered imports existed only as a Mantine workaround, so removing Mantine should let them go back to `layer(base)`/`layer(utilities)`. That is half right. What it missed: this file's own ~40KB of custom rules (`.think-tag-*`, `.chat-input-container`, `.project_files_table`, the `body` rules, and many more) are themselves unlayered. While the utilities are also unlayered, those custom rules and the utilities compete on ordinary specificity — which is how the app has always behaved, in v3 and after the v4 codemod. Move the utilities into `layer(utilities)` and every one of those unlayered custom rules wins against every utility on the same element regardless of specificity. That is a silent, app-wide restyling that no test in this repo can catch, because jsdom does not implement the cascade.
+
+Worth recording precisely, because the build output looked *correct* while the app looked wrong: after the change, `@layer utilities` held 199KB with `.border-border` inside it, `@layer base` held preflight plus both compat blocks, and only the custom rules were left unlayered. Every structural check passed. The regression was purely one of cascade precedence between two groups of rules that were both present and both correct in isolation. **A green build, a green suite and a correct-looking layer structure are not evidence that a cascade change is safe — only looking at the running app is.**
+
+One detail for whoever picks this up: re-layering the imports alone is not enough even in principle. `* { @apply border-border }` and `body { @apply bg-background text-foreground }` sit unlayered at the bottom of this file; layer the utilities and leave those alone and `*` beats every `border-*` utility in the app. They have to move into `@layer base` in the same change (that is where PR #196 took them from). That part was done correctly during the attempt and is not what broke it.
+
+Re-layering is still the right end state. It is a separate piece of work: audit the custom rules in this file, layer them deliberately, and verify in a browser page by page.
+
+Verification of the teardown as it now stands: `grep @mantine` → comments only. `npm run typecheck` clean. Production build succeeds. Full suite 290 files / 2599 tests pass. The compiled CSS has no `@layer utilities` block, and `.border-border` and `body`'s `!important` declarations are unlayered — i.e. the arrangement that works.

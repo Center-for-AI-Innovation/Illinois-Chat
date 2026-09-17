@@ -9,13 +9,7 @@ import { montserrat_heading } from 'fonts'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/shadcn/ui/button'
 import { usePostHog } from 'posthog-js/react'
@@ -47,7 +41,7 @@ const HEADER_HEIGHT = 60
 // narrow-viewport `list-item` variant it also defined is dropped — the
 // buttons it applied to are already hidden below their own breakpoints, so
 // the compact variant covered only a sliver of widths and wasn't visually
-// load-bearing (see docs/mantine-retirement-styles-notes.md).
+// load-bearing.
 const linkClassName =
   'text-(--navbar-text) text-xs font-bold text-center no-underline transition-colors duration-100 rounded-(--radius-sm) hover:text-(--button-hover-text-color) hover:bg-(--button-hover)'
 
@@ -191,7 +185,7 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
           )}
 
           <div className="ml-auto flex flex-nowrap items-center">
-            {/* This is the hamburger menu / dropdown (was Mantine <Transition pop-top-right> + <Paper>) */}
+            {/* This is the hamburger menu / dropdown */}
             {opened && (
               <div
                 data-testid="hamburger-menu"

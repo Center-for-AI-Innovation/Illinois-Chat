@@ -67,7 +67,7 @@ describe('LinkGeneratorModal', () => {
   })
 
   it('copies the generated link via CopyButton', async () => {
-    // Mantine's CopyButton clears `copied` after 1s, so drive the clock by hand
+    // The modal clears `copied` on a timer, so drive the clock by hand
     // instead of racing it with real timers.
     vi.useFakeTimers()
 
@@ -98,8 +98,7 @@ describe('LinkGeneratorModal', () => {
     })
     expect(screen.getByText('Copied!')).toBeInTheDocument()
 
-    // The shadcn rewrite of this modal resets `copied` after 2000ms; Mantine's
-    // <CopyButton> used 1000ms, which is what this test was written against.
+    // This modal resets `copied` after 2000ms.
     act(() => {
       vi.advanceTimersByTime(2000)
     })

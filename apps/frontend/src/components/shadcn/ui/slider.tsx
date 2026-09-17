@@ -21,14 +21,14 @@ function Slider({
   thumbClassName,
   ...props
 }: SliderPrimitive.Root.Props & {
-  /** Fixed tick labels rendered below the track (Mantine `Slider marks`). */
+  /** Fixed tick labels rendered below the track. */
   marks?: SliderMark[]
   markLabelClassName?: string
-  /** Override the track's background (Mantine `Slider styles.track`). */
+  /** Override the track's background. */
   trackClassName?: string
-  /** Override the filled portion's background (Mantine `Slider styles.bar`). */
+  /** Override the filled portion's background. */
   indicatorClassName?: string
-  /** Override the thumb's border/background (Mantine `Slider styles.thumb`). */
+  /** Override the thumb's border/background. */
   thumbClassName?: string
 }) {
   const _values = Array.isArray(value)

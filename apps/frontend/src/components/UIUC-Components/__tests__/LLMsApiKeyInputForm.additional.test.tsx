@@ -1071,7 +1071,7 @@ describe('showConfirmationToast – toast options', () => {
       autoClose: 5000,
     })
 
-    // Legacy Mantine-only options must not leak through
+    // Legacy options must not leak through
     const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
     expect(call.onOpen).toBeUndefined()
     expect(call.onClose).toBeUndefined()

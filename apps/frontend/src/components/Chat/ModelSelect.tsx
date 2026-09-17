@@ -99,9 +99,9 @@ export function getModelDropdownMaxHeight({
 }
 
 /**
- * Mantine passes `maxDropdownHeight` through `rem()`, which divides by a hardcoded 16 —
- * so a raw pixel value renders as `px/16rem` and grows with the user's root font size.
- * Pre-scale it so the emitted rem resolves back to the pixel height we measured.
+ * The dropdown's max height is emitted as rem against a hardcoded 16, so a raw
+ * pixel value would grow with the user's root font size. Pre-scale it so the
+ * emitted rem resolves back to the pixel height we measured.
  */
 export function toRemScaledDropdownHeight(
   pxHeight: number,
@@ -125,7 +125,6 @@ export function getModelDropdownBoundaryRect(
   const boundary =
     triggerEl.closest('[data-settings-modal-body]') ||
     triggerEl.closest('[data-settings-modal]') ||
-    triggerEl.closest('.mantine-Modal-content') ||
     triggerEl.closest('[role="dialog"]')
 
   if (boundary instanceof HTMLElement) {
@@ -545,8 +544,8 @@ const ModelDropdown: React.FC<
   const selectedModel = allModels.find((model) => model.id === value)
   const selectedModelCountry = getCountryOfConcern(value)
 
-  // Grouped by provider, in LLM_PROVIDER_ORDER — mirrors the old Mantine
-  // Select `data`/`group` shape, but nested per Base UI Combobox's grouping API.
+  // Grouped by provider, in LLM_PROVIDER_ORDER, nested per Base UI
+  // Combobox's grouping API.
   const groupedModels: ModelComboboxGroup[] = Object.entries(
     enabledProvidersAndModels,
   )
@@ -616,9 +615,7 @@ const ModelDropdown: React.FC<
             await onChange(selected.value)
           }}
         >
-          <ComboboxInputGroup
-            className="w-full cursor-pointer border-none bg-(--modal-button) text-(--modal-button-text) hover:bg-(--modal-button-hover) hover:text-(--modal-button-text-hover)"
-          >
+          <ComboboxInputGroup className="w-full cursor-pointer border-none bg-(--modal-button) text-(--modal-button-text) hover:bg-(--modal-button-hover) hover:text-(--modal-button-text-hover)">
             {selectedModel && (
               <Image
                 // @ts-ignore -- this being missing is fine

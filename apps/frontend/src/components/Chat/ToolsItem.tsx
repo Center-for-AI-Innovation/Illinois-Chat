@@ -90,7 +90,6 @@ export const ToolsItem = ({}) => {
               />
             </div>
 
-            {/* unable to use this until v7 of mantine since we can't control the hover color              highlightOnHover */}
             <Table
               aria-label="Tools configuration"
               className="w-[90%] text-(--modal-text)"
@@ -149,9 +148,7 @@ export const ToolsItem = ({}) => {
                     >
                       <Switch
                         checked={tool_obj.enabled}
-                        onCheckedChange={() =>
-                          handleToggleChecked(tool_obj.id)
-                        }
+                        onCheckedChange={() => handleToggleChecked(tool_obj.id)}
                         size={isSmallScreen ? 'sm' : 'lg'}
                       />
                     </TableCell>
@@ -160,9 +157,7 @@ export const ToolsItem = ({}) => {
                 {filteredTools.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4}>
-                      <span className="block text-center">
-                        No tools found
-                      </span>
+                      <span className="block text-center">No tools found</span>
                     </TableCell>
                   </TableRow>
                 )}

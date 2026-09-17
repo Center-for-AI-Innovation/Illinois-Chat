@@ -79,10 +79,10 @@ interface SortStatus {
 }
 
 /*
- * mantine-datatable rendered this table with `withBorder` + `withColumnBorders`
- * — a full grid. The shared shadcn <Table> only draws row separators, so the
- * vertical dividers and the `--table-border` color are reapplied here rather
- * than in `table.tsx`, which every other table in the app also renders.
+ * This table is drawn as a full grid. The shared shadcn <Table> only draws row
+ * separators, so the vertical dividers and the `--table-border` color are
+ * applied here rather than in `table.tsx`, which every other table in the app
+ * also renders.
  */
 const TABLE_GRID_CLASSES = [
   '[&_tr]:border-(--table-border)',
@@ -111,7 +111,8 @@ function SortableColumnHeader({
       onClick={() =>
         onSortStatusChange({
           columnAccessor: accessor,
-          direction: isActive && sortStatus.direction === 'asc' ? 'desc' : 'asc',
+          direction:
+            isActive && sortStatus.direction === 'asc' ? 'desc' : 'asc',
         })
       }
     >
@@ -130,10 +131,9 @@ function SortableColumnHeader({
 }
 
 /*
- * mantine-datatable put each column's filter behind a funnel icon that opened a
- * popover, keeping the header a single compact row. The first pass at this
- * conversion inlined an always-visible input under every label, which doubled
- * the header's height; this restores the original's shape.
+ * Each column's filter sits behind a funnel icon that opens a popover, which
+ * keeps the header a single compact row — an always-visible input under every
+ * label doubles the header's height.
  */
 function FilterPopover({
   label,
@@ -540,8 +540,7 @@ export function ProjectFilesTable({
     })
   }
 
-  const activeDocuments =
-    tabValue === 'failed' ? failedDocuments : documents
+  const activeDocuments = tabValue === 'failed' ? failedDocuments : documents
   const records: CourseDocument[] = activeDocuments?.final_docs ?? []
   const totalRecords: number = activeDocuments?.total_count ?? 0
   const isLoading =
@@ -561,7 +560,9 @@ export function ProjectFilesTable({
     records.some((record) => selectedRecords.includes(record)) &&
     !allSelectableChecked
 
-  const handleSelectedRecordsChange = (newSelectedRecords: CourseDocument[]) => {
+  const handleSelectedRecordsChange = (
+    newSelectedRecords: CourseDocument[],
+  ) => {
     if (newSelectedRecords.length > 0) {
       setSelectedRecords(newSelectedRecords)
       setShowDeleteButton(true)
@@ -711,7 +712,9 @@ export function ProjectFilesTable({
                         aria-label="Filter by document group"
                         value={selectedDocGroups}
                         placeholder={
-                          isLoadingDocumentGroups ? 'Loading...' : 'Select Group'
+                          isLoadingDocumentGroups
+                            ? 'Loading...'
+                            : 'Select Group'
                         }
                         disabled={isLoadingDocumentGroups}
                         onChange={async (newSelectedGroupsFromDropdown) => {
@@ -1070,19 +1073,19 @@ export function ProjectFilesTable({
                           />
                         </TableCell>
                       )}
-                      <TableCell className="whitespace-normal break-words">
+                      <TableCell className="break-words whitespace-normal">
                         {record.readable_filename ?? ''}
                       </TableCell>
                       <TableCell
-                        className="whitespace-normal break-words"
+                        className="break-words whitespace-normal"
                         style={{ maxWidth: '14vw' }}
                       >
                         {record.url ?? ''}
                       </TableCell>
-                      <TableCell className="whitespace-normal break-words">
+                      <TableCell className="break-words whitespace-normal">
                         {record.base_url ?? ''}
                       </TableCell>
-                      <TableCell className="whitespace-normal break-words">
+                      <TableCell className="break-words whitespace-normal">
                         {record.created_at
                           ? new Date(record.created_at).toLocaleString()
                           : ''}
@@ -1247,7 +1250,10 @@ export function ProjectFilesTable({
               </DialogTitle>
             </DialogHeader>
             <div className="flex items-center justify-center p-4">
-              <pre className="w-full overflow-x-auto rounded-md bg-(--modal) p-0 text-sm text-(--modal-text)" style={{ whiteSpace: 'pre-wrap', lineHeight: '165%' }}>
+              <pre
+                className="w-full overflow-x-auto rounded-md bg-(--modal) p-0 text-sm text-(--modal-text)"
+                style={{ whiteSpace: 'pre-wrap', lineHeight: '165%' }}
+              >
                 <div className="flex justify-end">
                   <Tooltip>
                     <TooltipTrigger
@@ -1298,8 +1304,7 @@ export function ProjectFilesTable({
               </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-(--modal-text)">
-              Are you sure you want to export all the documents and
-              embeddings?
+              Are you sure you want to export all the documents and embeddings?
             </p>
             <DialogFooter>
               <Button
@@ -1355,7 +1360,7 @@ function ErrorStateForProjectFilesTable() {
         <img
           src="https://assets.kastan.ai/this-is-fine.jpg"
           alt="No data found"
-          className="min-w-[300px] max-w-[30vw] rounded-lg"
+          className="max-w-[30vw] min-w-[300px] rounded-lg"
         />
         <p className="text-center text-base text-(--foreground-faded)">
           So.. please try again later.

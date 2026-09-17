@@ -70,7 +70,7 @@ describe('getModelDropdownMaxHeight', () => {
     ).toBe(332)
 
     // Too cramped for a usable list: keep the readable floor and let the modal clip/scroll,
-    // rather than collapsing to a sliver (or to 0, which Mantine renders as an empty box).
+    // rather than collapsing to a sliver (or to 0, which renders as an empty box).
     expect(
       getModelDropdownMaxHeight({
         triggerRect: { top: 150, bottom: 180 },
@@ -79,7 +79,7 @@ describe('getModelDropdownMaxHeight', () => {
     ).toBe(160)
   })
 
-  it('never returns a height that Mantine renders as an empty dropdown', async () => {
+  it('never returns a height that renders as an empty dropdown', async () => {
     const { getModelDropdownMaxHeight } = await import('../ModelSelect')
 
     // Trigger taller than its container — both sides measure negative.
@@ -113,7 +113,7 @@ describe('toRemScaledDropdownHeight', () => {
   it('shrinks the value so a larger root font still resolves to the measured pixels', async () => {
     const { toRemScaledDropdownHeight } = await import('../ModelSelect')
 
-    // Mantine emits `value / 16` rem, so at a 20px root the prop must be pre-scaled:
+    // The height is emitted as `value / 16` rem, so at a 20px root the prop must be pre-scaled:
     // 265.6 / 16 = 16.6rem, and 16.6rem * 20px = 332px.
     const scaled = toRemScaledDropdownHeight(332, 20)
     expect(scaled).toBeCloseTo(265.6)

@@ -1,10 +1,15 @@
 /*
-  Tailwind v4 normally emits preflight and the utilities into real CSS cascade
-  layers. Mantine v6 injects its emotion styles unlayered at runtime, and
-  unlayered CSS beats every layer regardless of specificity — so layered
-  preflight and utilities would lose to Mantine everywhere. Importing these two
-  parts without `layer(...)` keeps them unlayered, which is how they behaved in
-  v3. Theme stays layered: it only defines custom properties.
+  Preflight and the utilities are imported WITHOUT `layer(...)`, which keeps
+  them unlayered and competing on specificity, the way they behaved in v3.
+
+  This is load-bearing: the ~40KB of custom rules in this file are themselves
+  unlayered, so moving the utilities into `layer(utilities)` would make every
+  one of those rules win against any utility on the same element, no matter
+  how specific. That was tried and visibly broke the app.
+
+  Re-layering is still the right end state, but it is not a one-line change —
+  it means auditing the custom rules below and layering them too. Theme stays
+  layered: it only defines custom properties.
 */
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/preflight.css';
@@ -61,11 +66,8 @@
 }
 
 /*
- * Heading scale ported from the Mantine theme (_app.tsx MantineProvider) plus
- * Mantine 6's own heading defaults, for every native <h1>-<h6> that replaces a
- * migrated Mantine <Title order={n}>. h1/h2 are this app's theme overrides;
- * h3-h6 are Mantine 6 library defaults (the theme never touched them). See
- * docs/mantine-retirement-styles-notes.md and issue #232.
+ * Heading scale for every native <h1>-<h6>. h1/h2 carry this app's own
+ * overrides; h3-h6 are the inherited defaults. See issue #232.
  */
 .heading-h1 {
   font-size: 3rem;
@@ -98,8 +100,8 @@
   font-weight: 700;
 }
 
-/* Shimmer placeholder shown on <img> while it loads (was Mantine createStyles
-   in ImagePreview.tsx: a panning gradient, not an opacity pulse). */
+/* Shimmer placeholder shown on <img> while it loads: a panning gradient,
+   not an opacity pulse. */
 @keyframes image-loading-shimmer {
   0% {
     background-position: -600px 0;
@@ -117,17 +119,6 @@
   );
   background-size: 600px;
   animation: image-loading-shimmer 1.2s infinite;
-}
-
-/* WCAG 1.4.10 Reflow — ensure modals and popups remain accessible at all zoom levels */
-.mantine-Modal-content,
-.mantine-Modal-body {
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.mantine-Modal-inner {
-  padding: 1rem;
 }
 
 /* .grid-container {
@@ -1478,76 +1469,6 @@ button.css-s37qmw {
   position: relative;
   z-index: 0;
   /* Changed from 1 to 0 to match surrounding text */
-}
-
-/*
-changed dashboard > projectFilesTable checkboxes because dataTable v6 doesn't have a way to style it directly
-after changing to v8+, this can be removed and use checkboxProps to style the checkbox
-https://icflorescu.github.io/mantine-datatable/examples/records-selection/
-*/
-
-.project_files_table .mantine-Checkbox-input {
-  color: var(--button-text-color);
-  background-color: transparent;
-  border: 1px solid var(--button-border);
-}
-
-.project_files_table .mantine-Table-root {
-  thead {
-    th {
-      background-color: var(--table-header-background);
-
-      &:hover {
-        background-color: var(--table-header-hover-background);
-      }
-    }
-  }
-}
-
-.project_files_table .mantine-ActionIcon-root {
-  color: var(--foreground-faded);
-  background-color: transparent;
-  border: 1px solid var(--button-border);
-
-  &:hover {
-    background-color: var(--button-hover);
-    border-color: var(--button-hover);
-  }
-
-  svg {
-    color: var(--foreground-faded);
-  }
-}
-
-.project_files_table .mantine-Center-root {
-  color: var(--foreground-faded);
-
-  > div {
-    background-color: transparent; /* hack to remove no records icon */
-  }
-
-  .tabler-icon {
-    color: var(--foreground-faded);
-  }
-}
-
-.project_files_table .mantine-ScrollArea-root {
-  background-color: var(--dashboard-background-faded);
-
-  border-radius: 0px;
-}
-
-/* Ensure Mantine form labels have sufficient color contrast */
-.mantine-TextInput-label,
-.mantine-Select-label,
-.mantine-PasswordInput-label {
-  color: var(--foreground);
-}
-
-.project_files_table .mantine-ScrollArea-viewport {
-  > div > div:not(.mantine-MultiSelect-itemsWrapper) {
-    display: none; /* hack to hide the scroll shadows */
-  }
 }
 
 /* table is also older v6 version and needs to be updated */

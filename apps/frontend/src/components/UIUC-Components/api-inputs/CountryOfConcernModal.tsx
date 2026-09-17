@@ -23,8 +23,6 @@ interface CountryOfConcernModalProps {
  * Confirmation modal shown before an admin enables a country-of-concern model
  * or sets one as the chatbot default.
  *
- * Both flows previously rendered an unstyled Mantine modal with Tailwind
- * yellow and default system fonts, which did not match the design system.
  * Styling lives here so the two entry points cannot drift: modal chrome uses
  * the --modal* tokens (as in LinkGeneratorModal), copy uses Montserrat, the
  * warning icon uses --illinois-orange, and the confirm button uses the

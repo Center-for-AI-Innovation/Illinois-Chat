@@ -27,8 +27,8 @@ export const AuthMenu = ({ size = 34 }: AuthMenuProps) => {
   if (auth.isAuthenticated) {
     return (
       <DropdownMenu>
-        {/* Gradient avatar with a diagonal "shine" that sweeps across on hover.
-            Shine + lift reproduced from the former Mantine createStyles ::after. */}
+        {/* Gradient avatar with a diagonal "shine" that sweeps across on
+            hover, drawn with an ::after pseudo-element. */}
         <DropdownMenuTrigger
           nativeButton={false}
           render={

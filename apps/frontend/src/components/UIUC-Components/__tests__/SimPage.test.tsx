@@ -84,8 +84,8 @@ describe('SimPage', () => {
 
     renderWithProviders(<SimPage course_name="CS101" />)
 
-    // The three config inputs are label-associated, which the Mantine
-    // <TextInput label=...> gave for free and the conversion wires by hand.
+    // The three config inputs are label-associated, which the shadcn
+    // primitives require wiring by hand.
     expect(await screen.findByLabelText('API Key')).toBeInTheDocument()
     expect(screen.getByLabelText('Workspace ID')).toHaveValue('ws-42')
     expect(screen.getByLabelText('Base URL (optional)')).toBeInTheDocument()
