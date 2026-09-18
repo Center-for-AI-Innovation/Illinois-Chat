@@ -58,7 +58,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <h3
-                  className={`pl-4 ${montserrat_heading.variable} font-montserratHeading text-lg sm:text-2xl`}
+                  className={`pl-4 ${montserrat_heading.variable} font-montserratHeading text-lg font-bold sm:text-2xl`}
                 >
                   Concept Map of User Queries
                 </h3>

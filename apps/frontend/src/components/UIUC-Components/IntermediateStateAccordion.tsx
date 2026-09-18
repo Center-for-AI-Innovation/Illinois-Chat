@@ -61,7 +61,7 @@ export const IntermediateStateAccordion = ({
                   className={
                     disableChevronRotation
                       ? undefined
-                      : 'transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-90'
+                      : 'transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-180'
                   }
                 />
               )

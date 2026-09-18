@@ -22,17 +22,19 @@ export function TablePaginationFooter({
   className,
 }: TablePaginationFooterProps) {
   const totalPages = Math.max(1, Math.ceil(totalRecords / recordsPerPage))
-  const from = totalRecords === 0 ? 0 : (page - 1) * recordsPerPage + 1
-  const to = Math.min(page * recordsPerPage, totalRecords)
+  // Deleting or filtering can shrink the total while the caller still holds a
+  // now-out-of-range page, so clamp rather than render an impossible range
+  // (e.g. `101-100 of 100`) until the caller catches up.
+  const currentPage = Math.min(Math.max(1, page), totalPages)
+  const from = totalRecords === 0 ? 0 : (currentPage - 1) * recordsPerPage + 1
+  const to = Math.min(currentPage * recordsPerPage, totalRecords)
 
   return (
     <div
       className={`flex items-center justify-between gap-2 px-2 py-2 text-sm text-(--foreground) ${className ?? ''}`}
     >
       <span aria-live="polite">
-        {totalRecords === 0
-          ? 'No records'
-          : `${from}–${to} of ${totalRecords}`}
+        {totalRecords === 0 ? 'No records' : `${from}–${to} of ${totalRecords}`}
       </span>
       <div className="flex items-center gap-1">
         <Button
@@ -40,21 +42,24 @@ export function TablePaginationFooter({
           variant="ghost"
           size="icon-sm"
           aria-label="Previous page"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
         >
           <IconChevronLeft size={16} aria-hidden="true" />
         </Button>
-        <span aria-hidden="true" className="min-w-12 text-center">
-          {page} / {totalPages}
+        <span className="min-w-12 text-center">
+          <span aria-hidden="true">
+            {currentPage} / {totalPages}
+          </span>
+          <span className="sr-only">{`Page ${currentPage} of ${totalPages}`}</span>
         </span>
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           aria-label="Next page"
-          disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}
+          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
         >
           <IconChevronRight size={16} aria-hidden="true" />
         </Button>

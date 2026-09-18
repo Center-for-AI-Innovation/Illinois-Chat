@@ -599,7 +599,7 @@ const Home: NextPage = () => {
                 tabIndex={0}
                 className={buttonVariants({
                   className:
-                    'mt-8 rounded-sm border border-(--illinois-white) bg-none text-(--illinois-white) hover:bg-transparent focus:bg-(--dashboard-button)',
+                    'mt-8 rounded-sm border border-(--illinois-white) bg-transparent text-(--illinois-white) hover:bg-white/10 focus:bg-(--dashboard-button)',
                 })}
                 href="https://docs.uiuc.chat/api"
                 target="_blank"

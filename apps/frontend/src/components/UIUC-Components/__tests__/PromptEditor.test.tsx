@@ -938,8 +938,10 @@ describe('PromptEditor', () => {
       // Click Cancel in the modal
       const cancelButtons = screen.getAllByRole('button', { name: /Cancel/i })
       const modalCancel =
-        cancelButtons.find((btn) => btn.closest('[class*="Modal"]')) ??
-        cancelButtons[0]!
+        cancelButtons.find((btn) =>
+          btn.closest('[data-slot="dialog-content"]'),
+        ) ?? cancelButtons[0]!
+      expect(modalCancel.closest('[data-slot="dialog-content"]')).not.toBeNull()
       await user.click(modalCancel)
 
       await waitFor(() => {

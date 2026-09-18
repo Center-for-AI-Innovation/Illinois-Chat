@@ -47,13 +47,13 @@ export const FancyRetrieval = () => {
           <TooltipTrigger render={<div />}>
             {isSmallScreen ? (
               <h5
-                className={`${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+                className={`heading-h5 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
               >
                 Fancy Retrieval
               </h5>
             ) : (
               <h4
-                className={`${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+                className={`heading-h4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
               >
                 Fancy Retrieval
               </h4>
@@ -93,8 +93,8 @@ export const FancyRetrieval = () => {
             } font-montserratParagraph`}
             arrowClassName="bg-(--tooltip-background) fill-(--tooltip-background)"
           >
-            Multi-Query Retrieval is disabled for performance reasons,
-            I&apos;m working to bring it back ASAP.
+            Multi-Query Retrieval is disabled for performance reasons, I&apos;m
+            working to bring it back ASAP.
           </TooltipContent>
         </Tooltip>
         {/* <ModelParams

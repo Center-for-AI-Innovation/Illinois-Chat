@@ -74,9 +74,10 @@ const TABLE_REFRESH_INTERVAL_MS = 5 * 60_000
 
 /*
  * react-query hands back freshly constructed objects on every refetch, so
- * selection has to be tracked by a stable key (mantine-datatable used its
- * `idAccessor`) rather than by object identity, or the checkboxes desync from
- * `selectedRecords` the first time the table refreshes.
+ * selection has to be tracked by a stable key (the previous table
+ * implementation used its own id accessor) rather than by object identity, or
+ * the checkboxes desync from `selectedRecords` the first time the table
+ * refreshes.
  */
 const getRecordKey = (record: CourseDocument): string | number | null =>
   record.id ?? record.s3_path ?? record.url ?? null

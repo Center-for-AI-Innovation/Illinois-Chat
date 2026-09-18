@@ -77,7 +77,7 @@ export default function Unsubscribe() {
       <div className="w-full max-w-md space-y-6 rounded-lg bg-[#15162c] p-8 shadow-lg">
         <div className="space-y-2 text-center">
           <h3
-            className={`${montserrat_heading.className} inline-block p-0 text-neutral-200 select-text`}
+            className={`heading-h3 ${montserrat_heading.className} inline-block p-0 text-neutral-200 select-text`}
           >
             Unsubscribe <span style={{ fontSize: '22px' }}>🎉</span>
           </h3>
