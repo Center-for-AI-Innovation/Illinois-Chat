@@ -20,8 +20,10 @@ import os
 from flask import Flask, jsonify, request
 
 try:
+    from ai_ta_backend.rabbitmq.ingest_auth import ingest_request_is_authorized
     from ai_ta_backend.rabbitmq.rmqueue import Queue
 except ModuleNotFoundError:  # standalone container: rabbitmq dir is the workdir
+    from ingest_auth import ingest_request_is_authorized
     from rmqueue import Queue
 
 logging.basicConfig(level=logging.INFO)
@@ -47,7 +49,7 @@ def ingest():
     """Queue an ingest job. Accepts the same payload as the backend /ingest:
     course_name, readable_filename, s3_paths | content | url, base_url, groups, ...
     """
-    if INGEST_API_KEY and request.headers.get("Authorization", "") != f"Bearer {INGEST_API_KEY}":
+    if not ingest_request_is_authorized(request.headers.get("Authorization"), INGEST_API_KEY):
         return jsonify({"error": "unauthorized"}), 401
 
     data = request.get_json(force=True, silent=True)

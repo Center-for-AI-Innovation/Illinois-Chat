@@ -1,5 +1,4 @@
 import asyncio
-import hmac
 import os
 import re
 import time
@@ -54,6 +53,7 @@ from ai_ta_backend.utils.email.send_transactional_email import send_email
 from ai_ta_backend.utils.pubmed_extraction import extractPubmedData
 from ai_ta_backend.utils.rerun_webcrawl_for_project import webscrape_documents
 from ai_ta_backend.rabbitmq.rmqueue import Queue
+from ai_ta_backend.rabbitmq.ingest_auth import ingest_request_is_authorized
 from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
 
 app = Flask(__name__)
@@ -657,9 +657,7 @@ INGEST_API_KEY = os.getenv("INGEST_API_KEY")
 
 
 def _ingest_request_is_authorized() -> bool:
-  if not INGEST_API_KEY:
-    return True
-  return hmac.compare_digest(request.headers.get("Authorization", ""), f"Bearer {INGEST_API_KEY}")
+  return ingest_request_is_authorized(request.headers.get("Authorization"), INGEST_API_KEY)
 
 
 @app.route('/ingest', methods=['POST'])
