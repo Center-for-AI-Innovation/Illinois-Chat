@@ -30,6 +30,21 @@ services:
       SSO_PROVIDER_ID: ${SIM_SSO_PROVIDER_ID:-uiuc-keycloak}
       SSO_TRUSTED_PROVIDER_IDS: ${SIM_SSO_PROVIDER_ID:-uiuc-keycloak}
       TRUSTED_ORIGINS: ${SIM_TRUSTED_ORIGINS:-http://localhost:3010,http://localhost:3011,http://keycloak:8080}
+      # Block whitelist. Set ALLOWED_INTEGRATIONS in .env; this line only passes it
+      # through under the same name, so there is one source of truth and nobody has
+      # to reason about a compose default and an .env value at the same time.
+      # .env.template ships the full list; copy it.
+      #
+      # No default here on purpose. A value Sim receives as EMPTY means UNRESTRICTED,
+      # so `:?` is what stops a missing variable from silently dropping the policy:
+      # the stack refuses to start instead. Do not change it to `:-`.
+      #
+      # Ids are matched exactly, lowercased, with no version resolution on this pinned
+      # image - "slack" does NOT permit "slack_v2". Core blocks are NOT exempt.
+      # Re-verify every id after an image digest bump: upstream later canonicalizes
+      # versions, which would silently widen the list.
+      # See docs/sim-developer-guide.md section 5.
+      ALLOWED_INTEGRATIONS: ${ALLOWED_INTEGRATIONS:?ALLOWED_INTEGRATIONS is unset or empty. Sim treats an empty value as UNRESTRICTED, so the stack will not start without it. Copy the list from .env.template into your .env.}
     depends_on:
       sim-db:
         condition: service_healthy
