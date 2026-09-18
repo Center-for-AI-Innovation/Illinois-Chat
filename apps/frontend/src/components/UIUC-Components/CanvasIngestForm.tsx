@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Text, Card, Button, Input, Checkbox, Alert } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import { Input } from '@/components/shadcn/ui/input'
+import { Checkbox } from '@/components/shadcn/ui/checkbox'
+import {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+} from '@/components/shadcn/ui/alert'
 import { IconArrowRight, IconAlertTriangle } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import {
@@ -150,10 +157,7 @@ export default function CanvasIngestForm({
           nativeButton={false}
           className="focus:bg-(--dashboard-background-dark)"
           render={
-            <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-              style={{ height: '100%' }}
-            >
+            <div className="group relative h-full cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
               <div className="mb-2 -ml-2 flex items-center justify-between">
                 <div className="flex items-center space-x-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full">
@@ -165,14 +169,14 @@ export default function CanvasIngestForm({
                       className="object-contain"
                     />
                   </div>
-                  <Text className="text-xl font-semibold">Canvas</Text>
+                  <p className="text-xl font-semibold">Canvas</p>
                 </div>
               </div>
 
-              <Text className="text-sm leading-relaxed text-(--dashboard-foreground-faded)">
+              <p className="text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content directly from your Canvas course, including
                 assignments, discussions, files, and more.
-              </Text>
+              </p>
               <div className="mt-4 flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
@@ -181,7 +185,7 @@ export default function CanvasIngestForm({
                   className="ml-2 transition-transform group-hover:translate-x-1"
                 />
               </div>
-            </Card>
+            </div>
           }
         />
 
@@ -192,43 +196,37 @@ export default function CanvasIngestForm({
             </DialogTitle>
           </DialogHeader>
 
-          <Alert
-            icon={<IconAlertTriangle size={18} aria-hidden="true" />}
-            color="red"
-            title="IMPORTANT: Canvas Permission Required"
-            className="mb-4 bg-(--background-faded) text-(--illinois-orange)"
-            styles={{
-              message: {
-                color: 'var(--modal-text)',
-              },
-            }}
-          >
-            <span className="font-semibold">
-              Before proceeding, you MUST add the UIUC Chatbot as a student to
-              your Canvas course at{' '}
-              <NextLink
-                href="https://canvas.illinois.edu/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-(--link) hover:underline"
-              >
-                https://canvas.illinois.edu
-              </NextLink>
-            </span>
-            <div className="mt-2">
-              • Bot email:{' '}
-              <span className="font-mono text-(--illinois-orange)">
-                uiuc.chat@ad.uillinois.edu
+          <Alert className="mb-4 gap-2 bg-(--background-faded) text-(--illinois-orange)">
+            <IconAlertTriangle size={18} aria-hidden="true" />
+            <AlertTitle>IMPORTANT: Canvas Permission Required</AlertTitle>
+            <AlertDescription className="text-(--modal-text)">
+              <span className="font-semibold">
+                Before proceeding, you MUST add the UIUC Chatbot as a student to
+                your Canvas course at{' '}
+                <NextLink
+                  href="https://canvas.illinois.edu/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-(--link) hover:underline"
+                >
+                  https://canvas.illinois.edu
+                </NextLink>
               </span>
-              <br />• Bot name:{' '}
-              <span className="font-mono text-(--illinois-orange)">
-                UIUC Course AI
-              </span>
-            </div>
-            <div className="mt-2 text-xs italic">
-              This is required for access to any of your Canvas content. The AI
-              can only see what students/TAs have access to.
-            </div>
+              <div className="mt-2">
+                • Bot email:{' '}
+                <span className="font-mono text-(--illinois-orange)">
+                  uiuc.chat@ad.uillinois.edu
+                </span>
+                <br />• Bot name:{' '}
+                <span className="font-mono text-(--illinois-orange)">
+                  UIUC Course AI
+                </span>
+              </div>
+              <div className="mt-2 text-xs italic">
+                This is required for access to any of your Canvas content. The
+                AI can only see what students/TAs have access to.
+              </div>
+            </AlertDescription>
           </Alert>
 
           <div className="mb-4 overflow-hidden rounded-md">
@@ -268,44 +266,26 @@ export default function CanvasIngestForm({
                 </div>
               </div>
 
-              <Input
-                id="canvas-url"
-                aria-label="Canvas course URL"
-                icon={
-                  <Image
-                    src="/media/canvas_logo.png"
-                    alt="Canvas Logo"
-                    width={24}
-                    height={24}
-                    className="object-contain"
-                  />
-                }
-                className="mt-4 w-full rounded-full"
-                styles={{
-                  input: {
-                    color: 'var(--foreground)',
-                    backgroundColor: 'var(--background-faded)',
-                    borderColor: 'var(--background-dark)',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    '&:focus': {
-                      borderColor: 'var(--illinois-orange)',
-                    },
-                  },
-                  wrapper: {
-                    width: '100%',
-                  },
-                }}
-                placeholder="https://canvas.illinois.edu/courses/12345"
-                radius="md"
-                type="url"
-                value={url}
-                size="lg"
-                onChange={(e) => {
-                  handleUrlChange(e)
-                }}
-              />
+              <div className="relative mt-4 w-full">
+                <Image
+                  src="/media/canvas_logo.png"
+                  alt="Canvas Logo"
+                  width={24}
+                  height={24}
+                  className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 object-contain"
+                />
+                <Input
+                  id="canvas-url"
+                  aria-label="Canvas course URL"
+                  className="h-12 w-full truncate rounded-full border-(--background-dark) bg-(--background-faded) pl-11 text-(--foreground) focus-visible:border-(--illinois-orange)"
+                  placeholder="https://canvas.illinois.edu/courses/12345"
+                  type="url"
+                  value={url}
+                  onChange={(e) => {
+                    handleUrlChange(e)
+                  }}
+                />
+              </div>
             </div>
 
             <div className="mt-4">
@@ -328,30 +308,19 @@ export default function CanvasIngestForm({
                   'Assignments',
                   'Discussions',
                 ].map((option) => (
-                  <div
+                  <label
                     key={option}
-                    className="flex items-center space-x-2 rounded-lg bg-(--background-faded) p-2 text-(--foreground)"
+                    className="flex cursor-pointer items-center space-x-2 rounded-lg bg-(--background-faded) p-2 text-(--foreground)"
                   >
                     <Checkbox
-                      id={option.toLowerCase()}
                       checked={selectedOptions.includes(option.toLowerCase())}
-                      onChange={() => handleOptionChange(option.toLowerCase())}
-                      label={option}
-                      styles={{
-                        input: {
-                          backgroundColor: 'var(--background-faded)',
-                          borderColor: 'var(--background-dark)',
-                          '&:checked': {
-                            backgroundColor: 'var(--button)',
-                            borderColor: 'var(--button)',
-                          },
-                        },
-                        label: {
-                          color: 'var(--foreground)',
-                        },
-                      }}
+                      onCheckedChange={() =>
+                        handleOptionChange(option.toLowerCase())
+                      }
+                      className="border-(--background-dark) bg-(--background-faded)"
                     />
-                  </div>
+                    <span>{option}</span>
+                  </label>
                 ))}
               </div>
             </div>

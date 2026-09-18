@@ -318,7 +318,7 @@ describe('Sidebar – additional coverage', () => {
         } as any,
       })
 
-      // Use the Mantine Button with title="Admin Dashboard" (the settings icon)
+      // Use the button with title="Admin Dashboard" (the settings icon)
       const settingsBtn = screen.getAllByTitle('Admin Dashboard')[0]!
       await userEvent.setup().click(settingsBtn)
 

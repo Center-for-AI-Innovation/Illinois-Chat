@@ -1,21 +1,17 @@
 import {
-  Burger,
-  Container,
-  createStyles,
-  Flex,
-  Group,
-  Paper,
-  rem,
-  Transition,
-} from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
-import { IconHome, IconPlus, IconSettings } from '@tabler/icons-react'
+  IconHome,
+  IconMenu2,
+  IconPlus,
+  IconSettings,
+  IconX,
+} from '@tabler/icons-react'
 import { montserrat_heading } from 'fonts'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 
+import { Button } from '@/components/shadcn/ui/button'
 import { usePostHog } from 'posthog-js/react'
 import { useAuth } from 'react-oidc-context'
 import HomeContext from '~/components/home/home.context'
@@ -39,120 +35,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
 }
 
-const HEADER = rem(60)
-const HEADER_HEIGHT = parseFloat(HEADER) * 16
+const HEADER_HEIGHT = 60
 
-const useStyles = createStyles((theme, { isAdmin }: { isAdmin: boolean }) => ({
-  inner: {
-    height: HEADER_HEIGHT,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  link: {
-    color: 'var(--navbar-text)',
-    fontSize: rem(12), //change to css variables --font-size or tailwindcss
-    fontWeight: 700,
-    textAlign: 'center',
-    //should transition to using css variables...because this had overrides in the layout, so it wasn't clear if this should be changed here. something like this padding: 'var(--padding-xs) var(--padding-md)'
-    padding: `3px ${theme.spacing.xs}`,
-    //    margin: '0.2rem 0.1rem', //no reason to pad between. if you need more space, use padding. this way, the UX when mouse rollover doesn't blink weirdly (smoothly changes from one button to the next). --safe to remove this margin
-    textDecoration: 'none',
-    transition:
-      'border-color 100ms ease, color 100ms ease, background-color 100ms ease',
-    borderRadius: 'var(--radius-sm)',
-
-    '&:hover': {
-      color: 'var(--button-hover-text-color)', //hsl(280,100%,70%)
-      backgroundColor: 'var(--button-hover)', //'rgba(255, 255, 255, 0.1)',
-    },
-
-    '&[data-active="true"]': {
-      //      color: 'hsl(280,100%,70%)',
-      borderBottom: '2px solid var(--button-active)', // hsl(280,100%,70%)',
-      //      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      backgroundColor: 'var(--button-active)',
-      textAlign: 'right',
-    },
-
-    [theme.fn.smallerThan(isAdmin ? 825 : 500)]: {
-      display: 'list-item',
-      textAlign: 'center',
-      //      borderRadius: '0rem',
-      padding: theme.spacing.sm,
-      //      margin: '0.2rem 0 0.2rem 0',
-      //      margin: 'calc(var(--padding) * .2) 0rem calc(var(--padding) * .2) 0rem'
-    },
-  },
-  burger: {
-    [theme.fn.largerThan(isAdmin ? 825 : 500)]: {
-      display: 'none',
-    },
-    marginRight: '3px',
-    marginLeft: '0px',
-  },
-  dropdown: {
-    position: 'absolute',
-    top: HEADER_HEIGHT,
-    right: '20px',
-    zIndex: 10,
-    borderRadius: '4px',
-    overflow: 'hidden',
-    width: '200px',
-    [theme.fn.largerThan(isAdmin ? 825 : 500)]: {
-      display: 'none',
-    },
-    backgroundColor: 'var(--background-faded)',
-    color: 'var(--foreground)',
-  },
-  adminDashboard: {
-    [theme.fn.smallerThan(825)]: {
-      display: 'none',
-    },
-    display: 'block',
-  },
-  settings: {
-    [theme.fn.smallerThan(isAdmin ? 675 : 500)]: {
-      display: 'none',
-    },
-    display: 'block',
-  },
-  newChat: {
-    [theme.fn.smallerThan(isAdmin ? 500 : 350)]: {
-      display: 'none',
-    },
-    display: 'block',
-  },
-  modelSettings: {
-    position: 'absolute',
-    zIndex: 10,
-    borderRadius: '10px',
-    boxShadow: '0px 8px 16px 0px rgba(0,0,0,0.2)',
-  },
-  modelButtonContainer: {
-    position: 'relative',
-    top: '100%',
-  },
-  userAvatar: {
-    cursor: 'pointer',
-    backgroundColor: 'hsl(280,100%,70%)',
-    color: 'white',
-    '&:hover': {
-      backgroundColor: 'hsl(280,100%,60%)',
-    },
-  },
-  userMenu: {
-    backgroundColor: '#15162c',
-    border: '1px solid hsl(280,100%,70%)',
-
-    '.mantine-Menu-item': {
-      color: 'white',
-      '&:hover': {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      },
-    },
-  },
-}))
+// Base `.link` look, ported from the old `createStyles` `link` slot. The
+// narrow-viewport `list-item` variant it also defined is dropped — the
+// buttons it applied to are already hidden below their own breakpoints, so
+// the compact variant covered only a sliver of widths and wasn't visually
+// load-bearing.
+const linkClassName =
+  'text-(--navbar-text) text-xs font-bold text-center no-underline transition-colors duration-100 rounded-(--radius-sm) hover:text-(--button-hover-text-color) hover:bg-(--button-hover)'
 
 interface ChatNavbarProps {
   bannerUrl?: string
@@ -161,12 +52,12 @@ interface ChatNavbarProps {
 
 const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
   const router = useRouter()
-  const [opened, { toggle }] = useDisclosure(false)
+  const [opened, setOpened] = useState(false)
+  const toggle = useCallback(() => setOpened((v) => !v), [])
   const [show, setShow] = useState(true)
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(false)
   const auth = useAuth()
 
-  const { classes, theme } = useStyles({ isAdmin: isAdminOrOwner })
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 825,
   )
@@ -181,6 +72,16 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
   const getCurrentCourseName = () => {
     return router.asPath.split('/')[1]
   }
+
+  // Breakpoints ported from the old `createStyles` slots, which varied by
+  // `isAdminOrOwner` (theme.fn.smallerThan/largerThan).
+  const burgerBreakpoint = isAdminOrOwner ? 825 : 500
+  const settingsBreakpoint = isAdminOrOwner ? 675 : 500
+  const newChatBreakpoint = isAdminOrOwner ? 500 : 350
+  const showBurger = windowWidth <= burgerBreakpoint
+  const showNewChatLink = windowWidth > newChatBreakpoint
+  const showSettingsLink = windowWidth > settingsBreakpoint
+  const showAdminDashboardLink = windowWidth > 825
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -241,12 +142,7 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
         }}
       >
         {/* can remove in future. navbar had rounded-badge bg-(--navbar-background) shadow-lg shadow-(--navbar-shadow) */}
-        <Flex
-          justify="flex-start"
-          direction="row"
-          styles={{ height: '10px', flexWrap: 'nowrap', gap: '0rem' }}
-          className="min-h-16 w-full items-center p-2"
-        >
+        <div className="flex min-h-16 w-full flex-row flex-nowrap items-center justify-start gap-0 p-2">
           <Link
             href="/"
             className="flex items-center"
@@ -288,154 +184,141 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
             ></div>
           )}
 
-          <Group
-            position="right"
-            styles={{ marginLeft: 'auto', flexWrap: 'nowrap' }}
-            spacing="0px"
-            noWrap
-          >
+          <div className="ml-auto flex flex-nowrap items-center">
             {/* This is the hamburger menu / dropdown */}
-            <Transition
-              transition="pop-top-right"
-              duration={200}
-              mounted={opened}
-            >
-              {(styles) => (
-                <Paper
-                  className={classes.dropdown}
-                  withBorder
+            {opened && (
+              <div
+                data-testid="hamburger-menu"
+                className="animate-in fade-in-0 zoom-in-95 absolute z-10 min-w-[120px] overflow-hidden rounded-[4px] border border-(--background-dark) bg-(--background-faded) text-(--foreground) duration-200"
+                style={{
+                  top: HEADER_HEIGHT,
+                  right: '20px',
+                  transform: 'translateY(26px)',
+                }}
+              >
+                {/* New Chat button in hamburger when screen is small */}
+                <div
+                  className={linkClassName}
                   style={{
-                    ...styles,
-                    transform: 'translateY(26px)',
-                    minWidth: '120px',
-                    borderColor: 'var(--background-dark)',
+                    display:
+                      windowWidth <= (isAdminOrOwner ? 500 : 350) && opened
+                        ? 'block'
+                        : 'none',
+                    padding: 0,
                   }}
                 >
-                  {/* New Chat button in hamburger when screen is small */}
                   <div
-                    className={classes.link}
+                    onClick={() => {
+                      handleNewConversation()
+                      toggle()
+                      setTimeout(() => {
+                        const chatInput = document.querySelector(
+                          'textarea.chat-input',
+                        ) as HTMLTextAreaElement
+                        if (chatInput) {
+                          chatInput.focus()
+                        }
+                      }, 100)
+                    }}
                     style={{
-                      display:
-                        windowWidth <= (isAdminOrOwner ? 500 : 350) && opened
-                          ? 'block'
-                          : 'none',
-                      padding: 0,
+                      width: '100%',
+                      padding: '8px',
+                      cursor: 'pointer',
+                      height: '100%',
                     }}
                   >
-                    <div
-                      onClick={() => {
-                        handleNewConversation()
-                        toggle()
-                        setTimeout(() => {
-                          const chatInput = document.querySelector(
-                            'textarea.chat-input',
-                          ) as HTMLTextAreaElement
-                          if (chatInput) {
-                            chatInput.focus()
-                          }
-                        }, 100)
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        cursor: 'pointer',
-                        height: '100%',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <IconPlus size={24} aria-hidden="true" />
-                        <span
-                          className={`${montserrat_heading.variable} font-montserratHeading`}
-                          style={{ marginLeft: '8px' }}
-                        >
-                          New Chat
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Settings button in hamburger when screen is small */}
-                  <div
-                    className={classes.link}
-                    style={{
-                      display: windowWidth <= 675 && opened ? 'block' : 'none',
-                      padding: 0,
-                    }}
-                  >
-                    <div
-                      onClick={() => {
-                        homeDispatch({
-                          field: 'showModelSettings',
-                          value: !showModelSettings,
-                        })
-                        toggle()
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        cursor: 'pointer',
-                        height: '100%',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <IconSettings size={24} aria-hidden="true" />
-                        <span
-                          className={`${montserrat_heading.variable} font-montserratHeading`}
-                          style={{ marginLeft: '8px' }}
-                        >
-                          Settings
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Admin Dashboard in hamburger when screen is small */}
-                  {isAdminOrOwner && (
-                    <div
-                      className={classes.link}
-                      style={{
-                        display:
-                          windowWidth <= 825 && opened ? 'block' : 'none',
-                        padding: 0,
-                      }}
-                    >
-                      <Link
-                        href={`/${getCurrentCourseName()}/dashboard`}
-                        onClick={() => toggle()}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          cursor: 'pointer',
-                          textDecoration: 'none',
-                          color: 'inherit',
-                          display: 'block',
-                          height: '100%',
-                        }}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <IconPlus size={24} aria-hidden="true" />
+                      <span
+                        className={`${montserrat_heading.variable} font-montserratHeading`}
+                        style={{ marginLeft: '8px' }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <IconHome size={24} aria-hidden="true" />
-                          <span
-                            className={`${montserrat_heading.variable} font-montserratHeading`}
-                            style={{ marginLeft: '8px' }}
-                          >
-                            Admin Dashboard
-                          </span>
-                        </div>
-                      </Link>
+                        New Chat
+                      </span>
                     </div>
-                  )}
-                </Paper>
-              )}
-            </Transition>
+                  </div>
+                </div>
+
+                {/* Settings button in hamburger when screen is small */}
+                <div
+                  className={linkClassName}
+                  style={{
+                    display: windowWidth <= 675 && opened ? 'block' : 'none',
+                    padding: 0,
+                  }}
+                >
+                  <div
+                    onClick={() => {
+                      homeDispatch({
+                        field: 'showModelSettings',
+                        value: !showModelSettings,
+                      })
+                      toggle()
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      cursor: 'pointer',
+                      height: '100%',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <IconSettings size={24} aria-hidden="true" />
+                      <span
+                        className={`${montserrat_heading.variable} font-montserratHeading`}
+                        style={{ marginLeft: '8px' }}
+                      >
+                        Settings
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Admin Dashboard in hamburger when screen is small */}
+                {isAdminOrOwner && (
+                  <div
+                    className={linkClassName}
+                    style={{
+                      display: windowWidth <= 825 && opened ? 'block' : 'none',
+                      padding: 0,
+                    }}
+                  >
+                    <Link
+                      href={`/${getCurrentCourseName()}/dashboard`}
+                      onClick={() => toggle()}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        display: 'block',
+                        height: '100%',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <IconHome size={24} aria-hidden="true" />
+                        <span
+                          className={`${montserrat_heading.variable} font-montserratHeading`}
+                          style={{ marginLeft: '8px' }}
+                        >
+                          Admin Dashboard
+                        </span>
+                      </div>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* This is the main links on top  */}
-            <Container
-              className={classes.inner}
+            <div
+              className="flex h-[60px] items-center justify-between"
               style={{ padding: 0, margin: 0 }}
             >
-              <div className={classes.newChat}>
+              {showNewChatLink && (
                 <button
-                  className={`${classes.link}`}
+                  className={linkClassName}
                   style={{ padding: '3px 8px', minWidth: '100px' }}
                   onClick={() => {
                     handleNewConversation()
@@ -486,10 +369,10 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
                     </span>
                   </div>
                 </button>
-              </div>
-              <div className={classes.settings}>
+              )}
+              {showSettingsLink && (
                 <button
-                  className={`${classes.link}`}
+                  className={linkClassName}
                   style={{ padding: '3px 8px', minWidth: '100px' }}
                   onClick={() => {
                     homeDispatch({
@@ -536,84 +419,82 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
                     </span>
                   </div>
                 </button>
-              </div>
-              {isAdminOrOwner && (
-                <div className={classes.adminDashboard}>
-                  <button
-                    className={`${classes.link}`}
-                    style={{ padding: '3px 8px', minWidth: '100px' }}
-                    onClick={(e) => {
-                      // Handle click with modifier keys
-                      if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                        window.open(
-                          `/${getCurrentCourseName()}/dashboard`,
-                          '_blank',
-                        )
-                      } else {
-                        router.push(`/${getCurrentCourseName()}/dashboard`)
-                      }
-                    }}
-                    onAuxClick={(e) => {
-                      // Handle middle click (button 1)
-                      if (e.button === 1) {
-                        window.open(
-                          `/${getCurrentCourseName()}/dashboard`,
-                          '_blank',
-                        )
-                      }
-                    }}
-                    onContextMenu={(e) => {
-                      // Don't prevent default to allow normal right-click menu
-                      // But add the URL to the clipboard
-                      navigator.clipboard.writeText(
-                        `${
-                          window.location.origin
-                        }/${getCurrentCourseName()}/dashboard`,
+              )}
+              {isAdminOrOwner && showAdminDashboardLink && (
+                <button
+                  className={linkClassName}
+                  style={{ padding: '3px 8px', minWidth: '100px' }}
+                  onClick={(e) => {
+                    // Handle click with modifier keys
+                    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                      window.open(
+                        `/${getCurrentCourseName()}/dashboard`,
+                        '_blank',
                       )
+                    } else {
+                      router.push(`/${getCurrentCourseName()}/dashboard`)
+                    }
+                  }}
+                  onAuxClick={(e) => {
+                    // Handle middle click (button 1)
+                    if (e.button === 1) {
+                      window.open(
+                        `/${getCurrentCourseName()}/dashboard`,
+                        '_blank',
+                      )
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    // Don't prevent default to allow normal right-click menu
+                    // But add the URL to the clipboard
+                    navigator.clipboard.writeText(
+                      `${
+                        window.location.origin
+                      }/${getCurrentCourseName()}/dashboard`,
+                    )
+                  }}
+                  aria-label={`Go to dashboard`}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      width: '100%',
+                      position: 'relative',
                     }}
-                    aria-label={`Go to dashboard`}
                   >
-                    <div
+                    <IconHome
+                      size={30}
+                      strokeWidth={2}
+                      aria-hidden="true"
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        width: '100%',
+                        marginRight: '4px',
+                        marginLeft: '4px',
                         position: 'relative',
+                        top: '-2px',
+                      }}
+                    />
+                    <span
+                      style={{
+                        backgroundImage:
+                          "url('/media/hero-header-underline-reflow.svg')",
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: 'contain',
+                        backgroundPosition: 'bottom',
+                        width: '100%',
+                        height: '40px',
+                        position: 'relative',
+                        top: '13px',
                       }}
                     >
-                      <IconHome
-                        size={30}
-                        strokeWidth={2}
-                        aria-hidden="true"
-                        style={{
-                          marginRight: '4px',
-                          marginLeft: '4px',
-                          position: 'relative',
-                          top: '-2px',
-                        }}
-                      />
                       <span
-                        style={{
-                          backgroundImage:
-                            "url('/media/hero-header-underline-reflow.svg')",
-                          backgroundRepeat: 'no-repeat',
-                          backgroundSize: 'contain',
-                          backgroundPosition: 'bottom',
-                          width: '100%',
-                          height: '40px',
-                          position: 'relative',
-                          top: '13px',
-                        }}
+                        className={`${montserrat_heading.variable} font-montserratHeading`}
                       >
-                        <span
-                          className={`${montserrat_heading.variable} font-montserratHeading`}
-                        >
-                          Admin Dashboard
-                        </span>
+                        Admin Dashboard
                       </span>
-                    </div>
-                  </button>
-                </div>
+                    </span>
+                  </div>
+                </button>
               )}
               <div
                 style={{
@@ -625,17 +506,35 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
               >
                 <UserSettings />
               </div>
-            </Container>
+            </div>
 
-            <Container style={{ padding: 0, margin: 0 }}>
-              <Burger
-                opened={opened}
-                onClick={toggle}
-                className={classes.burger}
-                color="var(--foreground)"
-                size="sm"
-              />
-            </Container>
+            <div style={{ padding: 0, margin: 0 }}>
+              {showBurger && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggle}
+                  aria-label="Toggle burger menu"
+                  aria-expanded={opened}
+                  className="mr-[3px] ml-0"
+                >
+                  {opened ? (
+                    <IconX
+                      size={20}
+                      aria-hidden="true"
+                      color="var(--foreground)"
+                    />
+                  ) : (
+                    <IconMenu2
+                      size={20}
+                      aria-hidden="true"
+                      color="var(--foreground)"
+                    />
+                  )}
+                </Button>
+              )}
+            </div>
 
             {/* Sign in buttons */}
             <div
@@ -649,8 +548,8 @@ const ChatNavbar = ({ bannerUrl = '', isgpt4 = true }: ChatNavbarProps) => {
             >
               <AuthMenu />
             </div>
-          </Group>
-        </Flex>
+          </div>
+        </div>
       </div>
     </div>
   )

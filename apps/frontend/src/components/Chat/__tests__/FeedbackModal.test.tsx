@@ -74,7 +74,7 @@ describe('FeedbackModal', () => {
     renderModal()
 
     const select = screen.getByLabelText('Feedback category select')
-    expect(select).toHaveValue('Other')
+    expect(select).toHaveTextContent('Other')
   })
 
   // ---------------------------------------------------------------
@@ -161,7 +161,7 @@ describe('FeedbackModal', () => {
     expect(newTextarea).toHaveValue('')
 
     const select = screen.getByLabelText('Feedback category select')
-    expect(select).toHaveValue('Other')
+    expect(select).toHaveTextContent('Other')
   })
 
   // ---------------------------------------------------------------
@@ -312,7 +312,9 @@ describe('FeedbackModal', () => {
     ]
 
     for (const label of expectedLabels) {
-      expect(await screen.findByText(label)).toBeInTheDocument()
+      // "Other" is the default selection, so it also appears in the
+      // trigger's own SelectValue in addition to the dropdown option.
+      expect((await screen.findAllByText(label)).length).toBeGreaterThan(0)
     }
   })
 })

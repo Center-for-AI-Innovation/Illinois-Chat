@@ -46,7 +46,7 @@ export function ChatbotsGlobalNav({
                 href={item.link}
                 className={`${
                   montserrat_heading.variable
-                } font-montserratHeading flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold text-(--illinois-blue) transition-colors hover:bg-(--navbar-hover-background) sm:px-4 sm:text-sm dark:text-white`}
+                } font-montserratHeading flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold text-(--illinois-blue) transition-colors sm:px-4 sm:text-sm dark:text-white`}
               >
                 <item.icon size={20} strokeWidth={2} />
                 {item.label}

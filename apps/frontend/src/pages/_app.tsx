@@ -1,4 +1,3 @@
-import { MantineProvider } from '@mantine/core'
 import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
@@ -133,47 +132,10 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
                 position="left"
                 buttonPosition="bottom-right"
               />
-              <MantineProvider
-                withGlobalStyles
-                withNormalizeCSS
-                theme={{
-                  colorScheme: 'dark',
-                  colors: {
-                    // Using CSS variables for colors
-                    deepBlue: ['var(--illinois-blue)'],
-                    primary: ['var(--illinois-orange)'],
-                    secondary: ['var(--illinois-blue)'],
-                    accent: ['var(--illinois-industrial)'],
-                    background: ['var(--illinois-background-dark)'],
-                    nearlyBlack: ['var(--illinois-background-darker)'],
-                    nearlyWhite: ['var(--illinois-white)'],
-                    disabled: ['var(--illinois-storm-dark)'],
-                    errorBackground: ['var(--illinois-berry)'],
-                    errorBorder: ['var(--illinois-berry)'],
-                  },
-                  shadows: {
-                    // md: '1px 1px 3px rgba(0, 0, 0, .25)',
-                    // xl: '5px 5px 3px rgba(0, 0, 0, .25)',
-                  },
-                  headings: {
-                    fontFamily: 'Montserrat, Roboto, sans-serif',
-                    sizes: {
-                      h1: { fontSize: '3rem' },
-                      h2: { fontSize: '2.2rem' },
-                    },
-                  },
-                  defaultGradient: {
-                    from: 'var(--illinois-berry)',
-                    to: 'var(--illinois-earth)',
-                    deg: 80,
-                  },
-                }}
-              >
-                <ThemeProvider>
-                  <Toaster position="bottom-center" />
-                  <Component {...pageProps} />
-                </ThemeProvider>
-              </MantineProvider>
+              <ThemeProvider>
+                <Toaster position="bottom-center" />
+                <Component {...pageProps} />
+              </ThemeProvider>
             </PostHogProvider>
           </QueryClientProvider>
         </KeycloakProvider>

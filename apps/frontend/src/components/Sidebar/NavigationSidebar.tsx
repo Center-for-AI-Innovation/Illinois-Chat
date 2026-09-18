@@ -1,4 +1,3 @@
-import { createStyles, rem } from '@mantine/core'
 import {
   IconBrain,
   IconChartDots3,
@@ -34,251 +33,6 @@ interface NavigationSidebarProps {
   isCollapsed: boolean
   onCollapseToggle: () => void
 }
-
-const useStyles = createStyles((theme) => ({
-  sidebar: {
-    // Base styles - Mobile first approach
-    position: 'fixed',
-    top: rem(80),
-    left: 0,
-    bottom: 0,
-    width: rem(280),
-    height: 'auto',
-    minHeight: 'calc(100vh - 80px)',
-    backgroundColor: 'var(--sidebar-background)',
-    borderRight: '1px solid var(--dashboard-border)',
-    zIndex: 30,
-    transform: 'translateX(-100%)',
-    transition: 'all 0.3s ease-in-out',
-
-    '&.open': {
-      transform: 'translateX(0)',
-    },
-
-    // Desktop (md and up): allow collapse/expand functionality
-    '@media (min-width: 768px)': {
-      height: 'calc(100vh - 80px)',
-      bottom: 'auto',
-      transform: 'translateX(0)',
-
-      '&.collapsed': {
-        width: rem(80),
-      },
-    },
-  },
-
-  sidebarOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 20,
-  },
-
-  toggleButton: {
-    position: 'fixed',
-    top: rem(90),
-    left: rem(16),
-    zIndex: 40,
-    width: rem(40),
-    height: rem(40),
-    backgroundColor: 'var(--dashboard-button)',
-    color: 'var(--dashboard-button-foreground)',
-    border: 'none',
-    borderRadius: theme.radius.lg,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    boxShadow: theme.shadows.md,
-
-    '&:hover': {
-      backgroundColor: 'var(--dashboard-button-hover)',
-      transform: 'scale(1.05)',
-    },
-  },
-
-  sidebarContent: {
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: theme.spacing.md,
-
-    '&.collapsed': {
-      padding: `${theme.spacing.md} ${theme.spacing.xs}`,
-      alignItems: 'center',
-    },
-  },
-
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: theme.spacing.lg,
-    paddingBottom: theme.spacing.sm,
-    borderBottom: '1px solid var(--dashboard-border)',
-
-    '&.collapsed': {
-      justifyContent: 'center',
-      marginBottom: theme.spacing.md,
-    },
-  },
-
-  collapseButton: {
-    width: rem(40),
-    height: rem(40),
-    backgroundColor: 'transparent',
-    color: 'var(--foreground)',
-    border: '2px solid var(--dashboard-border)',
-    borderRadius: theme.radius.md,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-
-    '&:hover': {
-      backgroundColor: 'var(--dashboard-faded)',
-      color: 'var(--foreground)',
-      borderColor: 'var(--dashboard-faded)',
-    },
-  },
-
-  closeButton: {
-    width: rem(32),
-    height: rem(32),
-    backgroundColor: 'transparent',
-    color: 'var(--foreground-faded)',
-    border: '1px solid var(--dashboard-border)',
-    borderRadius: theme.radius.md,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-
-    '&:hover': {
-      backgroundColor: 'var(--dashboard-button)',
-      color: 'var(--dashboard-button-foreground)',
-      borderColor: 'var(--dashboard-button)',
-    },
-  },
-
-  chatButton: {
-    width: '100%',
-    backgroundColor: 'var(--dashboard-button)',
-    color: 'var(--dashboard-button-foreground)',
-    border: 'none',
-    borderRadius: theme.radius.md,
-    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-    marginBottom: theme.spacing.lg,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    fontSize: rem(14),
-
-    fontWeight: 500,
-
-    '&:hover': {
-      backgroundColor: 'var(--dashboard-button-hover)',
-      transform: 'translateY(-1px)',
-      boxShadow: theme.shadows.sm,
-    },
-
-    '&.collapsed': {
-      width: rem(48),
-      padding: theme.spacing.sm,
-      justifyContent: 'center',
-      gap: 0,
-      minHeight: rem(40),
-    },
-  },
-
-  breadcrumb: {
-    // marginBottom: theme.spacing.lg,
-    padding: theme.spacing.sm,
-    backgroundColor: 'var(--background-faded)',
-    borderRadius: theme.radius.md,
-    fontSize: rem(13),
-    marginRight: theme.spacing.md,
-    color: 'var(--foreground)',
-
-    '&.collapsed': {
-      display: 'none',
-    },
-  },
-
-  navSection: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '4px',
-  },
-
-  navLink: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-    color: 'var(--navbar-foreground)',
-    textDecoration: 'none',
-    borderRadius: theme.radius.md,
-    marginBottom: theme.spacing.xs,
-    fontSize: rem(14),
-    fontWeight: 500,
-    transition: 'all 0.2s ease',
-    position: 'relative',
-
-    '&:hover': {
-      backgroundColor: 'var(--navbar-hover-background)',
-      color: 'var(--navbar-hover)',
-      transform: 'translateX(0px)' /* 4px */,
-    },
-
-    '&[data-active="true"]': {
-      backgroundColor: 'var(--dashboard-button)',
-      color: 'var(--dashboard-button-foreground)',
-      fontWeight: 600,
-
-      '&:hover': {
-        backgroundColor: 'var(--dashboard-button-hover)',
-        color: 'var(--dashboard-button-foreground)',
-      },
-    },
-
-    '&.collapsed': {
-      padding: theme.spacing.sm,
-      justifyContent: 'center',
-      gap: 0,
-
-      '&:hover': {
-        transform: 'scale(1.05)',
-      },
-    },
-  },
-
-  navText: {
-    transition: 'opacity 0.2s ease',
-
-    '&.collapsed': {
-      display: 'none',
-    },
-  },
-
-  themeToggleContainer: {
-    marginTop: 'auto',
-    borderTop: '1px solid var(--dashboard-border)',
-    paddingTop: theme.spacing.md,
-    display: 'flex',
-    width: '100%',
-    justifyContent: 'center',
-  },
-}))
 
 function NavText({
   children,
@@ -381,7 +135,6 @@ export default function NavigationSidebar({
   isCollapsed,
   onCollapseToggle,
 }: NavigationSidebarProps) {
-  const { classes } = useStyles()
   const router = useRouter()
 
   const navItems: NavItem[] = [
@@ -474,7 +227,7 @@ export default function NavigationSidebar({
       {!isOpen && (
         <button
           aria-label="Toggle sidebar"
-          className={`${classes.toggleButton} md:hidden`}
+          className="fixed top-[90px] left-[16px] z-40 flex h-[40px] w-[40px] cursor-pointer items-center justify-center rounded-(--radius-lg) border-none bg-(--dashboard-button) text-(--dashboard-button-foreground) shadow-md transition-all hover:scale-105 hover:bg-(--dashboard-button-hover) md:hidden"
           onClick={onToggle}
         >
           <IconMenu2 size={20} aria-hidden="true" />
@@ -484,7 +237,7 @@ export default function NavigationSidebar({
       {/* Mobile Overlay - Hidden on md+ */}
       {isOpen && (
         <div
-          className={`${classes.sidebarOverlay} md:hidden`}
+          className="fixed inset-0 z-20 bg-black/50 md:hidden"
           onClick={onToggle}
         />
       )}
@@ -492,23 +245,25 @@ export default function NavigationSidebar({
       {/* Sidebar */}
       <aside
         aria-label="Settings navigation"
-        className={`${classes.sidebar} ${isOpen ? 'open' : ''} ${
-          isCollapsed ? 'collapsed' : ''
-        } md:desktop`}
+        className={`fixed top-[80px] bottom-0 left-0 z-30 h-auto min-h-[calc(100vh-80px)] w-[280px] border-r border-(--dashboard-border) bg-(--sidebar-background) transition-all duration-300 ease-in-out md:bottom-auto md:h-[calc(100vh-80px)] md:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        } ${isCollapsed ? 'md:w-[80px]' : ''}`}
       >
         <div
-          className={`${classes.sidebarContent} ${
-            isCollapsed ? 'collapsed' : ''
+          className={`flex h-full flex-col py-4 ${
+            isCollapsed ? 'items-center px-[10px]' : 'px-4'
           }`}
         >
           {/* Header */}
           <div
-            className={`${classes.header} ${isCollapsed ? 'collapsed' : ''}`}
+            className={`flex items-center border-b border-(--dashboard-border) pb-3 ${
+              isCollapsed ? 'mb-4 justify-center' : 'mb-5 justify-between'
+            }`}
           >
             {/* Breadcrumb - Always visible on mobile, conditionally on desktop */}
             <div
-              className={`${classes.breadcrumb} ${
-                isCollapsed ? 'collapsed' : ''
+              className={`mr-4 rounded-(--radius-md) bg-(--background-faded) p-3 text-[13px] text-(--foreground) ${
+                isCollapsed ? 'hidden' : ''
               }`}
             >
               <div
@@ -524,7 +279,7 @@ export default function NavigationSidebar({
             {/* Collapse Button - Hidden on mobile, visible on desktop */}
             <button
               aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-              className={`${classes.collapseButton} hidden md:flex`}
+              className="hidden h-[40px] w-[40px] cursor-pointer items-center justify-center rounded-(--radius-md) border-2 border-(--dashboard-border) bg-transparent text-(--foreground) transition-all hover:border-(--dashboard-faded) hover:bg-(--dashboard-faded) md:flex"
               onClick={onCollapseToggle}
             >
               {isCollapsed ? (
@@ -546,8 +301,10 @@ export default function NavigationSidebar({
           {/* Chat Button */}
           <button
             tabIndex={0}
-            className={`${classes.chatButton} ${
-              isCollapsed ? 'collapsed' : ''
+            className={`mb-5 flex cursor-pointer items-center justify-center rounded-(--radius-md) border-none bg-(--dashboard-button) text-sm font-medium text-(--dashboard-button-foreground) transition-all hover:-translate-y-px hover:bg-(--dashboard-button-hover) hover:shadow-sm ${
+              isCollapsed
+                ? 'min-h-[40px] w-[48px] gap-0 p-3'
+                : 'w-full gap-[10px] px-4 py-3'
             }`}
             onClick={handleChatNavigation}
             onMouseEnter={() => {
@@ -570,7 +327,7 @@ export default function NavigationSidebar({
           </button>
 
           {/* Navigation Links */}
-          <div className={classes.navSection}>
+          <div className="flex-1 overflow-y-auto p-1">
             {navItems.map((item, index) => (
               <Link
                 tabIndex={0}
@@ -579,8 +336,10 @@ export default function NavigationSidebar({
                 href={item.link}
                 prefetch={false}
                 data-active={activeLink === item.link}
-                className={`${classes.navLink} ${
-                  isCollapsed ? 'collapsed' : ''
+                className={`relative mb-[10px] flex items-center rounded-(--radius-md) text-sm font-medium text-(--navbar-foreground) no-underline transition-all hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) data-[active=true]:bg-(--dashboard-button) data-[active=true]:font-semibold data-[active=true]:text-(--dashboard-button-foreground) data-[active=true]:hover:bg-(--dashboard-button-hover) data-[active=true]:hover:text-(--dashboard-button-foreground) ${
+                  isCollapsed
+                    ? 'justify-center gap-0 p-3 hover:scale-105'
+                    : 'gap-3 px-4 py-3'
                 }`}
                 onMouseEnter={() => handleLinkHover(item.link)}
                 onClick={() => {
@@ -599,7 +358,7 @@ export default function NavigationSidebar({
           </div>
 
           {/* Theme Toggle at the bottom */}
-          <div className={classes.themeToggleContainer}>
+          <div className="mt-auto flex w-full justify-center border-t border-(--dashboard-border) pt-4">
             {!isCollapsed ? <ThemeToggle /> : <CollapsedThemeToggle />}
           </div>
         </div>

@@ -1,5 +1,5 @@
 // src/components/Chat/Chat.tsx
-import { Button, Text } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
 import { IconArrowRight, IconSettings } from '@tabler/icons-react'
 import { useTranslation } from 'next-i18next/pages'
 import {
@@ -1819,8 +1819,8 @@ export const Chat = memo(
       return (
         <div className="chat_welcome xs:mx-2 mt-4 max-w-3xl gap-3 px-4 last:mb-2 sm:mx-4 md:mx-auto lg:mx-auto">
           <div className="rounded-lg bg-(--welcome-background) p-6 backdrop-filter-[blur(10px)]">
-            <Text
-              className={`mb-2 text-lg ${montserrat_heading.variable} font-montserratHeading`}
+            <p
+              className={`mb-2 text-lg text-(--welcome-foreground) ${montserrat_heading.variable} font-montserratHeading`}
               style={{ whiteSpace: 'pre-wrap' }}
               dangerouslySetInnerHTML={{
                 __html:
@@ -1875,6 +1875,7 @@ export const Chat = memo(
                     }}
                   >
                     <Button
+                      type="button"
                       variant="link"
                       tabIndex={-1}
                       className={`text-md h-auto p-2 leading-relaxed font-bold text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph`}

@@ -1,11 +1,4 @@
-import {
-  Text,
-  Paper,
-  UnstyledButton,
-  Image,
-  Badge,
-  Tooltip,
-} from '@mantine/core'
+import { Badge } from '@/components/shadcn/ui/badge'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import {
   IconFileText,
@@ -230,24 +223,22 @@ export const CitationCard = ({
     effectivePageNumber !== '0'
 
   return (
-    <UnstyledButton
+    <button
+      type="button"
       onClick={handleClick}
-      className="-m-0.5 w-full rounded-md p-0.5 transition-all duration-300 hover:opacity-100"
+      className="-m-0.5 w-full rounded-md p-0.5 text-left transition-all duration-300 hover:opacity-100"
     >
-      <Paper
-        className="flex flex-col overflow-hidden border border-(--sources-border) bg-(--sources-item-background) text-(--sources-foreground) transition-all duration-300 ease-in-out hover:border-(--sources-border-hover)"
-        radius="md"
-      >
+      <div className="flex flex-col overflow-hidden rounded-md border border-(--sources-border) bg-(--sources-item-background) text-(--sources-foreground) transition-all duration-300 ease-in-out hover:border-(--sources-border-hover)">
         <div className="flex h-full flex-col">
           {thumbnailUrl ? (
             <div
               className={`relative flex w-full ${isWebIcon ? 'justify-center bg-(--sources-item-header-background) p-2' : 'h-32 overflow-hidden'}`}
             >
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element -- dynamic S3 presigned URLs / arbitrary third-party favicons, not next/image-eligible */}
+              <img
                 src={thumbnailUrl}
                 alt={`Thumbnail for ${readable_filename}`}
-                height={isWebIcon ? 48 : 'auto'}
-                width={isWebIcon ? 48 : '100%'}
+                style={isWebIcon ? { height: 48, width: 48 } : { height: 'auto', width: '100%' }}
                 className={`${isWebIcon ? 'object-contain' : 'w-full object-cover'}`}
                 onError={(e) => {
                   console.log('Failed to load image from URL:', thumbnailUrl)
@@ -262,11 +253,7 @@ export const CitationCard = ({
                   <div className="absolute bottom-2 left-2">
                     <Badge
                       aria-label={'Citation ' + (index + 1)}
-                      color="gray"
-                      variant="filled"
-                      radius="sm"
-                      size="xs"
-                      className="bg-(--sources-badge) text-(--background)"
+                      className="h-4 rounded-sm px-1 text-[10px] bg-(--sources-badge) text-(--background)"
                     >
                       {index + 1}
                     </Badge>
@@ -305,11 +292,7 @@ export const CitationCard = ({
                   <div className="absolute bottom-2 left-2">
                     <Badge
                       aria-label={'Citation ' + (index + 1)}
-                      color="gray"
-                      variant="filled"
-                      radius="sm"
-                      size="xs"
-                      className="bg-(--sources-badge) text-(--background)"
+                      className="h-4 rounded-sm px-1 text-[10px] bg-(--sources-badge) text-(--background)"
                     >
                       {index + 1}
                     </Badge>
@@ -337,33 +320,33 @@ export const CitationCard = ({
           <div className="flex flex-1 gap-3 p-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-col gap-1.5">
-                <Text
+                <p
                   className={`text-xs font-semibold ${montserrat_heading.variable} font-montserratHeading leading-tight wrap-break-word`}
                   style={{ wordBreak: 'break-word' }}
                 >
                   {readable_filename}
-                </Text>
+                </p>
                 <div className="flex flex-col gap-0.5">
                   {isPDF && hasPageNumber && (
-                    <Text
+                    <p
                       className={`text-xs text-(--foreground-faded) ${montserrat_paragraph.variable} font-montserratParagraph`}
                     >
                       Page {effectivePageNumber}
-                    </Text>
+                    </p>
                   )}
                   {text && (
-                    <Text
+                    <p
                       className={`text-xs text-(--foreground-faded) ${montserrat_paragraph.variable} font-montserratParagraph line-clamp-2`}
                     >
                       {text}
-                    </Text>
+                    </p>
                   )}
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </Paper>
-    </UnstyledButton>
+      </div>
+    </button>
   )
 }

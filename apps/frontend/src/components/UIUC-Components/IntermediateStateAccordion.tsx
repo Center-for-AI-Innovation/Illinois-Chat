@@ -1,5 +1,10 @@
 import React from 'react'
-import { Accordion, Badge } from '@mantine/core'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/shadcn/ui/accordion'
 import { montserrat_paragraph } from 'fonts'
 import { LoadingSpinner } from './LoadingSpinner'
 import { IconChevronDown } from '@tabler/icons-react'
@@ -23,50 +28,48 @@ export const IntermediateStateAccordion = ({
   disableChevronRotation?: boolean
   defaultValue?: string
 }) => {
-  // console.log('IntermediateStateAccordion, key:', accordionKey, 'isLoading:', isLoading, 'error:', error, 'default value:', defaultValue)
   return (
     <div className="w-full">
       <Accordion
-        variant="separated"
-        radius={'lg'}
-        order={2}
-        w={'100%'}
-        m={'auto'}
-        chevron={
-          chevron ? (
-            chevron
-          ) : isLoading ? (
-            <LoadingSpinner size="xs" />
-          ) : (
-            <IconChevronDown aria-hidden="true" />
-          )
-        }
-        disableChevronRotation={disableChevronRotation}
-        value={defaultValue !== undefined ? defaultValue : undefined}
+        className="w-full"
+        defaultValue={defaultValue !== undefined ? [defaultValue] : []}
+        keepMounted
       >
-        <Accordion.Item
-          key={accordionKey}
+        <AccordionItem
           value={accordionKey}
+          className="rounded-lg border-0"
           style={{
-            border: 0,
             color: 'var(--foreground)',
             backgroundColor: 'var(--background-faded)',
-            borderRadius: '0.5rem',
           }}
         >
-          <Accordion.Control
-            className={`rounded-lg hover:bg-transparent ${montserrat_paragraph.variable} font-montserratParagraph text-sm font-bold`}
+          <AccordionTrigger
+            className={`rounded-lg py-0 hover:bg-transparent hover:no-underline ${montserrat_paragraph.variable} font-montserratParagraph text-sm font-bold`}
             style={{
               textShadow: '0 0 0px' /* 10px */,
               color: 'var(--dashboard-foreground)',
-              display: 'flex',
-              alignItems: 'left',
             }}
             disabled={isLoading}
+            icon={
+              chevron ? (
+                chevron
+              ) : isLoading ? (
+                <LoadingSpinner size="xs" />
+              ) : (
+                <IconChevronDown
+                  aria-hidden="true"
+                  className={
+                    disableChevronRotation
+                      ? undefined
+                      : 'transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-180'
+                  }
+                />
+              )
+            }
           >
             {title}
-          </Accordion.Control>
-          <Accordion.Panel
+          </AccordionTrigger>
+          <AccordionContent
             className={`${
               montserrat_paragraph.variable
             } font-montserratParagraph rounded-lg bg-(--background-faded) pt-2 text-sm text-white ${
@@ -87,8 +90,8 @@ export const IntermediateStateAccordion = ({
                 {content}
               </pre>
             </div>
-          </Accordion.Panel>
-        </Accordion.Item>
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
     </div>
   )

@@ -2,7 +2,7 @@ import { type Config } from 'tailwindcss'
 
 export default {
   content: ['./src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class', // 'media' or 'class' (media uses system settings, class uses .dark{} in globals.css)
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -48,10 +48,15 @@ export default {
         emphasized: 'cubic-bezier(0.22, 1, 0.36, 1)',
       },
       colors: {
-        // Using HSL variables defined in @layer base for Tailwind classes
-        // These work alongside the existing hex variables used by inline styles
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        // `globals.css` defines these names twice: hex values in the
+        // unlayered `:root`/`.dark` blocks, and an HSL-triple copy inside
+        // `@layer base` for shadcn's `hsl(var(--foo))` convention. Unlayered
+        // always wins, so a name with a hex competitor must reference the
+        // variable bare (`var(--foo)`) — wrapping it in `hsl(...)` produces
+        // an invalid value like `hsl(#c84113)` that the browser drops.
+        // HSL-only names (no hex competitor) keep the `hsl(var(--foo))` wrapper.
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
@@ -61,31 +66,31 @@ export default {
           foreground: 'hsl(var(--popover-foreground))',
         },
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
         },
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
         'ring-offset-background': 'hsl(var(--ring-offset-background))',
         sidebar: {
-          DEFAULT: 'hsl(var(--sidebar-background))',
+          DEFAULT: 'var(--sidebar-background)',
           foreground: 'hsl(var(--sidebar-foreground))',
           primary: 'hsl(var(--sidebar-primary))',
           'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',

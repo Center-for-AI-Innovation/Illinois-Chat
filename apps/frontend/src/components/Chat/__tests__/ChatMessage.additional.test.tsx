@@ -124,7 +124,7 @@ describe('ChatMessage - additional coverage', () => {
       },
     )
 
-    // Enter edit mode via fireEvent (avoids Tooltip/Mantine pointer event delays)
+    // Enter edit mode via fireEvent (avoids Tooltip pointer event delays)
     fireEvent.click(screen.getByRole('button', { name: /Edit message/i }))
     await waitFor(() => expect(screen.getByRole('textbox')).toBeInTheDocument())
 

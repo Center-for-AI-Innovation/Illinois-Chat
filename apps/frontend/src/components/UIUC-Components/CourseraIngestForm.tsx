@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Text, Card, Button, Input } from '@mantine/core'
+import { Card } from '@/components/shadcn/ui/card'
+import { Button } from '@/components/shadcn/ui/button'
+import { Input } from '@/components/shadcn/ui/input'
 import { IconArrowRight } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'
@@ -90,13 +92,13 @@ export default function CourseraIngestForm(): JSX.Element {
                       className="h-8 w-8 object-contain"
                     />
                   </div>
-                  <Text className="text-xl font-semibold">Coursera</Text>
+                  <span className="text-xl font-semibold">Coursera</span>
                 </div>
               </div>
-              <Text className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
+              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content from Coursera courses, including lectures,
                 assignments, and course materials.
-              </Text>
+              </p>
               <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
@@ -119,9 +121,9 @@ export default function CourseraIngestForm(): JSX.Element {
             <div className="">
               <div>
                 <div className="text-sm wrap-break-word sm:text-base">
-                  <Text className="mb-2 text-sm font-semibold text-(--illinois-orange)">
+                  <p className="mb-2 text-sm font-semibold text-(--illinois-orange)">
                     Coming soon: Coursera ingest is temporarily unavailable.
-                  </Text>
+                  </p>
                   <strong>For Coursera</strong>, just enter a URL like{' '}
                   <code className="inline-flex items-center rounded-md bg-(--illinois-orange) px-2 py-1 font-mono text-xs text-(--illinois-white) sm:text-sm">
                     coursera.org/learn/COURSE_NAME
@@ -141,44 +143,26 @@ export default function CourseraIngestForm(): JSX.Element {
                   .
                 </div>
 
-                <Input
-                  icon={
-                    <Image
-                      src="/media/coursera_logo_cutout.png"
-                      alt="Coursera Logo"
-                      width={24}
-                      height={24}
-                      className="object-contain"
-                    />
-                  }
-                  aria-label="Coursera course URL"
-                  className="mt-4 w-full rounded-full"
-                  styles={{
-                    input: {
-                      color: 'var(--foreground)',
-                      backgroundColor: 'var(--background-faded)',
-                      borderColor: 'var(--background-dark)',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      '&:focus': {
-                        borderColor: 'var(--illinois-orange)',
-                      },
-                    },
-                    wrapper: {
-                      width: '100%',
-                    },
-                  }}
-                  placeholder="Enter URL..."
-                  radius="md"
-                  type="url"
-                  value={url}
-                  size="lg"
-                  onChange={(e) => {
-                    handleUrlChange(e)
-                  }}
-                  disabled
-                />
+                <div className="relative mt-4 w-full">
+                  <Image
+                    src="/media/coursera_logo_cutout.png"
+                    alt="Coursera Logo"
+                    width={24}
+                    height={24}
+                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 object-contain"
+                  />
+                  <Input
+                    aria-label="Coursera course URL"
+                    className="h-11 w-full rounded-full border-(--background-dark) bg-(--background-faded) pl-11 text-ellipsis whitespace-nowrap text-(--foreground) focus-visible:border-(--illinois-orange)"
+                    placeholder="Enter URL..."
+                    type="url"
+                    value={url}
+                    onChange={(e) => {
+                      handleUrlChange(e)
+                    }}
+                    disabled
+                  />
+                </div>
               </div>
             </div>
           </div>
