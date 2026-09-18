@@ -68,7 +68,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (!crawleeApiUrl) {
       return res.status(500).json({ error: 'CRAWLEE_API_URL is not set' })
     }
-    const response = await axios.post(crawleeApiUrl, { params: postParams })
+    // The crawler fails closed on an unset key, so a missing value here would only
+    // surface as a 503 from a different service. Say so plainly instead.
+    const crawleeApiKey = process.env.CRAWLEE_API_KEY
+    if (!crawleeApiKey) {
+      return res.status(500).json({ error: 'CRAWLEE_API_KEY is not set' })
+    }
+    const response = await axios.post(
+      crawleeApiUrl,
+      { params: postParams },
+      { headers: { Authorization: `Bearer ${crawleeApiKey}` } },
+    )
 
     return res.status(200).json(response.data)
   } catch (error: any) {

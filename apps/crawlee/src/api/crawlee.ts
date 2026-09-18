@@ -3,13 +3,16 @@ import { Configuration, PlaywrightCrawler, downloadListOfUrls } from "crawlee";
 import { Page } from "playwright";
 
 import { Config, configSchema } from "./configValidation.js";
-import { ingestPdf, uploadPdfToS3 } from "./uploadToS3.js";
+import { handlePdf, isPdfLink, postIngest } from "./ingestClient.js";
 
 export async function crawl(rawConfig: Config) {
   const config = configSchema.parse(removeUndefinedFromObject(rawConfig));
   console.log("PARSED, final config:", config);
 
   let pageCounter = 0;
+  // One ingest job per PDF per crawl: a site-wide handbook is linked from every
+  // page. Dedup across crawls is the worker's exact-URL check on `documents`.
+  const seenPdfUrls = new Set<string>();
 
   if (config.url) {
     console.log(`Crawling URL: ${config.url}`);
@@ -74,33 +77,14 @@ export async function crawl(rawConfig: Config) {
                       `base_url=${config.url} url=${request.loadedUrl} title=${JSON.stringify(title)}`,
                   );
                 } else {
-                  const ingestUrl = process.env.INGEST_URL;
-
-                  if (!ingestUrl) {
-                    console.error(
-                      "Error: INGEST_URL environment variable is not defined.",
-                    );
-                    return;
-                  }
-
-                  fetch(ingestUrl, {
-                    method: "POST",
-                    headers: {
-                      Accept: "*/*",
-                      "Accept-Encoding": "gzip, deflate",
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      base_url: config.url,
-                      url: request.loadedUrl,
-                      readable_filename: title,
-                      content: html,
-                      course_name: config.courseName,
-                      groups: config.documentGroups,
-                    }),
-                  })
-                    .then((response) => response.text())
-                    .catch((err) => console.error(err));
+                  await postIngest({
+                    base_url: config.url,
+                    url: request.loadedUrl,
+                    readable_filename: title,
+                    content: html,
+                    course_name: config.courseName,
+                    groups: config.documentGroups,
+                  });
                 }
               }
 
@@ -125,10 +109,11 @@ export async function crawl(rawConfig: Config) {
 
                   // Keep this here so if we encounter .pdfs (no matter what URL or strategy), we still grab them
                   transformRequestFunction(req) {
-                    if (req.url.endsWith(".pdf")) {
-                      // Download PDFs specially
-                      console.log(`Downloading PDF: ${req.url}`);
+                    if (isPdfLink(req.url)) {
+                      // The worker fetches and stores PDFs; we only report the URL.
+                      console.log(`Queueing PDF for ingest: ${req.url}`);
                       handlePdf(
+                        seenPdfUrls,
                         config.courseName,
                         config.url,
                         req.url,
@@ -155,10 +140,11 @@ export async function crawl(rawConfig: Config) {
 
                   // Keep this here so if we encounter .pdfs (no matter what URL or strategy), we still grab them
                   transformRequestFunction(req) {
-                    if (req.url.endsWith(".pdf")) {
-                      // Download PDFs specially
-                      console.log(`Downloading PDF: ${req.url}`);
+                    if (isPdfLink(req.url)) {
+                      // The worker fetches and stores PDFs; we only report the URL.
+                      console.log(`Queueing PDF for ingest: ${req.url}`);
                       handlePdf(
+                        seenPdfUrls,
                         config.courseName,
                         config.url,
                         req.url,
@@ -297,21 +283,6 @@ function shouldSkipIngest(
   return null;
 }
 
-async function handlePdf(
-  courseName: string,
-  base_url: string,
-  url: string,
-  documentGroups: string[],
-) {
-  try {
-    const s3Key = await uploadPdfToS3(url, courseName);
-    if (!s3Key) return; // URL didn't serve a real PDF (redirected to HTML) — skip ingest
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    await ingestPdf(s3Key, courseName, base_url, url, documentGroups);
-  } catch (error) {
-    console.error(`Error in handlePDF: ${error}`);
-  }
-}
 function getPageHtml(page: Page, selector = "body") {
   return page.evaluate((selector) => {
     // Exclude header, footer, nav from scraping

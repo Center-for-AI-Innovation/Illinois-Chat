@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 import openai
 import sentry_sdk
 from posthog import Posthog
@@ -52,10 +53,22 @@ from langchain.vectorstores import Qdrant
 try:
     from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB
     from ai_ta_backend.rabbitmq.embeddings import OpenAIAPIProcessor
+    from ai_ta_backend.rabbitmq.url_download import (
+        UrlDownloadError,
+        build_crawl_pdf_key,
+        download_pdf_to_tempfile,
+        is_non_retryable,
+    )
 except ModuleNotFoundError:
     # When running as worker outside Flask app, import from local path
     from rmsql import SQLAlchemyIngestDB
     from embeddings import OpenAIAPIProcessor
+    from url_download import (
+        UrlDownloadError,
+        build_crawl_pdf_key,
+        download_pdf_to_tempfile,
+        is_non_retryable,
+    )
 
 load_dotenv()
 
@@ -268,12 +281,17 @@ class Ingest:
 
             content: str | List[str] | None = inputs.get('content', None)  # defined if ingest type is webtext
             doc_groups: List[str] | str = inputs.get('groups', '')
+            # Crawled PDFs arrive as a bare URL: the worker downloads them itself and
+            # uploads to the bucket it already resolved for this project. Explicit flag
+            # rather than "url and no s3_paths" so no future caller is silently turned
+            # into an outbound fetch.
+            fetch_from_url: bool = bool(inputs.get('fetch_from_url', False))
 
             print(
                 f"In top of /ingest route. course: {course_name}, s3paths: {s3_paths}, readable_filename: {readable_filename}, base_url: {base_url}, url: {url}, content: {content}, doc_groups: {doc_groups}"
             )
             success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content,
-                                                doc_groups, force_embeddings)
+                                                doc_groups, force_embeddings, fetch_from_url=fetch_from_url)
             # Skip retries for "no text" errors - retrying won't help
             failure_error = (
                 success_fail_dict.get('failure_ingest', {}) or {}
@@ -282,17 +300,20 @@ class Ingest:
                 failure_error = failure_error.get('error', '')
             else:
                 failure_error = str(failure_error)
-            is_no_text_error = 'No text detected in image' in str(failure_error)
+            # Computed ONCE here, before the retry loop below: that position is what
+            # makes a deterministic failure (blocked URL, 404, oversized PDF) cost one
+            # attempt instead of three. Do not move it inside the loop.
+            is_no_text_error = is_non_retryable(failure_error)
 
             for retry_num in range(1, 3):
                 if isinstance(success_fail_dict, str):  # TODO: What does this indicate?
                     success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content,
-                                                        doc_groups, force_embeddings)
+                                                        doc_groups, force_embeddings, fetch_from_url=fetch_from_url)
                     time.sleep(13 * retry_num)  # max is 65
                 elif success_fail_dict.get('failure_ingest') and not is_no_text_error:
                     logging.error(f"Ingest failure -- Retry attempt {retry_num}. File: {success_fail_dict}")
                     success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content,
-                                                        doc_groups, force_embeddings)
+                                                        doc_groups, force_embeddings, fetch_from_url=fetch_from_url)
                     time.sleep(13 * retry_num)  # max is 65
                 else:
                     break
@@ -327,8 +348,13 @@ class Ingest:
             return json.dumps(success_fail_dict)
 
     def run_ingest(self, course_name, s3_paths, base_url, url, readable_filename, content, document_groups,
-                   force_embeddings=False):
+                   force_embeddings=False, fetch_from_url=False):
         """Routes ingest jobs based on the input data -> webscrape, url, readable_filename"""
+        if fetch_from_url:
+            # Checked first: these jobs carry no s3_paths, so every other branch would
+            # end up calling download_fileobj(Key='').
+            return self.ingest_pdf_from_url(course_name, url, base_url, readable_filename,
+                                            document_groups, force_embeddings=force_embeddings)
         if content:
             return self.ingest_single_web_text(course_name, base_url, url, content, readable_filename,
                                                groups=document_groups, force_embeddings=force_embeddings)
@@ -1299,6 +1325,81 @@ class Ingest:
             print(err)
             sentry_sdk.capture_exception(e)
             return str(err)
+
+    def ingest_pdf_from_url(self, course_name: str, url: str, base_url, readable_filename,
+                            document_groups, force_embeddings: bool = False) -> Dict[str, Any]:
+        """Fetch a crawled PDF ourselves, store it, then ingest it like any other PDF.
+
+        The crawler no longer writes to S3 — it only reports the URL — so the process
+        that uploads the object is the same one that resolved the project's bucket and
+        will read it back. A bucket mismatch is impossible by construction.
+
+        Returns the {"success_ingest", "failure_ingest"} shape `main_ingest` expects.
+        Both keys are always present: `main_ingest` indexes ['failure_ingest'] directly.
+        """
+        if not url:
+            return {"success_ingest": None, "failure_ingest": {"s3_path": "", "error": "fetch_from_url job has no url"}}
+
+        # Exact-match dedup across crawls. The crawler's per-crawl seen-set stops the
+        # same PDF linked from 50 pages producing 50 jobs; this stops a re-crawl
+        # re-downloading what we already have.
+        try:
+            if self.sql_session.document_exists_for_url(course_name, url):
+                logging.info(f"SKIP-PDF-URL (already_ingested): course={course_name} url={url}")
+                return {"success_ingest": str(url), "failure_ingest": None}
+        except Exception as e:
+            # A failed pre-check must not block the ingest; the worst case is a
+            # duplicate the existing check_for_duplicates still handles.
+            logging.warning(f"document_exists_for_url check failed for {url}: {e}")
+
+        try:
+            tmpfile, content_type = download_pdf_to_tempfile(url)
+        except UrlDownloadError as e:
+            if e.reason == 'not_a_pdf':
+                # A .pdf URL that redirects to an HTML page is common. The old crawler
+                # returned null and never enqueued, so no row existed; keep that parity
+                # by reporting neither success nor failure. main_ingest's guard is
+                # `if success_fail_dict['failure_ingest']:`, so None writes no
+                # documents_failed row while the in-progress row is still cleaned up.
+                logging.warning(f"SKIP-PDF-URL (not_a_pdf): url={url} {e.detail}")
+                return {"success_ingest": None, "failure_ingest": None}
+            logging.error(f"PDF fetch failed for {url}: {e}")
+            return {"success_ingest": None, "failure_ingest": {"s3_path": "", "error": e.as_error_message()}}
+        except Exception as e:
+            logging.error(f"Unexpected error fetching {url}: {e}")
+            sentry_sdk.capture_exception(e)
+            return {
+                "success_ingest": None,
+                "failure_ingest": {"s3_path": "", "error": f"PDF fetch failed (network): {e}"},
+            }
+
+        try:
+            s3_key, sanitized_name = build_crawl_pdf_key(course_name, url)
+            readable = readable_filename or sanitized_name
+
+            try:
+                self.s3_client.upload_fileobj(tmpfile, self.s3_bucket_name, s3_key)
+            except ClientError as e:
+                code = str(e.response.get('Error', {}).get('Code', '')) if hasattr(e, 'response') else ''
+                if code in ('NoSuchBucket', 'NotFound', '404'):
+                    error = (f"S3 bucket '{self.s3_bucket_name}' does not exist for project '{course_name}'. "
+                             f"Buckets are never created automatically — create it (or correct the project's "
+                             f"external S3 connection) and re-crawl. Source URL: {url}")
+                else:
+                    error = f"Failed to upload {url} to s3://{self.s3_bucket_name}/{s3_key}: {e}"
+                logging.error(error)
+                return {"success_ingest": None, "failure_ingest": {"s3_path": s3_key, "error": error}}
+        finally:
+            tmpfile.close()
+
+        logging.info(f"Uploaded crawled PDF to s3://{self.s3_bucket_name}/{s3_key} "
+                     f"(url={url}, content-type={content_type or 'n/a'})")
+
+        # Hand off to the untouched PDF path: the .pdf suffix dispatches to
+        # _ingest_single_pdf, which re-downloads the object (one extra GET) in
+        # exchange for zero changes to the OCR, thumbnail and metadata code.
+        return self.bulk_ingest(course_name, [s3_key], base_url=base_url, url=url, groups=document_groups,
+                                readable_filename=readable, force_embeddings=force_embeddings)
 
     def _ingest_single_pdf(self, s3_path: str, course_name: str, force_embeddings: bool, **kwargs):
         """

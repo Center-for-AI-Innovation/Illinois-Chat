@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 
 const hoisted = vi.hoisted(() => ({
@@ -18,6 +18,10 @@ vi.mock('axios', () => ({
 import handler from '~/pages/api/scrapeWeb'
 
 describe('scrapeWeb API', () => {
+  beforeEach(() => {
+    hoisted.axiosPost.mockClear()
+  })
+
   it('returns 405 for non-POST methods', async () => {
     const res = createMockRes()
     await handler(createMockReq({ method: 'GET' }) as any, res as any)
@@ -39,6 +43,7 @@ describe('scrapeWeb API', () => {
   it('returns 500 when CRAWLEE_API_URL is not set', async () => {
     const old = process.env.CRAWLEE_API_URL
     delete process.env.CRAWLEE_API_URL
+    process.env.CRAWLEE_API_KEY = 'crawl-secret'
 
     const res = createMockRes()
     await handler(
@@ -58,8 +63,34 @@ describe('scrapeWeb API', () => {
     process.env.CRAWLEE_API_URL = old
   })
 
+  it('returns 500 when CRAWLEE_API_KEY is not set', async () => {
+    process.env.CRAWLEE_API_URL = 'http://crawlee'
+    const old = process.env.CRAWLEE_API_KEY
+    delete process.env.CRAWLEE_API_KEY
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          url: 'example.com',
+          courseName: 'CS101',
+          maxUrls: 2,
+          scrapeStrategy: 'default',
+        },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(hoisted.axiosPost).not.toHaveBeenCalled()
+
+    if (old === undefined) delete process.env.CRAWLEE_API_KEY
+    else process.env.CRAWLEE_API_KEY = old
+  })
+
   it('posts to crawlee API with formatted url and match pattern', async () => {
     process.env.CRAWLEE_API_URL = 'http://crawlee'
+    process.env.CRAWLEE_API_KEY = 'crawl-secret'
     hoisted.axiosPost.mockResolvedValueOnce({ data: { ok: true } })
 
     const res = createMockRes()
@@ -79,12 +110,14 @@ describe('scrapeWeb API', () => {
     expect(hoisted.axiosPost).toHaveBeenCalledWith(
       'http://crawlee',
       expect.any(Object),
+      { headers: { Authorization: 'Bearer crawl-secret' } },
     )
     expect(res.status).toHaveBeenCalledWith(200)
   })
 
   it('returns 500 when axios throws', async () => {
     process.env.CRAWLEE_API_URL = 'http://crawlee'
+    process.env.CRAWLEE_API_KEY = 'crawl-secret'
     hoisted.axiosPost.mockRejectedValueOnce(new Error('boom'))
     const res = createMockRes()
     await handler(

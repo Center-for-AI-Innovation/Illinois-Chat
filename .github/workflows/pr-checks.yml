@@ -52,7 +52,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: apps/frontend/package-lock.json
+          cache-dependency-path: |
+            apps/frontend/package-lock.json
+            apps/crawlee/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: apps/frontend
@@ -74,3 +76,21 @@ jobs:
       - name: Frontend tests
         working-directory: apps/frontend
         run: npm run test:coverage:check
+
+      # --ignore-scripts skips the postinstall that downloads Playwright browsers.
+      # The crawler's tests import only src/api/auth.ts and src/api/ingestClient.ts,
+      # never crawlee or playwright, so they run fine without them. The install is
+      # still the slow part of this job (npm ci fetches crawlee and playwright
+      # regardless); a pruned test-only manifest is more machinery than two test
+      # files are worth.
+      - name: Install crawler dependencies
+        working-directory: apps/crawlee
+        run: npm ci --ignore-scripts
+
+      - name: Crawler typecheck
+        working-directory: apps/crawlee
+        run: npm run typecheck
+
+      - name: Crawler tests
+        working-directory: apps/crawlee
+        run: npm test

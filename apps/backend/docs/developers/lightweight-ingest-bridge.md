@@ -110,7 +110,12 @@ Common payload fields:
 | `s3_paths` | A single S3 key (string) or a list of keys, in the bucket the course's connection config points at. |
 | `url` / `base_url` | For web documents (this is what Crawlee sends). |
 | `content` | Raw text content to ingest directly. |
+| `fetch_from_url` | `true` means the job carries no `s3_paths`: the worker downloads the PDF at `url` itself, stores it in the project's bucket, and ingests that. This is what Crawlee sends for crawled PDFs. |
 | `groups` | Optional document groups to attach. |
+
+`INGEST_API_KEY` is honoured by this bridge *and* by the backend's own Flask
+`/ingest` route, with the same fail-open-when-unset semantics, so the two
+endpoints can be secured together.
 
 ## Bulk ingest pattern
 
