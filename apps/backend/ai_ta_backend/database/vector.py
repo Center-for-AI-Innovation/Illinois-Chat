@@ -173,8 +173,8 @@ class VectorDatabase:
     May be constructed three ways:
       * Default injection (no args): a pgvector-default instance with no
         Qdrant client and no eagerly-bound pgvector store. The store is
-        resolved lazily via ``ConnectionManager.get_pgvector_store`` on
-        first use, or injected explicitly via the constructor.
+        resolved lazily via ``vector_store.get_vector_store()`` on first
+        use, or injected explicitly via the constructor.
       * Explicit per-project Qdrant:
         ``VectorDatabase(qdrant_client=..., qdrant_config=...)`` — produced
         by ``ConnectionManager.get_vector_db`` for projects with an
