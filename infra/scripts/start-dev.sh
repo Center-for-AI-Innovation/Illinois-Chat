@@ -229,7 +229,7 @@ ensure_local_app_envs() {
 	print_success "App-local .env files are ready."
 }
 
-DEV_APPS_PID_FILE="$REPO_ROOT/.illinois-chat-dev-apps.pid"
+DEV_APPS_PID_FILE="${REPO_ROOT}/.illinois-chat-dev-apps.pid"
 DEV_APPS_PIDS=()
 DEV_APPS_CLEANED=false
 BACKEND_PYTHON=""
@@ -291,10 +291,10 @@ if [ "$CLEAN_MODE" = true ] && [ "$CREATE_SCHEMA" = true ]; then
 fi
 
 resolve_backend_python() {
-	if [ -x "$REPO_ROOT/apps/backend/.venv/bin/python" ]; then
-		BACKEND_PYTHON="$REPO_ROOT/apps/backend/.venv/bin/python"
-	elif [ -x "$REPO_ROOT/apps/backend/venv/bin/python" ]; then
-		BACKEND_PYTHON="$REPO_ROOT/apps/backend/venv/bin/python"
+	if [[ -x "${REPO_ROOT}/apps/backend/.venv/bin/python" ]]; then
+		BACKEND_PYTHON="${REPO_ROOT}/apps/backend/.venv/bin/python"
+	elif [[ -x "${REPO_ROOT}/apps/backend/venv/bin/python" ]]; then
+		BACKEND_PYTHON="${REPO_ROOT}/apps/backend/venv/bin/python"
 	elif command -v python3 >/dev/null 2>&1; then
 		BACKEND_PYTHON="$(command -v python3)"
 	elif command -v python >/dev/null 2>&1; then
@@ -307,7 +307,7 @@ resolve_backend_python() {
 port_in_use() {
 	local port="$1"
 	if command -v lsof >/dev/null 2>&1; then
-		lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+		lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
 	else
 		return 1
 	fi
@@ -318,14 +318,14 @@ ensure_dev_apps_prereqs() {
 
 	resolve_backend_python
 
-	if [ -z "$BACKEND_PYTHON" ]; then
+	if [[ -z ${BACKEND_PYTHON} ]]; then
 		print_error "Python 3 is required to start the backend and worker."
 		print_error "Install Python 3.10 or 3.11, then: cd apps/backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -r ai_ta_backend/rabbitmq/requirements.txt"
 		exit 1
 	fi
 
-	if ! "$BACKEND_PYTHON" -c "import flask" >/dev/null 2>&1; then
-		print_error "Flask is not installed for $BACKEND_PYTHON."
+	if ! "${BACKEND_PYTHON}" -c "import flask" >/dev/null 2>&1; then
+		print_error "Flask is not installed for ${BACKEND_PYTHON}."
 		print_error "From apps/backend: pip install -r requirements.txt && pip install -r ai_ta_backend/rabbitmq/requirements.txt"
 		exit 1
 	fi
@@ -335,53 +335,53 @@ ensure_dev_apps_prereqs() {
 		exit 1
 	fi
 
-	if [ ! -d "$REPO_ROOT/apps/frontend/node_modules" ]; then
+	if [[ ! -d "${REPO_ROOT}/apps/frontend/node_modules" ]]; then
 		print_error "Frontend dependencies are missing. Run: cd apps/frontend && npm install"
 		exit 1
 	fi
 
 	local port
 	for port in 8000 8001 3000; do
-		if port_in_use "$port"; then
+		if port_in_use "${port}"; then
 			print_error "Port ${port} is already in use. Stop the existing process, then retry."
 			exit 1
 		fi
 	done
 
-	print_success "Dev app prerequisites look good (python: $BACKEND_PYTHON)"
+	print_success "Dev app prerequisites look good (python: ${BACKEND_PYTHON})"
 }
 
 kill_process_tree() {
 	local pid="$1"
 	local signal="${2:-TERM}"
 	local child
-	if ! kill -0 "$pid" 2>/dev/null; then
+	if ! kill -0 "${pid}" 2>/dev/null; then
 		return 0
 	fi
-	for child in $(pgrep -P "$pid" 2>/dev/null || true); do
-		kill_process_tree "$child" "$signal"
+	for child in $(pgrep -P "${pid}" 2>/dev/null || true); do
+		kill_process_tree "${child}" "${signal}"
 	done
-	kill "-${signal}" "$pid" 2>/dev/null || true
+	kill "-${signal}" "${pid}" 2>/dev/null || true
 }
 
 cleanup_dev_apps() {
-	if [ "$DEV_APPS_CLEANED" = true ]; then
+	if [[ ${DEV_APPS_CLEANED} == true ]]; then
 		return 0
 	fi
 	DEV_APPS_CLEANED=true
 
 	print_status "Stopping backend, worker, and frontend..."
 	local pid
-	if [ "${#DEV_APPS_PIDS[@]}" -gt 0 ]; then
+	if [[ ${#DEV_APPS_PIDS[@]} -gt 0 ]]; then
 		for pid in "${DEV_APPS_PIDS[@]}"; do
-			kill_process_tree "$pid" TERM
+			kill_process_tree "${pid}" TERM
 		done
 		sleep 1
 		for pid in "${DEV_APPS_PIDS[@]}"; do
-			kill_process_tree "$pid" KILL
+			kill_process_tree "${pid}" KILL
 		done
 	fi
-	rm -f "$DEV_APPS_PID_FILE"
+	rm -f "${DEV_APPS_PID_FILE}"
 	print_success "Dev apps stopped. Infrastructure is still running (use infra/scripts/stop-dev.sh to stop it)."
 }
 
@@ -391,44 +391,44 @@ start_dev_app() {
 	local pid
 	shift 2
 	(
-		cd "$workdir"
-		if [ -f .env ]; then
+		cd "${workdir}"
+		if [[ -f .env ]]; then
 			set -a
 			# shellcheck disable=SC1091
 			. ./.env
 			set +a
 		fi
 		export PYTHONUNBUFFERED=1
-		export PYTHONPATH="${workdir}${PYTHONPATH:+:$PYTHONPATH}"
+		export PYTHONPATH="${workdir}${PYTHONPATH:+:${PYTHONPATH}}"
 		exec "$@"
 	) > >(
 		while IFS= read -r line; do
-			printf '[%s] %s\n' "$name" "$line"
+			printf '[%s] %s\n' "${name}" "${line}"
 		done
 	) 2>&1 &
 	pid=$!
-	DEV_APPS_PIDS+=("$pid")
+	DEV_APPS_PIDS+=("${pid}")
 	print_success "Started ${name} (pid ${pid})"
 }
 
 start_dev_apps() {
-	local backend_dir="$REPO_ROOT/apps/backend"
-	local frontend_dir="$REPO_ROOT/apps/frontend"
+	local backend_dir="${REPO_ROOT}/apps/backend"
+	local frontend_dir="${REPO_ROOT}/apps/frontend"
 
-	: >"$DEV_APPS_PID_FILE"
+	: >"${DEV_APPS_PID_FILE}"
 	DEV_APPS_PIDS=()
 
 	print_status "Starting backend, ingest worker, and frontend in dev mode..."
 
-	start_dev_app "backend" "$backend_dir" \
-		"$BACKEND_PYTHON" -m flask --app ai_ta_backend.main:app --debug run --port 8000
+	start_dev_app "backend" "${backend_dir}" \
+		"${BACKEND_PYTHON}" -m flask --app ai_ta_backend.main:app --debug run --port 8000
 
-	start_dev_app "worker" "$backend_dir" \
-		"$BACKEND_PYTHON" ai_ta_backend/rabbitmq/worker.py
+	start_dev_app "worker" "${backend_dir}" \
+		"${BACKEND_PYTHON}" ai_ta_backend/rabbitmq/worker.py
 
-	start_dev_app "frontend" "$frontend_dir" npm run local
+	start_dev_app "frontend" "${frontend_dir}" npm run local
 
-	printf '%s\n' "${DEV_APPS_PIDS[@]}" >"$DEV_APPS_PID_FILE"
+	printf '%s\n' "${DEV_APPS_PIDS[@]}" >"${DEV_APPS_PID_FILE}"
 
 	trap cleanup_dev_apps EXIT
 	trap 'cleanup_dev_apps; exit 130' INT TERM
@@ -444,8 +444,8 @@ start_dev_apps() {
 	local pid
 	while true; do
 		for pid in "${DEV_APPS_PIDS[@]}"; do
-			if ! kill -0 "$pid" 2>/dev/null; then
-				wait "$pid" || true
+			if ! kill -0 "${pid}" 2>/dev/null; then
+				wait "${pid}" || true
 				print_error "A dev process exited (pid ${pid}). Stopping the rest..."
 				exit 1
 			fi
@@ -545,7 +545,7 @@ fi
 ensure_encryption_master_key
 ensure_local_app_envs
 
-if [ "$APPS_MODE" = true ]; then
+if [[ ${APPS_MODE} == true ]]; then
 	ensure_dev_apps_prereqs
 fi
 
@@ -814,7 +814,7 @@ echo "   - Test Qdrant: curl -H 'api-key: ${QDRANT_API_KEY:-your-strong-key-here
 echo "   - Test PostgreSQL: psql -h localhost -p 5432 -U postgres -d postgres"
 echo ""
 
-if [ "$APPS_MODE" = true ]; then
+if [[ ${APPS_MODE} == true ]]; then
 	start_dev_apps
 fi
 
