@@ -13,7 +13,9 @@ copyright: >-
 
 theme:
   name: material
-  logo: assets/logo.png
+  custom_dir: overrides
+  font: false
+  logo: assets/logo_illinois.png
   favicon: assets/favicon.ico
   palette:
     - media: "(prefers-color-scheme: light)"
@@ -44,6 +46,9 @@ theme:
 
 extra_css:
   - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/brand.js
 
 plugins:
   - search

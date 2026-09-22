@@ -1,26 +1,510 @@
-/* University of Illinois brand colors.
-   Blue #13294B (Illini Blue), Orange #FF5F05 (Illini Orange). */
+/* Illinois Chat docs theme.
+   Visual tokens from the product (apps/frontend) plus Figma dashboard chrome.
+   Colors, type, radius, and elevation only. */
 
 :root {
-  --md-primary-fg-color: #13294b;
-  --md-primary-fg-color--light: #1f3a66;
-  --md-primary-fg-color--dark: #0c1b33;
-  --md-accent-fg-color: #ff5f05;
-}
+  --illinois-orange: #c84113; /* Altgeld — accessible interactive orange */
+  --illinois-orange-branding: #ff5f05; /* official Block I / wordmark orange */
+  --illinois-blue: #13294b;
+  --illinois-white: #ffffff;
+  --illinois-storm-dark: #636563;
+  --illinois-storm-medium: #9c9a9d;
+  --illinois-storm-light: #c8c6c7;
+  --illinois-storm-95: #f4f4f4;
+  --illinois-industrial: #1d58a7;
+  --illinois-altgeld: #c84113;
+  --illinois-background-dark: #0d1d36;
 
-[data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #13294b;
+  --ic-orange: var(--illinois-orange-branding);
+  --ic-orange-ui: var(--illinois-orange);
+  --ic-blue: var(--illinois-blue);
+  --ic-foreground: var(--illinois-blue);
+  --ic-nav-fg: var(--illinois-blue);
+  --ic-sidebar-fg: var(--illinois-blue);
+  --ic-sidebar-accent-fg: var(--illinois-blue);
+  --ic-text-secondary: var(--illinois-storm-dark);
+  --ic-muted-fg: var(--illinois-storm-medium);
+  --ic-bg: var(--illinois-white);
+  --ic-sidebar-bg: #f9fafc;
+  --ic-slate-25: #f9fafc;
+  --ic-slate-100: #edeff3;
+  --ic-slate-400: #a6b4c7;
+  --ic-muted: var(--illinois-storm-95);
+  --ic-border: var(--illinois-storm-light);
+  --ic-card: var(--illinois-white);
+  --ic-radius: 0.5rem;
+  --ic-radius-md: 8px;
+  --ic-radius-lg: 10px;
+  --ic-radius-xl: 14px;
+  --ic-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --ic-shadow-sm:
+    0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+
+  --md-text-font: "Montserrat", system-ui, sans-serif;
+  --md-code-font: "Roboto Mono", ui-monospace, monospace;
+
+  --md-primary-fg-color: var(--illinois-blue);
   --md-primary-fg-color--light: #1f3a66;
   --md-primary-fg-color--dark: #0c1b33;
-  --md-accent-fg-color: #ff5f05;
-  --md-typeset-a-color: #7fa8e0;
+  --md-primary-bg-color: var(--illinois-white);
+  --md-accent-fg-color: var(--illinois-orange-branding);
+  --md-accent-fg-color--transparent: rgb(255 95 5 / 0.12);
+  --md-accent-bg-color: var(--illinois-white);
+
+  --md-default-fg-color: var(--illinois-blue);
+  --md-default-fg-color--light: var(--illinois-storm-dark);
+  --md-default-fg-color--lighter: var(--illinois-storm-medium);
+  --md-default-fg-color--lightest: var(--illinois-storm-light);
+  --md-default-bg-color: var(--illinois-white);
+  --md-default-bg-color--light: var(--ic-slate-25);
+  --md-default-bg-color--lighter: var(--ic-slate-100);
+  --md-default-bg-color--lightest: var(--illinois-storm-95);
+
+  --md-code-bg-color: var(--ic-slate-25);
+  --md-code-fg-color: var(--illinois-blue);
+  --md-code-hl-color: rgb(255 95 5 / 0.12);
+  --md-typeset-a-color: var(--illinois-blue);
+  --md-typeset-table-color: var(--ic-border);
+  --md-footer-bg-color: var(--ic-sidebar-bg);
+  --md-footer-bg-color--dark: var(--illinois-blue);
+  --md-footer-fg-color: var(--illinois-blue);
+  --md-footer-fg-color--light: rgb(255 255 255 / 0.72);
 }
 
 [data-md-color-scheme="default"] {
-  --md-typeset-a-color: #13294b;
+  --md-typeset-a-color: var(--illinois-blue);
+}
+
+[data-md-color-scheme="slate"] {
+  --ic-foreground: var(--illinois-white);
+  --ic-nav-fg: var(--illinois-white);
+  --ic-sidebar-fg: var(--illinois-white);
+  --ic-sidebar-accent-fg: var(--illinois-white);
+  --ic-text-secondary: var(--illinois-storm-light);
+  --ic-muted-fg: var(--illinois-storm-medium);
+  --ic-bg: var(--illinois-blue);
+  --ic-sidebar-bg: var(--illinois-background-dark);
+  --ic-slate-25: #10233f;
+  --ic-slate-100: #1a335c;
+  --ic-slate-400: #4a6284;
+  --ic-muted: #1a335c;
+  --ic-border: #2a4a73;
+  --ic-card: var(--illinois-blue);
+
+  --md-primary-fg-color: var(--illinois-blue);
+  --md-accent-fg-color: var(--illinois-orange-branding);
+  --md-typeset-a-color: #ff8a3d;
+  --md-default-fg-color: var(--illinois-white);
+  --md-default-fg-color--light: var(--illinois-storm-light);
+  --md-default-fg-color--lighter: var(--illinois-storm-medium);
+  --md-default-fg-color--lightest: #2a4a73;
+  --md-default-bg-color: var(--illinois-blue);
+  --md-code-bg-color: var(--illinois-background-dark);
+  --md-code-fg-color: var(--illinois-white);
+  --md-footer-bg-color: var(--illinois-background-dark);
+  --md-footer-bg-color--dark: var(--illinois-background-dark);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--illinois-orange) !important;
+  outline-offset: 2px !important;
+}
+
+/* ----- Header: LandingPageHeader / Navbar Logo ----- */
+
+.md-header {
+  background-color: var(--ic-bg);
+  color: var(--ic-nav-fg);
+  box-shadow: none;
+  border-bottom: 1px solid var(--ic-border);
+}
+
+.md-header--shadow {
+  box-shadow: var(--ic-shadow-sm);
+}
+
+.md-header__inner {
+  min-height: 3.5rem;
+  align-items: center;
+}
+
+.md-header .md-header__button,
+.md-header .md-source,
+.md-header .md-source__repository,
+.md-header .md-source__icon,
+.md-header .md-search__icon {
+  color: var(--ic-nav-fg);
+}
+
+.md-header__button.md-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.md-header__button.md-logo img {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+}
+
+.md-header__title {
+  flex-grow: 1;
+  margin: 0 0 0 0.5rem;
+  padding: 0.2rem 0;
+  height: 2.4rem;
+  line-height: 2.4rem;
+}
+
+.md-header__ellipsis {
+  height: 2.4rem;
+}
+
+.md-header__topic {
+  line-height: 2.4rem;
+}
+
+.md-author img,
+.md-post__authors img {
+  object-fit: contain;
+  background: var(--illinois-white);
+}
+
+.md-content__inner > h1 + h1 {
+  display: none;
+}
+
+.md-header__button:hover {
+  opacity: 1;
+  color: var(--illinois-orange-branding);
+}
+
+.md-header__topic:first-child .md-ellipsis,
+.ic-brand {
+  font-family: Montserrat, var(--md-text-font);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+  line-height: 2.4rem;
+}
+
+.ic-brand-illinois {
+  color: var(--illinois-orange-branding);
+}
+
+.ic-brand-chat {
+  color: var(--illinois-blue);
+}
+
+[data-md-color-scheme="slate"] .ic-brand-chat {
+  color: var(--illinois-white);
+}
+
+/* Tabs ≈ GlobalHeader orange outline nav (13px / Montserrat 700) */
+
+.md-tabs {
+  background-color: var(--ic-bg);
+  color: var(--ic-nav-fg);
+  border-bottom: 1px solid var(--ic-border);
+}
+
+.md-tabs__link {
+  font-family: Montserrat, var(--md-text-font);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-weight: 600;
+  opacity: 1;
+  color: var(--ic-nav-fg);
+}
+
+.md-tabs__link:hover {
+  color: var(--illinois-orange-branding);
+}
+
+.md-tabs__item--active {
+  border-bottom: 2px solid var(--illinois-orange-branding);
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: var(--illinois-orange);
+  font-weight: 700;
+}
+
+/* Search */
+
+.md-search__form {
+  border-radius: var(--ic-radius-md);
+  border: 1px solid var(--ic-border);
+  background-color: var(--ic-slate-25);
+  box-shadow: var(--ic-shadow-xs);
+}
+
+.md-search__input {
+  color: var(--ic-foreground);
+  font-family: var(--md-text-font);
+}
+
+.md-search__input::placeholder {
+  color: var(--ic-text-secondary);
+}
+
+.md-search__input + .md-search__icon {
+  color: var(--ic-text-secondary);
+}
+
+/* ----- Sidebar ----- */
+
+@media screen and (min-width: 76.25em) {
+  .md-nav--primary .md-nav__title,
+  .md-nav--secondary .md-nav__title {
+    background: transparent;
+    box-shadow: none;
+    color: var(--ic-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+}
+
+.md-nav__link {
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: var(--ic-radius-md);
+  color: var(--ic-sidebar-fg);
+}
+
+.md-nav__link:hover {
+  background-color: var(--ic-slate-100);
+  color: var(--illinois-orange);
+}
+
+.md-nav__item--active > .md-nav__link,
+.md-nav__link--active {
+  background-color: var(--ic-slate-100);
+  color: var(--illinois-orange);
+  font-weight: 700;
+}
+
+.md-nav__item--nested > .md-nav__link {
+  font-weight: 700;
+  color: var(--ic-sidebar-fg);
+}
+
+.md-sidebar--primary {
+  background-color: transparent;
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    background-color: var(--ic-sidebar-bg);
+    border-right: 1px solid var(--ic-border);
+  }
+}
+
+/* ----- Type: app uses Montserrat 700 headings, 500 body ----- */
+
+.md-typeset {
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--ic-foreground);
+}
+
+.md-typeset h1 {
+  font-family: Montserrat, var(--md-text-font);
+  font-weight: 700;
+  font-size: 1.65em;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--ic-foreground);
+}
+
+.md-typeset h2 {
+  font-family: Montserrat, var(--md-text-font);
+  font-weight: 700;
+  font-size: 1.25em;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: var(--ic-foreground);
+}
+
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+  font-family: Montserrat, var(--md-text-font);
+  font-weight: 700;
+  color: var(--ic-foreground);
+}
+
+.md-typeset h3 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.md-typeset p,
+.md-typeset li {
+  color: var(--ic-foreground);
+}
+
+.md-typeset a:hover {
+  color: var(--illinois-orange-branding);
+}
+
+.md-typeset strong {
+  font-weight: 700;
+}
+
+/* ----- Cards ----- */
+
+.md-typeset .grid.cards > ol > li,
+.md-typeset .grid.cards > ul > li,
+.md-typeset .grid > .card {
+  border: 1px solid var(--ic-border);
+  border-radius: var(--ic-radius-xl);
+  background-color: var(--ic-card);
+  box-shadow: var(--ic-shadow-sm);
+  padding: 1.5rem;
+}
+
+.md-typeset .grid.cards > ol > li:hover,
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--illinois-orange-branding);
+  box-shadow: var(--ic-shadow-sm);
+}
+
+.md-typeset .grid.cards > ol > li > p:first-child,
+.md-typeset .grid.cards > ul > li > p:first-child {
+  font-weight: 700;
+  color: var(--ic-foreground);
+}
+
+/* ----- Buttons: dashboard navy fill + orange outline ----- */
+
+.md-typeset .md-button {
+  border-radius: var(--ic-radius-md);
+  font-family: Montserrat, var(--md-text-font);
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border: 1px solid var(--illinois-orange);
+  color: var(--illinois-orange);
+  background: transparent;
+  box-shadow: none;
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--illinois-blue);
+  border-color: var(--illinois-blue);
+  color: var(--illinois-white);
+}
+
+.md-typeset .md-button:hover {
+  background-color: rgb(255 95 5 / 0.05);
+  border-color: var(--illinois-orange);
+  color: var(--illinois-orange);
+}
+
+.md-typeset .md-button--primary:hover {
+  background-color: color-mix(in srgb, var(--illinois-blue), black 20%);
+  border-color: color-mix(in srgb, var(--illinois-blue), black 20%);
+  color: var(--illinois-white);
+}
+
+/* ----- Tables ----- */
+
+.md-typeset table:not([class]) {
+  border: 1px solid var(--ic-border);
+  border-radius: var(--ic-radius-lg);
+  box-shadow: none;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--ic-slate-25);
+  color: var(--ic-text-secondary);
+  font-weight: 700;
+  font-size: 0.875rem;
+  height: 2.5rem;
+  border-bottom: 1px solid var(--ic-border);
+}
+
+.md-typeset table:not([class]) td {
+  border-bottom: 1px solid var(--ic-border);
+  font-size: 0.875rem;
+}
+
+.md-typeset table:not([class]) tr:hover td {
+  background-color: var(--ic-slate-25);
+}
+
+/* ----- Code, admonitions, images ----- */
+
+.md-typeset code {
+  border-radius: 6px;
+  background-color: var(--ic-slate-100);
+}
+
+.md-typeset pre > code {
+  background-color: var(--ic-slate-25);
+}
+
+.md-typeset .highlight {
+  border: 1px solid var(--ic-border);
+  border-radius: var(--ic-radius-lg);
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--ic-radius-lg);
+  border-color: var(--ic-border);
+  box-shadow: var(--ic-shadow-xs);
 }
 
 .md-typeset img {
-  border-radius: 0.2rem;
-  box-shadow: 0 0.1rem 0.5rem rgba(0, 0, 0, 0.15);
+  border-radius: var(--ic-radius-lg);
+  border: 1px solid var(--ic-border);
+  box-shadow: var(--ic-shadow-sm);
+}
+
+.md-typeset .md-logo img,
+.md-header__button.md-logo img,
+.md-nav__button.md-logo img {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* ----- Footer ----- */
+
+.md-footer {
+  background-color: var(--ic-sidebar-bg);
+  color: var(--ic-sidebar-fg);
+  border-top: 1px solid var(--ic-border);
+}
+
+.md-footer__inner {
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+.md-footer-meta {
+  background-color: var(--illinois-blue);
+  color: var(--illinois-white);
+}
+
+.md-social__link svg {
+  color: var(--illinois-orange-branding);
+}
+
+.md-top {
+  background-color: var(--illinois-blue);
+  color: var(--illinois-white);
+  border-radius: 9999px;
+}
+
+.md-top:hover {
+  background-color: var(--illinois-orange-branding);
 }
