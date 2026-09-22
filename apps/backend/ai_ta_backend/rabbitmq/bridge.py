@@ -20,16 +20,20 @@ import os
 from flask import Flask, jsonify, request
 
 try:
+    from ai_ta_backend.rabbitmq.ingest_auth import ingest_request_is_authorized
     from ai_ta_backend.rabbitmq.rmqueue import Queue
 except ModuleNotFoundError:  # standalone container: rabbitmq dir is the workdir
+    from ingest_auth import ingest_request_is_authorized
     from rmqueue import Queue
 
 logging.basicConfig(level=logging.INFO)
 
 # Optional bearer-token auth. When INGEST_API_KEY is set (recommended for a
 # public/internet-facing deployment), callers must send
-# `Authorization: Bearer <INGEST_API_KEY>`. Crawlee already sends this header
-# (its BEAM_API_KEY must equal INGEST_API_KEY). If unset, the endpoint is open.
+# `Authorization: Bearer <INGEST_API_KEY>`. The Flask backend's own /ingest route
+# honours the same variable, and every caller (frontend UIUC-api/ingest.ts, the
+# Crawlee HTML and PDF paths) sends the header when it is set. If unset, the
+# endpoint is open.
 INGEST_API_KEY = os.getenv("INGEST_API_KEY")
 
 app = Flask(__name__)
@@ -45,7 +49,7 @@ def ingest():
     """Queue an ingest job. Accepts the same payload as the backend /ingest:
     course_name, readable_filename, s3_paths | content | url, base_url, groups, ...
     """
-    if INGEST_API_KEY and request.headers.get("Authorization", "") != f"Bearer {INGEST_API_KEY}":
+    if not ingest_request_is_authorized(request.headers.get("Authorization"), INGEST_API_KEY):
         return jsonify({"error": "unauthorized"}), 401
 
     data = request.get_json(force=True, silent=True)

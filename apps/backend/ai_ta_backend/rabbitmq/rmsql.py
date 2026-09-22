@@ -226,6 +226,22 @@ class SQLAlchemyIngestDB:
 
         return response
 
+    def document_exists_for_url(self, course_name, url) -> bool:
+        """True when this project already has a document ingested from exactly this URL.
+
+        Deliberately an exact match, unlike get_like_docs_by_url's LIKE '%url%' which
+        also matches `…/a.pdf?v=2` for `…/a.pdf`, and unlike that method it does not
+        load the (large) contexts column.
+        """
+        query = (
+            select(models.Document.id)
+            .where(models.Document.course_name == course_name)
+            .where(models.Document.url == url)
+            .limit(1)
+        )
+        with self.get_session() as session:
+            return session.execute(query).first() is not None
+
     def get_like_docs_by_url(self, course_name, url):
         query = (
             select(models.Document.id, models.Document.contexts, models.Document.url)

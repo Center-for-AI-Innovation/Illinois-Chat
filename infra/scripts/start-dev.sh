@@ -85,6 +85,32 @@ ensure_encryption_master_key() {
 	print_success "ENCRYPTION_MASTER_KEY written to .env"
 }
 
+# Bearer tokens shared between the services: CRAWLEE_API_KEY guards POST /crawl
+# (the crawler fails closed without it, so nothing crawls) and INGEST_API_KEY
+# guards POST /ingest. Neither can ship with a default — a published default is
+# no protection — so generate them once into the root .env, like
+# ENCRYPTION_MASTER_KEY.
+ensure_shared_api_keys() {
+	local name value
+	for name in CRAWLEE_API_KEY INGEST_API_KEY; do
+		eval "value=\${$name:-}"
+		if [ -n "$value" ]; then
+			continue
+		fi
+		print_status "Generating $name (shared between the frontend, crawler, and backend)..."
+		value="$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-40)"
+		eval "$name=\$value"
+		export "$name"
+		if grep -q "^${name}=" .env; then
+			sed -i.bak "s|^${name}=.*|${name}=\"${value}\"|" .env
+			rm -f .env.bak
+		else
+			printf '%s="%s"\n' "$name" "$value" >>.env
+		fi
+		print_success "$name written to .env"
+	done
+}
+
 # Sim's secrets have no defaults in docker-compose.sim.yaml — a working
 # default would be a published key, and API_ENCRYPTION_KEY is what encrypts
 # stored Sim API keys. Generate per-deployment values on first run and persist
@@ -148,6 +174,8 @@ ensure_local_app_envs() {
 	local keycloak_admin="${KEYCLOAK_ADMIN_USERNAME:-admin}"
 	local keycloak_password="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
 	local encryption_master_key="${ENCRYPTION_MASTER_KEY:-}"
+	local crawlee_api_key="${CRAWLEE_API_KEY:-}"
+	local ingest_api_key="${INGEST_API_KEY:-}"
 	local allowed_embedding_providers="${ALLOWED_EMBEDDING_PROVIDERS:-openai,ollama}"
 	local default_course_admins="${DEFAULT_COURSE_ADMINS:-}"
 
@@ -182,6 +210,9 @@ ensure_local_app_envs() {
 	append_env_if_missing "$backend_env" "S3_BUCKET_NAME" "$s3_bucket"
 	append_env_if_missing "$backend_env" "RAILWAY_URL" "http://localhost:8000"
 	append_env_if_missing "$backend_env" "INGEST_URL" "http://localhost:8000/ingest"
+	append_env_if_missing "$backend_env" "INGEST_API_KEY" "$ingest_api_key"
+	append_env_if_missing "$backend_env" "CRAWLEE_API_URL" "http://localhost:3345/crawl"
+	append_env_if_missing "$backend_env" "CRAWLEE_API_KEY" "$crawlee_api_key"
 	append_env_if_missing "$backend_env" "KEYCLOAK_URL" "http://localhost:8080/"
 	append_env_if_missing "$backend_env" "KEYCLOAK_ADMIN_USERNAME" "$keycloak_admin"
 	append_env_if_missing "$backend_env" "KEYCLOAK_ADMIN_PASSWORD" "$keycloak_password"
@@ -207,6 +238,8 @@ ensure_local_app_envs() {
 	append_env_if_missing "$frontend_env" "RAILWAY_URL" "http://localhost:8000"
 	append_env_if_missing "$frontend_env" "INGEST_URL" "http://localhost:8000/ingest"
 	append_env_if_missing "$frontend_env" "CRAWLEE_API_URL" "http://localhost:3345/crawl"
+	append_env_if_missing "$frontend_env" "CRAWLEE_API_KEY" "$crawlee_api_key"
+	append_env_if_missing "$frontend_env" "INGEST_API_KEY" "$ingest_api_key"
 	append_env_if_missing "$frontend_env" "REDIS_URL" "redis://default:${redis_password}@localhost:6379"
 	append_env_if_missing "$frontend_env" "POSTGRES_ENDPOINT" "localhost"
 	append_env_if_missing "$frontend_env" "POSTGRES_PORT" "5432"
@@ -259,20 +292,12 @@ ensure_local_app_envs() {
 	ensure_env_file "$crawlee_env" "Crawlee local development env"
 	append_env_if_missing "$crawlee_env" "PORT" "3345"
 	append_env_if_missing "$crawlee_env" "INGEST_URL" "http://localhost:8000/ingest"
-	append_env_if_missing "$crawlee_env" "LOCAL_MINIO" "true"
-	append_env_if_missing "$crawlee_env" "AWS_REGION" "$aws_region"
-	append_env_if_missing "$crawlee_env" "AWS_KEY" "$aws_access_key"
-	append_env_if_missing "$crawlee_env" "AWS_SECRET" "$aws_secret_key"
-	append_env_if_missing "$crawlee_env" "AWS_ACCESS_KEY_ID" "$aws_access_key"
-	append_env_if_missing "$crawlee_env" "AWS_SECRET_ACCESS_KEY" "$aws_secret_key"
-	append_env_if_missing "$crawlee_env" "S3_BUCKET_NAME" "$s3_bucket"
-	append_env_if_missing "$crawlee_env" "MINIO_ENDPOINT" "http://localhost:10000"
+	append_env_if_missing "$crawlee_env" "INGEST_API_KEY" "$ingest_api_key"
+	append_env_if_missing "$crawlee_env" "CRAWLEE_API_KEY" "$crawlee_api_key"
+	# No AWS/S3/MinIO here: the crawler does not write to object storage. It reports
+	# crawled PDFs to /ingest as a URL and the worker stores them in the project's bucket.
 	append_env_if_missing "$crawlee_env" "NO_CRAWL" ""
 	append_env_if_missing "$crawlee_env" "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" ""
-	append_env_if_missing "$crawlee_env" "OPENAI_API_KEY" ""
-	append_env_if_missing "$crawlee_env" "NCSA_HOSTED_API_KEY" ""
-	append_env_if_missing "$crawlee_env" "EMBEDDING_API_BASE" ""
-	append_env_if_missing "$crawlee_env" "EMBEDDING_MODEL" ""
 
 	print_success "App-local .env files are ready."
 }
@@ -426,6 +451,8 @@ else
 fi
 
 ensure_encryption_master_key
+# Unconditional: the crawler needs CRAWLEE_API_KEY whether or not Sim is running.
+ensure_shared_api_keys
 if [ "$WITH_SIM" = true ]; then
 	ensure_sim_secrets
 	if [ -z "${SIM_APPROVAL_ADMIN_EMAIL:-}" ]; then
@@ -725,8 +752,8 @@ fi
 MINIO_CONTAINER="$("${COMPOSE[@]}" ps -q minio)"
 if [ -n "$MINIO_CONTAINER" ]; then
 	docker run --rm --entrypoint /bin/sh --network "container:${MINIO_CONTAINER}" quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z \
-		-c "mc alias set local http://localhost:${DOCKER_INTERNAL_MINIO_API_PORT:-10000} '${AWS_ACCESS_KEY_ID}' '${AWS_SECRET_ACCESS_KEY}' >/dev/null && mc mb -p local/uiuc-chat >/dev/null 2>&1 || true"
-	print_success "✓ MinIO bucket 'uiuc-chat' is ready"
+		-c "mc alias set local http://localhost:${DOCKER_INTERNAL_MINIO_API_PORT:-10000} '${AWS_ACCESS_KEY_ID}' '${AWS_SECRET_ACCESS_KEY}' >/dev/null && mc mb -p 'local/${S3_BUCKET_NAME:-uiuc-chat}' >/dev/null 2>&1 || true"
+	print_success "✓ MinIO bucket '${S3_BUCKET_NAME:-uiuc-chat}' is ready"
 else
 	print_warning "MinIO container was not found, skipping bucket setup"
 fi

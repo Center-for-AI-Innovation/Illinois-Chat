@@ -8,3 +8,11 @@ storage
 
 # installed files
 node_modules
+
+# Local dev env files. src/api/configValidation.ts calls configDotenv(), so a
+# .env copied into the image is READ AT RUNTIME. That silently reintroduced the
+# AWS/MinIO credentials this service is no longer supposed to have, and set PORT
+# to a developer's local value, making the container listen somewhere other than
+# the port compose maps. Configuration comes from the environment only.
+.env
+.env.*

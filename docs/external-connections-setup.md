@@ -32,6 +32,11 @@ Deeper reference material lives with the apps:
   the app-local `.env` files automatically; for other deployments set it in
   your environment (see the root `.env.template` for the generation
   one-liner).
+- **The crawler needs neither `ENCRYPTION_MASTER_KEY` nor S3 credentials.** It
+  reports crawled PDFs to `/ingest` as a URL; the ingest worker downloads them
+  and writes them to the project's bucket with the connection it has already
+  resolved. The bucket must already exist — nothing in this pipeline creates
+  buckets.
 - **A super-admin account** on the frontend. Connection CRUD is restricted to
   super admins (`SUPER_ADMIN_EMAILS` / `src/utils/superAdmins.ts`).
 - The host database schema must include the external-connections tables.

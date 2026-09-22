@@ -53,6 +53,7 @@ from ai_ta_backend.utils.email.send_transactional_email import send_email
 from ai_ta_backend.utils.pubmed_extraction import extractPubmedData
 from ai_ta_backend.utils.rerun_webcrawl_for_project import webscrape_documents
 from ai_ta_backend.rabbitmq.rmqueue import Queue
+from ai_ta_backend.rabbitmq.ingest_auth import ingest_request_is_authorized
 from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
 
 app = Flask(__name__)
@@ -648,25 +649,40 @@ def get_conversation_stats(service: RetrievalService) -> Response:
 
 
 
+# Optional bearer-token auth for /ingest, matching rabbitmq/bridge.py. Fail-open
+# when unset so an existing deployment keeps working after an upgrade; set it once
+# every caller (frontend, crawler) is sending the header. This matters more now
+# that a job can ask the worker to fetch an arbitrary URL.
+INGEST_API_KEY = os.getenv("INGEST_API_KEY")
+
+
+def _ingest_request_is_authorized() -> bool:
+  return ingest_request_is_authorized(request.headers.get("Authorization"), INGEST_API_KEY)
+
+
 @app.route('/ingest', methods=['POST'])
 def ingest() -> Response:
+  if not _ingest_request_is_authorized():
+    return jsonify({"error": "unauthorized"}), 401  # type: ignore[return-value]
+
   active_queue = Queue()
   data = request.get_json()
   logging.info("Data received: %s", data)
 
-  # TODO: Authentication?
+  # addJobToIngestQueue reads inputs['readable_filename'] unconditionally; a caller
+  # omitting it used to 500 here (bridge.py has always defaulted it).
+  if isinstance(data, dict):
+    data.setdefault('readable_filename', '')
 
   job_id = active_queue.addJobToIngestQueue(data)
   logging.info("Result from addJobToIngestQueue:  %s", job_id)
 
-  response = jsonify(
+  return jsonify(
     {
       "outcome": f'Queued Ingest task',
       "task_id": job_id
     }
   )
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  return response
 
 @app.route('/canvas_ingest', methods=['POST'])
 def canvas_ingest() -> Response:
