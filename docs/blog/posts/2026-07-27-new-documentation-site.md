@@ -1,12 +1,11 @@
 ---
 date: 2026-07-27
+title: Announcing the new Illinois Chat documentation
 categories:
   - Announcements
 authors:
   - caii
 ---
-
-# Announcing the new Illinois Chat documentation
 
 Welcome to the new home of the Illinois Chat documentation — built with Material for MkDocs, versioned alongside the code, and published automatically from the [monorepo](https://github.com/Center-for-AI-Innovation/Illinois-Chat).
 
