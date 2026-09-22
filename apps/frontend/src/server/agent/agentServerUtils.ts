@@ -367,7 +367,9 @@ export interface FetchContextsServerParams {
 
 /**
  * Server-side context fetching - directly calls the backend instead of going through API
- * Includes retry logic with exponential backoff for transient failures
+ * Includes retry logic with exponential backoff for transient failures.
+ * Resolves to [] on abort; throws once every attempt has failed so callers can
+ * tell a backend outage apart from a legitimately empty result.
  */
 export async function fetchContextsServer(
   params: FetchContextsServerParams,
@@ -424,7 +426,7 @@ export async function fetchContextsServer(
         console.error(
           `[fetchContextsServer] failed after ${delaysMs.length} attempts (${lastError})`,
         )
-        return []
+        throw new Error(lastError)
       }
 
       return contexts
@@ -443,11 +445,11 @@ export async function fetchContextsServer(
       console.error(
         `[fetchContextsServer] failed after ${delaysMs.length} attempts (${lastError})`,
       )
-      return []
+      throw new Error(lastError)
     }
   }
 
-  return []
+  throw new Error(lastError ?? 'Context retrieval failed')
 }
 
 /**
