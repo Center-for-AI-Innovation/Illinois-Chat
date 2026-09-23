@@ -499,7 +499,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
               </Button>
             )}
             {apiKey && !loading && (
-              <div className="mt-4 mb-12 flex flex-col items-center gap-4 pt-5">
+              <div className="mt-4 mb-12 flex flex-row items-center justify-center gap-4 pt-5">
                 <Button
                   onClick={handleRotate}
                   disabled={loading || apiKey === null}
