@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import {
   ProviderNames,
+  rememberUserModelChoice,
   selectBestModel,
   type AllLLMProviders,
 } from '../LLMProvider'
@@ -28,13 +29,31 @@ function makeAllProviders(
   return base as unknown as AllLLMProviders
 }
 
+const PROJECT = 'test-project'
+
+function storePreference(
+  projectName: string,
+  modelId: string,
+  projectDefaultId: string | null,
+) {
+  localStorage.setItem(
+    `defaultModel:${projectName}`,
+    JSON.stringify({ modelId, projectDefaultId }),
+  )
+}
+
+function readStoredModelId(projectName: string): string | undefined {
+  const raw = localStorage.getItem(`defaultModel:${projectName}`)
+  return raw ? JSON.parse(raw).modelId : undefined
+}
+
 describe('selectBestModel', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
   it('returns the user-selected default model when available', () => {
-    localStorage.setItem('defaultModel', OpenAIModelID.GPT_4o_mini)
+    storePreference(PROJECT, OpenAIModelID.GPT_4o_mini, null)
 
     const providers = makeAllProviders({
       [ProviderNames.OpenAI]: {
@@ -43,7 +62,100 @@ describe('selectBestModel', () => {
       },
     })
 
-    expect(selectBestModel(providers).id).toBe(OpenAIModelID.GPT_4o_mini)
+    expect(selectBestModel(providers, PROJECT).id).toBe(
+      OpenAIModelID.GPT_4o_mini,
+    )
+  })
+
+  it('keeps the user pick when the project default is unchanged', () => {
+    storePreference(PROJECT, OpenAIModelID.GPT_4o_mini, OpenAIModelID.GPT_4o)
+
+    const providers = makeAllProviders({
+      [ProviderNames.OpenAI]: {
+        enabled: true,
+        models: [
+          { ...OpenAIModels[OpenAIModelID.GPT_4o_mini], enabled: true },
+          {
+            ...OpenAIModels[OpenAIModelID.GPT_4o],
+            enabled: true,
+            default: true,
+          },
+        ],
+      },
+    })
+
+    expect(selectBestModel(providers, PROJECT).id).toBe(
+      OpenAIModelID.GPT_4o_mini,
+    )
+  })
+
+  it('drops a stale user pick after the admin changes the project default', () => {
+    // Pick made while GPT-4o was the project default; the admin has since moved
+    // the default to GPT-4.1.
+    storePreference(PROJECT, OpenAIModelID.GPT_4o_mini, OpenAIModelID.GPT_4o)
+
+    const providers = makeAllProviders({
+      [ProviderNames.OpenAI]: {
+        enabled: true,
+        models: [
+          { ...OpenAIModels[OpenAIModelID.GPT_4o_mini], enabled: true },
+          { ...OpenAIModels[OpenAIModelID.GPT_4o], enabled: true },
+          {
+            ...OpenAIModels[OpenAIModelID.GPT_4_1],
+            enabled: true,
+            default: true,
+          },
+        ],
+      },
+    })
+
+    expect(selectBestModel(providers, PROJECT).id).toBe(OpenAIModelID.GPT_4_1)
+    expect(localStorage.getItem(`defaultModel:${PROJECT}`)).toBeNull()
+  })
+
+  it('does not leak a pick made in one project into another project', () => {
+    const providers = makeAllProviders({
+      [ProviderNames.OpenAI]: {
+        enabled: true,
+        models: [
+          { ...OpenAIModels[OpenAIModelID.GPT_4o_mini], enabled: true },
+          {
+            ...OpenAIModels[OpenAIModelID.GPT_4o],
+            enabled: true,
+            default: true,
+          },
+        ],
+      },
+    })
+
+    rememberUserModelChoice(providers, 'project-a', OpenAIModelID.GPT_4o_mini)
+
+    expect(selectBestModel(providers, 'project-a').id).toBe(
+      OpenAIModelID.GPT_4o_mini,
+    )
+    expect(selectBestModel(providers, 'project-b').id).toBe(
+      OpenAIModelID.GPT_4o,
+    )
+  })
+
+  it('falls back to the project default when no project name is available', () => {
+    storePreference(PROJECT, OpenAIModelID.GPT_4o_mini, null)
+
+    const providers = makeAllProviders({
+      [ProviderNames.OpenAI]: {
+        enabled: true,
+        models: [
+          { ...OpenAIModels[OpenAIModelID.GPT_4o_mini], enabled: true },
+          {
+            ...OpenAIModels[OpenAIModelID.GPT_4o],
+            enabled: true,
+            default: true,
+          },
+        ],
+      },
+    })
+
+    expect(selectBestModel(providers).id).toBe(OpenAIModelID.GPT_4o)
   })
 
   it('handles partial provider maps without crashing', () => {
@@ -59,10 +171,7 @@ describe('selectBestModel', () => {
   })
 
   it('migrates a legacy Qwen default only after Qwen 3.5 is available', () => {
-    localStorage.setItem(
-      'defaultModel',
-      NCSAHostedVLMModelID.QWEN2_5VL_32B_INSTRUCT,
-    )
+    storePreference(PROJECT, NCSAHostedVLMModelID.QWEN2_5VL_32B_INSTRUCT, null)
 
     const providers = makeAllProviders({
       [ProviderNames.NCSAHostedVLM]: {
@@ -71,19 +180,14 @@ describe('selectBestModel', () => {
       },
     })
 
-    expect(selectBestModel(providers)).toEqual(
+    expect(selectBestModel(providers, PROJECT)).toEqual(
       NCSAHostedVLMModels[NCSAHostedVLMModelID.QWEN3_5_27B],
     )
-    expect(localStorage.getItem('defaultModel')).toBe(
-      NCSAHostedVLMModelID.QWEN3_5_27B,
-    )
+    expect(readStoredModelId(PROJECT)).toBe(NCSAHostedVLMModelID.QWEN3_5_27B)
   })
 
   it('keeps the stored legacy Qwen default when Qwen 3.5 is unavailable', () => {
-    localStorage.setItem(
-      'defaultModel',
-      NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT,
-    )
+    storePreference(PROJECT, NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT, null)
 
     const providers = makeAllProviders({
       [ProviderNames.NCSAHostedVLM]: {
@@ -96,10 +200,10 @@ describe('selectBestModel', () => {
       },
     })
 
-    expect(selectBestModel(providers)).toEqual(
+    expect(selectBestModel(providers, PROJECT)).toEqual(
       NCSAHostedVLMModels[NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT],
     )
-    expect(localStorage.getItem('defaultModel')).toBe(
+    expect(readStoredModelId(PROJECT)).toBe(
       NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT,
     )
   })
@@ -158,10 +262,7 @@ describe('selectBestModel', () => {
   })
 
   it('rewrites the legacy NCSA default model in localStorage', () => {
-    localStorage.setItem(
-      'defaultModel',
-      NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT,
-    )
+    storePreference(PROJECT, NCSAHostedVLMModelID.QWEN2_5VL_72B_INSTRUCT, null)
 
     const providers = makeAllProviders({
       [ProviderNames.NCSAHostedVLM]: {
@@ -170,12 +271,10 @@ describe('selectBestModel', () => {
       },
     })
 
-    expect(selectBestModel(providers)).toEqual(
+    expect(selectBestModel(providers, PROJECT)).toEqual(
       NCSAHostedVLMModels[NCSAHostedVLMModelID.QWEN3_5_27B],
     )
-    expect(localStorage.getItem('defaultModel')).toBe(
-      NCSAHostedVLMModelID.QWEN3_5_27B,
-    )
+    expect(readStoredModelId(PROJECT)).toBe(NCSAHostedVLMModelID.QWEN3_5_27B)
   })
 
   it('falls back to the current NCSA default descriptor when no models are available', () => {
