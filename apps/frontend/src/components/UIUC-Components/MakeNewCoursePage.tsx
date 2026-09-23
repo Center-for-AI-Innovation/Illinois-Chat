@@ -2,10 +2,10 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import React, { useRef, useState } from 'react'
 
-import { Card, Flex, Title } from '@mantine/core'
+import { Card } from '@/components/shadcn/ui/card'
 import { Button } from '@/components/shadcn/ui/button'
 import { LoaderCircle } from 'lucide-react'
-import { useDebouncedValue } from '@mantine/hooks'
+import { useDebounce } from '~/hooks/useDebounce'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   callSetCourseMetadata,
@@ -61,7 +61,7 @@ const MakeNewCoursePage = ({
   const [currentStep, setStep] = useState(0)
 
   // Debounce project name input to avoid excessive API calls
-  const [debouncedProjectName] = useDebouncedValue(projectName, 1000)
+  const debouncedProjectName = useDebounce(projectName, 1000)
 
   // Check project name availability using React Query
   const { data: courseExists, isFetching: isCheckingAvailability } =
@@ -380,12 +380,8 @@ const MakeNewCoursePage = ({
       >
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">
-          <Card
-            padding="none"
-            withBorder={true}
-            radius="lg"
-            className="my-auto flex w-full max-w-[720px] flex-col border-(--dashboard-border)! bg-(--background) px-6 py-8 text-(--foreground) sm:px-10 sm:py-10"
-          >
+          <Card className="my-auto flex w-full max-w-[720px] flex-col rounded-2xl border border-(--dashboard-border)! bg-(--background) px-6 py-8 text-(--foreground) sm:px-10 sm:py-10">
+
             <div
               ref={stepContainerRef}
               className="step_container flex min-h-88 flex-col"

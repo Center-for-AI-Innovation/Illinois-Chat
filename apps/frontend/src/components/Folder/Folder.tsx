@@ -20,7 +20,11 @@ import HomeContext from '~/components/home/home.context'
 
 import SidebarActionButton from '@/components/Buttons/SidebarActionButton'
 
-import { Tooltip } from '@mantine/core'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 
 interface Props {
   currentFolder: FolderInterface
@@ -129,15 +133,17 @@ const Folder = ({
             ) : (
               <IconCaretRight size={18} aria-hidden="true" />
             )}
-            <Tooltip
-              label={currentFolder.name}
-              position="top-end"
-              withArrow
-              multiline
-            >
-              <div className="relative max-h-5 min-w-0 flex-1 truncate text-left text-sm leading-3 break-all text-ellipsis whitespace-nowrap">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className="relative max-h-5 min-w-0 flex-1 truncate text-left text-sm leading-3 break-all text-ellipsis whitespace-nowrap" />
+                }
+              >
                 {currentFolder.name}
-              </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end" className="text-wrap">
+                {currentFolder.name}
+              </TooltipContent>
             </Tooltip>
           </button>
         )}

@@ -35,9 +35,7 @@ interface NavigationContentProps {
   courseName: string
 }
 
-// Shared nav-link classes (formerly the Mantine `link` createStyles entry).
-// Mantine tokens resolved: spacing.xs=10px, spacing.sm=12px, spacing.lg=20px, radius.sm=4px.
-// All colors remain the existing --navbar-* CSS variables. See docs/mantine-retirement-styles-notes.md.
+// Shared nav-link classes. Colors come from the --navbar-* CSS variables.
 const navLinkClass =
   'flex items-center justify-center gap-[0.4rem] rounded px-3 py-2.5 text-[13px] font-bold text-(--navbar-foreground) transition-colors hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) hover:no-underline data-[active=true]:bg-(--navbar-background) data-[active=true]:text-(--navbar-active) data-[active=true]:no-underline max-md:justify-start max-md:rounded-none max-md:bg-(--navbar-background) max-md:px-3 max-md:py-5'
 
@@ -135,7 +133,7 @@ function NavigationContent({
 }: NavigationContentProps) {
   return (
     <>
-      {/* Mobile dropdown (was Mantine <Transition pop-top-right> + <Paper>) */}
+      {/* Mobile dropdown */}
       {opened && (
         <nav
           aria-label="Mobile navigation"

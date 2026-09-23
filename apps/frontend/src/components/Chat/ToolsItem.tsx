@@ -1,5 +1,14 @@
-import { Switch, Table, TextInput, Title, Text } from '@mantine/core'
-import { useMediaQuery } from '@mantine/hooks'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/ui/table'
+import { Input } from '@/components/shadcn/ui/input'
+import { Switch } from '@/components/shadcn/ui/switch'
+import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import { IconSearch } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useContext, useMemo, useState } from 'react'
@@ -49,56 +58,51 @@ export const ToolsItem = ({}) => {
       >
         <div>
           <div className="flex flex-col"></div>
-          <Title
-            className={`px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
-            order={isSmallScreen ? 5 : 3}
-          >
-            Tools
-          </Title>
+          {isSmallScreen ? (
+            <h5
+              className={`heading-h5 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+            >
+              Tools
+            </h5>
+          ) : (
+            <h3
+              className={`heading-h3 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+            >
+              Tools
+            </h3>
+          )}
           <div className="flex flex-col items-center justify-center rounded-lg">
-            <TextInput
-              type="search"
-              placeholder="Search Tools"
-              aria-label="Search Tools"
-              my="sm"
-              radius="md"
-              icon={
-                <IconSearch size={isSmallScreen ? 15 : 20} aria-hidden="true" />
-              }
-              value={toolSearch}
-              onChange={handleToolSearchChange}
-              w={'90%'}
-              size={isSmallScreen ? 'xs' : 'sm'}
-              styles={{
-                input: {
-                  color: 'var(--foreground)',
-                  backgroundColor: 'var(--background-faded)',
-                  borderColor: 'var(--background-dark)',
-                  '&:focus': {
-                    borderColor: 'var(--background-darker)',
-                  },
-                },
-              }}
-            />
+            <div className="relative my-3 w-[90%]">
+              <IconSearch
+                size={isSmallScreen ? 15 : 20}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-(--foreground-faded)"
+              />
+              <Input
+                type="search"
+                placeholder="Search Tools"
+                aria-label="Search Tools"
+                value={toolSearch}
+                onChange={handleToolSearchChange}
+                className={`rounded-lg border-(--background-dark) bg-(--background-faded) pl-9 text-(--foreground) focus-visible:border-(--background-darker) ${
+                  isSmallScreen ? 'h-7 text-xs' : 'h-8 text-sm'
+                }`}
+              />
+            </div>
 
-            {/* unable to use this until v7 of mantine since we can't control the hover color              highlightOnHover */}
             <Table
               aria-label="Tools configuration"
-              variant="striped"
-              className="text-(--modal-text)"
-              style={{
-                width: '90%',
-              }}
+              className="w-[90%] text-(--modal-text)"
             >
-              <thead>
-                <tr
+              <TableHeader>
+                <TableRow
                   className={`${
                     montserrat_paragraph.variable
                   } font-montserratParagraph ${
                     isSmallScreen ? 'text-xs' : 'text-sm'
                   }`}
                 >
-                  <th
+                  <TableHead
                     style={{
                       width: '60%',
                       wordWrap: 'break-word',
@@ -106,8 +110,8 @@ export const ToolsItem = ({}) => {
                     }}
                   >
                     Tool
-                  </th>
-                  <th
+                  </TableHead>
+                  <TableHead
                     style={{
                       width: '40%',
                       wordWrap: 'break-word',
@@ -118,14 +122,14 @@ export const ToolsItem = ({}) => {
                     <span className="flex flex-col items-center justify-center">
                       <span className="self-center">Enabled</span>
                     </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="[&>tr:nth-child(even)]:bg-(--background-faded)">
                 {filteredTools.map((tool_obj, index) => (
-                  <tr key={index}>
-                    <td style={{ wordWrap: 'break-word' }}>
-                      <Text
+                  <TableRow key={index}>
+                    <TableCell style={{ wordWrap: 'break-word' }}>
+                      <span
                         className={`${
                           montserrat_paragraph.variable
                         } font-montserratParagraph ${
@@ -133,9 +137,9 @@ export const ToolsItem = ({}) => {
                         }`}
                       >
                         {tool_obj.readableName}
-                      </Text>
-                    </td>
-                    <td
+                      </span>
+                    </TableCell>
+                    <TableCell
                       style={{
                         display: 'flex',
                         justifyContent: 'center',
@@ -144,21 +148,20 @@ export const ToolsItem = ({}) => {
                     >
                       <Switch
                         checked={tool_obj.enabled}
-                        onChange={() => handleToggleChecked(tool_obj.id)}
-                        color="orange"
+                        onCheckedChange={() => handleToggleChecked(tool_obj.id)}
                         size={isSmallScreen ? 'sm' : 'lg'}
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {filteredTools.length === 0 && (
-                  <tr>
-                    <td colSpan={4}>
-                      <Text align="center">No tools found</Text>
-                    </td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={4}>
+                      <span className="block text-center">No tools found</span>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
+              </TableBody>
             </Table>
           </div>
         </div>

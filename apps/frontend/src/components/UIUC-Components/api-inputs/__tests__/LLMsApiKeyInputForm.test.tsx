@@ -426,12 +426,12 @@ describe('ModelItem', () => {
   it('renders the model label', () => {
     render(
       <ModelItem
+        value="gpt-4"
         label="GPT-4"
         modelId="gpt-4"
         selectedModelId="gpt-4"
         modelType="OpenAI"
         vram_required_MB={0}
-        loadingModelId={null}
       />,
     )
     expect(screen.getByText('GPT-4')).toBeInTheDocument()
@@ -440,34 +440,17 @@ describe('ModelItem', () => {
   it('renders the model logo image', () => {
     render(
       <ModelItem
+        value="claude-3"
         label="Claude"
         modelId="claude-3"
         selectedModelId={undefined}
         modelType="Anthropic"
         vram_required_MB={0}
-        loadingModelId={null}
       />,
     )
     const img = screen.getByAltText('Anthropic logo')
     expect(img).toBeInTheDocument()
     expect(img).toHaveAttribute('src', '/media/llm_icons/Anthropic.png')
-  })
-
-  it('forwards ref and extra props', () => {
-    const ref = React.createRef<HTMLDivElement>()
-    render(
-      <ModelItem
-        ref={ref}
-        label="Test"
-        modelId="test"
-        selectedModelId={undefined}
-        modelType="OpenAI"
-        vram_required_MB={0}
-        loadingModelId={null}
-        data-testid="model-item"
-      />,
-    )
-    expect(screen.getByTestId('model-item')).toBeInTheDocument()
   })
 })
 
@@ -634,9 +617,8 @@ describe('APIKeyInputForm', () => {
       <APIKeyInputForm projectName="test-project" isEmbedded />,
     )
     await waitFor(() => {
-      // The NewModelDropdown renders a Mantine Select with "Select a model" placeholder
-      const select = screen.queryByPlaceholderText('Select a model')
-      // Even if the select is not text-searchable, the component should render
+      // The NewModelDropdown renders a Base UI combobox with "Select a model" placeholder
+      expect(screen.queryByPlaceholderText('Select a model')).toBeTruthy()
       expect(document.querySelector('.llm-providers-form')).toBeInTheDocument()
     })
   })

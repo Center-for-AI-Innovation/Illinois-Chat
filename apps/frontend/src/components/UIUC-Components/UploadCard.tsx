@@ -30,8 +30,8 @@ const montserrat_light = Montserrat({
   subsets: ['latin'],
 })
 
-// Restores the `autosize` behavior the Mantine Textarea gave us: grow to fit
-// the content, with the `max-h-*` class doing what `maxRows` used to.
+// Autosizing textarea: grows to fit its content, with the `max-h-*` class
+// capping how far it can grow.
 function useAutosizeTextarea(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {

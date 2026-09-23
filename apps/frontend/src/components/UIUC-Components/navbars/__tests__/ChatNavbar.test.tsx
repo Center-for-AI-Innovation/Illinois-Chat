@@ -5,20 +5,6 @@ import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    Burger: ({ onClick, opened }: any) => (
-      <button type="button" aria-label="burger" onClick={onClick}>
-        {opened ? 'burger-open' : 'burger-closed'}
-      </button>
-    ),
-    Transition: ({ mounted, children }: any) =>
-      mounted ? <div data-testid="hamburger-menu">{children({})}</div> : null,
-  }
-})
-
 vi.mock('../ThemeToggle', () => ({
   ThemeToggle: () => <div data-testid="theme-toggle" />,
 }))

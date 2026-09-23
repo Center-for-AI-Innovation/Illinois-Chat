@@ -14,7 +14,12 @@ import { IconSettings } from '@tabler/icons-react'
 
 import { type FolderWithConversation } from '~/types/folder'
 import Search from '../Search'
-import { Button, Tooltip } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { useAuth } from 'react-oidc-context'
@@ -150,43 +155,42 @@ const Sidebar = <T,>({
           </button>
         </div>
 
-        <Tooltip
-          tabIndex={0}
-          aria-label="Admin Dashboard"
-          label="Admin Dashboard"
-          disabled={permission !== 'edit'}
-          withArrow
-          position="right"
-          withinPortal
-        >
-          <div
-            role="button"
-            tabIndex={permission === 'edit' ? 0 : -1}
-            aria-label="Open Admin Dashboard"
-            aria-hidden={permission !== 'edit'}
-            className={`flex items-center justify-start gap-3 rounded-lg bg-(--sidebar-background) p-2 text-(--foreground) transition-colors md:gap-4 md:p-3 ${
-              permission === 'edit'
-                ? 'cursor-pointer hover:bg-(--navbar-hover-background)'
-                : 'cursor-default'
-            }`}
-            onClick={
-              permission === 'edit'
-                ? () => {
-                    if (courseName) {
-                      void nextRouter.push(`/${courseName}/dashboard`)
-                    }
-                  }
-                : undefined
-            }
-            onKeyDown={
-              permission === 'edit'
-                ? (e) => {
-                    if ((e.key === 'Enter' || e.key === ' ') && courseName) {
-                      e.preventDefault()
-                      void nextRouter.push(`/${courseName}/dashboard`)
-                    }
-                  }
-                : undefined
+        <Tooltip disabled={permission !== 'edit'}>
+          <TooltipTrigger
+            render={
+              <div
+                role="button"
+                tabIndex={permission === 'edit' ? 0 : -1}
+                aria-label="Open Admin Dashboard"
+                aria-hidden={permission !== 'edit'}
+                className={`flex items-center justify-start gap-3 rounded-lg bg-(--sidebar-background) p-2 text-(--foreground) transition-colors md:gap-4 md:p-3 ${
+                  permission === 'edit'
+                    ? 'cursor-pointer hover:bg-(--navbar-hover-background)'
+                    : 'cursor-default'
+                }`}
+                onClick={
+                  permission === 'edit'
+                    ? () => {
+                        if (courseName) {
+                          void nextRouter.push(`/${courseName}/dashboard`)
+                        }
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  permission === 'edit'
+                    ? (e) => {
+                        if (
+                          (e.key === 'Enter' || e.key === ' ') &&
+                          courseName
+                        ) {
+                          e.preventDefault()
+                          void nextRouter.push(`/${courseName}/dashboard`)
+                        }
+                      }
+                    : undefined
+                }
+              />
             }
           >
             {/* Banner/logo (if present) */}
@@ -257,7 +261,8 @@ const Sidebar = <T,>({
                 </Button>
               </div>
             ) : null}
-          </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">Admin Dashboard</TooltipContent>
         </Tooltip>
 
         <Search

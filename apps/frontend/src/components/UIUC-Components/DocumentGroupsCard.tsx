@@ -27,12 +27,7 @@ function DocumentGroupsCard({
         borderColor: 'var(--dashboard-border)',
       }}
     >
-      <div
-        style={{
-          color: 'white',
-        }}
-        className="min-h-full bg-(--background)"
-      >
+      <div className="min-h-full bg-(--background) text-(--foreground)">
         <div className="w-full border-b border-(--dashboard-border) px-4 py-3 sm:px-6 sm:py-4 md:px-8">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">

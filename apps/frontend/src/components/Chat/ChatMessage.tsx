@@ -9,14 +9,19 @@ import React, {
   createContext,
   useContext as useReactContext,
 } from 'react'
+import { Badge } from '@/components/shadcn/ui/badge'
 import {
-  Text,
-  createStyles,
-  Badge,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
+import {
   Tooltip,
-  Modal,
-  Button,
-} from '@mantine/core'
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
+import { XIcon } from 'lucide-react'
 import {
   IconCheck,
   IconEdit,
@@ -64,23 +69,12 @@ import { IntermediateStateAccordion } from '../UIUC-Components/IntermediateState
 import { AgentExecutionTimeline } from './AgentExecutionTimeline'
 import { FeedbackModal } from './FeedbackModal'
 
-const useStyles = createStyles((theme) => ({
-  imageContainerStyle: {
-    maxWidth: '25%',
-    flex: '1 0 21%',
-    padding: '0.5rem',
-    borderRadius: '0.5rem',
-  },
-  imageStyle: {
-    width: '100%',
-    height: '100px',
-    objectFit: 'cover',
-    borderRadius: '0.5rem',
-    borderColor: 'var(--dashboard-border)',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-  },
-}))
+const imageContainerClassName = 'max-w-[25%] flex-[1_0_21%] p-2 rounded-lg'
+const imageClassName =
+  'w-full h-[100px] object-cover rounded-lg border border-(--dashboard-border)'
+const tooltipContentClassName = 'bg-(--tooltip-background) text-(--tooltip)'
+const tooltipArrowClassName =
+  'bg-(--tooltip-background) fill-(--tooltip-background)'
 
 // Component that's the Timer for GPT's response duration.
 const Timer: React.FC<{ timerVisible: boolean }> = ({ timerVisible }) => {
@@ -102,9 +96,7 @@ const Timer: React.FC<{ timerVisible: boolean }> = ({ timerVisible }) => {
   }, [timerVisible])
 
   return timer > 0 ? (
-    <Text fz="sm" c="dimmed" mt="sm">
-      {timer} s.
-    </Text>
+    <p className="mt-3 text-sm text-(--foreground-faded)">{timer} s.</p>
   ) : (
     <></>
   )
@@ -297,22 +289,25 @@ const FilePreviewModal: React.FC<{
   }
 
   return (
-    <Modal.Root opened={isOpen} onClose={onClose} centered size="xl">
-      <Modal.Overlay className="modal-overlay-common" />
-      <Modal.Content className="modal-common">
-        <Modal.Header className="modal-header-common">
-          <Modal.Title
+    <Dialog open={isOpen} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        className="modal-common w-full max-w-[calc(100%-2rem)] gap-0 p-0 sm:max-w-[788px]"
+      >
+        <div className="modal-header-common flex items-center justify-between">
+          <DialogTitle
             className={`modal-title-common ${montserrat_heading.variable} font-montserratHeading`}
           >
             {fileName}
-          </Modal.Title>
-          <Modal.CloseButton
-            onClick={onClose}
+          </DialogTitle>
+          <DialogClose
             aria-label="Close file preview"
-            className="modal-close-button-common"
-          />
-        </Modal.Header>
-        <Modal.Body className="modal-body-common">
+            className="modal-close-button-common rounded p-1"
+          >
+            <XIcon className="size-4" aria-hidden="true" />
+          </DialogClose>
+        </div>
+        <div className="modal-body-common">
           <div className="file-preview-container">
             {isPdf && actualFileUrl ? (
               <iframe
@@ -326,9 +321,9 @@ const FilePreviewModal: React.FC<{
               </div>
             ) : null}
           </div>
-        </Modal.Body>
-      </Modal.Content>
-    </Modal.Root>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -522,7 +517,6 @@ export const ChatMessage = memo(
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const [timerVisible, setTimerVisible] = useState(false)
-    const { classes } = useStyles() // for Accordion
 
     const agentEvents = Array.isArray(message.agentEvents)
       ? message.agentEvents
@@ -1959,14 +1953,14 @@ export const ChatMessage = memo(
                                         <div
                                           key={index}
                                           className={
-                                            classes.imageContainerStyle
+                                            imageContainerClassName
                                           }
                                         >
                                           <div className="overflow-hidden rounded-lg">
                                             <ImagePreview
                                               src={processedUrl as string}
                                               alt="Chat message"
-                                              className={classes.imageStyle}
+                                              className={imageClassName}
                                             />
                                           </div>
                                         </div>
@@ -2150,18 +2144,7 @@ export const ChatMessage = memo(
                                         title={
                                           <>
                                             Routing the request to{' '}
-                                            <Badge
-                                              color="var(--background-dark)"
-                                              radius="md"
-                                              size="sm"
-                                              styles={{
-                                                root: {
-                                                  color: 'var(--foreground)',
-                                                  backgroundColor:
-                                                    'var(--background-dark)',
-                                                },
-                                              }}
-                                            >
+                                            <Badge className="rounded-md bg-(--background-dark) text-(--foreground)">
                                               {response.readableName}
                                             </Badge>
                                           </>
@@ -2192,7 +2175,7 @@ export const ChatMessage = memo(
                                                         <div
                                                           key={index}
                                                           className={
-                                                            classes.imageContainerStyle
+                                                            imageContainerClassName
                                                           }
                                                         >
                                                           <div className="overflow-hidden rounded-lg">
@@ -2200,7 +2183,7 @@ export const ChatMessage = memo(
                                                               src={imageUrl}
                                                               alt={`Tool image argument ${index}`}
                                                               className={
-                                                                classes.imageStyle
+                                                                imageClassName
                                                               }
                                                             />
                                                           </div>
@@ -2244,19 +2227,11 @@ export const ChatMessage = memo(
                                         <>
                                           Tool output from{' '}
                                           <Badge
-                                            color="var(--background-dark)"
-                                            radius="md"
-                                            size="sm"
-                                            styles={{
-                                              root: {
-                                                color: response.error
-                                                  ? 'var(--illinois-white)'
-                                                  : 'var(--foreground)',
-                                                backgroundColor: response.error
-                                                  ? 'var(--badge-error)'
-                                                  : 'var(--background-dark)',
-                                              },
-                                            }}
+                                            className={`rounded-md ${
+                                              response.error
+                                                ? 'bg-(--badge-error) text-(--illinois-white)'
+                                                : 'bg-(--background-dark) text-(--foreground)'
+                                            }`}
                                           >
                                             {response.readableName}
                                           </Badge>
@@ -2286,7 +2261,7 @@ export const ChatMessage = memo(
                                                       <div
                                                         key={index}
                                                         className={
-                                                          classes.imageContainerStyle
+                                                          imageContainerClassName
                                                         }
                                                       >
                                                         <div className="overflow-hidden rounded-lg">
@@ -2294,7 +2269,7 @@ export const ChatMessage = memo(
                                                             src={imageUrl}
                                                             alt={`Tool output image ${index}`}
                                                             className={
-                                                              classes.imageStyle
+                                                              imageClassName
                                                             }
                                                           />
                                                         </div>
@@ -2356,43 +2331,37 @@ export const ChatMessage = memo(
                       </div>
                       {!isEditing && (
                         <div className="mt-0 flex items-center justify-start gap-4">
-                          <Tooltip
-                            label="Edit Message"
-                            position="bottom"
-                            withArrow
-                            arrowSize={6}
-                            transitionProps={{
-                              transition: 'fade',
-                              duration: 200,
-                            }}
-                            classNames={{
-                              tooltip: 'text-sm py-1 px-2',
-                              arrow: 'border-gray-700',
-                            }}
-                            style={{
-                              color: 'var(--tooltip)',
-                              backgroundColor: 'var(--tooltip-background)',
-                            }}
-                          >
-                            <button
-                              type="button"
-                              aria-label="Edit message"
-                              className={`text-(--foreground-faded) hover:text-(--foreground) ${
-                                Array.isArray(message.content) &&
-                                message.content.some(
-                                  (content) => content.type === 'image_url',
-                                )
-                                  ? 'hidden'
-                                  : ''
-                              }`}
-                              onClick={toggleEditing}
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <button
+                                  type="button"
+                                  aria-label="Edit message"
+                                  className={`text-(--foreground-faded) hover:text-(--foreground) ${
+                                    Array.isArray(message.content) &&
+                                    message.content.some(
+                                      (content) => content.type === 'image_url',
+                                    )
+                                      ? 'hidden'
+                                      : ''
+                                  }`}
+                                  onClick={toggleEditing}
+                                />
+                              }
                             >
                               <IconEdit
                                 size={20}
                                 aria-hidden="true"
                                 className="text-(--button-faded) hover:text-(--button)"
                               />
-                            </button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="bottom"
+                              className={tooltipContentClassName}
+                              arrowClassName={tooltipArrowClassName}
+                            >
+                              Edit Message
+                            </TooltipContent>
                           </Tooltip>
                         </div>
                       )}
