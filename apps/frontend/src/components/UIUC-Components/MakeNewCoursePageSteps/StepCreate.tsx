@@ -187,6 +187,7 @@ const StepCreate = ({
               <SelectTrigger
                 id="step-create-project-type"
                 aria-label="Project Type"
+                className="w-full"
               >
                 <SelectValue placeholder="Pick a category" />
               </SelectTrigger>
@@ -223,6 +224,7 @@ const StepCreate = ({
               <SelectTrigger
                 id="step-create-organization"
                 aria-label="Organization"
+                className="w-full"
               >
                 <SelectValue placeholder="Pick an organization" />
               </SelectTrigger>
