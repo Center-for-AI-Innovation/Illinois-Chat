@@ -291,7 +291,7 @@ describe('StepCreate', () => {
     expect(onUpdateProjectType).toHaveBeenCalledWith(undefined)
   })
 
-  it('returns to the placeholder after clearing a selection', async () => {
+  it('returns to the placeholder after clearing a selection', () => {
     const { rerender } = render(
       <StepCreate {...defaultProps} organization="Computer Science" />,
     )
