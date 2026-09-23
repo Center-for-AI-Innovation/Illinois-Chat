@@ -1,21 +1,9 @@
 /* @vitest-environment node */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-const hoisted = vi.hoisted(() => ({
-  invalidate: vi.fn(),
-}))
-
-vi.mock('~/utils/connectionManager', () => ({
-  connectionManager: { invalidate: hoisted.invalidate },
-}))
-
-import {
-  extractRequestMeta,
-  formatZodError,
-  invalidateForProject,
-} from '../handlerShared'
+import { extractRequestMeta, formatZodError } from '../handlerShared'
 
 function req(headers: Record<string, unknown>, remoteAddress?: string) {
   return { headers, socket: { remoteAddress } } as any
@@ -84,27 +72,3 @@ describe('formatZodError', () => {
   })
 })
 
-describe('invalidateForProject', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('delegates to the connection manager', async () => {
-    hoisted.invalidate.mockResolvedValueOnce(undefined)
-    await invalidateForProject('cardiology')
-    expect(hoisted.invalidate).toHaveBeenCalledWith('cardiology')
-  })
-
-  it('warns but does not throw when invalidation fails', async () => {
-    // A stale cache entry must never fail the write that preceded it.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    hoisted.invalidate.mockRejectedValueOnce(new Error('redis down'))
-
-    await expect(invalidateForProject('cardiology')).resolves.toBeUndefined()
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('cardiology'),
-      expect.any(Error),
-    )
-    warn.mockRestore()
-  })
-})

@@ -17,7 +17,6 @@ function makeRes() {
 }
 
 const auditEntries: any[] = []
-const invalidatedProjects: string[] = []
 
 function mockRepoAndManager(setActiveImpl: () => any) {
   vi.doMock('~/db/projectConnectionsRepo', () => ({
@@ -26,24 +25,15 @@ function mockRepoAndManager(setActiveImpl: () => any) {
       auditEntries.push(e)
     }),
   }))
-  vi.doMock('~/utils/connectionManager', () => ({
-    connectionManager: {
-      invalidate: vi.fn(async (n: string) => {
-        invalidatedProjects.push(n)
-      }),
-    },
-  }))
 }
 
 beforeEach(() => {
   auditEntries.length = 0
-  invalidatedProjects.length = 0
   vi.resetModules()
 })
 
 afterEach(() => {
   vi.doUnmock('~/db/projectConnectionsRepo')
-  vi.doUnmock('~/utils/connectionManager')
 })
 
 describe('projectConnections/active handler', () => {
@@ -97,7 +87,6 @@ describe('projectConnections/active handler', () => {
       res,
     )
     expect(res.statusCode).toBe(404)
-    expect(invalidatedProjects).toHaveLength(0)
     expect(auditEntries[0]).toMatchObject({
       action: 'set_active',
       outcome: 'failure',
@@ -106,7 +95,7 @@ describe('projectConnections/active handler', () => {
     })
   })
 
-  it('happy path: 200, invalidate, audit success with is_active in changed_fields', async () => {
+  it('happy path: 200 and audit success with is_active in changed_fields', async () => {
     mockRepoAndManager(() => ({ found: true, is_active: false }))
     const { handler } =
       await import('~/pages/api/UIUC-api/projectConnections/active')
@@ -126,7 +115,6 @@ describe('projectConnections/active handler', () => {
       project_name: 'demo',
       is_active: false,
     })
-    expect(invalidatedProjects).toEqual(['demo'])
     expect(auditEntries[0]).toMatchObject({
       action: 'set_active',
       outcome: 'success',

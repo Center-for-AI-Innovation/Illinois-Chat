@@ -462,6 +462,10 @@ export async function runAgentConversation(
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : 'Unknown error'
+            // fetchContextsServer throws once every retry has failed, and
+            // message.tools holds this same object reference, so the failure
+            // reaches the final-answer prompt's tool output serialization
+            retrievalTool.error = errorMessage
             updateAgentEvent(retrievalEventId, {
               status: 'error',
               metadata: { contextQuery: searchQuery, errorMessage },
