@@ -123,8 +123,8 @@ const getProviderFromModel = (
   return selectedOption?.group || ProviderNames.OpenAI
 }
 
-// Height must go through React's `style` prop — imperative `el.style.height`
-// is wiped when React re-syncs the style attribute (e.g. for font-family).
+// Height lives in the `style` prop as well as on the element; see the note in
+// `PromptEditor.tsx`.
 function useAutosizeTextarea(value: string) {
   const ref = useRef<HTMLTextAreaElement | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -136,7 +136,9 @@ function useAutosizeTextarea(value: string) {
     if (!el) return
     el.style.height = 'auto'
     const next = el.scrollHeight
-    el.style.height = ''
+    // Write the height back rather than clearing it: `setHeight` bails out on
+    // an unchanged value, leaving the DOM with whatever was set here.
+    el.style.height = `${next}px`
     lastWidthRef.current = el.clientWidth
     setHeight(next)
   }, [])
@@ -265,10 +267,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   const closeResetModal = useCallback(() => setResetModalOpened(false), [])
   const [llmProviders, setLLMProviders] = useState<AllLLMProviders | null>(null)
   const [linkGeneratorOpened, setLinkGeneratorOpened] = useState(false)
-  const openLinkGenerator = useCallback(
-    () => setLinkGeneratorOpened(true),
-    [],
-  )
+  const openLinkGenerator = useCallback(() => setLinkGeneratorOpened(true), [])
   const closeLinkGenerator = useCallback(
     () => setLinkGeneratorOpened(false),
     [],

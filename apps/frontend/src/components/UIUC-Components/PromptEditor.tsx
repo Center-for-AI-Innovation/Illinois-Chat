@@ -125,13 +125,9 @@ const getProviderFromModel = (
 
 // Autosizing textarea: grows to fit its content, with the `max-h-*` class
 // capping how far it can grow.
-// Returns a ref for the textarea plus a `height` value to spread into its
-// `style` prop. The height MUST be applied through React's own render output
-// (not written directly to `el.style.height`): this textarea also takes a
-// `style` prop for its font-family, and React re-syncs the whole `style`
-// attribute to match that prop on every re-render, silently wiping out any
-// height set imperatively outside of React the moment something else in this
-// component re-renders (which happens often, unrelated to the prompt text).
+// Returns a ref plus a `height` to spread into the textarea's `style` prop,
+// which also carries its font-family - so the height has to live in that prop
+// too, not only on the element.
 function useAutosizeTextarea(value: string) {
   const ref = useRef<HTMLTextAreaElement | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -143,7 +139,9 @@ function useAutosizeTextarea(value: string) {
     if (!el) return
     el.style.height = 'auto'
     const next = el.scrollHeight
-    el.style.height = ''
+    // Write the height back rather than clearing it: `setHeight` bails out on
+    // an unchanged value, leaving the DOM with whatever was set here.
+    el.style.height = `${next}px`
     lastWidthRef.current = el.clientWidth
     setHeight(next)
   }, [])
