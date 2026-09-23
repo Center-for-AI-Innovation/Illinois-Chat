@@ -138,6 +138,29 @@ describe('selectBestModel', () => {
     )
   })
 
+  it('falls back to the project default when the stored preference is unreadable', () => {
+    const providers = makeAllProviders({
+      [ProviderNames.OpenAI]: {
+        enabled: true,
+        models: [
+          { ...OpenAIModels[OpenAIModelID.GPT_4o_mini], enabled: true },
+          {
+            ...OpenAIModels[OpenAIModelID.GPT_4o],
+            enabled: true,
+            default: true,
+          },
+        ],
+      },
+    })
+
+    localStorage.setItem(`defaultModel:${PROJECT}`, 'not-json')
+    expect(selectBestModel(providers, PROJECT).id).toBe(OpenAIModelID.GPT_4o)
+
+    // A value of the right type but the wrong shape is ignored the same way.
+    localStorage.setItem(`defaultModel:${PROJECT}`, JSON.stringify({}))
+    expect(selectBestModel(providers, PROJECT).id).toBe(OpenAIModelID.GPT_4o)
+  })
+
   it('falls back to the project default when no project name is available', () => {
     storePreference(PROJECT, OpenAIModelID.GPT_4o_mini, null)
 
@@ -155,6 +178,9 @@ describe('selectBestModel', () => {
       },
     })
 
+    // With no project to scope it to, a pick is not remembered at all.
+    rememberUserModelChoice(providers, undefined, OpenAIModelID.GPT_4o_mini)
+    expect(localStorage.length).toBe(1)
     expect(selectBestModel(providers).id).toBe(OpenAIModelID.GPT_4o)
   })
 
