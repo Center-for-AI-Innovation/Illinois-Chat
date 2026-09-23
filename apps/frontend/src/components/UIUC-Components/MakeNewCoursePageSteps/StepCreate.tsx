@@ -31,9 +31,6 @@ import {
 
 import HeaderStepNavigation from './HeaderStepNavigation'
 
-// Sentinel for the "no selection" item, since Radix Select doesn't accept "".
-const UNSET_VALUE = '__none__'
-
 const StepCreate = ({
   project_name,
   is_new_course = true,
@@ -182,13 +179,9 @@ const StepCreate = ({
               </span>
             </label>
             <Select
-              value={project_type ?? UNSET_VALUE}
+              value={project_type ?? null}
               onValueChange={(value) =>
-                onUpdateProjectType?.(
-                  value === UNSET_VALUE
-                    ? undefined
-                    : (value as ChatbotProjectType),
-                )
+                onUpdateProjectType?.(value ?? undefined)
               }
             >
               <SelectTrigger
@@ -198,7 +191,7 @@ const StepCreate = ({
                 <SelectValue placeholder="Pick a category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNSET_VALUE}>None</SelectItem>
+                <SelectItem value={null}>None</SelectItem>
                 {CHATBOT_PROJECT_TYPES.map((value) => (
                   <SelectItem key={value} value={value}>
                     {value}
@@ -222,11 +215,9 @@ const StepCreate = ({
               </span>
             </label>
             <Select
-              value={organization ?? UNSET_VALUE}
+              value={organization ?? null}
               onValueChange={(value) =>
-                onUpdateOrganization?.(
-                  value == null || value === UNSET_VALUE ? undefined : value,
-                )
+                onUpdateOrganization?.(value ?? undefined)
               }
             >
               <SelectTrigger
@@ -236,7 +227,7 @@ const StepCreate = ({
                 <SelectValue placeholder="Pick an organization" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNSET_VALUE}>None</SelectItem>
+                <SelectItem value={null}>None</SelectItem>
                 {COMMON_ORGANIZATIONS.map((value) => (
                   <SelectItem key={value} value={value}>
                     {value}
