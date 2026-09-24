@@ -120,7 +120,7 @@ describe('ProjectConnectionEditor', () => {
     expect(await screen.findByText('****cdef')).toBeInTheDocument()
     expect(screen.queryByLabelText(/API key/)).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Change' }))
+    await user.click(screen.getByRole('button', { name: /^Change / }))
 
     const input = screen.getByLabelText(/API key/)
     expect(input).toHaveAttribute('type', 'password')
@@ -166,7 +166,7 @@ describe('ProjectConnectionEditor', () => {
     await user.clear(collection)
     await user.type(collection, 'illinois-v2')
 
-    await user.click(screen.getByRole('button', { name: 'Change' }))
+    await user.click(screen.getByRole('button', { name: /^Change / }))
     // Opened but left empty: that means "keep the stored secret", not "set it
     // to empty string".
     await user.click(screen.getByRole('button', { name: /Save changes/ }))
@@ -181,7 +181,7 @@ describe('ProjectConnectionEditor', () => {
     renderEditor()
 
     await screen.findByText('****cdef')
-    await user.click(screen.getByRole('button', { name: 'Change' }))
+    await user.click(screen.getByRole('button', { name: /^Change / }))
     await user.type(screen.getByLabelText(/API key/), 'brand-new-key')
     await user.click(screen.getByRole('button', { name: /Save changes/ }))
 
@@ -309,7 +309,7 @@ describe('ProjectConnectionEditor', () => {
     )
 
     await screen.findByText('****cdef')
-    await user.click(screen.getByRole('button', { name: 'Change' }))
+    await user.click(screen.getByRole('button', { name: /^Change / }))
     await user.type(screen.getByLabelText(/API key/), 'half-typed')
 
     await user.keyboard('{Escape}')

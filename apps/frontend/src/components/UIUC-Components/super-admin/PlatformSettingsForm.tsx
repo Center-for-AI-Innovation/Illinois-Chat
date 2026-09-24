@@ -6,11 +6,11 @@
 // other card's on-screen values too.
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { cva } from 'class-variance-authority'
 import { Loader2, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { FormProvider, useForm } from 'react-hook-form'
 import { Button } from '~/components/shadcn/ui/button'
-import { Form } from '~/components/shadcn/ui/form'
 import { useFetchPlatformSettings } from '~/hooks/queries/useFetchPlatformSettings'
 import { useUpdatePlatformSettings } from '~/hooks/queries/useUpdatePlatformSettings'
 import {
@@ -22,9 +22,24 @@ import {
   AdminCardSkeleton,
   AdminInlineError,
   AdminInlineWarning,
+  adminMutedTextClass,
 } from './AdminCard'
 import { AnnouncementBannerCard } from './AnnouncementBannerCard'
 import { MaintenanceModeCard } from './MaintenanceModeCard'
+
+// Floats only while there is something to save, so on small screens it does
+// not permanently cover a slice of the form.
+const saveBarVariants = cva(
+  'z-10 flex flex-col gap-3 rounded-[14px] bg-white/95 p-4 ring-1 ring-[#e5e7eb] backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:bg-[#13294b]/95 dark:ring-[#32517a]',
+  {
+    variants: {
+      floating: {
+        true: 'sticky bottom-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)]',
+        false: 'shadow-[0_4px_20px_rgba(0,0,0,0.06)]',
+      },
+    },
+  },
+)
 
 interface PlatformSettingsFormProps {
   /** Lets the page warn before a tab switch discards edits. */
@@ -121,10 +136,11 @@ export function PlatformSettingsForm({
   }
 
   return (
-    <Form {...form}>
+    <FormProvider {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="flex flex-col gap-6"
+        noValidate
       >
         {data?.warning && <AdminInlineWarning message={data.warning} />}
         {data?.bannerState === 'invalid' && (
@@ -142,16 +158,26 @@ export function PlatformSettingsForm({
           <MaintenanceModeCard />
         </div>
 
-        <div className="sticky bottom-4 flex flex-col gap-3 rounded-[14px] border border-[#e5e7eb] bg-white/95 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.08)] backdrop-blur dark:border-[#32517a] dark:bg-[#13294b]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className={saveBarVariants({
+            floating: isDirty || updateSettings.isPending,
+          })}
+        >
           <div className="min-w-0 text-sm">
             {/* Announced to assistive tech; also the visible save receipt. */}
-            <p aria-live="polite" className="min-w-0">
+            <p aria-live="polite" className="flex min-w-0 items-center gap-2">
               {isDirty ? (
-                <span className="font-semibold text-[--illinois-orange]">
-                  Unsaved changes
-                </span>
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="size-2 shrink-0 rounded-full bg-(--illinois-orange)"
+                  />
+                  <span className="font-semibold text-(--illinois-orange)">
+                    Unsaved changes
+                  </span>
+                </>
               ) : (
-                <span className="text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
+                <span className={adminMutedTextClass}>
                   {saveStatus ??
                     (data?.updatedAt
                       ? `Last saved ${new Date(
@@ -164,10 +190,11 @@ export function PlatformSettingsForm({
               )}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center justify-end gap-3">
             <Button
               type="button"
               variant="outline"
+              className="flex-1 sm:flex-none"
               onClick={() => {
                 form.reset(data?.settings)
                 setSaveError(null)
@@ -180,19 +207,19 @@ export function PlatformSettingsForm({
             <Button
               type="submit"
               variant="dashboard"
+              className="flex-1 sm:flex-none"
               disabled={!isDirty || updateSettings.isPending}
-              className="gap-2"
             >
               {updateSettings.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <Loader2 className="animate-spin" aria-hidden="true" />
               ) : (
-                <Save className="h-4 w-4" aria-hidden="true" />
+                <Save aria-hidden="true" />
               )}
               {updateSettings.isPending ? 'Saving' : 'Save changes'}
             </Button>
           </div>
         </div>
       </form>
-    </Form>
+    </FormProvider>
   )
 }

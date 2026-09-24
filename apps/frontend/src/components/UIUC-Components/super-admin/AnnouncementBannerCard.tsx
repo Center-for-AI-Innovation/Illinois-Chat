@@ -1,25 +1,40 @@
 // The orange announcement bar on the home page. Fields live in the shared
 // PlatformSettingsForm, so this card is presentation plus the live preview.
 
+import { cva } from 'class-variance-authority'
 import { Megaphone } from 'lucide-react'
-import { useFormContext, useWatch } from 'react-hook-form'
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from '~/components/shadcn/ui/field'
 import { Input } from '~/components/shadcn/ui/input'
 import { Switch } from '~/components/shadcn/ui/switch'
 import { Textarea } from '~/components/shadcn/ui/textarea'
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '~/components/shadcn/ui/form'
+import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
 import {
   ANNOUNCEMENT_MESSAGE_MAX_LENGTH,
   type PlatformSettings,
 } from '~/utils/platformSettings.schema'
-import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
-import { AdminCard } from './AdminCard'
+import {
+  AdminCard,
+  adminInsetClass,
+  adminMutedTextClass,
+  adminSubtleTextClass,
+} from './AdminCard'
+
+const counterVariants = cva('text-xs tabular-nums', {
+  variants: {
+    over: {
+      true: 'text-destructive font-medium',
+      false: adminSubtleTextClass,
+    },
+  },
+})
 
 export function AnnouncementBannerCard() {
   const form = useFormContext<PlatformSettings>()
@@ -34,108 +49,115 @@ export function AnnouncementBannerCard() {
     <AdminCard
       title="Announcement banner"
       blastRadius="Shows to everyone on the home page. Takes up to 30 seconds to appear after saving."
-      icon={<Megaphone className="h-5 w-5" aria-hidden="true" />}
+      icon={<Megaphone className="size-5" aria-hidden="true" />}
       headerAside={
-        <FormField
+        <Controller
           control={form.control}
           name="announcementBanner.enabled"
           render={({ field }) => (
-            <FormItem className="flex items-center gap-3 space-y-0">
-              <FormLabel className="cursor-pointer text-sm text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
+            <Field orientation="horizontal" className="w-auto gap-2.5">
+              <span
+                aria-hidden="true"
+                className={`text-sm font-medium ${adminMutedTextClass}`}
+              >
                 {field.value ? 'Shown' : 'Hidden'}
-              </FormLabel>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  aria-label="Show the announcement banner"
-                />
-              </FormControl>
-            </FormItem>
+              </span>
+              <Switch
+                variant="labeled"
+                size="sm"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                aria-label="Show the announcement banner"
+              />
+            </Field>
           )}
         />
       }
     >
-      <div className="flex flex-col gap-5">
-        <FormField
+      <FieldGroup className="gap-5">
+        <Controller
           control={form.control}
           name="announcementBanner.message"
-          render={({ field }) => (
-            <FormItem>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid || undefined}>
               <div className="flex items-baseline justify-between gap-3">
-                <FormLabel>Message</FormLabel>
+                <FieldLabel htmlFor="announcement-message">Message</FieldLabel>
                 <span
-                  className={`text-xs ${
-                    messageLength > ANNOUNCEMENT_MESSAGE_MAX_LENGTH
-                      ? 'text-destructive'
-                      : 'text-[--illinois-storm-medium] dark:text-[#94a3b8]'
-                  }`}
+                  className={counterVariants({
+                    over: messageLength > ANNOUNCEMENT_MESSAGE_MAX_LENGTH,
+                  })}
                 >
                   {messageLength}/{ANNOUNCEMENT_MESSAGE_MAX_LENGTH}
                 </span>
               </div>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  rows={3}
-                  placeholder="Illinois Chat will be unavailable Saturday 8am–noon for maintenance."
-                  className="resize-y rounded-[8px]"
-                />
-              </FormControl>
-              <FormDescription>
+              <Textarea
+                {...field}
+                id="announcement-message"
+                rows={3}
+                placeholder="Illinois Chat will be unavailable Saturday 8am–noon for maintenance."
+                aria-invalid={fieldState.invalid || undefined}
+                className="resize-y rounded-[8px]"
+              />
+              <FieldDescription>
                 Rendered as plain text. HTML is not interpreted.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
+              </FieldDescription>
+              <FieldError errors={[fieldState.error]} />
+            </Field>
           )}
         />
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField
+          <Controller
             control={form.control}
             name="announcementBanner.linkText"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Link text</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    placeholder="Read the status page"
-                    className="rounded-[8px]"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid || undefined}>
+                <FieldLabel htmlFor="announcement-link-text">
+                  Link text
+                </FieldLabel>
+                <Input
+                  {...field}
+                  id="announcement-link-text"
+                  placeholder="Read the status page"
+                  aria-invalid={fieldState.invalid || undefined}
+                  className="rounded-[8px]"
+                />
+                <FieldError errors={[fieldState.error]} />
+              </Field>
             )}
           />
-          <FormField
+          <Controller
             control={form.control}
             name="announcementBanner.linkUrl"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Link URL</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    inputMode="url"
-                    placeholder="https://status.illinois.edu"
-                    className="rounded-[8px]"
-                  />
-                </FormControl>
-                <FormDescription>
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid || undefined}>
+                <FieldLabel htmlFor="announcement-link-url">
+                  Link URL
+                </FieldLabel>
+                <Input
+                  {...field}
+                  id="announcement-link-url"
+                  inputMode="url"
+                  placeholder="https://status.illinois.edu"
+                  aria-invalid={fieldState.invalid || undefined}
+                  className="rounded-[8px]"
+                />
+                <FieldDescription>
                   Must be https. Leave both link fields blank for no link.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
+                </FieldDescription>
+                <FieldError errors={[fieldState.error]} />
+              </Field>
             )}
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-semibold text-[--illinois-blue] dark:text-white">
-            Preview
-          </p>
-          <div className="overflow-hidden rounded-[8px] border border-[#e5e7eb] dark:border-[#32517a]">
+        <Field>
+          <FieldTitle>Preview</FieldTitle>
+          {/* Inert so clicking the preview link cannot navigate away from unsaved edits. */}
+          <div
+            inert
+            className="overflow-hidden rounded-[8px] ring-1 ring-[#e5e7eb] dark:ring-[#32517a]"
+          >
             {banner?.enabled && banner.message ? (
               // The real component, not a mock-up: the preview is the shipping
               // renderer fed the current form values, so an operator cannot be
@@ -150,15 +172,17 @@ export function AnnouncementBannerCard() {
                 }}
               />
             ) : (
-              <p className="bg-[--background-faded] px-4 py-3 text-sm text-[--illinois-storm-medium] dark:bg-[#0c1f3f] dark:text-[#94a3b8]">
+              <p
+                className={`${adminInsetClass} rounded-none px-4 py-3 text-sm ${adminSubtleTextClass}`}
+              >
                 {banner?.enabled
                   ? 'Add a message to preview the banner.'
                   : 'Hidden — the home page shows no announcement bar.'}
               </p>
             )}
           </div>
-        </div>
-      </div>
+        </Field>
+      </FieldGroup>
     </AdminCard>
   )
 }

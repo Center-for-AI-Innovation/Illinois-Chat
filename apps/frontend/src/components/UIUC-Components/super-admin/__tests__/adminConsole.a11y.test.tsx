@@ -253,6 +253,18 @@ describe('admin console accessibility', () => {
     const { container } = renderWithProviders(<AdminPage />)
 
     await screen.findByDisplayValue('Scheduled maintenance Saturday.')
+
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('the users tab has no violations', async () => {
+    const user = userEvent.setup()
+    const AdminPage = (await import('~/pages/admin')).default
+    const { container } = renderWithProviders(<AdminPage />)
+
+    await screen.findByDisplayValue('Scheduled maintenance Saturday.')
+    await user.click(screen.getByRole('tab', { name: /Users/ }))
     await waitFor(() =>
       expect(screen.getByText('granted@illinois.edu')).toBeInTheDocument(),
     )

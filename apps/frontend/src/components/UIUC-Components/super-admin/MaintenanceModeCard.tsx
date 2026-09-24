@@ -1,9 +1,11 @@
 // Maintenance mode. Fields live in the shared PlatformSettingsForm; the
 // confirmation dialog and the recovery note live here.
 
-import { Construction } from 'lucide-react'
+import { cva } from 'class-variance-authority'
+import { Construction, Info } from 'lucide-react'
 import { useState } from 'react'
-import { useFormContext, useWatch } from 'react-hook-form'
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
+import { Alert, AlertDescription } from '~/components/shadcn/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,18 +17,26 @@ import {
   AlertDialogTitle,
 } from '~/components/shadcn/ui/alert-dialog'
 import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '~/components/shadcn/ui/form'
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '~/components/shadcn/ui/field'
 import { Input } from '~/components/shadcn/ui/input'
 import { Switch } from '~/components/shadcn/ui/switch'
 import { Textarea } from '~/components/shadcn/ui/textarea'
 import type { PlatformSettings } from '~/utils/platformSettings.schema'
-import { AdminCard } from './AdminCard'
+import { AdminCard, adminInsetClass, adminMutedTextClass } from './AdminCard'
+
+const stateLabelVariants = cva('text-sm font-medium', {
+  variants: {
+    enabled: {
+      true: 'font-semibold text-(--illinois-orange)',
+      false: adminMutedTextClass,
+    },
+  },
+})
 
 export function MaintenanceModeCard() {
   const form = useFormContext<PlatformSettings>()
@@ -53,83 +63,86 @@ export function MaintenanceModeCard() {
       <AdminCard
         title="Maintenance mode"
         blastRadius="Replaces every page with a maintenance notice for all visitors, on their next page load."
-        icon={<Construction className="h-5 w-5" aria-hidden="true" />}
+        icon={<Construction className="size-5" aria-hidden="true" />}
         tone={isEnabled ? 'alert' : 'default'}
         headerAside={
-          <FormField
+          <Controller
             control={form.control}
             name="maintenance.enabled"
             render={({ field }) => (
-              <FormItem className="flex items-center gap-3 space-y-0">
-                <FormLabel
-                  className={`cursor-pointer text-sm ${
-                    field.value
-                      ? 'font-semibold text-[--illinois-orange]'
-                      : 'text-[--illinois-storm-dark] dark:text-[#c8d2e3]'
-                  }`}
+              <Field orientation="horizontal" className="w-auto gap-2.5">
+                <span
+                  aria-hidden="true"
+                  className={stateLabelVariants({ enabled: field.value })}
                 >
                   {field.value ? 'On' : 'Off'}
-                </FormLabel>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={handleToggle}
-                    aria-label="Enable maintenance mode"
-                  />
-                </FormControl>
-              </FormItem>
+                </span>
+                <Switch
+                  variant="labeled"
+                  size="sm"
+                  checked={field.value}
+                  onCheckedChange={handleToggle}
+                  aria-label="Enable maintenance mode"
+                />
+              </Field>
             )}
           />
         }
       >
-        <div className="flex flex-col gap-5">
-          <p className="rounded-[8px] bg-[--background-faded] px-4 py-3 text-sm text-[--illinois-storm-dark] dark:bg-[#0c1f3f] dark:text-[#c8d2e3]">
-            Sign-in and this page stay reachable while maintenance is on, so you
-            can always turn it back off. Open tabs keep working until they
-            navigate or refetch.
-          </p>
+        <FieldGroup className="gap-5">
+          <Alert
+            role="note"
+            className={`${adminInsetClass} border-0 ${adminMutedTextClass}`}
+          >
+            <Info aria-hidden="true" />
+            <AlertDescription className="text-current">
+              Sign-in and this page stay reachable while maintenance is on, so
+              you can always turn it back off. Open tabs keep working until
+              they navigate or refetch.
+            </AlertDescription>
+          </Alert>
 
-          <FormField
+          <Controller
             control={form.control}
             name="maintenance.titleText"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notice title</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    placeholder="Illinois Chat is down for maintenance"
-                    className="rounded-[8px]"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid || undefined}>
+                <FieldLabel htmlFor="maintenance-title">Notice title</FieldLabel>
+                <Input
+                  {...field}
+                  id="maintenance-title"
+                  placeholder="Illinois Chat is down for maintenance"
+                  aria-invalid={fieldState.invalid || undefined}
+                  className="rounded-[8px]"
+                />
+                <FieldError errors={[fieldState.error]} />
+              </Field>
             )}
           />
 
-          <FormField
+          <Controller
             control={form.control}
             name="maintenance.bodyText"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notice body</FormLabel>
-                <FormControl>
-                  <Textarea
-                    {...field}
-                    rows={3}
-                    placeholder="We expect to be back by 12:00 PM CT. Thanks for your patience."
-                    className="resize-y rounded-[8px]"
-                  />
-                </FormControl>
-                <FormDescription>
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid || undefined}>
+                <FieldLabel htmlFor="maintenance-body">Notice body</FieldLabel>
+                <Textarea
+                  {...field}
+                  id="maintenance-body"
+                  rows={3}
+                  placeholder="We expect to be back by 12:00 PM CT. Thanks for your patience."
+                  aria-invalid={fieldState.invalid || undefined}
+                  className="resize-y rounded-[8px]"
+                />
+                <FieldDescription>
                   Shown on the maintenance page. Saved even while maintenance is
                   off, so the copy is ready before you need it.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
+                </FieldDescription>
+                <FieldError errors={[fieldState.error]} />
+              </Field>
             )}
           />
-        </div>
+        </FieldGroup>
       </AdminCard>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -146,12 +159,14 @@ export function MaintenanceModeCard() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() =>
+              variant="danger"
+              onClick={() => {
                 form.setValue('maintenance.enabled', true, {
                   shouldDirty: true,
                   shouldValidate: true,
                 })
-              }
+                setConfirmOpen(false)
+              }}
             >
               Turn on
             </AlertDialogAction>
