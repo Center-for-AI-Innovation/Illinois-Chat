@@ -2,7 +2,7 @@
 // sole writer; the backend reads via SQLAlchemy ORM. All operations run
 // against `hostDb` — this table never participates in per-project routing.
 
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, ilike, isNotNull, isNull, sql } from 'drizzle-orm'
 import { db as hostDb } from '~/db/dbClient'
 import {
   projectExternalConnections,
@@ -197,6 +197,36 @@ export async function listConnections(): Promise<ConnectionSummary[]> {
       configured_kinds: configured,
     }
   })
+}
+
+/**
+ * Names of projects that exist but have no connections row yet — the
+ * candidates for a first override. Capped, because the admin picker searches
+ * as the operator types rather than paging through every project.
+ */
+export async function searchProjectsWithoutConnection(
+  query: string,
+  limit: number,
+): Promise<string[]> {
+  const escaped = query.replace(/[\\%_]/g, (char) => `\\${char}`)
+  const rows = await hostDb
+    .select({ name: projects.course_name })
+    .from(projects)
+    .leftJoin(
+      projectExternalConnections,
+      eq(projectExternalConnections.project_id, projects.id),
+    )
+    .where(
+      and(
+        isNull(projectExternalConnections.id),
+        isNotNull(projects.course_name),
+        ilike(projects.course_name, `%${escaped}%`),
+      ),
+    )
+    .orderBy(projects.course_name)
+    .limit(limit)
+
+  return rows.flatMap((row) => (row.name ? [row.name] : []))
 }
 
 export async function deleteConnection(args: {

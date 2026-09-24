@@ -51,6 +51,7 @@ vi.mock('~/utils/platformSettings.server', () => ({
 
 vi.mock('~/db/projectConnectionsRepo', () => ({
   listConnections: vi.fn(async () => []),
+  searchProjectsWithoutConnection: vi.fn(async () => ['leaked-project']),
 }))
 
 function makeRes() {
@@ -85,6 +86,11 @@ const PROTECTED_ROUTES = [
   {
     name: 'GET /api/UIUC-api/projectConnections/list',
     module: '~/pages/api/UIUC-api/projectConnections/list',
+    method: 'GET',
+  },
+  {
+    name: 'GET /api/UIUC-api/projectConnections/candidates',
+    module: '~/pages/api/UIUC-api/projectConnections/candidates',
     method: 'GET',
   },
 ] as const
