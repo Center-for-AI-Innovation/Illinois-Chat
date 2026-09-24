@@ -6,24 +6,53 @@ import { cva } from 'class-variance-authority'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import type { ReactNode } from 'react'
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from '~/components/shadcn/ui/alert'
 import { Button } from '~/components/shadcn/ui/button'
-import { Card, CardContent } from '~/components/shadcn/ui/card'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '~/components/shadcn/ui/card'
 import { Skeleton } from '~/components/shadcn/ui/skeleton'
 
 export const adminCardVariants = cva(
-  'rounded-[14px] border bg-white shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:bg-[#13294b] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]',
+  'gap-5 rounded-[14px] bg-white py-5 shadow-[0_4px_20px_rgba(0,0,0,0.06)] ring-1 sm:py-6 dark:bg-[#13294b] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]',
   {
     variants: {
       tone: {
-        default: 'border-[#e5e7eb] dark:border-[#32517a]',
+        default: 'ring-[#e5e7eb] dark:ring-[#32517a]',
         // For a card whose current state is doing something visible to every
         // visitor — maintenance mode while it is on.
-        alert: 'border-[--illinois-orange] dark:border-[--illinois-orange]',
+        alert: 'ring-2 ring-(--illinois-orange)',
       },
     },
     defaultVariants: { tone: 'default' },
   },
 )
+
+export const adminMutedTextClass =
+  'text-(--illinois-storm-dark) dark:text-[#c8d2e3]'
+export const adminSubtleTextClass =
+  'text-(--illinois-storm-medium) dark:text-[#94a3b8]'
+export const adminInsetClass =
+  'rounded-[8px] bg-(--background-faded) dark:bg-[#0c1f3f]'
+// The shadcn muted/background tokens are not dark-adapted in this app, so the
+// admin tab bars pin their dark surfaces to the same palette as the cards.
+export const adminTabsListClass = 'dark:bg-[#0c1f3f] dark:ring-1 dark:ring-[#32517a]'
+export const adminTabsTriggerClass =
+  'cursor-pointer disabled:cursor-not-allowed dark:text-[#94a3b8] dark:hover:text-white dark:data-active:border-[#32517a] dark:data-active:bg-[#13294b] dark:data-active:text-white'
+// Same token problem for shadcn field helper text on the navy card surface.
+export const adminFieldDescriptionClass =
+  'dark:[&_[data-slot=field-description]]:text-[#94a3b8]'
 
 interface AdminCardProps {
   title: string
@@ -51,38 +80,40 @@ export function AdminCard({
 }: AdminCardProps) {
   return (
     <Card className={adminCardVariants({ tone })}>
-      <CardContent className="flex flex-col gap-5 p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            {icon && (
-              <span className="mt-0.5 shrink-0 text-[--illinois-orange]">
-                {icon}
-              </span>
-            )}
-            <div className="min-w-0">
-              <h2
-                className={`truncate text-lg font-semibold text-[--illinois-blue] dark:text-white ${montserrat_heading.variable} font-montserratHeading`}
-              >
-                {title}
-              </h2>
-              <p
-                className={`mt-1 text-sm leading-5 text-[--illinois-storm-dark] dark:text-[#c8d2e3] ${montserrat_paragraph.variable} font-montserratParagraph`}
-              >
-                {blastRadius}
-              </p>
-            </div>
+      <CardHeader className="gap-1.5 px-5 sm:px-6">
+        <div className="flex min-w-0 items-start gap-3">
+          {icon && (
+            <span className="hidden size-9 shrink-0 items-center sm:flex justify-center rounded-[10px] bg-(--illinois-orange)/10 text-(--illinois-orange)">
+              {icon}
+            </span>
+          )}
+          <div className="min-w-0">
+            <CardTitle
+              role="heading"
+              aria-level={2}
+              className={`text-lg font-semibold text-(--illinois-blue) dark:text-white ${montserrat_heading.variable} font-montserratHeading`}
+            >
+              {title}
+            </CardTitle>
+            <CardDescription
+              className={`mt-0.5 leading-5 ${adminMutedTextClass} ${montserrat_paragraph.variable} font-montserratParagraph`}
+            >
+              {blastRadius}
+            </CardDescription>
           </div>
-          {headerAside && <div className="shrink-0">{headerAside}</div>}
         </div>
+        {headerAside && <CardAction>{headerAside}</CardAction>}
+      </CardHeader>
 
+      <CardContent className={`px-5 sm:px-6 ${adminFieldDescriptionClass}`}>
         {children}
-
-        {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#e5e7eb] pt-4 dark:border-[#32517a]">
-            {footer}
-          </div>
-        )}
       </CardContent>
+
+      {footer && (
+        <CardFooter className="flex-wrap justify-end gap-3 border-t border-[#e5e7eb] px-5 pt-4 sm:px-6 dark:border-[#32517a]">
+          {footer}
+        </CardFooter>
+      )}
     </Card>
   )
 }
@@ -95,17 +126,20 @@ export function AdminCard({
  */
 export function AdminCardSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <Card className={adminCardVariants()}>
-      <CardContent className="flex flex-col gap-5 p-5 sm:p-6">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-full max-w-md" />
+    <Card className={adminCardVariants()} aria-busy="true">
+      <CardContent className="flex flex-col gap-5 px-5 sm:px-6">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-9 rounded-[10px]" />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-4 w-full max-w-md" />
+          </div>
         </div>
         <div className="flex flex-col gap-4">
           {Array.from({ length: rows }).map((_, index) => (
             <div key={index} className="flex flex-col gap-2">
               <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-10 w-full rounded-[8px]" />
+              <Skeleton className="h-9 w-full rounded-[8px]" />
             </div>
           ))}
         </div>
@@ -133,53 +167,48 @@ export function AdminInlineError({
   isRetrying?: boolean
 }) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col gap-3 rounded-[8px] border border-red-300 bg-red-50 p-4 text-sm dark:border-red-500/50 dark:bg-red-500/10 sm:flex-row sm:items-start sm:justify-between"
+    <Alert
+      variant="destructive"
+      className="border-red-300 bg-red-50 text-red-800 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-200"
     >
-      <div className="flex min-w-0 gap-3">
-        <AlertTriangle
-          className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400"
-          aria-hidden="true"
-        />
-        <div className="min-w-0">
-          <p className="font-semibold text-red-800 dark:text-red-200">
-            {title}
-          </p>
-          <p className="mt-1 break-words text-red-700 dark:text-red-300">
-            {message}
-          </p>
-        </div>
-      </div>
+      <AlertTriangle aria-hidden="true" />
+      <AlertTitle className="font-semibold">{title}</AlertTitle>
+      <AlertDescription className="wrap-break-word text-red-700 dark:text-red-300">
+        {message}
+      </AlertDescription>
       {onRetry && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRetry}
-          disabled={isRetrying}
-          className="shrink-0 gap-2 border-red-300 bg-white text-red-700 hover:bg-red-100 dark:border-red-500/50 dark:bg-transparent dark:text-red-200 dark:hover:bg-red-500/20"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`}
-            aria-hidden="true"
-          />
-          {isRetrying ? 'Retrying' : 'Retry'}
-        </Button>
+        <AlertAction>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            disabled={isRetrying}
+            className="border-red-300 bg-white text-red-700 hover:bg-red-100 dark:border-red-500/50 dark:bg-transparent dark:text-red-200 dark:hover:bg-red-500/20"
+          >
+            <RefreshCw
+              className={isRetrying ? 'animate-spin' : undefined}
+              aria-hidden="true"
+            />
+            {isRetrying ? 'Retrying' : 'Retry'}
+          </Button>
+        </AlertAction>
       )}
-    </div>
+    </Alert>
   )
 }
 
 /** Non-blocking warning — the panel still works, but something is degraded. */
 export function AdminInlineWarning({ message }: { message: string }) {
   return (
-    <div
+    <Alert
       role="status"
-      className="flex gap-3 rounded-[8px] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-200"
+      className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-200"
     >
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <p className="min-w-0 break-words">{message}</p>
-    </div>
+      <AlertTriangle aria-hidden="true" />
+      <AlertDescription className="wrap-break-word text-current">
+        {message}
+      </AlertDescription>
+    </Alert>
   )
 }

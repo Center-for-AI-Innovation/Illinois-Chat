@@ -1,7 +1,14 @@
 // The super-admin roster: env entries (read-only) plus Redis grants (editable).
 
-import { Loader2, Lock, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Loader2,
+  Lock,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+  UserRound,
+} from 'lucide-react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from 'react-oidc-context'
 import {
   AlertDialog,
@@ -22,8 +29,16 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '~/components/shadcn/ui/empty'
+import { Field, FieldError, FieldLabel } from '~/components/shadcn/ui/field'
 import { Input } from '~/components/shadcn/ui/input'
-import { Label } from '~/components/shadcn/ui/label'
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '~/components/shadcn/ui/item'
 import { useFetchSuperAdmins } from '~/hooks/queries/useFetchSuperAdmins'
 import { useUpdateSuperAdmins } from '~/hooks/queries/useUpdateSuperAdmins'
 import { superAdminEmailSchema } from '~/utils/platformSettings.schema'
@@ -33,7 +48,35 @@ import {
   AdminCardSkeleton,
   AdminInlineError,
   AdminInlineWarning,
+  adminSubtleTextClass,
 } from './AdminCard'
+
+const rosterBadgeClass = 'shrink-0 rounded-[6px]'
+
+function RosterRow({
+  email,
+  children,
+}: {
+  email: string
+  children: ReactNode
+}) {
+  return (
+    <Item role="listitem" size="sm" className="rounded-none px-0">
+      <ItemMedia
+        variant="icon"
+        className="size-8 rounded-full bg-(--background-faded) text-(--illinois-blue) dark:bg-[#0c1f3f] dark:text-white"
+      >
+        <UserRound aria-hidden="true" />
+      </ItemMedia>
+      <ItemContent className="min-w-0">
+        <ItemTitle className="block w-full truncate font-normal text-(--illinois-blue) dark:text-white">
+          {email}
+        </ItemTitle>
+      </ItemContent>
+      <ItemActions>{children}</ItemActions>
+    </Item>
+  )
+}
 
 export function SuperAdminsCard() {
   const auth = useAuth()
@@ -66,8 +109,11 @@ export function SuperAdminsCard() {
   const envAdmins = data?.envAdmins ?? []
   const grantedAdmins = data?.grantedAdmins ?? []
   const hasAny = envAdmins.length > 0 || grantedAdmins.length > 0
+  const isAdding = updateAdmins.isPending && pendingRemoval === null
+  const isRemoving = updateAdmins.isPending && pendingRemoval !== null
 
-  async function handleAdd() {
+  async function handleAdd(event?: FormEvent) {
+    event?.preventDefault()
     const parsed = superAdminEmailSchema.safeParse(emailInput)
     if (!parsed.success) {
       setInputError(parsed.error.issues[0]?.message ?? 'Enter a valid email')
@@ -108,7 +154,7 @@ export function SuperAdminsCard() {
       <AdminCard
         title="Super admins"
         blastRadius="Full access to this page and admin-level access to every project. Revoking takes effect on the next request."
-        icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />}
+        icon={<ShieldCheck className="size-5" aria-hidden="true" />}
       >
         <div className="flex flex-col gap-5">
           {data?.warning && <AdminInlineWarning message={data.warning} />}
@@ -116,113 +162,88 @@ export function SuperAdminsCard() {
             <AdminInlineError title="Action failed" message={actionError} />
           )}
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="super-admin-email">Add by email</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="super-admin-email"
-                type="email"
-                value={emailInput}
-                autoComplete="off"
-                placeholder="netid@illinois.edu"
-                aria-invalid={!!inputError}
-                aria-describedby={
-                  inputError ? 'super-admin-email-error' : undefined
-                }
-                onChange={(event) => {
-                  setEmailInput(event.target.value)
-                  if (inputError) setInputError(null)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    void handleAdd()
+          <form onSubmit={(event) => void handleAdd(event)} noValidate>
+            <Field data-invalid={inputError ? true : undefined}>
+              <FieldLabel htmlFor="super-admin-email">Add by email</FieldLabel>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="super-admin-email"
+                  type="email"
+                  value={emailInput}
+                  autoComplete="off"
+                  placeholder="netid@illinois.edu"
+                  aria-invalid={inputError ? true : undefined}
+                  aria-describedby={
+                    inputError ? 'super-admin-email-error' : undefined
                   }
-                }}
-                className="rounded-[8px] sm:flex-1"
-              />
-              <Button
-                type="button"
-                variant="dashboard"
-                onClick={() => void handleAdd()}
-                disabled={updateAdmins.isPending || emailInput.trim() === ''}
-                className="gap-2"
-              >
-                {updateAdmins.isPending ? (
-                  <Loader2
-                    className="h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <UserPlus className="h-4 w-4" aria-hidden="true" />
-                )}
-                Add admin
-              </Button>
-            </div>
-            {inputError && (
-              <p
-                id="super-admin-email-error"
-                className="text-sm font-medium text-destructive"
-              >
-                {inputError}
-              </p>
-            )}
-          </div>
+                  onChange={(event) => {
+                    setEmailInput(event.target.value)
+                    if (inputError) setInputError(null)
+                  }}
+                  className="rounded-[8px] sm:flex-1"
+                />
+                <Button
+                  type="submit"
+                  variant="dashboard"
+                  disabled={updateAdmins.isPending || emailInput.trim() === ''}
+                  className="h-9 sm:w-auto"
+                >
+                  {isAdding ? (
+                    <Loader2 className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <UserPlus aria-hidden="true" />
+                  )}
+                  Add admin
+                </Button>
+              </div>
+              <FieldError id="super-admin-email-error">{inputError}</FieldError>
+            </Field>
+          </form>
 
           {hasAny ? (
-            <ul className="flex flex-col divide-y divide-[#e5e7eb] dark:divide-[#32517a]">
-              {envAdmins.map((email) => (
-                <li
-                  key={`env-${email}`}
-                  className="flex items-center gap-3 py-3"
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
-                    {email}
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 gap-1 rounded-[8px] border-[#e5e7eb] dark:border-[#32517a]"
-                  >
-                    <Lock className="h-3 w-3" aria-hidden="true" />
-                    Environment
-                  </Badge>
-                  {/* No remove control on purpose. The env allowlist is the
-                      recovery floor when Redis is unreachable, so it is only
-                      changeable through deployment config. */}
-                </li>
-              ))}
-              {grantedAdmins.map((email) => (
-                <li
-                  key={`grant-${email}`}
-                  className="flex items-center gap-3 py-3"
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
-                    {email}
-                  </span>
-                  {email === currentEmail && (
+            <div className="flex flex-col gap-2">
+              <p
+                className={`text-xs font-medium tracking-wide uppercase ${adminSubtleTextClass}`}
+              >
+                {envAdmins.length + grantedAdmins.length} with access
+              </p>
+              <ItemGroup className="gap-0 divide-y divide-[#e5e7eb] border-y border-[#e5e7eb] dark:divide-[#32517a] dark:border-[#32517a]">
+                {envAdmins.map((email) => (
+                  <RosterRow key={`env-${email}`} email={email}>
+                    {email === currentEmail && <YouBadge />}
                     <Badge
                       variant="outline"
-                      className="shrink-0 rounded-[8px] border-[--illinois-orange] text-[--illinois-orange]"
+                      className={`${rosterBadgeClass} border-[#e5e7eb] text-(--illinois-storm-dark) dark:border-[#32517a] dark:text-[#c8d2e3]`}
+                      title="Set through SUPER_ADMIN_EMAILS. Change it in the deployment config."
                     >
-                      You
+                      <Lock aria-hidden="true" />
+                      Environment
                     </Badge>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
-                    aria-label={`Remove ${email} from super admins`}
-                    disabled={updateAdmins.isPending}
-                    onClick={() => setPendingRemoval(email)}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                    {/* No remove control on purpose. The env allowlist is the
+                        recovery floor when Redis is unreachable, so it is only
+                        changeable through deployment config. */}
+                  </RosterRow>
+                ))}
+                {grantedAdmins.map((email) => (
+                  <RosterRow key={`grant-${email}`} email={email}>
+                    {email === currentEmail && <YouBadge />}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
+                      aria-label={`Remove ${email} from super admins`}
+                      disabled={updateAdmins.isPending}
+                      onClick={() => setPendingRemoval(email)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  </RosterRow>
+                ))}
+              </ItemGroup>
+            </div>
           ) : (
-            <Empty className="border border-dashed border-[#e5e7eb] py-8 dark:border-[#32517a]">
+            <Empty className="border border-dashed border-[#e5e7eb] p-8 dark:border-[#32517a]">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <ShieldCheck aria-hidden="true" />
@@ -241,12 +262,14 @@ export function SuperAdminsCard() {
       <AlertDialog
         open={pendingRemoval !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingRemoval(null)
+          if (!open && !isRemoving) setPendingRemoval(null)
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {pendingRemoval}?</AlertDialogTitle>
+            <AlertDialogTitle className="break-all">
+              {`Remove ${pendingRemoval}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRemoval === currentEmail
                 ? 'This is your own account. You will lose access to this page and to every project you do not personally own, immediately.'
@@ -254,18 +277,33 @@ export function SuperAdminsCard() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
+              variant="danger"
+              disabled={isRemoving}
               onClick={() => {
                 if (pendingRemoval) void handleRemove(pendingRemoval)
               }}
             >
+              {isRemoving && (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              )}
               Remove access
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
+  )
+}
+
+function YouBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className={`${rosterBadgeClass} border-(--illinois-orange) text-(--illinois-orange)`}
+    >
+      You
+    </Badge>
   )
 }

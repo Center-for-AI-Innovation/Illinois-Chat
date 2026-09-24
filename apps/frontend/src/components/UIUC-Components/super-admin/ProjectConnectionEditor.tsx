@@ -19,8 +19,10 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
+import { cva } from 'class-variance-authority'
 import { useEffect, useMemo, useState } from 'react'
 import type { z } from 'zod'
+import { Alert, AlertDescription } from '~/components/shadcn/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,8 +41,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/shadcn/ui/dialog'
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '~/components/shadcn/ui/field'
 import { Input } from '~/components/shadcn/ui/input'
-import { Label } from '~/components/shadcn/ui/label'
 import {
   Select,
   SelectContent,
@@ -60,13 +69,32 @@ import {
   type ConnectionKind,
 } from '~/utils/projectConnections/validation'
 import { showErrorToast, showSuccessToast } from '~/utils/toastUtils'
-import { AdminInlineError, AdminInlineWarning } from './AdminCard'
+import {
+  AdminInlineError,
+  AdminInlineWarning,
+  adminFieldDescriptionClass,
+  adminInsetClass,
+  adminMutedTextClass,
+  adminSubtleTextClass,
+  adminTabsListClass,
+  adminTabsTriggerClass,
+} from './AdminCard'
 import {
   CONNECTION_KIND_META,
   CONNECTION_PROPAGATION_NOTICE,
   isMaskedSecret,
   type ConnectionFieldDescriptor,
 } from './admin.types'
+
+const testResultVariants = cva('', {
+  variants: {
+    ok: {
+      true: 'border-green-300 bg-green-50 text-green-900 dark:border-green-500/50 dark:bg-green-500/10 dark:text-green-200',
+      false:
+        'border-red-300 bg-red-50 text-red-900 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-200',
+    },
+  },
+})
 
 type FieldValue = string | boolean
 type FieldValues = Record<string, FieldValue>
@@ -82,6 +110,13 @@ const CONFIG_KEY_BY_KIND = {
   database: 'database_config',
   qdrant: 'qdrant_config',
   embedding: 'embedding_config',
+} as const satisfies Record<ConnectionKind, string>
+
+const TAB_LABEL_BY_KIND = {
+  s3: 'S3',
+  database: 'Database',
+  qdrant: 'Qdrant',
+  embedding: 'Embedding',
 } as const satisfies Record<ConnectionKind, string>
 
 function initialValuesFor(
@@ -302,12 +337,14 @@ export function ProjectConnectionEditor({
           onOpenChange(next)
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-[14px] dark:border-[#32517a] dark:bg-[#13294b]">
-          <DialogHeader>
-            <DialogTitle className="text-[--illinois-blue] dark:text-white">
+        <DialogContent
+          className={`max-h-[90vh] overflow-y-auto rounded-[14px] bg-white sm:max-w-2xl dark:bg-[#13294b] dark:ring-[#32517a] ${adminFieldDescriptionClass}`}
+        >
+          <DialogHeader className="pr-8">
+            <DialogTitle className="text-lg font-semibold text-(--illinois-blue) dark:text-white">
               External connections
             </DialogTitle>
-            <DialogDescription className="break-words">
+            <DialogDescription className="font-mono text-xs break-all">
               {projectName}
             </DialogDescription>
           </DialogHeader>
@@ -328,26 +365,30 @@ export function ProjectConnectionEditor({
             />
           ) : (
             <div className="flex flex-col gap-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] bg-[--background-faded] px-4 py-3 dark:bg-[#0c1f3f]">
+              <div
+                className={`${adminInsetClass} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+              >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[--illinois-blue] dark:text-white">
+                  <p className="text-sm font-semibold text-(--illinois-blue) dark:text-white">
                     Connection overrides
                   </p>
-                  <p className="text-xs text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
+                  <p className={`text-xs ${adminMutedTextClass}`}>
                     {rowIsActive
                       ? 'Active — this project uses the configs below.'
                       : 'Disabled — this project uses the platform defaults.'}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <Label
-                    htmlFor="connection-active"
-                    className="text-sm text-[--illinois-storm-dark] dark:text-[#c8d2e3]"
+                  <span
+                    aria-hidden="true"
+                    className={`text-sm font-medium ${adminMutedTextClass}`}
                   >
                     {rowIsActive ? 'Active' : 'Disabled'}
-                  </Label>
+                  </span>
                   <Switch
                     id="connection-active"
+                    variant="labeled"
+                    size="sm"
                     checked={rowIsActive}
                     disabled={!data?.found || updateConnection.isPending}
                     aria-label="Use these connection overrides"
@@ -358,21 +399,29 @@ export function ProjectConnectionEditor({
                           projectName,
                           isActive: next,
                         })
+                        .then(() =>
+                          showSuccessToast(
+                            next
+                              ? `${projectName} now uses its connection overrides.`
+                              : `${projectName} is back on the platform defaults.`,
+                            next ? 'Overrides enabled' : 'Overrides disabled',
+                          ),
+                        )
                         .catch((err: unknown) => {
                           const message =
                             err instanceof Error ? err.message : 'Unknown error'
                           setFormError(message)
+                          showErrorToast(message, 'Could not update status')
                         })
                     }}
                   />
                 </div>
               </div>
 
-              <div className="flex items-start gap-2 text-xs text-[--illinois-storm-medium] dark:text-[#94a3b8]">
-                <Clock
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                  aria-hidden="true"
-                />
+              <div
+                className={`flex items-start gap-2 text-xs ${adminSubtleTextClass}`}
+              >
+                <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                 <p>{CONNECTION_PROPAGATION_NOTICE}</p>
               </div>
 
@@ -380,7 +429,9 @@ export function ProjectConnectionEditor({
                 value={kind}
                 onValueChange={(next) => setKind(next as ConnectionKind)}
               >
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                <TabsList
+                  className={`grid h-auto! w-full grid-cols-2 sm:h-9! sm:grid-cols-4 ${adminTabsListClass}`}
+                >
                   {CONNECTION_KINDS.map((connectionKind) => {
                     const configured =
                       (data?.[CONFIG_KEY_BY_KIND[connectionKind]] ?? null) !==
@@ -389,14 +440,17 @@ export function ProjectConnectionEditor({
                       <TabsTrigger
                         key={connectionKind}
                         value={connectionKind}
-                        className="gap-1.5 capitalize"
+                        className={`gap-1.5 ${adminTabsTriggerClass}`}
                       >
-                        {connectionKind}
+                        {TAB_LABEL_BY_KIND[connectionKind]}
                         {configured && (
-                          <span
-                            aria-label="configured"
-                            className="h-1.5 w-1.5 rounded-full bg-[--illinois-orange]"
-                          />
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="size-1.5 rounded-full bg-(--illinois-orange)"
+                            />
+                            <span className="sr-only">(configured)</span>
+                          </>
                         )}
                       </TabsTrigger>
                     )
@@ -405,10 +459,10 @@ export function ProjectConnectionEditor({
               </Tabs>
 
               <div>
-                <p className="text-sm font-semibold text-[--illinois-blue] dark:text-white">
+                <p className="text-sm font-semibold text-(--illinois-blue) dark:text-white">
                   {meta.label}
                 </p>
-                <p className="mt-1 text-sm text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
+                <p className={`mt-1 text-sm ${adminMutedTextClass}`}>
                   {meta.description}
                 </p>
               </div>
@@ -423,7 +477,7 @@ export function ProjectConnectionEditor({
                 />
               )}
 
-              <div className="flex flex-col gap-5">
+              <FieldGroup className="gap-5">
                 {meta.fields.map((field) => (
                   <ConnectionField
                     key={field.name}
@@ -444,34 +498,24 @@ export function ProjectConnectionEditor({
                     }}
                   />
                 ))}
-              </div>
+              </FieldGroup>
 
               {testResult && (
-                <div
+                <Alert
                   role="status"
-                  className={`flex gap-3 rounded-[8px] border p-3 text-sm ${
-                    testResult.ok
-                      ? 'border-green-300 bg-green-50 text-green-900 dark:border-green-500/50 dark:bg-green-500/10 dark:text-green-200'
-                      : 'border-red-300 bg-red-50 text-red-900 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-200'
-                  }`}
+                  className={testResultVariants({ ok: testResult.ok })}
                 >
                   {testResult.ok ? (
-                    <CheckCircle2
-                      className="mt-0.5 h-4 w-4 shrink-0"
-                      aria-hidden="true"
-                    />
+                    <CheckCircle2 aria-hidden="true" />
                   ) : (
-                    <XCircle
-                      className="mt-0.5 h-4 w-4 shrink-0"
-                      aria-hidden="true"
-                    />
+                    <XCircle aria-hidden="true" />
                   )}
-                  <p className="min-w-0 break-words">
+                  <AlertDescription className="wrap-break-word text-current">
                     {testResult.ok
                       ? `Reached the saved ${meta.label.toLowerCase()}.`
                       : testResult.message ?? 'The probe failed.'}
-                  </p>
-                </div>
+                  </AlertDescription>
+                </Alert>
               )}
 
               <div className="flex flex-col gap-3 border-t border-[#e5e7eb] pt-4 dark:border-[#32517a] sm:flex-row sm:items-center sm:justify-between">
@@ -479,7 +523,6 @@ export function ProjectConnectionEditor({
                   <Button
                     type="button"
                     variant="outline"
-                    className="gap-2"
                     disabled={
                       !isConfigured || testConnection.isPending || hasChanges
                     }
@@ -501,12 +544,9 @@ export function ProjectConnectionEditor({
                     }
                   >
                     {testConnection.isPending ? (
-                      <Loader2
-                        className="h-4 w-4 animate-spin"
-                        aria-hidden="true"
-                      />
+                      <Loader2 className="animate-spin" aria-hidden="true" />
                     ) : (
-                      <PlugZap className="h-4 w-4" aria-hidden="true" />
+                      <PlugZap aria-hidden="true" />
                     )}
                     Test saved connection
                   </Button>
@@ -514,11 +554,11 @@ export function ProjectConnectionEditor({
                     <Button
                       type="button"
                       variant="ghost"
-                      className="gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
                       disabled={updateConnection.isPending}
                       onClick={() => setRemoveOpen(true)}
                     >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      <Trash2 aria-hidden="true" />
                       Remove
                     </Button>
                   )}
@@ -526,19 +566,15 @@ export function ProjectConnectionEditor({
                 <Button
                   type="button"
                   variant="dashboard"
-                  className="gap-2"
                   disabled={
                     updateConnection.isPending || (isConfigured && !hasChanges)
                   }
                   onClick={() => void handleSave()}
                 >
                   {updateConnection.isPending ? (
-                    <Loader2
-                      className="h-4 w-4 animate-spin"
-                      aria-hidden="true"
-                    />
+                    <Loader2 className="animate-spin" aria-hidden="true" />
                   ) : (
-                    <Save className="h-4 w-4" aria-hidden="true" />
+                    <Save aria-hidden="true" />
                   )}
                   {isConfigured ? 'Save changes' : 'Create configuration'}
                 </Button>
@@ -560,7 +596,7 @@ export function ProjectConnectionEditor({
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
+              variant="danger"
               onClick={() => {
                 setDiscardOpen(false)
                 onOpenChange(false)
@@ -578,15 +614,14 @@ export function ProjectConnectionEditor({
             <AlertDialogTitle>Remove the {meta.label} config?</AlertDialogTitle>
             <AlertDialogDescription>
               {projectName} falls back to the platform default for this
-              connection. The stored credentials are deleted and cannot be
-              recovered from here. Backend workers may keep using the old config
-              for up to 30 minutes.
+              connection on its next request. The stored credentials are
+              deleted and cannot be recovered from here.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
+              variant="danger"
               onClick={() => void handleRemove()}
             >
               Remove configuration
@@ -622,61 +657,62 @@ function ConnectionField({
     [field.helpText ? helpId : null, error ? errorId : null]
       .filter(Boolean)
       .join(' ') || undefined
+  const invalid = error ? true : undefined
 
   const label = (
-    <Label htmlFor={inputId} className="flex items-center gap-2">
+    <FieldLabel htmlFor={inputId}>
       {field.label}
       {field.required && (
-        <span className="text-xs font-normal text-[--illinois-storm-medium] dark:text-[#94a3b8]">
+        <span className={`text-xs font-normal ${adminSubtleTextClass}`}>
           required
         </span>
       )}
-    </Label>
+    </FieldLabel>
   )
 
   const help = field.helpText ? (
-    <p
-      id={helpId}
-      className="text-xs text-[--illinois-storm-medium] dark:text-[#94a3b8]"
-    >
+    <FieldDescription id={helpId} className="text-xs">
       {field.helpText}
-    </p>
+    </FieldDescription>
   ) : null
 
-  const errorNode = error ? (
-    <p id={errorId} className="text-sm font-medium text-destructive">
-      {error}
-    </p>
-  ) : null
+  const errorNode = <FieldError id={errorId}>{error}</FieldError>
 
   if (field.type === 'switch') {
     return (
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
+      <Field orientation="horizontal" className="items-start justify-between">
+        <FieldContent>
           {label}
           {help}
-        </div>
+        </FieldContent>
         <Switch
           id={inputId}
+          variant="labeled"
+          size="sm"
           checked={value === true}
           onCheckedChange={(next) => onChange(next)}
           aria-describedby={describedBy}
-          className="mt-1 shrink-0"
+          className="mt-0.5"
         />
-      </div>
+      </Field>
     )
   }
 
   if (field.type === 'select') {
     return (
-      <div className="space-y-2">
+      <Field data-invalid={invalid} className="gap-2">
         {label}
-        <Select value={String(value)} onValueChange={(next) => onChange(next)}>
+        <Select
+          value={String(value)}
+          onValueChange={(next) => {
+            if (next !== null) onChange(next)
+          }}
+        >
           <SelectTrigger
             id={inputId}
             aria-describedby={describedBy}
-            aria-invalid={!!error}
-            className="rounded-[8px]"
+            aria-invalid={invalid}
+            className="w-full rounded-[8px]"
           >
             <SelectValue placeholder="Select a provider" />
           </SelectTrigger>
@@ -690,31 +726,33 @@ function ConnectionField({
         </Select>
         {help}
         {errorNode}
-      </div>
+      </Field>
     )
   }
 
   if (field.type === 'secret') {
     const hasStored = typeof storedValue === 'string' && storedValue !== ''
     return (
-      <div className="space-y-2">
+      <Field data-invalid={invalid} className="gap-2">
         {label}
         {hasStored && !isEditingSecret ? (
-          <div className="flex items-center gap-3">
-            <span className="min-w-0 flex-1 truncate rounded-[8px] border border-[#e5e7eb] bg-[--background-faded] px-3 py-2 font-mono text-sm text-[--illinois-storm-dark] dark:border-[#32517a] dark:bg-[#0c1f3f] dark:text-[#c8d2e3]">
+          <div className="flex items-center gap-2">
+            <span
+              className={`${adminInsetClass} flex h-9 min-w-0 flex-1 items-center truncate px-3 font-mono text-sm ring-1 ring-[#e5e7eb] dark:ring-[#32517a] ${adminMutedTextClass}`}
+            >
               {String(storedValue)}
             </span>
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              className="h-9 rounded-[8px]"
               onClick={() => onToggleSecretEdit(true)}
             >
-              Change
+              Change<span className="sr-only"> {field.label}</span>
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Input
               id={inputId}
               type="password"
@@ -722,7 +760,7 @@ function ConnectionField({
               value={String(value)}
               placeholder={field.placeholder}
               aria-describedby={describedBy}
-              aria-invalid={!!error}
+              aria-invalid={invalid}
               onChange={(event) => onChange(event.target.value)}
               className="rounded-[8px]"
             />
@@ -730,28 +768,28 @@ function ConnectionField({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                className="h-9"
                 onClick={() => onToggleSecretEdit(false)}
               >
-                Cancel
+                Cancel<span className="sr-only"> changing {field.label}</span>
               </Button>
             )}
           </div>
         )}
         {hasStored && isEditingSecret && (
-          <p className="flex items-center gap-1.5 text-xs text-[--illinois-storm-medium] dark:text-[#94a3b8]">
-            <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+          <FieldDescription className="flex items-center gap-1.5 text-xs">
+            <AlertTriangle className="size-3.5" aria-hidden="true" />
             Leave blank to keep the current value.
-          </p>
+          </FieldDescription>
         )}
         {help}
         {errorNode}
-      </div>
+      </Field>
     )
   }
 
   return (
-    <div className="space-y-2">
+    <Field data-invalid={invalid} className="gap-2">
       {label}
       <Input
         id={inputId}
@@ -760,12 +798,12 @@ function ConnectionField({
         value={String(value)}
         placeholder={field.placeholder}
         aria-describedby={describedBy}
-        aria-invalid={!!error}
+        aria-invalid={invalid}
         onChange={(event) => onChange(event.target.value)}
         className="rounded-[8px]"
       />
       {help}
       {errorNode}
-    </div>
+    </Field>
   )
 }
