@@ -27,7 +27,10 @@ export function useFetchMaintenanceMode({
     queryFn: fetchMaintenanceMode,
     retry: 1,
     enabled,
-    staleTime: 30 * 1000, // Cache for 30 seconds
-    refetchOnWindowFocus: false, // Don't refetch on window focus to avoid flickering
+    staleTime: 30 * 1000,
+    // The gate stays mounted for the whole session, so without polling other
+    // users would only see a toggle after a full reload.
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
   })
 }
