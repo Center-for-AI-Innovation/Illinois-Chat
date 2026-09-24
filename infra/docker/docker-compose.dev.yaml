@@ -39,7 +39,8 @@ services:
       retries: 3
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
+    # Upstream community images are no longer published. Silo is the maintained MinIO fork.
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
     # Customize env vars in .env file
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
