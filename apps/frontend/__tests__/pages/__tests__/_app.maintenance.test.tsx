@@ -21,6 +21,10 @@ vi.mock('next-i18next', () => ({
   Trans: ({ i18nKey }: { i18nKey: string }) => i18nKey,
 }))
 
+vi.mock('next-i18next/pages', () => ({
+  appWithTranslation: (component: unknown) => component,
+}))
+
 vi.mock('~/providers/KeycloakProvider', () => ({
   KeycloakProvider: ({ children }: { children: React.ReactNode }) =>
     React.createElement(
