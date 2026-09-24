@@ -11,16 +11,12 @@ export function isAdminTab(value: string): value is AdminTab {
 }
 
 /**
- * How long a connection change can take to reach a backend worker.
- *
- * `get_vector_db()` caches a `VectorDatabase` built from the config snapshot
- * for `_CONNECTION_TTL = 1800` seconds, and `_should_apply_course_filter()`
- * reads that snapshot rather than re-reading the row. There is no
- * cross-process invalidation, so this is a real bound the operator has to
- * know about — the UI must not imply a save is live everywhere.
+ * The frontend, backend, and ingest worker all read the row per request, so
+ * there is no cache to wait out. Requests already in flight finish on the
+ * config they started with.
  */
 export const CONNECTION_PROPAGATION_NOTICE =
-  'Saved immediately, but backend workers cache connection configs for up to 30 minutes. Changes to the course filter or credentials can take that long to take effect everywhere.'
+  'Changes apply to the next request on every service. Requests already in progress finish on the previous config.'
 
 export type ConnectionFieldType =
   | 'text'
