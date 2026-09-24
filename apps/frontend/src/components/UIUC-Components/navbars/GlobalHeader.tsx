@@ -319,18 +319,24 @@ export function LandingPageHeader({
         <div
           className={`relative flex grow items-center gap-0 font-bold ${montserrat_heading.variable} font-montserratHeading`}
         >
-          <div style={{ width: '2.5rem', height: '2.5rem' }}>
-            <img
-              alt="Illinois Logo"
-              src="/media/logo_illinois.png"
-              width="auto"
-              height="100%"
-            ></img>
-          </div>
+          <Link
+            href="/"
+            aria-label="Illinois Chat home"
+            className="flex items-center rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-(--illinois-orange)"
+          >
+            <div style={{ width: '2.5rem', height: '2.5rem' }}>
+              <img
+                alt=""
+                src="/media/logo_illinois.png"
+                width="auto"
+                height="100%"
+              ></img>
+            </div>
 
-          <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
-            Illinois <span className="text-(--foreground)">Chat</span>
-          </div>
+            <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
+              Illinois <span className="text-(--foreground)">Chat</span>
+            </div>
+          </Link>
         </div>
 
         {/* Navigation links on desktop */}
@@ -445,7 +451,7 @@ export function LandingPageHeader({
               )}
 
               {showAdminInNav && (
-                <Link href="/admin" className={classes.link} tabIndex={0}>
+                <Link href="/admin" className={orangeOutlineBtn} tabIndex={0}>
                   <span className="flex items-center">
                     <IconShieldCheck
                       size={18}
