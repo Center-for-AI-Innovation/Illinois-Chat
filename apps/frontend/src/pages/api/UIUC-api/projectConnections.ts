@@ -264,8 +264,6 @@ async function handlePatch(
       })
     }
 
-    await invalidateForProject(projectName)
-
     await writeAuditEntry({
       actor_email: actorEmail,
       action: 'upsert',

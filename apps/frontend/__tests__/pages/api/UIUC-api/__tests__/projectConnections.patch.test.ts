@@ -24,7 +24,6 @@ function makeRes() {
 }
 
 const auditEntries: any[] = []
-const invalidatedProjects: string[] = []
 
 /**
  * Stands in for `patchConnectionField`, running the handler's merge callback
@@ -83,14 +82,6 @@ async function mockRepo(options: {
       auditEntries.push(entry)
     }),
   }))
-  vi.doMock('~/utils/connectionManager', () => ({
-    connectionManager: {
-      invalidate: vi.fn(async (name: string) => {
-        invalidatedProjects.push(name)
-      }),
-    },
-  }))
-
   return captured
 }
 
@@ -105,7 +96,6 @@ function patchReq(body: unknown) {
 
 beforeEach(() => {
   auditEntries.length = 0
-  invalidatedProjects.length = 0
   vi.resetModules()
   vi.unstubAllEnvs()
   vi.stubEnv('ENCRYPTION_MASTER_KEY', MASTER_KEY)
@@ -129,7 +119,7 @@ describe('projectConnections PATCH', () => {
       isActive: false,
     })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({
@@ -158,7 +148,7 @@ describe('projectConnections PATCH', () => {
       },
     })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({
@@ -184,7 +174,7 @@ describe('projectConnections PATCH', () => {
       storedConfig: { connection_uri: 'postgresql://user:old@host:6543/db' },
     })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({
@@ -198,7 +188,6 @@ describe('projectConnections PATCH', () => {
     )
 
     expect(res.statusCode).toBe(200)
-    expect(invalidatedProjects).toContain('demo')
     expect(auditEntries[0]).toMatchObject({
       action: 'upsert',
       outcome: 'success',
@@ -213,7 +202,7 @@ describe('projectConnections PATCH', () => {
       storedConfig: { connection_uri: 'postgresql://user:pw@host:6543/db' },
     })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({
@@ -230,7 +219,7 @@ describe('projectConnections PATCH', () => {
   it('404s when the project has no connections row', async () => {
     await mockRepo({ status: 'row_not_found' })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({
@@ -246,7 +235,7 @@ describe('projectConnections PATCH', () => {
   it('404s when the row exists but this kind is not configured', async () => {
     await mockRepo({ status: 'kind_not_configured' })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({
@@ -262,7 +251,7 @@ describe('projectConnections PATCH', () => {
   it('400s on an empty config', async () => {
     await mockRepo({ storedConfig: { region: 'us-east-1' } })
 
-    const { handler } = await import('../projectConnections')
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await handler(
       patchReq({ project_name: 'demo', kind: 's3', config: {} }),
@@ -283,7 +272,7 @@ describe('projectConnections PATCH', () => {
       },
     }))
 
-    const mod = await import('../projectConnections')
+    const mod = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
     await mod.default(
       {
