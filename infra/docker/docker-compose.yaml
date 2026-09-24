@@ -37,7 +37,8 @@ services:
       start_period: 30s # Give Qdrant time to start before health checks begin
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
+    # Upstream community images are no longer published. Silo is the maintained MinIO fork.
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
@@ -57,7 +58,7 @@ services:
       retries: 3
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     networks:
       - uiuc-chat-network
     depends_on:
