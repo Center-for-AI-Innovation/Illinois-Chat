@@ -11,7 +11,7 @@ import {
   withCourseAdminAccess,
   withCourseOwnerAccess,
   withCourseOwnerOrAdminAccess,
-} from '../authorization'
+} from '~/server/authorization'
 
 const hoisted = vi.hoisted(() => ({
   hGet: vi.fn(),

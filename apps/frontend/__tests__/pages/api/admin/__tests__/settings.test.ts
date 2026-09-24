@@ -67,7 +67,7 @@ describe('GET|PUT /api/admin/settings', () => {
       },
     }))
 
-    const mod = await import('../settings')
+    const mod = await import('~/pages/api/admin/settings')
     const res = makeRes()
     await mod.default({ method: 'GET', headers: {} } as any, res)
     expect(res.statusCode).toBe(403)
@@ -75,7 +75,7 @@ describe('GET|PUT /api/admin/settings', () => {
 
   it('returns the stored snapshot on GET', async () => {
     mockStore()
-    const { handler } = await import('../settings')
+    const { handler } = await import('~/pages/api/admin/settings')
     const res = makeRes()
     await handler(
       { method: 'GET', headers: {}, user: { email: 'a@example.com' } } as any,
@@ -89,7 +89,7 @@ describe('GET|PUT /api/admin/settings', () => {
 
   it('reports saved and revalidated separately when revalidation throws', async () => {
     mockStore()
-    const { handler } = await import('../settings')
+    const { handler } = await import('~/pages/api/admin/settings')
     const res = makeRes({
       revalidate: vi.fn(async () => {
         throw new Error('regeneration blew up')
@@ -117,7 +117,7 @@ describe('GET|PUT /api/admin/settings', () => {
     const writePlatformSettings = vi.fn()
     mockStore({ writePlatformSettings })
 
-    const { handler } = await import('../settings')
+    const { handler } = await import('~/pages/api/admin/settings')
     const res = makeRes()
     await handler(
       {
@@ -146,7 +146,7 @@ describe('GET|PUT /api/admin/settings', () => {
       }),
     })
 
-    const { handler } = await import('../settings')
+    const { handler } = await import('~/pages/api/admin/settings')
     const res = makeRes()
     await handler(
       {

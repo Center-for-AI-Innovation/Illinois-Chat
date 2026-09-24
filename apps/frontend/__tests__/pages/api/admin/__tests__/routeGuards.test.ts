@@ -69,17 +69,17 @@ function makeRes() {
 }
 
 const PROTECTED_ROUTES = [
-  { name: 'GET /api/admin/settings', module: '../settings', method: 'GET' },
-  { name: 'PUT /api/admin/settings', module: '../settings', method: 'PUT' },
-  { name: 'GET /api/admin/superAdmins', module: '../superAdmins', method: 'GET' },
+  { name: 'GET /api/admin/settings', module: '~/pages/api/admin/settings', method: 'GET' },
+  { name: 'PUT /api/admin/settings', module: '~/pages/api/admin/settings', method: 'PUT' },
+  { name: 'GET /api/admin/superAdmins', module: '~/pages/api/admin/superAdmins', method: 'GET' },
   {
     name: 'POST /api/admin/superAdmins',
-    module: '../superAdmins',
+    module: '~/pages/api/admin/superAdmins',
     method: 'POST',
   },
   {
     name: 'DELETE /api/admin/superAdmins',
-    module: '../superAdmins',
+    module: '~/pages/api/admin/superAdmins',
     method: 'DELETE',
   },
   {
@@ -130,7 +130,7 @@ describe('admin route guards', () => {
 describe('GET /api/admin/me', () => {
   it('answers false for a non-admin instead of 403', async () => {
     hoisted.isSuperAdminAsync.mockResolvedValue(false)
-    const mod = await import('../me')
+    const mod = await import('~/pages/api/admin/me')
     const res = makeRes()
     await mod.default({ method: 'GET', headers: {} } as any, res)
 
@@ -142,7 +142,7 @@ describe('GET /api/admin/me', () => {
 
   it('answers true for an admin', async () => {
     hoisted.isSuperAdminAsync.mockResolvedValue(true)
-    const mod = await import('../me')
+    const mod = await import('~/pages/api/admin/me')
     const res = makeRes()
     await mod.default({ method: 'GET', headers: {} } as any, res)
 
@@ -151,7 +151,7 @@ describe('GET /api/admin/me', () => {
 
   it('still requires authentication', async () => {
     hoisted.currentUser = null
-    const mod = await import('../me')
+    const mod = await import('~/pages/api/admin/me')
     const res = makeRes()
     await mod.default({ method: 'GET', headers: {} } as any, res)
 
