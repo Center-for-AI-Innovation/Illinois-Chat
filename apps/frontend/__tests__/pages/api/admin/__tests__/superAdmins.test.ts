@@ -77,7 +77,7 @@ describe('/api/admin/superAdmins', () => {
       },
     }))
 
-    const mod = await import('../superAdmins')
+    const mod = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await mod.default({ method: 'GET', headers: {} } as any, res)
     expect(res.statusCode).toBe(403)
@@ -88,7 +88,7 @@ describe('/api/admin/superAdmins', () => {
       envAdmins: ['env@example.com'],
       grantedAdmins: ['granted@example.com'],
     })
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler({ method: 'GET', headers: {}, user: actor } as any, res)
 
@@ -104,7 +104,7 @@ describe('/api/admin/superAdmins', () => {
       envAdmins: ['env@example.com'],
       grantedAdmins: [],
     })
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler(
       {
@@ -127,7 +127,7 @@ describe('/api/admin/superAdmins', () => {
       envAdmins: [],
       grantedAdmins: ['only@example.com'],
     })
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler(
       {
@@ -149,7 +149,7 @@ describe('/api/admin/superAdmins', () => {
       envAdmins: [],
       grantedAdmins: ['one@example.com', 'two@example.com'],
     })
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler(
       {
@@ -171,7 +171,7 @@ describe('/api/admin/superAdmins', () => {
       grantedAdmins: [],
       warning: 'Redis unreachable',
     })
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler(
       {
@@ -191,7 +191,7 @@ describe('/api/admin/superAdmins', () => {
     const { addSuperAdminGrant } = mockRoster({
       envAdmins: ['env@example.com'],
     })
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler(
       {
@@ -209,7 +209,7 @@ describe('/api/admin/superAdmins', () => {
 
   it('400s on a malformed email', async () => {
     const { addSuperAdminGrant } = mockRoster({})
-    const { handler } = await import('../superAdmins')
+    const { handler } = await import('~/pages/api/admin/superAdmins')
     const res = makeRes()
     await handler(
       {
