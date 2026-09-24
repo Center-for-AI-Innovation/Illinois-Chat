@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ConnectionKind } from '~/utils/projectConnections/validation'
 import {
+  CONNECTION_CANDIDATES_QUERY_KEY,
   PROJECT_CONNECTIONS_QUERY_KEY,
   projectConnectionQueryKey,
 } from './useFetchProjectConnections'
@@ -114,6 +115,9 @@ export function useUpdateProjectConnection() {
       })
       void queryClient.invalidateQueries({
         queryKey: PROJECT_CONNECTIONS_QUERY_KEY,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: CONNECTION_CANDIDATES_QUERY_KEY,
       })
     },
   })

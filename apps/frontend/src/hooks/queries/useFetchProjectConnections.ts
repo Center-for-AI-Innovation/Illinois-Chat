@@ -11,6 +11,10 @@ export function projectConnectionQueryKey(projectName: string) {
   return ['projectConnection', projectName] as const
 }
 
+export const CONNECTION_CANDIDATES_QUERY_KEY = [
+  'projectConnectionCandidates',
+] as const
+
 export interface ProjectConnectionSummary {
   project_name: string
   is_active: boolean
@@ -73,6 +77,42 @@ export async function fetchProjectConnection(
     )
   }
   return (await response.json()) as ProjectConnectionDetail
+}
+
+export interface ConnectionCandidates {
+  projects: string[]
+  limit: number
+}
+
+/** Projects that exist but have no connections row yet, matching `query`. */
+export async function fetchConnectionCandidates(
+  query: string,
+): Promise<ConnectionCandidates> {
+  const response = await fetch(
+    `/api/UIUC-api/projectConnections/candidates?q=${encodeURIComponent(query)}`,
+  )
+  if (!response.ok) {
+    throw await readError(
+      response,
+      `Error searching projects: ${response.status}`,
+    )
+  }
+  return (await response.json()) as ConnectionCandidates
+}
+
+export function useFetchConnectionCandidates(
+  query: string,
+  { enabled = true }: UseFetchProjectConnectionsOptions = {},
+) {
+  return useQuery({
+    queryKey: [...CONNECTION_CANDIDATES_QUERY_KEY, query],
+    queryFn: () => fetchConnectionCandidates(query),
+    enabled,
+    retry: 1,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous,
+  })
 }
 
 export function useFetchProjectConnections({

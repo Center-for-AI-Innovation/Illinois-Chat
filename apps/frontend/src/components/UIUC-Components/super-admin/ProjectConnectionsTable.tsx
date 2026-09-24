@@ -6,19 +6,26 @@ import {
   ArrowUpDown,
   Database,
   Pencil,
+  Plus,
   Search,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { cva } from 'class-variance-authority'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Badge } from '~/components/shadcn/ui/badge'
 import { Button } from '~/components/shadcn/ui/button'
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from '~/components/shadcn/ui/empty'
-import { Input } from '~/components/shadcn/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '~/components/shadcn/ui/input-group'
 import { Skeleton } from '~/components/shadcn/ui/skeleton'
 import {
   Table,
@@ -32,12 +39,56 @@ import {
   useFetchProjectConnections,
   type ProjectConnectionSummary,
 } from '~/hooks/queries/useFetchProjectConnections'
-import { AdminCard, AdminInlineError } from './AdminCard'
+import {
+  AdminCard,
+  AdminInlineError,
+  adminMutedTextClass,
+  adminSubtleTextClass,
+} from './AdminCard'
+import { AddConnectionDialog } from './AddConnectionDialog'
 import { CONNECTION_PROPAGATION_NOTICE } from './admin.types'
 import { ProjectConnectionEditor } from './ProjectConnectionEditor'
 
 type SortColumn = 'project_name' | 'updated_at'
 type SortDirection = 'asc' | 'desc'
+
+const statusBadgeVariants = cva('rounded-[6px]', {
+  variants: {
+    active: {
+      true: 'border-(--illinois-orange) bg-(--illinois-orange)/10 text-(--illinois-orange)',
+      false: `border-[#e5e7eb] dark:border-[#32517a] ${adminSubtleTextClass}`,
+    },
+  },
+})
+
+function SortableHead({
+  label,
+  ariaSort,
+  onSort,
+  icon,
+  className,
+}: {
+  label: string
+  ariaSort: 'ascending' | 'descending' | 'none'
+  onSort: () => void
+  icon: ReactNode
+  className?: string
+}) {
+  return (
+    <TableHead aria-sort={ariaSort} className={className}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onSort}
+        className="-ml-3 h-8 px-3 text-sm font-semibold text-(--illinois-blue) hover:bg-(--background-faded) dark:text-white dark:hover:bg-[#0c1f3f]"
+      >
+        {label}
+        {icon}
+      </Button>
+    </TableHead>
+  )
+}
 
 function compareRows(
   a: ProjectConnectionSummary,
@@ -66,6 +117,20 @@ export function ProjectConnectionsTable() {
   const [sortColumn, setSortColumn] = useState<SortColumn>('project_name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [editingProject, setEditingProject] = useState<string | null>(null)
+  const [isAdding, setIsAdding] = useState(false)
+
+  const addButton = (
+    <Button
+      type="button"
+      variant="dashboard"
+      size="sm"
+      onClick={() => setIsAdding(true)}
+      className="rounded-[8px]"
+    >
+      <Plus aria-hidden="true" />
+      Add connection
+    </Button>
+  )
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -95,14 +160,14 @@ export function ProjectConnectionsTable() {
       : ('descending' as const)
   }
 
-  function SortIcon({ column }: { column: SortColumn }) {
+  function sortIconFor(column: SortColumn) {
     if (column !== sortColumn) {
-      return <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" />
+      return <ArrowUpDown className="size-3.5 opacity-60" aria-hidden="true" />
     }
     return sortDirection === 'asc' ? (
-      <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+      <ArrowUp className="size-3.5" aria-hidden="true" />
     ) : (
-      <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+      <ArrowDown className="size-3.5" aria-hidden="true" />
     )
   }
 
@@ -110,11 +175,12 @@ export function ProjectConnectionsTable() {
     <>
       <AdminCard
         title="Project connections"
-        blastRadius="Per-project overrides for storage, database, vector store, and embeddings. Only projects with an existing row appear here."
-        icon={<Database className="h-5 w-5" aria-hidden="true" />}
+        blastRadius="Per-project overrides for storage, database, vector store, and embeddings. Projects without a row use the platform defaults."
+        icon={<Database className="size-5" aria-hidden="true" />}
+        headerAside={isError || isPending || !data?.length ? undefined : addButton}
       >
         <div className="flex flex-col gap-4">
-          <p className="text-xs text-[--illinois-storm-medium] dark:text-[#94a3b8]">
+          <p className={`text-xs ${adminSubtleTextClass}`}>
             {CONNECTION_PROPAGATION_NOTICE}
           </p>
 
@@ -126,162 +192,177 @@ export function ProjectConnectionsTable() {
               isRetrying={isFetching}
             />
           ) : isPending ? (
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-10 w-full max-w-xs rounded-[8px]" />
+            <div className="flex flex-col gap-3" aria-busy="true">
+              <Skeleton className="h-9 w-full max-w-xs rounded-[8px]" />
               {Array.from({ length: 4 }).map((_, index) => (
                 <Skeleton key={index} className="h-12 w-full rounded-[8px]" />
               ))}
             </div>
           ) : (data?.length ?? 0) === 0 ? (
-            <Empty className="border border-dashed border-[#e5e7eb] py-10 dark:border-[#32517a]">
+            <Empty className="border border-dashed border-[#e5e7eb] p-10 dark:border-[#32517a]">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <Database aria-hidden="true" />
                 </EmptyMedia>
                 <EmptyTitle>No project connections</EmptyTitle>
                 <EmptyDescription>
-                  Every project is using the platform defaults. Rows appear here
-                  once a project gets its first override, which is created
-                  through the external-connections CLI or the API.
+                  Every project is using the platform defaults. Add a
+                  connection to point a project at its own storage, database,
+                  vector store, or embedding provider.
                 </EmptyDescription>
               </EmptyHeader>
+              <EmptyContent>{addButton}</EmptyContent>
             </Empty>
           ) : (
             <>
-              <div className="relative max-w-xs">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[--illinois-storm-medium] dark:text-[#94a3b8]"
-                  aria-hidden="true"
-                />
-                <Input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Filter projects"
-                  aria-label="Filter projects by name"
-                  className="rounded-[8px] pl-9"
-                />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <InputGroup className="rounded-[8px] sm:max-w-xs">
+                  <InputGroupAddon>
+                    <Search aria-hidden="true" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Filter projects"
+                    aria-label="Filter projects by name"
+                  />
+                </InputGroup>
+                <p
+                  aria-live="polite"
+                  className={`text-xs ${adminSubtleTextClass}`}
+                >
+                  {rows.length === data?.length
+                    ? `${rows.length} ${rows.length === 1 ? 'project' : 'projects'}`
+                    : `${rows.length} of ${data?.length ?? 0} projects`}
+                </p>
               </div>
 
               {/* Horizontal scroll container comes from <Table>; the
                   lower-priority columns hide below md so the project name and
                   the row action are never squeezed. */}
-              <Table>
-                <TableHeader>
-                  <TableRow className="dark:border-[#32517a]">
-                    <TableHead aria-sort={ariaSortFor('project_name')}>
-                      <button
-                        type="button"
-                        onClick={() => toggleSort('project_name')}
-                        className="inline-flex items-center gap-1.5 rounded-[8px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--illinois-orange] focus-visible:ring-offset-2"
-                      >
-                        Project
-                        <SortIcon column="project_name" />
-                      </button>
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden md:table-cell">
-                      Configured
-                    </TableHead>
-                    <TableHead
-                      aria-sort={ariaSortFor('updated_at')}
-                      className="hidden md:table-cell"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSort('updated_at')}
-                        className="inline-flex items-center gap-1.5 rounded-[8px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--illinois-orange] focus-visible:ring-offset-2"
-                      >
-                        Updated
-                        <SortIcon column="updated_at" />
-                      </button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.length === 0 ? (
-                    <TableRow className="dark:border-[#32517a]">
-                      <TableCell
-                        colSpan={5}
-                        className="py-8 text-center text-sm text-[--illinois-storm-medium] dark:text-[#94a3b8]"
-                      >
-                        No project matches “{query}”.
-                      </TableCell>
+              <div className="overflow-hidden rounded-[10px] ring-1 ring-[#e5e7eb] dark:ring-[#32517a]">
+                <Table>
+                  <TableHeader className="bg-(--background-faded) dark:bg-[#0c1f3f]">
+                    <TableRow className="hover:bg-transparent dark:border-[#32517a]">
+                      <SortableHead
+                        label="Project"
+                        ariaSort={ariaSortFor('project_name')}
+                        onSort={() => toggleSort('project_name')}
+                        icon={sortIconFor('project_name')}
+                        className="pl-4"
+                      />
+                      <TableHead className="font-semibold text-(--illinois-blue) dark:text-white">
+                        Status
+                      </TableHead>
+                      <TableHead className="hidden font-semibold text-(--illinois-blue) md:table-cell dark:text-white">
+                        Configured
+                      </TableHead>
+                      <SortableHead
+                        label="Updated"
+                        ariaSort={ariaSortFor('updated_at')}
+                        onSort={() => toggleSort('updated_at')}
+                        icon={sortIconFor('updated_at')}
+                        className="hidden md:table-cell"
+                      />
+                      <TableHead className="pr-4 text-right">
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    rows.map((row) => (
-                      <TableRow
-                        key={row.project_name}
-                        className="dark:border-[#32517a]"
-                      >
-                        <TableCell className="max-w-[220px] font-medium text-[--illinois-blue] dark:text-white">
-                          <span className="block min-w-0 truncate">
-                            {row.project_name}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`rounded-[8px] ${
-                              row.is_active
-                                ? 'border-[--illinois-orange] text-[--illinois-orange]'
-                                : 'border-[#e5e7eb] text-[--illinois-storm-medium] dark:border-[#32517a] dark:text-[#94a3b8]'
-                            }`}
-                          >
-                            {row.is_active ? 'Active' : 'Disabled'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <div className="flex flex-wrap gap-1.5">
-                            {row.configured_kinds.length === 0 ? (
-                              <span className="text-sm text-[--illinois-storm-medium] dark:text-[#94a3b8]">
-                                None
-                              </span>
-                            ) : (
-                              row.configured_kinds.map((kind) => (
-                                <Badge
-                                  key={kind}
-                                  variant="secondary"
-                                  className="rounded-[8px] capitalize"
-                                >
-                                  {kind}
-                                </Badge>
-                              ))
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden whitespace-nowrap text-sm text-[--illinois-storm-dark] dark:text-[#c8d2e3] md:table-cell">
-                          {row.updated_at
-                            ? new Date(row.updated_at).toLocaleDateString()
-                            : '—'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9"
-                            aria-label={`Edit connections for ${row.project_name}`}
-                            onClick={() => setEditingProject(row.project_name)}
-                          >
-                            <Pencil
-                              className="h-4 w-4 text-[--illinois-blue] dark:text-white"
-                              aria-hidden="true"
-                            />
-                          </Button>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.length === 0 ? (
+                      <TableRow className="hover:bg-transparent dark:border-[#32517a]">
+                        <TableCell
+                          colSpan={5}
+                          className={`py-10 text-center text-sm ${adminSubtleTextClass}`}
+                        >
+                          No project matches “{query}”.
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      rows.map((row) => (
+                        <TableRow
+                          key={row.project_name}
+                          className="dark:border-[#32517a] dark:hover:bg-[#0c1f3f]/60"
+                        >
+                          <TableCell className="max-w-[220px] pl-4 font-medium text-(--illinois-blue) dark:text-white">
+                            <span className="block min-w-0 truncate">
+                              {row.project_name}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={statusBadgeVariants({
+                                active: row.is_active,
+                              })}
+                            >
+                              {row.is_active ? 'Active' : 'Disabled'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <div className="flex flex-wrap gap-1.5">
+                              {row.configured_kinds.length === 0 ? (
+                                <span
+                                  className={`text-sm ${adminSubtleTextClass}`}
+                                >
+                                  None
+                                </span>
+                              ) : (
+                                row.configured_kinds.map((kind) => (
+                                  <Badge
+                                    key={kind}
+                                    variant="secondary"
+                                    className="rounded-[6px] capitalize"
+                                  >
+                                    {kind}
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell
+                            className={`hidden text-sm whitespace-nowrap md:table-cell ${adminMutedTextClass}`}
+                          >
+                            {row.updated_at
+                              ? new Date(row.updated_at).toLocaleDateString()
+                              : '—'}
+                          </TableCell>
+                          <TableCell className="pr-4 text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Edit connections for ${row.project_name}`}
+                              onClick={() =>
+                                setEditingProject(row.project_name)
+                              }
+                              className="rounded-[8px] text-(--illinois-blue) dark:text-white"
+                            >
+                              <Pencil aria-hidden="true" />
+                              <span className="hidden sm:inline">Edit</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </>
           )}
         </div>
       </AdminCard>
+
+      <AddConnectionDialog
+        open={isAdding}
+        onOpenChange={setIsAdding}
+        onSelect={(projectName) => {
+          setIsAdding(false)
+          setEditingProject(projectName)
+        }}
+      />
 
       {editingProject && (
         <ProjectConnectionEditor
