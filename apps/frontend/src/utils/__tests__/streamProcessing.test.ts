@@ -17,7 +17,7 @@ vi.mock('~/utils/fetchContexts', () => ({
   fetchContexts: vi.fn(),
   fetchMQRContexts: vi.fn(),
 }))
-vi.mock('~/pages/api/UIUC-api/fetchImageDescription', () => ({
+vi.mock('~/utils/fetchImageDescription', () => ({
   fetchImageDescription: vi.fn(),
 }))
 vi.mock('../citations', () => ({
@@ -37,7 +37,7 @@ import { runGeminiChat } from '~/utils/modelProviders/routes/gemini'
 import { runSambaNovaChat } from '~/app/utils/sambanova'
 import posthog from 'posthog-js'
 import { fetchContexts } from '~/utils/fetchContexts'
-import { fetchImageDescription } from '~/pages/api/UIUC-api/fetchImageDescription'
+import { fetchImageDescription } from '~/utils/fetchImageDescription'
 import { replaceCitationLinks } from '../citations'
 import { openAIAzureChat } from '../modelProviders/OpenAIAzureChat'
 import { NCSAHostedVLMModelID } from '../modelProviders/types/NCSAHostedVLM'
@@ -494,6 +494,33 @@ describe('validateRequestBody', () => {
       } as any),
     ).rejects.toThrow(/stream/i)
   })
+
+  it.each([0, -1, 1.5, '8', Number.MAX_SAFE_INTEGER + 1])(
+    'throws when top_n is invalid: %s',
+    async (top_n) => {
+      await expect(
+        validateRequestBody({
+          model: OpenAIModelID.GPT_4o,
+          messages: [{ id: 'm1', role: 'user', content: 'hi' }],
+          course_name: 'CS101',
+          api_key: 'k',
+          top_n,
+        } as any),
+      ).rejects.toThrow(/top_n/i)
+    },
+  )
+
+  it('allows a positive top_n above the default', async () => {
+    await expect(
+      validateRequestBody({
+        model: OpenAIModelID.GPT_4o,
+        messages: [{ id: 'm1', role: 'user', content: 'hi' }],
+        course_name: 'CS101',
+        api_key: 'k',
+        top_n: 101,
+      }),
+    ).resolves.toBeUndefined()
+  })
 })
 
 describe('constructSearchQuery', () => {
@@ -544,8 +571,9 @@ describe('handleContextSearch / attachContextsToLastMessage', () => {
       selectedConversation,
       'q',
       ['g1'],
+      8,
     )
-    expect(fetchContexts).toHaveBeenCalledWith('CS101', 'q', 123, ['g1'], '')
+    expect(fetchContexts).toHaveBeenCalledWith('CS101', 'q', 123, ['g1'], '', 8)
     expect(contexts).toEqual([{ id: 2 }])
     expect(message.contexts).toEqual([{ id: 2 }])
   })

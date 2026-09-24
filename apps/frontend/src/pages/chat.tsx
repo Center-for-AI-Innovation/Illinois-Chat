@@ -8,7 +8,7 @@ import { useAuth } from 'react-oidc-context'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
-import Home from '~/pages/api/home/home'
+import Home from '~/components/home/home'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
@@ -217,7 +217,7 @@ const ChatPage: NextPage = () => {
       (currentEmail === '' && metadata?.is_private) ? (
         <MainPageBackground>
           <div
-            className={`flex items-center justify-center font-montserratHeading text-white ${montserrat_heading.variable}`}
+            className={`font-montserratHeading flex items-center justify-center text-white ${montserrat_heading.variable}`}
           >
             <span className="mr-2">Warming up the knowledge engines...</span>
             <LoadingSpinner size="sm" />

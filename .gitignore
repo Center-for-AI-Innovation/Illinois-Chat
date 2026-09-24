@@ -159,6 +159,9 @@ dmypy.json
 [Ii]nclude
 [Ll]ib
 [Ll]ib64
+# The venv patterns above are unanchored and match ANY lib/ dir in the repo;
+# re-include the frontend's shadcn lib (see use-controllable-state.ts incident)
+!apps/frontend/src/components/shadcn/lib/
 [Ll]ocal
 /[Ss]cripts
 pyvenv.cfg
@@ -180,3 +183,6 @@ pip-selfcheck.json
 
 # Local start-dev.sh --apps process tracking
 .illinois-chat-dev-apps.pid
+
+# Node dependencies anywhere in the repo
+node_modules/

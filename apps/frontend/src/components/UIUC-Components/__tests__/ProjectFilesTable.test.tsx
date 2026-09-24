@@ -7,14 +7,12 @@ import { http, HttpResponse } from 'msw'
 import { server } from '~/test-utils/server'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
-  showNotification: vi.fn(),
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 vi.mock('axios', () => ({
@@ -24,87 +22,6 @@ vi.mock('axios', () => ({
     get: vi.fn(async () => ({ data: {} })),
   },
 }))
-
-vi.mock('mantine-datatable', () => ({
-  DataTable: (props: any) => {
-    const records = props.records ?? []
-    const columns = props.columns ?? []
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() =>
-            props.onSortStatusChange?.({
-              ...props.sortStatus,
-              direction: props.sortStatus?.direction === 'asc' ? 'desc' : 'asc',
-            })
-          }
-        >
-          sort-toggle
-        </button>
-        <button
-          type="button"
-          onClick={() => props.onSelectedRecordsChange?.([records[0]])}
-        >
-          select-first
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            props.onSelectedRecordsChange?.(
-              Array.from({ length: 101 }).map((_, i) => ({ id: i + 1 })),
-            )
-          }
-        >
-          select-many
-        </button>
-        <div>
-          {columns.map((col: any, idx: number) => (
-            <div key={idx}>{col.filter ?? null}</div>
-          ))}
-        </div>
-        <div>
-          {records.length === 0 ? (props.noRecordsIcon ?? null) : null}
-          {records.map((record: any, index: number) => (
-            <div key={record.id ?? record.s3_path ?? record.url ?? index}>
-              {columns.map((col: any, cIdx: number) => (
-                <div key={cIdx}>
-                  {col.render
-                    ? col.render(record, index)
-                    : (record[col.accessor] ?? null)}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  },
-}))
-
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    MultiSelect: (props: any) => (
-      <div>
-        <div aria-label="multiselect-kind">{props.sx ? 'row' : 'bulk'}</div>
-        <div aria-label="multiselect-value">
-          {(props.value ?? []).join(',')}
-        </div>
-        <button
-          type="button"
-          onClick={() => props.onChange?.([...(props.value ?? []), 'Group B'])}
-        >
-          {props.sx ? 'set-groups-row' : 'set-groups-bulk'}
-        </button>
-        <button type="button" onClick={() => props.onChange?.([])}>
-          {props.sx ? 'clear-groups-row' : 'clear-groups-bulk'}
-        </button>
-      </div>
-    ),
-  }
-})
 
 vi.mock('@/hooks/queries/useFetchDocumentGroups', () => ({
   useFetchDocumentGroups: () => ({
@@ -119,16 +36,18 @@ vi.mock('@/hooks/queries/useFetchDocumentGroups', () => ({
   }),
 }))
 
+const appendToDocGroupMutate = vi.fn(async () => undefined)
 vi.mock('@/hooks/queries/useAppendToDocGroup', () => ({
   useAppendToDocGroup: () => ({
-    mutate: vi.fn(async () => undefined),
+    mutate: appendToDocGroupMutate,
     isPending: false,
   }),
 }))
 
+const removeFromDocGroupMutate = vi.fn(async () => undefined)
 vi.mock('@/hooks/queries/useDeleteFromDocGroup', () => ({
   useDeleteFromDocGroup: () => ({
-    mutate: vi.fn(async () => undefined),
+    mutate: removeFromDocGroupMutate,
     isPending: false,
   }),
 }))
@@ -141,12 +60,12 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
   }
 })
 
-vi.mock('~/pages/util/handleExport', () => ({
-  default: vi.fn(async () => ({ message: 'export started' })),
+vi.mock('~/utils/handleExport', () => ({
+  handleExport: vi.fn(async () => ({ message: 'export started' })),
 }))
 
 describe('ProjectFilesTable', () => {
-  it('renders success tab, filters/sorts, views and deletes documents, and opens export modal', async () => {
+  it('renders success tab, filters/sorts, assigns groups, views and deletes documents, and opens export modal', async () => {
     const user = userEvent.setup()
     vi.spyOn(console, 'debug').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -207,11 +126,26 @@ describe('ProjectFilesTable', () => {
     expect(await screen.findByText(/Success/i)).toBeInTheDocument()
     expect(await screen.findByText(/file1-/i)).toBeInTheDocument()
 
-    // Row-level document group change path.
-    await user.click(screen.getByRole('button', { name: /set-groups-row/i }))
+    // Row-level document group change path: open the in-cell combobox and
+    // pick the other group.
+    const rowGroupCombobox = screen.getByRole('combobox', {
+      name: 'Assign document groups',
+    })
+    await user.click(rowGroupCombobox)
+    await user.click(await screen.findByRole('option', { name: 'Group B' }))
 
-    // Filter (updates queryKey and triggers refetch).
-    await user.type(screen.getByLabelText('File Name'), 'hello')
+    await waitFor(() => expect(appendToDocGroupMutate).toHaveBeenCalled())
+
+    // Close the combobox popup: Base UI marks the rest of the page
+    // `aria-hidden` while it is open, which hides the header from `getByRole`.
+    await user.keyboard('{Escape}')
+
+    // Filter (updates queryKey and triggers refetch). The input lives behind
+    // the column's funnel-icon popover.
+    await user.click(
+      screen.getByRole('button', { name: 'Filter by File Name' }),
+    )
+    await user.type(await screen.findByLabelText('File Name'), 'hello')
     await waitFor(() =>
       expect(
         fetchSpy.mock.calls.some(([url]) =>
@@ -220,8 +154,13 @@ describe('ProjectFilesTable', () => {
       ).toBe(true),
     )
 
-    // Sort (updates queryKey and triggers refetch).
-    await user.click(screen.getByRole('button', { name: /sort-toggle/i }))
+    // Close the filter popover before going after the sort control, so its
+    // overlay is not sitting on top of the header row.
+    await user.keyboard('{Escape}')
+
+    // Sort (updates queryKey and triggers refetch) — the sort button, not
+    // the filter popover's trigger, which is named "Filter by File Name".
+    await user.click(screen.getByRole('button', { name: /^File Name/ }))
     await waitFor(() =>
       expect(
         fetchSpy.mock.calls.some(([url]) =>
@@ -235,12 +174,16 @@ describe('ProjectFilesTable', () => {
     await user.click(screen.getByRole('button', { name: /view document/i }))
     await waitFor(() => expect(openSpy).toHaveBeenCalled())
 
-    // Select and open bulk multi-select; exercise group-change handler.
-    await user.click(screen.getByRole('button', { name: /select-first/i }))
+    // Select the row, open the bulk multi-select, and assign a group.
+    await user.click(screen.getByRole('checkbox', { name: /select document/i }))
     await user.click(
       screen.getByRole('button', { name: /Add Document to Groups/i }),
     )
-    await user.click(screen.getByRole('button', { name: /set-groups-bulk/i }))
+    const bulkGroupCombobox = screen.getByRole('combobox', {
+      name: 'Filter by document group',
+    })
+    await user.click(bulkGroupCombobox)
+    await user.click(await screen.findByRole('option', { name: 'Group B' }))
 
     // Delete action opens modal.
     await user.click(screen.getByRole('button', { name: /Delete document/i }))
@@ -264,25 +207,22 @@ describe('ProjectFilesTable', () => {
 
   it('shows a toast when attempting to delete more than 100 selected records', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications as any).show.mockClear()
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as any).mockClear()
+
+    const manyDocs = Array.from({ length: 101 }).map((_, i) => ({
+      id: i + 1,
+      readable_filename: `f${i + 1}.txt`,
+      s3_path: `cs101/f${i + 1}.txt`,
+      url: '',
+      base_url: '',
+      created_at: new Date().toISOString(),
+      doc_groups: [],
+    }))
 
     server.use(
       http.get('*/api/materialsTable/fetchProjectMaterials*', async () => {
-        return HttpResponse.json({
-          final_docs: [
-            {
-              id: 1,
-              readable_filename: 'f.txt',
-              s3_path: 'cs101/f.txt',
-              url: '',
-              base_url: '',
-              created_at: new Date().toISOString(),
-              doc_groups: [],
-            },
-          ],
-          total_count: 1,
-        })
+        return HttpResponse.json({ final_docs: manyDocs, total_count: 101 })
       }),
       http.get('*/api/materialsTable/fetchFailedDocuments*', async () => {
         return HttpResponse.json({
@@ -307,16 +247,182 @@ describe('ProjectFilesTable', () => {
       { homeContext: { dispatch: vi.fn() } },
     )
 
-    await user.click(
-      await screen.findByRole('button', { name: /select-many/i }),
-    )
-    const deleteLabels = await screen.findAllByText(/Delete 101/i)
-    await user.click(deleteLabels[0]!.closest('button') as HTMLElement)
+    await screen.findByText('f1.txt')
 
-    expect((notifications as any).show).toHaveBeenCalledWith(
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: /select all documents on this page/i,
+      }),
+    )
+
+    const deleteButton = await screen.findByRole('button', {
+      name: /Delete 101 selected records/i,
+    })
+    await user.click(deleteButton)
+
+    expect(showToast as any).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Selection Limit Exceeded' }),
     )
-  })
+  }, 20_000)
+
+  it('keeps the selection after a refetch hands back freshly built records', async () => {
+    // react-query returns new objects on every refetch, so selection tracked by
+    // object identity silently desyncs from the checkboxes the first time the
+    // table refreshes.
+    const user = userEvent.setup()
+
+    const docs = [
+      {
+        id: 1,
+        readable_filename: 'alpha.txt',
+        s3_path: 'cs101/alpha.txt',
+        url: '',
+        base_url: '',
+        created_at: new Date().toISOString(),
+        doc_groups: [],
+      },
+      {
+        id: 2,
+        readable_filename: 'beta.txt',
+        s3_path: 'cs101/beta.txt',
+        url: '',
+        base_url: '',
+        created_at: new Date().toISOString(),
+        doc_groups: [],
+      },
+    ]
+
+    server.use(
+      // Each response is re-serialised, so the rows arrive as new objects.
+      http.get('*/api/materialsTable/fetchProjectMaterials*', async () =>
+        HttpResponse.json({ final_docs: docs, total_count: 2 }),
+      ),
+      http.get('*/api/materialsTable/fetchFailedDocuments*', async () =>
+        HttpResponse.json({
+          final_docs: [],
+          total_count: 0,
+          recent_fail_count: 0,
+        }),
+      ),
+    )
+
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard' }
+    const { ProjectFilesTable } = await import('../ProjectFilesTable')
+    renderWithProviders(
+      <ProjectFilesTable
+        course_name="CS101"
+        tabValue="success"
+        onTabChange={vi.fn()}
+        setFailedCount={vi.fn()}
+        failedCount={0}
+      />,
+      { homeContext: { dispatch: vi.fn() } },
+    )
+
+    await screen.findByText('alpha.txt')
+
+    const rowCheckbox = screen.getByRole('checkbox', {
+      name: /select document 1/i,
+    })
+    await user.click(rowCheckbox)
+    await screen.findByRole('button', { name: /Delete 1 selected record/i })
+
+    await user.click(
+      screen.getByRole('button', { name: /refresh documents table/i }),
+    )
+
+    // The row is still checked and the count has not drifted.
+    await waitFor(() => {
+      expect(
+        screen.getByRole('checkbox', { name: /select document 1/i }),
+      ).toBeChecked()
+    })
+    expect(
+      screen.getByRole('button', { name: /Delete 1 selected record/i }),
+    ).toBeInTheDocument()
+
+    // Unchecking must still clear it rather than append a duplicate.
+    await user.click(
+      screen.getByRole('checkbox', { name: /select document 1/i }),
+    )
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /Delete \d+ selected record/i }),
+      ).not.toBeInTheDocument()
+    })
+  }, 20_000)
+
+  it('marks the header checkbox indeterminate when only some rows are selected', async () => {
+    const user = userEvent.setup()
+
+    const docs = [1, 2].map((id) => ({
+      id,
+      readable_filename: `doc${id}.txt`,
+      s3_path: `cs101/doc${id}.txt`,
+      url: '',
+      base_url: '',
+      created_at: new Date().toISOString(),
+      doc_groups: [],
+    }))
+
+    server.use(
+      http.get('*/api/materialsTable/fetchProjectMaterials*', async () =>
+        HttpResponse.json({ final_docs: docs, total_count: 2 }),
+      ),
+      http.get('*/api/materialsTable/fetchFailedDocuments*', async () =>
+        HttpResponse.json({
+          final_docs: [],
+          total_count: 0,
+          recent_fail_count: 0,
+        }),
+      ),
+    )
+
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard' }
+    const { ProjectFilesTable } = await import('../ProjectFilesTable')
+    renderWithProviders(
+      <ProjectFilesTable
+        course_name="CS101"
+        tabValue="success"
+        onTabChange={vi.fn()}
+        setFailedCount={vi.fn()}
+        failedCount={0}
+      />,
+      { homeContext: { dispatch: vi.fn() } },
+    )
+
+    await screen.findByText('doc1.txt')
+
+    const selectAll = screen.getByRole('checkbox', {
+      name: /select all documents on this page/i,
+    })
+    expect(selectAll).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /select document 1/i }),
+    )
+
+    // Partial selection must not read as "all selected" — to a screen reader or
+    // visually, where a lone check mark is indistinguishable from fully checked.
+    await waitFor(() => {
+      expect(selectAll).toHaveAttribute('aria-checked', 'mixed')
+    })
+    expect(selectAll).toHaveAttribute('data-indeterminate')
+    // jsdom does not evaluate Tailwind, so assert the swap is wired rather than
+    // which glyph paints: a distinct minus exists and the check is class-hidden
+    // whenever the root is indeterminate.
+    expect(selectAll.querySelector('.lucide-minus')).toBeInTheDocument()
+    expect(selectAll.querySelector('.lucide-check')).toHaveClass(
+      'group-data-indeterminate:hidden',
+    )
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /select document 2/i }),
+    )
+    await waitFor(() => {
+      expect(selectAll).toHaveAttribute('aria-checked', 'true')
+    })
+  }, 20_000)
 
   it('renders failed tab and shows error details modal via "Read more"', async () => {
     const user = userEvent.setup()
@@ -390,8 +496,56 @@ describe('ProjectFilesTable', () => {
     else delete (HTMLElement.prototype as any).clientHeight
   }, 20_000)
 
+  it('refreshes both queries when the refresh button is clicked', async () => {
+    const user = userEvent.setup()
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const countCalls = (pattern: RegExp) =>
+      fetchSpy.mock.calls.filter(([url]) => pattern.test(String(url))).length
+
+    server.use(
+      http.get('*/api/materialsTable/fetchProjectMaterials*', async () => {
+        return HttpResponse.json({ final_docs: [], total_count: 0 })
+      }),
+      http.get('*/api/materialsTable/fetchFailedDocuments*', async () => {
+        return HttpResponse.json({
+          final_docs: [],
+          total_count: 0,
+          recent_fail_count: 0,
+        })
+      }),
+    )
+
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/dashboard' }
+    const { ProjectFilesTable } = await import('../ProjectFilesTable')
+    renderWithProviders(
+      <ProjectFilesTable
+        course_name="CS101"
+        tabValue="success"
+        onTabChange={vi.fn()}
+        setFailedCount={vi.fn()}
+        failedCount={0}
+      />,
+      { homeContext: { dispatch: vi.fn() } },
+    )
+
+    await screen.findByText(/Success/i)
+
+    const materialsBefore = countCalls(/fetchProjectMaterials/)
+    const failedBefore = countCalls(/fetchFailedDocuments/)
+    await user.click(
+      screen.getByRole('button', { name: /refresh documents table/i }),
+    )
+    await waitFor(() => {
+      expect(countCalls(/fetchProjectMaterials/)).toBeGreaterThan(
+        materialsBefore,
+      )
+      expect(countCalls(/fetchFailedDocuments/)).toBeGreaterThan(failedBefore)
+    })
+  }, 20_000)
+
   it('renders an error-state table when document fetch fails', async () => {
-    const { showNotification } = await import('@mantine/notifications')
+    const { showErrorToast } = await import('~/utils/toastUtils')
 
     server.use(
       http.get('*/api/materialsTable/fetchProjectMaterials*', async () => {
@@ -420,7 +574,12 @@ describe('ProjectFilesTable', () => {
       { homeContext: { dispatch: vi.fn() } },
     )
 
-    await waitFor(() => expect(showNotification as any).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(showErrorToast as any).toHaveBeenCalledWith(
+        'Failed to fetch documents',
+        'Error',
+      ),
+    )
     expect(
       await screen.findByText(
         /Ah! We hit a wall when fetching your documents/i,

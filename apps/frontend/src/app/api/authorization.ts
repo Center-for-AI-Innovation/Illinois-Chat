@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import { withAppRouterAuth } from '~/utils/appRouterAuth'
 import { ensureRedisConnected } from '~/utils/redisClient'
-import { AuthenticatedUser } from '~/middleware'
+import { AuthenticatedUser } from '~/proxy'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 // Helper function to get course metadata from Redis
@@ -170,7 +170,7 @@ export function withCourseAccessFromRequest(
 
         // Platform super admins get project access through a live check
         // rather than by being written into `course_admins` — see the note in
-        // `src/pages/api/authorization.ts` for why. Memoized because both the
+        // `src/server/authorization.ts` for why. Memoized because both the
         // private-course gate and the admin-tier gate below can need it, and
         // only evaluated after a normal check has already failed, so ordinary
         // authorized requests never pay for the extra Redis read.

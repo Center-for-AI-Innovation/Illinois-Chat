@@ -10,7 +10,7 @@ import { encrypt, isEncrypted } from '~/utils/crypto'
 import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { upsertChatbotTags } from '~/utils/chatbotTagsRegistry'
-import { withCourseOwnerOrAdminAccess } from '~/pages/api/authorization'
+import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { courseName, courseMetadata } = req.body as {
@@ -51,7 +51,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // metadata makes their access unrevocable: the stored array is a snapshot,
     // so every project seeded while someone was listed keeps granting them
     // admin rights after the grant is removed. Super admins now get project
-    // access from the live check in `~/pages/api/authorization.ts` instead.
+    // access from the live check in `~/server/authorization.ts` instead.
     if (!combined_metadata.course_admins) {
       combined_metadata.course_admins = []
     }

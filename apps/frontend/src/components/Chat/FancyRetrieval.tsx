@@ -1,12 +1,17 @@
-import { Input, Switch, Title, Tooltip } from '@mantine/core'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
+import { Switch } from '@/components/shadcn/ui/switch'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { ModelParams } from './ModelParams'
 import { IconExternalLink } from '@tabler/icons-react'
 import { useContext, useEffect, useState } from 'react'
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 import { useTranslation } from 'react-i18next'
 import Link from 'next/link'
-import { useMediaQuery } from '@mantine/hooks'
+import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 
 export const FancyRetrieval = () => {
   // Toggle to enable Fancy retrieval method: Multi-Query Retrieval
@@ -35,58 +40,62 @@ export const FancyRetrieval = () => {
   return (
     <>
       <div
-        className="flex h-full w-[100%] flex-col space-y-4 rounded-lg p-3"
+        className="flex h-full w-full flex-col space-y-4 rounded-lg p-3"
         style={{ position: 'relative' }}
       >
-        <Tooltip
-          multiline
-          // color="#15162b"
-          color=""
-          arrowPosition="side"
-          position="top-start"
-          arrowSize={8}
-          withArrow
-          label="Multi-Query Retrieval is disabled for performance reasons, I'm working to bring it back ASAP."
-          classNames={{
-            tooltip: `${
-              isSmallScreen ? 'text-xs' : 'text-sm'
-            } text-[--tooltip] bg-[--tooltip-background] ${
+        <Tooltip>
+          <TooltipTrigger render={<div />}>
+            {isSmallScreen ? (
+              <h5
+                className={`heading-h5 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+              >
+                Fancy Retrieval
+              </h5>
+            ) : (
+              <h4
+                className={`heading-h4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4 text-(--modal-text)`}
+              >
+                Fancy Retrieval
+              </h4>
+            )}
+            <div className="mx-4 flex items-start gap-3 pt-2 pl-2">
+              <Switch
+                tabIndex={0}
+                disabled
+                checked={false}
+                onCheckedChange={(checked) => setUseMQRetrieval(checked)}
+              />
+              <div>
+                <span
+                  className={`${
+                    montserrat_paragraph.variable
+                  } font-montserratParagraph ${isSmallScreen ? 'text-xs' : ''}`}
+                >
+                  {t('Multi Query Retrieval (slow 30 second response time)')}
+                </span>
+                <p
+                  className={`${
+                    montserrat_paragraph.variable
+                  } font-montserratParagraph ${isSmallScreen ? 'text-xs' : ''}`}
+                >
+                  {t(
+                    'A LLM generates multiple queries based on your original for improved semantic search. Then every retrieved context is filtered by a smaller LLM (Mistral 7b) so that only high quality and relevant documents are included in the final GPT-4 call.',
+                  )}
+                </p>
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            align="start"
+            className={`${isSmallScreen ? 'text-xs' : 'text-sm'} bg-(--tooltip-background) text-(--tooltip) ${
               montserrat_paragraph.variable
-            } font-montserratParagraph`,
-          }}
-        >
-          <div>
-            <Title
-              className={`${montserrat_heading.variable} rounded-lg bg-[--modal-dark] p-4 font-montserratHeading text-[--modal-text]`}
-              color="white"
-              order={isSmallScreen ? 5 : 4}
-            >
-              Fancy Retrieval
-            </Title>
-            <Switch
-              tabIndex={0}
-              disabled={true}
-              // checked={useMQRetrieval}
-              checked={false}
-              color="orange"
-              className="mx-4 pl-2 pt-2"
-              classNames={{
-                label: `${
-                  montserrat_paragraph.variable
-                } font-montserratParagraph ${isSmallScreen ? 'text-xs' : ''}`,
-                description: `${
-                  montserrat_paragraph.variable
-                } font-montserratParagraph ${isSmallScreen ? 'text-xs' : ''}`,
-              }}
-              label={t('Multi Query Retrieval (slow 30 second response time)')}
-              onChange={(event) =>
-                setUseMQRetrieval(event.currentTarget.checked)
-              }
-              description={t(
-                'A LLM generates multiple queries based on your original for improved semantic search. Then every retrieved context is filtered by a smaller LLM (Mistral 7b) so that only high quality and relevant documents are included in the final GPT-4 call.',
-              )}
-            />
-          </div>
+            } font-montserratParagraph`}
+            arrowClassName="bg-(--tooltip-background) fill-(--tooltip-background)"
+          >
+            Multi-Query Retrieval is disabled for performance reasons, I&apos;m
+            working to bring it back ASAP.
+          </TooltipContent>
         </Tooltip>
         {/* <ModelParams
           selectedConversation={selectedConversation}
@@ -95,7 +104,7 @@ export const FancyRetrieval = () => {
           t={t}
         /> */}
         <div className="flex h-full flex-col space-y-4 rounded-lg p-2">
-          <Input.Description
+          <p
             className={`text-right ${isSmallScreen ? 'text-xs' : 'text-sm'} ${
               montserrat_paragraph.variable
             } font-montserratParagraph`}
@@ -114,7 +123,7 @@ export const FancyRetrieval = () => {
                 className={'mb-2 inline'}
               />
             </Link>
-          </Input.Description>
+          </p>
         </div>
       </div>
     </>

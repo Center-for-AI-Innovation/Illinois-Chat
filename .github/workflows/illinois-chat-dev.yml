@@ -34,6 +34,11 @@ jobs:
       # was linted, and check-mode: all would fail on all of them forever.
       # These commits already passed the same linters as a PR diff, so this is
       # a cheap guard against anything that lands on main outside a PR.
+      #
+      # Non-frontend paths (apps/backend, infra, etc.) are ignored repo-wide
+      # in .trunk/trunk.yaml for now, so this stays diff-only while only
+      # ever surfacing frontend issues. Drop that ignore rule once those
+      # trees are ready to be linted too.
       - name: Trunk Check (pushed commits only)
         uses: trunk-io/trunk-action@v1
         with:

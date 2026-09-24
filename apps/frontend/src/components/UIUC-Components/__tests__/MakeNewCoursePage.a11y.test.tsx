@@ -110,8 +110,12 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
   }
 })
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: { show: vi.fn() },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+  showWarningToast: vi.fn(),
+  showInfoToast: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -183,7 +187,7 @@ describe('MakeNewCoursePage - accessibility', () => {
       )
 
       // heading-order violation is pre-existing in the disabled config view
-      // (Mantine Title renders as h3, skipping h2 after the sr-only h1)
+      // (the title renders as h3, skipping h2 after the sr-only h1)
       const results = await axe(container, {
         rules: { 'heading-order': { enabled: false } },
       })

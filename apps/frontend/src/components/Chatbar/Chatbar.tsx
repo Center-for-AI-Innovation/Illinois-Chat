@@ -1,11 +1,11 @@
 import { useState, useCallback, useContext, useEffect, Suspense } from 'react'
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 import { useCreateReducer } from '@/hooks/useCreateReducer'
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_TEMPERATURE } from '@/utils/app/const'
 import { type Conversation } from '@/types/chat'
 import { OpenAIModels } from '~/utils/modelProviders/types/openai'
 
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 import { ChatFolders } from './components/ChatFolders'
 import { ChatbarSettings } from './components/ChatbarSettings'
 import { Conversations } from './components/Conversations'
@@ -21,7 +21,7 @@ import { useUpdateConversation } from '@/hooks/queries/useUpdateConversation'
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { LoadingSpinner } from '../UIUC-Components/LoadingSpinner'
-import { useDebouncedState } from '@mantine/hooks'
+import { useDebounce } from '~/hooks/useDebounce'
 import posthog from 'posthog-js'
 import { saveConversationToServer } from '@/hooks/__internal__/conversation'
 
@@ -60,10 +60,10 @@ export const Chatbar = ({
     dispatch: chatDispatch,
   } = chatBarContextValue
 
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useDebouncedState(
-    searchTerm,
-    500,
-  )
+  // Only feeds the debounce once current_email/courseName are known (matches
+  // the previous useDebouncedState + gated setter behavior below).
+  const [gatedSearchTerm, setGatedSearchTerm] = useState(searchTerm)
+  const debouncedSearchTerm = useDebounce(gatedSearchTerm, 500)
 
   const queryClient = useQueryClient()
   const deleteConversationMutation = useDeleteConversation(
@@ -133,7 +133,7 @@ export const Chatbar = ({
     if (!current_email || !courseName) {
       return
     }
-    setDebouncedSearchTerm(searchTerm)
+    setGatedSearchTerm(searchTerm)
   }, [searchTerm, current_email, courseName])
 
   async function updateConversations(conversationHistory: Conversation[]) {

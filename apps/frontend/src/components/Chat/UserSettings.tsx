@@ -1,7 +1,19 @@
-import { useContext, useEffect } from 'react'
-import { Divider, Flex, Modal, Title, createStyles, Tabs } from '@mantine/core'
-import HomeContext from '~/pages/api/home/home.context'
-import { useDisclosure, useMediaQuery } from '@mantine/hooks'
+import { useCallback, useContext, useEffect, useState } from 'react'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/shadcn/ui/tabs'
+import { Separator } from '@/components/shadcn/ui/separator'
+import HomeContext from '~/components/home/home.context'
+import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import React from 'react'
 import { ModelSelect } from './ModelSelect'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
@@ -11,49 +23,9 @@ import { ToolsItem } from './ToolsItem'
 import { ModelParams } from './ModelParams'
 import { useTranslation } from 'react-i18next'
 import { prebuiltAppConfig } from '~/utils/modelProviders/ConfigWebLLM'
-import * as webllm from '@mlc-ai/web-llm'
 import { type WebllmModel, webLLMModels } from '~/utils/modelProviders/WebLLM'
+import { XIcon } from 'lucide-react'
 
-const useStyles = createStyles((theme) => ({
-  modalContent: {
-    height: '95%',
-    width: '90%',
-    borderRadius: '.25rem',
-    color: 'var(--modal-text)',
-    backgroundColor: 'var(--modal)',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  modalHeader: {
-    width: '100%',
-    borderRadius: '.5rem',
-    backgroundColor: 'var(--modal-dark)',
-  },
-  title: {
-    fontFamily: montserrat_heading.variable,
-    fontWeight: 'bold',
-  },
-  tab: {
-    fontFamily: montserrat_paragraph.variable,
-    '&:hover': {
-      color: 'white',
-      backgroundColor: 'var(--modal-active)',
-    },
-    '&[data-active="true"]': {
-      backgroundColor: 'var(--modal-active)',
-      '&:hover': {
-        color: 'white',
-        backgroundColor: 'var(--modal-active)',
-      },
-    },
-    whiteSpace: 'normal',
-  },
-  divider: {
-    alignSelf: 'center',
-    margin: '8px 0',
-  },
-}))
 export const modelCached: WebllmModel[] = []
 
 const appConfig = prebuiltAppConfig
@@ -73,10 +45,12 @@ export const UserSettings = () => {
   } = useContext(HomeContext)
 
   const { t } = useTranslation('chat')
-  const { classes } = useStyles()
-  const [opened, { open, close }] = useDisclosure(false)
+  const [opened, setOpened] = useState(false)
+  const open = useCallback(() => setOpened(true), [])
+  const close = useCallback(() => setOpened(false), [])
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const loadModelCache = async () => {
+    const webllm = await import('@mlc-ai/web-llm')
     for (const model of webLLMModels) {
       const theCachedModel = await webllm.hasModelInCache(model.name, appConfig)
       if (theCachedModel) {
@@ -104,96 +78,86 @@ export const UserSettings = () => {
     homeDispatch({ field: 'showModelSettings', value: false })
   }
 
+  const tabTriggerClass = `${isSmallScreen ? 'px-2 text-xs' : 'px-4 text-sm'} py-2.5 ${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-text) justify-start data-active:bg-(--modal-active) hover:bg-(--modal-active) hover:text-white data-active:text-white whitespace-normal`
+
   return (
-    <Modal.Root opened={opened} onClose={handleClose} centered size={'800px'}>
-      <Modal.Overlay
-        style={{ width: '100%', color: 'var(--background-faded)' }}
-      />
-      <Modal.Content
+    <Dialog open={opened} onOpenChange={(next) => !next && handleClose()}>
+      <DialogContent
         data-settings-modal
-        className={`${classes.modalContent} ${isSmallScreen ? 'p-2' : 'p-4'} overflow-hidden bg-[--modal] text-[--modal-text] md:rounded-lg`}
+        showCloseButton={false}
+        className={`flex h-[95%] w-[90%] max-w-[1000px] min-w-0 flex-col gap-0 overflow-hidden rounded-[.25rem] bg-(--modal) text-(--modal-text) md:rounded-lg lg:min-w-[800px] ${isSmallScreen ? 'p-2' : 'p-4'}`}
       >
-        <Modal.Header className={classes.modalHeader}>
-          <Modal.Title
-            className={`${classes.title} ${montserrat_heading.variable} font-montserratHeading`}
+        <div className="flex w-full items-center justify-between rounded-lg bg-(--modal-dark) p-4">
+          <DialogTitle
+            className={`text-base font-bold ${montserrat_heading.variable} font-montserratHeading`}
           >
             Settings
-          </Modal.Title>
-          <Modal.CloseButton
+          </DialogTitle>
+          <DialogClose
             onClick={handleClose}
             aria-label="Close settings"
-            className="text-[--foreground-faded] hover:text-[--foreground]"
-          />
-        </Modal.Header>
-        <Modal.Body
-          data-settings-modal-body
-          className="mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
-          p={isSmallScreen ? 'xs' : 'md'}
-        >
-          <Tabs
-            orientation="vertical"
-            defaultValue="model"
-            variant="pills"
-            styles={{
-              tabsList: {
-                width: isSmallScreen ? '25%' : 'auto',
-              },
-            }}
+            className="text-(--foreground-faded) hover:text-(--foreground)"
           >
-            <Tabs.List mt={'xl'} ml="xs">
-              <Tabs.Tab
-                className={`${classes.tab} ${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-[--modal-text]`}
-                value="model"
+            <XIcon className="size-4" aria-hidden="true" />
+          </DialogClose>
+        </div>
+        <div
+          data-settings-modal-body
+          className={`mt-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto ${isSmallScreen ? 'p-2' : 'p-4'}`}
+        >
+          <Tabs orientation="vertical" defaultValue="model">
+            <div className="flex w-full">
+              <TabsList
+                className={`mt-6 ml-2.5 h-fit flex-col bg-transparent ${isSmallScreen ? 'w-1/4' : 'w-auto'}`}
               >
-                Model
-              </Tabs.Tab>
-              <Tabs.Tab
-                className={`${classes.tab} ${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-[--modal-text]`}
-                value="documentGroups"
-              >
-                Document Groups
-              </Tabs.Tab>
-              <Tabs.Tab
-                className={`${classes.tab} ${isSmallScreen ? 'px-2 text-xs' : 'text-md'} ${montserrat_paragraph.variable} font-montserratParagraph text-[--modal-text]`}
-                value="tools"
-              >
-                Tools
-              </Tabs.Tab>
-            </Tabs.List>
+                <TabsTrigger value="model" className={tabTriggerClass}>
+                  Model
+                </TabsTrigger>
+                <TabsTrigger value="documentGroups" className={tabTriggerClass}>
+                  Document Groups
+                </TabsTrigger>
+                <TabsTrigger value="tools" className={tabTriggerClass}>
+                  Tools
+                </TabsTrigger>
+              </TabsList>
 
-            <Divider ml={'sm'} orientation="vertical" />
+              <Separator
+                orientation="vertical"
+                className="ml-3 bg-(--modal-border)"
+              />
 
-            <Tabs.Panel value="model" pt="xs">
-              <Flex direction="column">
-                <ModelSelect />
-                <Divider
-                  className={classes.divider}
-                  w={isSmallScreen ? '70%' : '90%'}
-                />
-                <ModelParams
-                  selectedConversation={selectedConversation}
-                  prompts={prompts}
-                  handleUpdateConversation={handleUpdateConversation}
-                  t={t}
-                />
-                <Divider
-                  className={classes.divider}
-                  w={isSmallScreen ? '70%' : '90%'}
-                />
-                <FancyRetrieval />
-              </Flex>
-            </Tabs.Panel>
+              <div className="flex-1">
+                <TabsContent value="model" className="pt-2">
+                  <div className="flex flex-col">
+                    <ModelSelect />
+                    <Separator
+                      className={`my-2 self-center bg-(--modal-border) ${isSmallScreen ? 'w-[70%]' : 'w-[90%]'}`}
+                    />
+                    <ModelParams
+                      selectedConversation={selectedConversation}
+                      prompts={prompts}
+                      handleUpdateConversation={handleUpdateConversation}
+                      t={t}
+                    />
+                    <Separator
+                      className={`my-2 self-center bg-(--modal-border) ${isSmallScreen ? 'w-[70%]' : 'w-[90%]'}`}
+                    />
+                    <FancyRetrieval />
+                  </div>
+                </TabsContent>
 
-            <Tabs.Panel value="documentGroups" pt="xs">
-              <DocumentGroupsItem />
-            </Tabs.Panel>
+                <TabsContent value="documentGroups" className="pt-2">
+                  <DocumentGroupsItem />
+                </TabsContent>
 
-            <Tabs.Panel value="tools" pt="xs">
-              <ToolsItem />
-            </Tabs.Panel>
+                <TabsContent value="tools" className="pt-2">
+                  <ToolsItem />
+                </TabsContent>
+              </div>
+            </div>
           </Tabs>
-        </Modal.Body>
-      </Modal.Content>
-    </Modal.Root>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

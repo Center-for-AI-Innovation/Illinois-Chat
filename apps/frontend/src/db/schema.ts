@@ -1,5 +1,6 @@
 // Generated schema.ts based on PostgreSQL database
 import { relations, sql } from 'drizzle-orm'
+import type { SimApiKeyField } from '~/types/sim'
 import {
   bigint,
   bigserial,
@@ -136,12 +137,6 @@ export const fileUploads = pgTable('file_uploads', {
   url: text('url'),
 })
 
-// n8n_workflows table
-export const n8nWorkflows = pgTable('n8n_workflows', {
-  latest_workflow_id: serial('latest_workflow_id').notNull(),
-  is_locked: boolean('is_locked').notNull(),
-})
-
 // usage_metrics table
 export const usageMetrics = pgTable('usage_metrics', {
   id: bigint('id', { mode: 'number' }).notNull(),
@@ -244,7 +239,6 @@ export const projects = pgTable('projects', {
   course_name: varchar('course_name'),
   doc_map_id: varchar('doc_map_id'),
   convo_map_id: varchar('convo_map_id'),
-  n8n_api_key: text('n8n_api_key'),
   last_uploaded_doc_id: bigint('last_uploaded_doc_id', { mode: 'number' }),
   last_uploaded_convo_id: bigint('last_uploaded_convo_id', { mode: 'number' }),
   subscribed: bigint('subscribed', { mode: 'number' }),
@@ -252,6 +246,10 @@ export const projects = pgTable('projects', {
   metadata_schema: jsonb('metadata_schema'),
   conversation_map_index: text('conversation_map_index'),
   document_map_index: text('document_map_index'),
+  // Encrypted envelope (see SimApiKeyField); never a plaintext key.
+  sim_api_key: jsonb('sim_api_key').$type<SimApiKeyField>(),
+  sim_base_url: text('sim_base_url'),
+  sim_workspace_id: text('sim_workspace_id'),
 })
 
 // CourseNames table
@@ -337,8 +335,12 @@ export const docGroups = pgTable(
 export const documentsDocGroups = pgTable(
   'documents_doc_groups',
   {
-    document_id: bigint('document_id', { mode: 'number' }).notNull(),
-    doc_group_id: bigint('doc_group_id', { mode: 'number' }).notNull(),
+    document_id: bigint('document_id', { mode: 'number' })
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    doc_group_id: bigint('doc_group_id', { mode: 'number' })
+      .notNull()
+      .references(() => docGroups.id, { onDelete: 'cascade' }),
     created_at: timestamp('created_at').defaultNow(),
   },
   (table) => {

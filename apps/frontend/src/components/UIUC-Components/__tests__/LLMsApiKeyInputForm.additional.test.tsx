@@ -4,6 +4,38 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
+// The default-model picker is a Base UI combobox (not a native <select>):
+// open it, then click the option by its visible label.
+async function chooseModel(
+  user: ReturnType<typeof userEvent.setup>,
+  optionLabel: string,
+  comboboxIndex = 0,
+) {
+  const comboboxes = screen.getAllByLabelText('Select a model')
+  await user.click(comboboxes[comboboxIndex]!)
+  await user.click(await screen.findByRole('option', { name: optionLabel }))
+}
+
+// Opens the combobox and reads back the visible option values (grouped
+// listbox rendering means options aren't nested inside the input element, so
+// this can't use `within(select)` the way a native <select> mock could).
+// Returns [] once the popup has settled with no options (e.g. "Nothing
+// found"), rather than timing out like `findAllByRole` would.
+async function getVisibleModelOptionValues(
+  user: ReturnType<typeof userEvent.setup>,
+  comboboxIndex = 0,
+) {
+  const comboboxes = screen.getAllByLabelText('Select a model')
+  await user.click(comboboxes[comboboxIndex]!)
+  await waitFor(() => {
+    expect(
+      screen.queryAllByRole('option').length > 0 ||
+        screen.queryByText('Nothing found'),
+    ).toBeTruthy()
+  })
+  return screen.queryAllByRole('option').map((o) => o.textContent)
+}
+
 // ---------------------------------------------------------------------------
 // Hoisted mocks – must be declared before any vi.mock() that references them
 // ---------------------------------------------------------------------------
@@ -29,37 +61,9 @@ vi.mock('@/hooks/queries/useUpdateProjectLLMProviders', () => ({
   }),
 }))
 
-vi.mock('@mantine/notifications', () => ({
-  notifications: {
-    show: vi.fn(),
-    update: vi.fn(),
-    hide: vi.fn(),
-    clean: vi.fn(),
-  },
+vi.mock('~/utils/toastUtils', () => ({
+  showToast: vi.fn(),
 }))
-
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    Select: (props: any) => (
-      <label>
-        <span>{props.placeholder ?? 'Select'}</span>
-        <select
-          aria-label={props.placeholder ?? 'Select'}
-          value={props.value ?? ''}
-          onChange={(e) => props.onChange?.(e.target.value)}
-        >
-          {(props.data ?? []).map((opt: { value: string; label: string }) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </label>
-    ),
-  }
-})
 
 vi.mock('~/components/Layout/SettingsLayout', () => ({
   __esModule: true,
@@ -230,23 +234,22 @@ describe('findDefaultModel', () => {
 // showConfirmationToast
 // ===========================================================================
 describe('showConfirmationToast', () => {
-  it('calls notifications.show with success styling by default', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+  it('calls showToast with the success type by default', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({ title: 'Success', message: 'Saved!' })
 
-    expect(notifications.show).toHaveBeenCalledTimes(1)
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
+    expect(showToast).toHaveBeenCalledTimes(1)
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
     expect(call.title).toBe('Success')
     expect(call.message).toBe('Saved!')
-    expect(call.color).toBe('green')
+    expect(call.type).toBe('success')
   })
 
-  it('calls notifications.show with error styling when isError=true', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+  it('calls showToast with the error type when isError=true', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({
       title: 'Error',
@@ -254,14 +257,13 @@ describe('showConfirmationToast', () => {
       isError: true,
     })
 
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
-    expect(call.color).toBe('red')
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+    expect(call.type).toBe('error')
   })
 
   it('respects custom autoClose value', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({
       title: 'Quick',
@@ -269,8 +271,7 @@ describe('showConfirmationToast', () => {
       autoClose: 1000,
     })
 
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
     expect(call.autoClose).toBe(1000)
   })
 })
@@ -282,12 +283,12 @@ describe('ModelItem', () => {
   it('renders model label and provider logo', () => {
     const { container } = renderWithProviders(
       <ModelItem
+        value="gpt-4o"
         label="GPT-4o"
         modelId="gpt-4o"
         selectedModelId="gpt-4o"
         modelType="OpenAI"
         vram_required_MB={0}
-        loadingModelId={null}
       />,
     )
 
@@ -297,19 +298,22 @@ describe('ModelItem', () => {
     expect(img).toHaveAttribute('alt', 'OpenAI logo')
   })
 
-  it('renders without crashing when loadingModelId is set', () => {
+  it('renders a country-of-concern warning for a flagged model', () => {
     renderWithProviders(
       <ModelItem
-        label="Claude 3"
-        modelId="claude-3"
+        value="deepseek-chat"
+        label="DeepSeek Chat"
+        modelId="deepseek-chat"
         selectedModelId={undefined}
-        modelType="Anthropic"
+        modelType="OpenAICompatible"
         vram_required_MB={0}
-        loadingModelId="claude-3"
       />,
     )
 
-    expect(screen.getByText('Claude 3')).toBeInTheDocument()
+    expect(screen.getByText('DeepSeek Chat')).toBeInTheDocument()
+    expect(
+      screen.getByLabelText(/Country of concern warning/i),
+    ).toBeInTheDocument()
   })
 })
 
@@ -574,14 +578,12 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
     )
 
     // Select a different model
-    await user.selectOptions(
-      screen.getByLabelText('Select a model'),
-      'claude-3',
-    )
+    await chooseModel(user, 'Claude 3')
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalled())
   })
 
-  it('filters out disabled providers from the dropdown', () => {
+  it('filters out disabled providers from the dropdown', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -616,15 +618,14 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).not.toContain('claude-3')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).not.toContain('Claude 3')
   })
 
-  it('filters out disabled models within an enabled provider', () => {
+  it('filters out disabled models within an enabled provider', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -652,12 +653,10 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).not.toContain('gpt-3.5')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).not.toContain('GPT-3.5')
   })
 
   it('does not render dropdown when no providers are loaded', () => {
@@ -678,8 +677,8 @@ describe('LLMsApiKeyInputForm – default model selection', () => {
 describe('LLMsApiKeyInputForm – form submission callbacks', () => {
   it('shows success toast on mutation success', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     setUpGlobals()
     mocks.query.data = makeProviders({
@@ -709,13 +708,13 @@ describe('LLMsApiKeyInputForm – form submission callbacks', () => {
     )
 
     // Trigger form submit by selecting a different default model
-    await user.selectOptions(screen.getByLabelText('Select a model'), 'gpt-4o')
+    await chooseModel(user, 'GPT-4o')
 
     await waitFor(() => {
-      expect(notifications.show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Updated LLM providers',
-          color: 'green',
+          type: 'success',
         }),
       )
     })
@@ -723,8 +722,8 @@ describe('LLMsApiKeyInputForm – form submission callbacks', () => {
 
   it('shows error toast on mutation failure', async () => {
     const user = userEvent.setup()
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     setUpGlobals()
     mocks.query.data = makeProviders({
@@ -757,13 +756,13 @@ describe('LLMsApiKeyInputForm – form submission callbacks', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    await user.selectOptions(screen.getByLabelText('Select a model'), 'gpt-4o')
+    await chooseModel(user, 'GPT-4o')
 
     await waitFor(() => {
-      expect(notifications.show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error updating LLM providers',
-          color: 'red',
+          type: 'error',
         }),
       )
     })
@@ -774,9 +773,9 @@ describe('LLMsApiKeyInputForm – form submission callbacks', () => {
 // LLMsApiKeyInputForm – error state
 // ===========================================================================
 describe('LLMsApiKeyInputForm – error loading providers', () => {
-  it('shows error notification when providers fail to load', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+  it('shows error toast when providers fail to load', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     setUpGlobals()
     mocks.query.data = null
@@ -787,10 +786,10 @@ describe('LLMsApiKeyInputForm – error loading providers', () => {
     )
 
     await waitFor(() => {
-      expect(notifications.show).toHaveBeenCalledWith(
+      expect(showToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Error',
-          color: 'red',
+          type: 'error',
         }),
       )
     })
@@ -819,7 +818,8 @@ describe('LLMsApiKeyInputForm – loading state', () => {
 // LLMsApiKeyInputForm – multiple enabled providers
 // ===========================================================================
 describe('LLMsApiKeyInputForm – multiple providers', () => {
-  it('shows models from multiple enabled providers in dropdown', () => {
+  it('shows models from multiple enabled providers in dropdown', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -867,16 +867,15 @@ describe('LLMsApiKeyInputForm – multiple providers', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).toContain('claude-3')
-    expect(optionValues).toContain('gemini-pro')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).toContain('Claude 3')
+    expect(optionLabels).toContain('Gemini Pro')
   })
 
-  it('skips providers with enabled=true but no enabled models', () => {
+  it('skips providers with enabled=true but no enabled models', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders({
       OpenAI: {
@@ -912,12 +911,10 @@ describe('LLMsApiKeyInputForm – multiple providers', () => {
       (<LLMsApiKeyInputForm projectName="CS101" isEmbedded={true} />) as any,
     )
 
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).getAllByRole('option')
-    const optionValues = options.map((o) => o.getAttribute('value'))
+    const optionLabels = await getVisibleModelOptionValues(user)
 
-    expect(optionValues).toContain('gpt-4o')
-    expect(optionValues).not.toContain('claude-3')
+    expect(optionLabels).toContain('GPT-4o')
+    expect(optionLabels).not.toContain('Claude 3')
   })
 })
 
@@ -1003,7 +1000,8 @@ describe('LLMsApiKeyInputForm – edge cases', () => {
     expect(screen.getByText('Closed source LLMs')).toBeInTheDocument()
   })
 
-  it('handles all providers disabled with empty dropdown', () => {
+  it('handles all providers disabled with empty dropdown', async () => {
+    const user = userEvent.setup()
     setUpGlobals()
     mocks.query.data = makeProviders() // all disabled by default
 
@@ -1012,10 +1010,9 @@ describe('LLMsApiKeyInputForm – edge cases', () => {
     )
 
     // The dropdown renders but has no model options
-    const select = screen.getByLabelText('Select a model')
-    const options = within(select).queryAllByRole('option')
+    const optionLabels = await getVisibleModelOptionValues(user)
     // No options should be present when all providers are disabled
-    expect(options).toHaveLength(0)
+    expect(optionLabels).toHaveLength(0)
   })
 })
 
@@ -1052,48 +1049,49 @@ describe('LLMsApiKeyInputForm – full page form submit', () => {
     expect(selects.length).toBeGreaterThanOrEqual(1)
 
     // Select a model from the first dropdown to trigger submission
-    await user.selectOptions(selects[0]!, 'gpt-4o')
+    await chooseModel(user, 'GPT-4o', 0)
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalled())
   })
 })
 
 // ===========================================================================
-// showConfirmationToast – onOpen / onClose callbacks
+// showConfirmationToast – toast options
 // ===========================================================================
-describe('showConfirmationToast – callbacks and styles', () => {
-  it('passes onOpen and onClose callbacks to notifications.show', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+describe('showConfirmationToast – toast options', () => {
+  it('passes only the supported toast options to showToast', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({ title: 'Test', message: 'msg' })
 
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
+    expect(showToast).toHaveBeenCalledWith({
+      title: 'Test',
+      message: 'msg',
+      type: 'success',
+      autoClose: 5000,
+    })
 
-    // onOpen and onClose should be functions
-    expect(typeof call.onOpen).toBe('function')
-    expect(typeof call.onClose).toBe('function')
-
-    // Calling them should not throw
-    expect(() => call.onOpen()).not.toThrow()
-    expect(() => call.onClose()).not.toThrow()
+    // Legacy options must not leak through
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+    expect(call.onOpen).toBeUndefined()
+    expect(call.onClose).toBeUndefined()
+    expect(call.styles).toBeUndefined()
   })
 
-  it('uses green color and non-error icon for success toast', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+  it('uses the success type and no custom icon for success toast', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({ title: 'OK', message: 'done' })
 
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
-    expect(call.color).toBe('green')
-    expect(call.styles.root.borderColor).not.toBe('#E53935')
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+    expect(call.type).toBe('success')
+    expect(call.icon).toBeUndefined()
   })
 
-  it('uses red color and error icon for error toast', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+  it('uses the error type and no custom icon for error toast', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({
       title: 'Fail',
@@ -1101,21 +1099,19 @@ describe('showConfirmationToast – callbacks and styles', () => {
       isError: true,
     })
 
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
-    expect(call.color).toBe('red')
-    expect(call.styles.root.borderColor).toBe('#E53935')
-    expect(call.styles.icon.color).toBe('#E53935')
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+    expect(call.type).toBe('error')
+    expect(call.message).toBe('error')
+    expect(call.icon).toBeUndefined()
   })
 
   it('uses default autoClose of 5000ms', async () => {
-    const { notifications } = await import('@mantine/notifications')
-    ;(notifications.show as ReturnType<typeof vi.fn>).mockClear()
+    const { showToast } = await import('~/utils/toastUtils')
+    ;(showToast as ReturnType<typeof vi.fn>).mockClear()
 
     showConfirmationToast({ title: 'Default', message: 'auto' })
 
-    const call = (notifications.show as ReturnType<typeof vi.fn>).mock
-      .calls[0]![0]
+    const call = (showToast as ReturnType<typeof vi.fn>).mock.calls[0]![0]
     expect(call.autoClose).toBe(5000)
   })
 })

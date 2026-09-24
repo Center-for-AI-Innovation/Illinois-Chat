@@ -1,9 +1,23 @@
-import { Switch, Table, TextInput, Title, Text, Tooltip } from '@mantine/core'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/ui/table'
+import { Input } from '@/components/shadcn/ui/input'
+import { Switch } from '@/components/shadcn/ui/switch'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { IconSearch } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useContext, useMemo, useState } from 'react'
-import HomeContext from '~/pages/api/home/home.context'
-import { useMediaQuery } from '@mantine/hooks'
+import HomeContext from '~/components/home/home.context'
+import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 
 export const DocumentGroupsItem = ({}) => {
   const {
@@ -52,61 +66,56 @@ export const DocumentGroupsItem = ({}) => {
   return (
     <>
       <div
-        className="flex h-full w-[100%] flex-col space-y-4 rounded-lg p-3"
+        className="flex h-full w-full flex-col space-y-4 rounded-lg p-3"
         style={{ position: 'relative', zIndex: 100 }}
       >
         <div>
           <div className="flex flex-col"></div>
-          <Title
-            className={`px-4 pt-4 ${montserrat_heading.variable} rounded-lg bg-[--modal-dark] p-4 font-montserratHeading md:rounded-lg`}
-            order={isSmallScreen ? 5 : 3}
-          >
-            Document Groups
-          </Title>
+          {isSmallScreen ? (
+            <h5
+              className={`heading-h5 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4`}
+            >
+              Document Groups
+            </h5>
+          ) : (
+            <h3
+              className={`heading-h3 px-4 pt-4 ${montserrat_heading.variable} font-montserratHeading rounded-lg bg-(--modal-dark) p-4`}
+            >
+              Document Groups
+            </h3>
+          )}
           <div className="flex flex-col items-center justify-center rounded-lg">
-            <TextInput
-              type="search"
-              placeholder="Search by Document Group"
-              aria-label="Search by Document Group"
-              my="sm"
-              radius="md"
-              icon={
-                <IconSearch size={isSmallScreen ? 15 : 20} aria-hidden="true" />
-              }
-              value={documentGroupSearch}
-              onChange={handleDocumentGroupSearchChange}
-              w={'90%'}
-              size={isSmallScreen ? 'xs' : 'sm'}
-              styles={{
-                input: {
-                  color: 'var(--foreground)',
-                  backgroundColor: 'var(--background-faded)',
-                  borderColor: 'var(--background-dark)',
-                  '&:focus': {
-                    borderColor: 'var(--background-darker)',
-                  },
-                },
-              }}
-            />
+            <div className="relative my-3 w-[90%]">
+              <IconSearch
+                size={isSmallScreen ? 15 : 20}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-(--foreground-faded)"
+              />
+              <Input
+                type="search"
+                placeholder="Search by Document Group"
+                aria-label="Search by Document Group"
+                value={documentGroupSearch}
+                onChange={handleDocumentGroupSearchChange}
+                className={`rounded-lg border-(--background-dark) bg-(--background-faded) pl-9 text-(--foreground) focus-visible:border-(--background-darker) ${
+                  isSmallScreen ? 'h-7 text-xs' : 'h-8 text-sm'
+                }`}
+              />
+            </div>
 
-            {/* unable to use this until v7 of mantine since we can't control the hover color              highlightOnHover */}
             <Table
               aria-label="Document groups configuration"
-              variant="striped"
-              className="text-[--modal-text]"
-              style={{
-                width: '90%',
-              }}
+              className="w-[90%] text-(--modal-text)"
             >
-              <thead>
-                <tr
+              <TableHeader>
+                <TableRow
                   className={`${
                     montserrat_paragraph.variable
                   } font-montserratParagraph ${
                     isSmallScreen ? 'text-xs' : 'text-sm'
                   }`}
                 >
-                  <th
+                  <TableHead
                     style={{
                       width: '60%',
                       wordWrap: 'break-word',
@@ -114,8 +123,8 @@ export const DocumentGroupsItem = ({}) => {
                     }}
                   >
                     Document Group
-                  </th>
-                  <th
+                  </TableHead>
+                  <TableHead
                     style={{
                       width: '40%',
                       wordWrap: 'break-word',
@@ -126,19 +135,19 @@ export const DocumentGroupsItem = ({}) => {
                     <span className="flex flex-col items-center justify-center">
                       <span className="self-center">Enabled</span>
                     </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="[&>tr:nth-child(even)]:bg-(--background-faded)">
                 {filteredDocumentGroups.map((doc_group_obj, index) => (
-                  <tr
+                  <TableRow
                     key={doc_group_obj.id ?? index}
                     className={
                       doc_group_obj.adminDisabled ? 'opacity-[0.72]' : undefined
                     }
                   >
-                    <td style={{ wordWrap: 'break-word' }}>
-                      <Text
+                    <TableCell style={{ wordWrap: 'break-word' }}>
+                      <span
                         className={`${
                           montserrat_paragraph.variable
                         } font-montserratParagraph ${
@@ -146,63 +155,67 @@ export const DocumentGroupsItem = ({}) => {
                         }`}
                       >
                         {doc_group_obj.name}
-                      </Text>
-                    </td>
-                    <td
+                      </span>
+                    </TableCell>
+                    <TableCell
                       style={{
                         display: 'flex',
                         justifyContent: 'center',
                         wordWrap: 'break-word',
                       }}
                     >
-                      <Tooltip
-                        label="Admin has disabled that doc group"
-                        disabled={!doc_group_obj.adminDisabled}
-                        withinPortal
-                      >
+                      {doc_group_obj.adminDisabled ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={<span style={{ display: 'inline-flex' }} />}
+                          >
+                            <Switch
+                              checked={doc_group_obj.checked}
+                              disabled={doc_group_obj.adminDisabled}
+                              aria-label={`${doc_group_obj.name}: Admin has disabled that doc group`}
+                              onCheckedChange={() =>
+                                handleToggleChecked(doc_group_obj.id)
+                              }
+                              size="sm"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Admin has disabled that doc group
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
                         <span
                           style={{ display: 'inline-flex' }}
-                          className={
-                            doc_group_obj.adminDisabled
-                              ? undefined
-                              : 'cursor-pointer'
-                          }
+                          className="cursor-pointer"
                         >
                           <Switch
                             checked={doc_group_obj.checked}
-                            disabled={doc_group_obj.adminDisabled}
-                            aria-label={
-                              doc_group_obj.adminDisabled
-                                ? `${doc_group_obj.name}: Admin has disabled that doc group`
-                                : `${doc_group_obj.name}: toggle document group`
-                            }
-                            onChange={() =>
+                            aria-label={`${doc_group_obj.name}: toggle document group`}
+                            onCheckedChange={() =>
                               handleToggleChecked(doc_group_obj.id)
                             }
-                            styles={{
-                              track: {
-                                backgroundColor: doc_group_obj.checked
-                                  ? 'var(--dashboard-button) !important'
-                                  : 'var(--dashboard-background-dark)',
-                                borderColor: doc_group_obj.checked
-                                  ? 'var(--dashboard-button) !important'
-                                  : 'var(--dashboard-background-dark)',
-                              },
-                            }}
+                            size="sm"
+                            className={
+                              doc_group_obj.checked
+                                ? 'data-checked:border-(--dashboard-button) data-checked:bg-(--dashboard-button)'
+                                : 'data-unchecked:border-(--dashboard-background-dark) data-unchecked:bg-(--dashboard-background-dark)'
+                            }
                           />
                         </span>
-                      </Tooltip>
-                    </td>
-                  </tr>
+                      )}
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {filteredDocumentGroups.length === 0 && (
-                  <tr>
-                    <td colSpan={4}>
-                      <Text align="center">No document groups found</Text>
-                    </td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={4}>
+                      <span className="block text-center">
+                        No document groups found
+                      </span>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
+              </TableBody>
             </Table>
           </div>
         </div>

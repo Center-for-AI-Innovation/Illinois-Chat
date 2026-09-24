@@ -1,7 +1,7 @@
 import { IconCheck, IconTrash, IconX } from '@tabler/icons-react'
 import { type FC, useState } from 'react'
 
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 
 import { SidebarButton } from '@/components/Sidebar/SidebarButton'
 
@@ -29,7 +29,7 @@ export const ClearConversations: FC<Props> = ({ onClearConversations }) => {
 
       <div className="flex w-[40px]">
         <button
-          className="ml-auto mr-1 border-none bg-transparent p-0 text-neutral-400 hover:text-neutral-100"
+          className="mr-1 ml-auto border-none bg-transparent p-0 text-neutral-400 hover:text-neutral-100"
           aria-label="Confirm clear conversations"
           onClick={(e) => {
             e.stopPropagation()

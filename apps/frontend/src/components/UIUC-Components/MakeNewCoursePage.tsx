@@ -2,17 +2,17 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import React, { useRef, useState } from 'react'
 
-import { Card, Flex, Title } from '@mantine/core'
+import { Card } from '@/components/shadcn/ui/card'
 import { Button } from '@/components/shadcn/ui/button'
 import { LoaderCircle } from 'lucide-react'
-import { useDebouncedValue } from '@mantine/hooks'
-import { notifications } from '@mantine/notifications'
+import { useDebounce } from '~/hooks/useDebounce'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   callSetCourseMetadata,
   createProject,
   fetchCourseMetadata,
 } from '~/utils/apiUtils'
+import { showToast } from '~/utils/toastUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type ChatbotProjectType, type ChatbotTag } from '~/types/chatbotTags'
 import { ChatbotsGlobalNav } from './chatbots-hub/ChatbotsGlobalNav'
@@ -27,32 +27,7 @@ import StepSuccess from './MakeNewCoursePageSteps/StepSuccess'
 import { useAuth } from 'react-oidc-context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from './GlobalFooter'
-
-/**
- * Build a safe relative URL for navigating to a project's chat page.
- * Guards against open-redirect attacks by ensuring the project name
- * is converted into a single, safe path segment and cannot influence
- * the host, protocol, or parent path.
- */
-const buildProjectChatPath = (name: string): string => {
-  // Normalize to string and trim whitespace
-  const raw = String(name || '').trim()
-
-  // Allow only URL-safe characters for a single path segment:
-  // letters, numbers, dash, underscore. Replace others with '-'.
-  let safeSegment = raw.replace(/[^a-zA-Z0-9_-]+/g, '-')
-
-  // Remove any leading dots or slashes to avoid path traversal or
-  // protocol-relative URL patterns like "../" or "//evil.com".
-  safeSegment = safeSegment.replace(/^[./\\]+/, '')
-
-  // Fallback to a safe placeholder if nothing remains
-  if (!safeSegment) {
-    return '/chat'
-  }
-
-  return `/${safeSegment}/chat`
-}
+import { buildProjectChatPath, isValidProjectName } from '~/utils/projectName'
 
 const MakeNewCoursePage = ({
   project_name,
@@ -86,7 +61,7 @@ const MakeNewCoursePage = ({
   const [currentStep, setStep] = useState(0)
 
   // Debounce project name input to avoid excessive API calls
-  const [debouncedProjectName] = useDebouncedValue(projectName, 1000)
+  const debouncedProjectName = useDebounce(projectName, 1000)
 
   // Check project name availability using React Query
   const { data: courseExists, isFetching: isCheckingAvailability } =
@@ -106,7 +81,10 @@ const MakeNewCoursePage = ({
         }
         return response.json() as Promise<boolean>
       },
-      enabled: debouncedProjectName.length > 0 && is_new_course,
+      enabled:
+        debouncedProjectName.length > 0 &&
+        is_new_course &&
+        isValidProjectName(debouncedProjectName),
       retry: 1,
     })
 
@@ -167,6 +145,7 @@ const MakeNewCoursePage = ({
     <StepUpload
       key="upload"
       project_name={projectName}
+      uploadFiles={uploadFiles}
       setUploadFiles={handleSetUploadFiles}
       courseMetadata={
         queryClient.getQueryData(['courseMetadata', projectName]) as
@@ -266,31 +245,13 @@ const MakeNewCoursePage = ({
             'Error fetching course metadata after creation:',
             metadataError,
           )
-          const fallbackMetadata: CourseMetadata = {
-            is_frozen: false,
-            is_private: true,
-            course_owner: current_user_email,
-            course_admins: [],
-            approved_emails_list: [],
-            example_questions: undefined,
-            banner_image_s3: undefined,
-            course_intro_message: undefined,
-            system_prompt: undefined,
-            openai_api_key: undefined,
-            disabled_models: undefined,
-            project_description,
-            documentsOnly: undefined,
-            disableCitations: undefined,
-            guidedLearning: undefined,
-            systemPromptOnly: undefined,
-            vector_search_rewrite_disabled: undefined,
-            allow_logged_in_users: undefined,
-            tags: initialTags,
-          }
-          queryClient.setQueryData(
-            ['courseMetadata', project_name],
-            fallbackMetadata,
-          )
+          showToast({
+            title: 'Project created, but its settings could not be loaded',
+            message:
+              'The project was created successfully, but its settings could not be fetched. Refresh the page if upload options look wrong.',
+            type: 'warning',
+            autoClose: 8000,
+          })
         }
       }
 
@@ -308,12 +269,12 @@ const MakeNewCoursePage = ({
       const err = error as Error & { status?: number; error?: string }
       if (err.status === 409) {
         // Project name already exists - race condition caught by server
-        notifications.show({
+        showToast({
           title: 'Project name already taken',
           message:
             err.message ||
             `A project with the name "${project_name}" already exists. Please choose a different name.`,
-          color: 'red',
+          type: 'error',
           autoClose: 5000,
         })
         // Invalidate the query to refresh availability check
@@ -323,12 +284,12 @@ const MakeNewCoursePage = ({
         })
       } else {
         // Other errors
-        notifications.show({
+        showToast({
           title: 'Failed to create project',
           message:
             err.message ||
             'An error occurred while creating the project. Please try again.',
-          color: 'red',
+          type: 'error',
           autoClose: 5000,
         })
       }
@@ -369,17 +330,17 @@ const MakeNewCoursePage = ({
   // <Flex direction="column" className="p-6 sm:p-10">
   // <Title
   // order={3}
-  // className={`${montserrat_heading.variable} font-montserratHeading text-[--foreground]`}
+  // className={`${montserrat_heading.variable} font-montserratHeading text-(--foreground)`}
   // >
   // New project creation is currently disabled
   // </Title>
   // <div
-  // className={`mt-3 text-sm sm:text-base ${montserrat_paragraph.variable} font-montserratParagraph text-[--foreground]`}
+  // className={`mt-3 text-sm sm:text-base ${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground)`}
   // >
   // We’re getting ready to transition to{' '}
   // <a
   // href="https://chat.illinois.edu"
-  // className="text-[--illinois-orange] underline"
+  // className="text-(--illinois-orange) underline"
   // target="_blank"
   // rel="noopener noreferrer"
   // >
@@ -389,7 +350,7 @@ const MakeNewCoursePage = ({
   // questions, please email us at{' '}
   // <a
   // href="mailto:genaisupport@mx.uillinois.edu"
-  // className="text-[--illinois-orange] underline"
+  // className="text-(--illinois-orange) underline"
   // >
   // genaisupport@mx.uillinois.edu
   // </a>
@@ -415,19 +376,15 @@ const MakeNewCoursePage = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main flex min-h-screen w-full flex-col items-center px-4 pb-28 pt-20 sm:px-6"
+        className="course-page-main flex min-h-screen w-full flex-col items-center px-4 pt-20 pb-28 sm:px-6"
       >
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">
-          <Card
-            padding="none"
-            withBorder={true}
-            radius="lg"
-            className="my-auto flex w-full max-w-[720px] flex-col !border-[--dashboard-border] bg-[--background] px-6 py-8 text-[--foreground] sm:px-10 sm:py-10"
-          >
+          <Card className="my-auto flex w-full max-w-[720px] flex-col rounded-2xl border border-(--dashboard-border)! bg-(--background) px-6 py-8 text-(--foreground) sm:px-10 sm:py-10">
+
             <div
               ref={stepContainerRef}
-              className="step_container flex min-h-[22rem] flex-col"
+              className="step_container flex min-h-88 flex-col"
               aria-label={`Step ${currentStep + 1} of ${totalSteps}: ${
                 stepNames[currentStep]
               }`}
@@ -448,13 +405,13 @@ const MakeNewCoursePage = ({
         {/* Sticky Footer Navigation */}
         <nav
           aria-label="Wizard navigation"
-          className="fixed bottom-0 left-0 right-0 z-40 border-t border-[--dashboard-border] bg-[--background]"
+          className="fixed right-0 bottom-0 left-0 z-40 border-t border-(--dashboard-border) bg-(--background)"
         >
           <div className="mx-auto flex max-w-[720px] items-center justify-between px-4 py-3 sm:px-6">
             <Button
               variant="outline"
               size="sm"
-              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
+              className="border-(--foreground) text-(--foreground) hover:bg-(--foreground)/10 hover:text-(--foreground)"
               onClick={goToPreviousStep}
               disabled={isFirstStep || shouldBlockNavigation}
               aria-label="Go to previous step"
@@ -476,7 +433,7 @@ const MakeNewCoursePage = ({
                     stepNames[index]
                   }${currentStep === index ? ' (current)' : ''}`}
                   aria-current={currentStep === index ? 'step' : undefined}
-                  className={`rounded-full bg-[--foreground] transition-all duration-200 ${currentStep === index ? 'h-2.5 w-2.5 opacity-100' : 'h-2 w-2 opacity-25'}`}
+                  className={`rounded-full bg-(--foreground) transition-all duration-200 ${currentStep === index ? 'h-2.5 w-2.5 opacity-100' : 'h-2 w-2 opacity-25'}`}
                 />
               ))}
             </div>
@@ -484,7 +441,7 @@ const MakeNewCoursePage = ({
             <Button
               variant="outline"
               size="sm"
-              className="border-[--foreground] text-[--foreground] hover:bg-[--foreground]/10 hover:text-[--foreground]"
+              className="border-(--foreground) text-(--foreground) hover:bg-(--foreground)/10 hover:text-(--foreground)"
               aria-label={
                 isLastStep
                   ? 'Start chatting with your new chatbot'
@@ -495,6 +452,7 @@ const MakeNewCoursePage = ({
                   if (!hasCreatedProject) {
                     if (
                       projectName === '' ||
+                      !isValidProjectName(projectName) ||
                       isLoading ||
                       !isCourseAvailable ||
                       isWaitingForAvailabilityCheck
@@ -530,6 +488,7 @@ const MakeNewCoursePage = ({
                 (currentStep === 0 &&
                   !hasCreatedProject &&
                   (projectName === '' ||
+                    !isValidProjectName(projectName) ||
                     !isCourseAvailable ||
                     isLoading ||
                     isWaitingForAvailabilityCheck))

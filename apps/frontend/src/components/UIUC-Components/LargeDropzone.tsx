@@ -1,107 +1,128 @@
 // LargeDropzone.tsx
-import React, { useRef, useState, useEffect } from 'react'
-import {
-  createStyles,
-  Group,
-  rem,
-  Text,
-  Title,
-  Paper,
-  Progress,
-  // useMantineTheme,
-} from '@mantine/core'
+import React, { useRef, useState } from 'react'
 
-import {
-  IconAlertCircle,
-  IconCheck,
-  IconCloudUpload,
-  IconDownload,
-  IconFileUpload,
-  IconX,
-} from '@tabler/icons-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Dropzone } from '@mantine/dropzone'
+import { IconCloudUpload, IconDownload } from '@tabler/icons-react'
+import { type QueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import SupportedFileUploadTypes from './SupportedFileUploadTypes'
-import { useMediaQuery } from '@mantine/hooks'
+import { LoadingSpinner } from './LoadingSpinner'
+import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
+import {
+  isActiveUpload,
+  useGatedIngestPoller,
+} from '~/hooks/useGatedIngestPoller'
 import { v4 as uuidv4 } from 'uuid'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
-const useStyles = createStyles((theme) => ({
-  wrapper: {
-    position: 'relative',
-    // marginBottom: rem(10),
-  },
+const POLL_INTERVAL_MS = 5000
 
-  icon: {
-    color:
-      theme.colorScheme === 'dark'
-        ? theme.colors.dark[3]
-        : theme.colors.gray[4],
-  },
+const isActiveDocument = (file: FileUpload) => isActiveUpload(file, 'document')
 
-  control: {
-    position: 'absolute',
-    width: rem(250),
-    left: `calc(50% - ${rem(125)})`,
-    bottom: rem(-20),
-  },
-  dropzone: {
-    backgroundPosition: '0% 0%',
-    '&:hover': {
-      backgroundPosition: '100% 100%',
-      background: 'linear-gradient(135deg, #2a2a40 0%, #1c1c2e 100%)',
-    },
-  },
-}))
+// `DataTransfer.files` flattens a dropped folder into a single zero-byte entry,
+// so directories have to be walked through the entry API to reach their files.
+type DroppedEntry = {
+  isFile: boolean
+  isDirectory: boolean
+  file: (onSuccess: (file: File) => void, onError?: () => void) => void
+  createReader: () => {
+    readEntries: (
+      onSuccess: (entries: DroppedEntry[]) => void,
+      onError?: () => void,
+    ) => void
+  }
+}
+
+const readEntryFiles = async (entry: DroppedEntry): Promise<File[]> => {
+  if (entry.isFile) {
+    const file = await new Promise<File | null>((resolve) => {
+      entry.file(
+        (f) => resolve(f),
+        () => resolve(null),
+      )
+    })
+    return file ? [file] : []
+  }
+
+  if (!entry.isDirectory) return []
+
+  const reader = entry.createReader()
+  const files: File[] = []
+  // readEntries returns a partial batch (100 in Chrome) and must be re-read
+  // until it comes back empty.
+  for (;;) {
+    const batch = await new Promise<DroppedEntry[]>((resolve) => {
+      reader.readEntries(
+        (entries) => resolve(entries),
+        () => resolve([]),
+      )
+    })
+    if (batch.length === 0) break
+    for (const child of batch) {
+      files.push(...(await readEntryFiles(child)))
+    }
+  }
+  return files
+}
+
+export const collectDroppedFiles = async (
+  dataTransfer: DataTransfer,
+): Promise<File[]> => {
+  const flatFiles = Array.from(dataTransfer.files ?? [])
+  // webkitGetAsEntry must run before this handler yields; the item list is
+  // cleared as soon as the drop event finishes dispatching.
+  const entries = Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === 'file')
+    .map((item) =>
+      typeof item.webkitGetAsEntry === 'function'
+        ? (item.webkitGetAsEntry() as DroppedEntry | null)
+        : null,
+    )
+    .filter((entry): entry is DroppedEntry => entry !== null)
+
+  if (entries.length === 0) return flatFiles
+
+  const nested = await Promise.all(entries.map(readEntryFiles))
+  return nested.flat()
+}
 
 export function LargeDropzone({
   courseName,
   current_user_email,
-  redirect_to_gpt_4 = true,
   isDisabled = false,
   courseMetadata,
   is_new_course,
+  uploadFiles,
   setUploadFiles,
+  queryClient,
   auth,
 }: {
   courseName: string
   current_user_email: string
-  redirect_to_gpt_4?: boolean
   isDisabled?: boolean
   courseMetadata: CourseMetadata
   is_new_course: boolean
+  uploadFiles: FileUpload[]
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
+  queryClient: QueryClient
   auth: AuthContextProps
 }) {
   // upload-in-progress spinner control
   const [uploadInProgress, setUploadInProgress] = useState(false)
-  const [uploadComplete, setUploadComplete] = useState(false)
-  const [successfulUploads, setSuccessfulUploads] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
   const router = useRouter()
   const isSmallScreen = useMediaQuery('(max-width: 960px)')
-  const { classes, theme } = useStyles()
-  const openRef = useRef<() => void>(null)
-  const [files, setFiles] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  // dragenter/dragleave fire on every child element the cursor crosses, not
+  // just at the dropzone's own boundary. A counter (incremented on enter,
+  // decremented on leave) only reads "left" once it nets back to zero,
+  // instead of flickering every time a child element is crossed.
+  const dragCounterRef = useRef(0)
 
-  const refreshOrRedirect = async (redirect_to_gpt_4: boolean) => {
-    if (is_new_course) {
-      // refresh current page
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      await router.push(`/${courseName}/dashboard`)
-      return
-    }
+  const interactionDisabled = isDisabled || uploadInProgress
 
-    if (redirect_to_gpt_4) {
-      await router.push(`/${courseName}/chat`)
-    }
-    // refresh current page
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    await router.reload()
-  }
   const uploadToS3 = async (file: File | null, uniqueFileName: string) => {
     if (!file) return
 
@@ -159,10 +180,7 @@ export function LargeDropzone({
     if (!files) return
     files = files.filter((file) => file !== null)
 
-    setFiles(files)
-    setSuccessfulUploads(0)
     setUploadInProgress(true)
-    setUploadComplete(false)
 
     // Initialize file upload status
     const initialFileUploads = files.map((file) => {
@@ -195,7 +213,7 @@ export function LargeDropzone({
     }
 
     // Process files in parallel
-    const allSuccessOrFail = await Promise.all(
+    await Promise.all(
       files.map(async (file) => {
         const extension = file.name.slice(file.name.lastIndexOf('.'))
         const nameWithoutExtension = file.name
@@ -206,7 +224,6 @@ export function LargeDropzone({
 
         try {
           await uploadToS3(file, uniqueFileName)
-          setSuccessfulUploads((prev) => prev + 1)
 
           const response = await fetch(`/api/UIUC-api/ingest`, {
             method: 'POST',
@@ -221,7 +238,6 @@ export function LargeDropzone({
           })
           const res = await response.json()
           console.debug('Ingest submitted...', res)
-          return { ok: true, s3_path: file.name }
         } catch (error) {
           console.error('Error during file upload or ingest:', error)
           // Update file status to error so it doesn't block navigation
@@ -230,290 +246,291 @@ export function LargeDropzone({
               f.name === uniqueReadableFileName ? { ...f, status: 'error' } : f,
             ),
           )
-          return { ok: false, s3_path: file.name }
         }
       }),
-    )
-
-    setSuccessfulUploads(files.length)
-    setUploadComplete(true)
-
-    // Process results
-    const resultSummary = allSuccessOrFail.reduce(
-      (acc: { success_ingest: any[]; failure_ingest: any[] }, curr) => {
-        if (curr.ok) acc.success_ingest.push(curr)
-        else acc.failure_ingest.push(curr)
-        return acc
-      },
-      { success_ingest: [], failure_ingest: [] },
     )
 
     setUploadInProgress(false)
 
     if (is_new_course) {
-      await refreshOrRedirect(redirect_to_gpt_4)
+      // refresh current page
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      await router.push(`/${courseName}/dashboard`)
     }
   }
-  useEffect(() => {
-    let pollInterval = 9000 // Start with a slower interval
-    const MIN_INTERVAL = 1000 // Fast polling when active
-    const MAX_INTERVAL = 20000 // Slow polling when inactive
-    let consecutiveEmptyPolls = 0
 
-    const checkIngestStatus = async () => {
-      const response = await fetch(
-        `/api/materialsTable/docsInProgress?course_name=${courseName}`,
+  // Poll ingest status only while document uploads are in flight, sending the
+  // tracked filenames as a server-side filter so the endpoints never return
+  // the whole documents table.
+  useGatedIngestPoller({
+    courseName,
+    uploadFiles,
+    setUploadFiles,
+    queryClient,
+    type: 'document',
+    intervalMs: POLL_INTERVAL_MS,
+    buildFilter: (files) => ({
+      filenames: files
+        .filter((file) => isActiveDocument(file))
+        .map((file) => file.name),
+    }),
+    applyStatus: (status, files) => {
+      const inProgressNames = new Set(
+        status.inProgress.map((doc) => doc.readable_filename),
       )
-      const data = await response.json()
-
-      const docsResponse = await fetch(
-        `/api/materialsTable/successDocs?course_name=${courseName}`,
+      const completedNames = new Set(
+        status.completed.map((doc) => doc.readable_filename),
       )
-      const docsData = await docsResponse.json()
-      // Adjust polling interval based on activity
-      if (data.documents.length > 0) {
-        pollInterval = MIN_INTERVAL
-        consecutiveEmptyPolls = 0
-      } else {
-        consecutiveEmptyPolls++
-        if (consecutiveEmptyPolls >= 3) {
-          // After 3 empty polls, slow down
-          pollInterval = Math.min(pollInterval * 1.5, MAX_INTERVAL)
-        }
-      }
 
-      setUploadFiles((prev) => {
-        return prev.map((file) => {
-          if (file.type !== 'document') return file
+      return files.map((file) => {
+        // Only files the tick actually asked about may be re-classified;
+        // anything else is absent from the results for a benign reason.
+        if (!isActiveDocument(file)) return file
 
-          if (file.status === 'uploading') {
-            const isIngesting = data?.documents?.some(
-              (doc: { readable_filename: string }) =>
-                doc.readable_filename === file.name,
-            )
-            if (isIngesting) {
-              return { ...file, status: 'ingesting' }
-            } else {
-              // Ingest can happen very quickly, check if completed also
-              const isInCompletedDocs = docsData?.documents?.some(
-                (doc: { readable_filename: string }) =>
-                  doc.readable_filename === file.name,
-              )
-              if (isInCompletedDocs) {
-                return { ...file, status: 'complete' }
-              }
-            }
-          } else if (file.status === 'ingesting') {
-            const isStillIngesting = data?.documents?.some(
-              (doc: { readable_filename: string }) =>
-                doc.readable_filename === file.name,
-            )
-
-            if (!isStillIngesting) {
-              const isInCompletedDocs = docsData?.documents?.some(
-                (doc: { readable_filename: string }) =>
-                  doc.readable_filename === file.name,
-              )
-              return {
-                ...file,
-                status: isInCompletedDocs
-                  ? ('complete' as const)
-                  : ('error' as const),
-              }
-            }
+        if (file.status === 'uploading') {
+          if (inProgressNames.has(file.name)) {
+            return { ...file, status: 'ingesting' }
           }
-          return file
-        })
+          // Ingest can happen very quickly, check if completed also
+          if (completedNames.has(file.name)) {
+            return { ...file, status: 'complete' }
+          }
+        } else if (!inProgressNames.has(file.name)) {
+          return {
+            ...file,
+            status: completedNames.has(file.name)
+              ? ('complete' as const)
+              : ('error' as const),
+          }
+        }
+        return file
       })
+    },
+  })
+
+  const handleFiles = (files: File[]) => {
+    // Common audio and video file extensions to block
+    const audioVideoExtensions = [
+      // Audio extensions
+      '.mp3',
+      '.wav',
+      '.ogg',
+      '.m4a',
+      '.flac',
+      '.aac',
+      '.wma',
+      '.aiff',
+      '.ape',
+      '.opus',
+      // Video extensions
+      '.mp4',
+      '.avi',
+      '.mov',
+      '.wmv',
+      '.flv',
+      '.mkv',
+      '.webm',
+      '.m4v',
+      '.mpg',
+      '.mpeg',
+      '.3gp',
+    ]
+
+    const hasRejected = files.some((f) => {
+      // Check MIME type
+      const hasMimeType =
+        f.type.startsWith('audio/') || f.type.startsWith('video/')
+
+      // Check file extension as fallback
+      const fileName = f.name.toLowerCase()
+      const hasExtension = audioVideoExtensions.some((ext) =>
+        fileName.endsWith(ext),
+      )
+
+      return hasMimeType || hasExtension
+    })
+
+    if (hasRejected) {
+      alert('Audio and video files are not supported at this time.')
+      return
     }
 
-    const intervalId = setInterval(checkIngestStatus, pollInterval)
+    ingestFiles(files, is_new_course).catch((error) => {
+      console.error('Error during file upload:', error)
+    })
+  }
 
-    return () => {
-      clearInterval(intervalId)
-    }
-  }, [courseName])
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (interactionDisabled) return
+    dragCounterRef.current += 1
+    setIsDragging(true)
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+  }
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (interactionDisabled) return
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1)
+    if (dragCounterRef.current === 0) setIsDragging(false)
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    dragCounterRef.current = 0
+    setIsDragging(false)
+    if (interactionDisabled) return
+    collectDroppedFiles(event.dataTransfer)
+      .then((files) => {
+        if (files.length > 0) handleFiles(files)
+      })
+      .catch((error) => {
+        console.error('Error reading dropped items:', error)
+      })
+  }
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : []
+    // Reset so selecting the exact same file again still fires onChange.
+    event.target.value = ''
+    if (files.length > 0) handleFiles(files)
+  }
+
+  const openFileBrowser = () => {
+    if (!interactionDisabled) fileInputRef.current?.click()
+  }
 
   return (
-    <>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* TODO: fix large dropzone display across all screens */}
       <div
+        className="relative"
         style={{
+          flex: 1,
           display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           flexDirection: 'column',
         }}
       >
-        {/* TODO: fix large dropzone display across all screens */}
         <div
-          className={classes.wrapper}
+          role="button"
+          tabIndex={interactionDisabled ? -1 : 0}
+          aria-disabled={interactionDisabled}
+          aria-busy={uploadInProgress}
+          data-testid="dropzone"
+          onClick={openFileBrowser}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              openFileBrowser()
+            }
+          }}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="group relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
           style={{
-            flex: 1,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            flexDirection: 'column',
+            width: '100%',
+            minHeight: '12.5rem',
+            height: 'auto',
+            backgroundColor: isDisabled
+              ? 'var(--background-faded)'
+              : 'var(--background)',
+            cursor: interactionDisabled ? 'not-allowed' : 'pointer',
+            borderWidth: '2px',
+            borderStyle: 'dashed',
+            borderColor: 'var(--dashboard-border)',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            margin: '0 auto',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            background: 'var(--background)',
           }}
         >
-          <Dropzone
-            openRef={openRef}
-            className="group relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-            style={{
-              width: '100%',
-              minHeight: rem(200),
-              height: 'auto',
-              backgroundColor: isDisabled
-                ? 'var(--background-faded)'
-                : 'var(--background)',
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              borderWidth: '2px',
-              borderStyle: 'dashed',
-              borderColor: 'var(--dashboard-border)',
-              borderRadius: rem(12),
-              padding: '1rem',
-              margin: '0 auto',
-              maxWidth: '100%',
-              overflow: 'hidden',
-              background: 'var(--background)',
-            }}
-            onDrop={async (files) => {
-              // Common audio and video file extensions to block
-              const audioVideoExtensions = [
-                // Audio extensions
-                '.mp3',
-                '.wav',
-                '.ogg',
-                '.m4a',
-                '.flac',
-                '.aac',
-                '.wma',
-                '.aiff',
-                '.ape',
-                '.opus',
-                // Video extensions
-                '.mp4',
-                '.avi',
-                '.mov',
-                '.wmv',
-                '.flv',
-                '.mkv',
-                '.webm',
-                '.m4v',
-                '.mpg',
-                '.mpeg',
-                '.3gp',
-              ]
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            aria-hidden="true"
+            tabIndex={-1}
+            disabled={interactionDisabled}
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
 
-              const hasRejected = files.some((f) => {
-                // Check MIME type
-                const hasMimeType =
-                  f.type.startsWith('audio/') || f.type.startsWith('video/')
-
-                // Check file extension as fallback
-                const fileName = f.name.toLowerCase()
-                const hasExtension = audioVideoExtensions.some((ext) =>
-                  fileName.endsWith(ext),
-                )
-
-                return hasMimeType || hasExtension
-              })
-
-              if (hasRejected) {
-                alert('Audio and video files are not supported at this time.')
-                return
-              }
-
-              ingestFiles(files, is_new_course).catch((error) => {
-                console.error('Error during file upload:', error)
-              })
-            }}
-            loading={uploadInProgress}
-          >
+          {uploadInProgress && (
             <div
-              style={{ pointerEvents: 'none' }}
-              className="flex flex-col items-center justify-center px-2 sm:px-4"
+              data-testid="dropzone-loading-overlay"
+              className="absolute inset-0 z-10 flex items-center justify-center bg-(--background)/70"
             >
-              <Group position="center" pt={rem(12)} className="sm:pt-5">
-                <Dropzone.Accept>
-                  <IconDownload
-                    size={isSmallScreen ? rem(30) : rem(50)}
-                    color="var(--dashboard-foreground)"
+              <LoadingSpinner size="lg" />
+            </div>
+          )}
+
+          <div
+            style={{ pointerEvents: 'none' }}
+            className="flex flex-col items-center justify-center px-2 sm:px-4"
+          >
+            <div className="flex items-center justify-center gap-2 pt-3 sm:pt-5">
+              {isDragging ? (
+                <IconDownload
+                  size={isSmallScreen ? 30 : 50}
+                  color="var(--dashboard-foreground)"
+                  stroke={1.5}
+                  aria-hidden="true"
+                />
+              ) : (
+                !isDisabled && (
+                  <IconCloudUpload
+                    size={isSmallScreen ? 30 : 50}
+                    color="var(--illinois-orange)"
                     stroke={1.5}
                     aria-hidden="true"
                   />
-                </Dropzone.Accept>
-                <Dropzone.Reject>
-                  <IconX
-                    size={isSmallScreen ? rem(30) : rem(50)}
-                    color="var(--error)"
-                    stroke={1.5}
-                    aria-hidden="true"
-                  />
-                </Dropzone.Reject>
-                {!isDisabled && (
-                  <Dropzone.Idle>
-                    <IconCloudUpload
-                      size={isSmallScreen ? rem(30) : rem(50)}
-                      color="var(--illinois-orange)"
-                      stroke={1.5}
-                      aria-hidden="true"
-                    />
-                  </Dropzone.Idle>
-                )}
-              </Group>
-
-              <Text
-                ta="center"
-                fw={700}
-                fz={isSmallScreen ? 'md' : 'lg'}
-                mt={isSmallScreen ? 'md' : 'xl'}
-                className="text-[--dashboard-foreground]"
-              >
-                <Dropzone.Accept>Drop files here</Dropzone.Accept>
-                <Dropzone.Reject>
-                  Upload rejected, not proper file type or too large.
-                </Dropzone.Reject>
-                <Dropzone.Idle>
-                  {isDisabled
-                    ? 'Enter an available project name above! 👀'
-                    : 'Upload materials'}
-                </Dropzone.Idle>
-              </Text>
-
-              {!isDisabled && (
-                <Text
-                  ta="center"
-                  fz={isSmallScreen ? 'xs' : 'sm'}
-                  mt="xs"
-                  className="text-[--foreground-faded]"
-                >
-                  Drag&apos;n&apos;drop files or a whole folder here
-                </Text>
+                )
               )}
+            </div>
 
-              <div className="mt-2 w-full overflow-x-hidden sm:mt-4">
-                <SupportedFileUploadTypes />
-              </div>
-            </div>
-          </Dropzone>
-          {/* {uploadInProgress && (
-            <div className="flex flex-col items-center justify-center px-4 text-center">
-              <Title
-                order={4}
-                style={{
-                  marginTop: 10,
-                  color: '#B22222',
-                  fontSize: isSmallScreen ? '0.9rem' : '1rem',
-                  lineHeight: '1.4',
-                }}
+            <p
+              className={`text-center font-bold ${
+                isSmallScreen ? 'mt-4 text-base' : 'mt-8 text-lg'
+              } text-(--dashboard-foreground)`}
+            >
+              {isDragging
+                ? 'Drop files here'
+                : isDisabled
+                  ? 'Enter an available project name above! 👀'
+                  : 'Upload materials'}
+            </p>
+
+            {!isDisabled && (
+              <p
+                className={`mt-2.5 text-center ${
+                  isSmallScreen ? 'text-xs' : 'text-sm'
+                } text-(--foreground-faded)`}
               >
-                Remain on this page until upload is complete
-                <br />
-                or ingest will fail.
-              </Title>
+                Drag&apos;n&apos;drop files or a whole folder here
+              </p>
+            )}
+
+            <div className="mt-2 w-full overflow-x-hidden sm:mt-4">
+              <SupportedFileUploadTypes />
             </div>
-          )} */}
+          </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

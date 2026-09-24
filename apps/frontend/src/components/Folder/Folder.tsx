@@ -16,11 +16,15 @@ import {
 
 import { type FolderInterface } from '@/types/folder'
 
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 
 import SidebarActionButton from '@/components/Buttons/SidebarActionButton'
 
-import { Tooltip } from '@mantine/core'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 
 interface Props {
   currentFolder: FolderInterface
@@ -105,7 +109,7 @@ const Folder = ({
             )}
             <input
               aria-label="Rename Folder Input"
-              className="mr-12 flex-1 overflow-hidden overflow-ellipsis border-neutral-400 bg-transparent text-left text-[12.5px] leading-3 text-white focus:border-neutral-100"
+              className="mr-12 flex-1 overflow-hidden border-neutral-400 bg-transparent text-left text-[12.5px] leading-3 text-ellipsis text-white focus:border-neutral-100"
               type="text"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
@@ -117,7 +121,7 @@ const Folder = ({
           <button
             tabIndex={0}
             aria-label={isOpen ? 'Close Folder' : 'Open Folder'}
-            className={`flex w-full cursor-pointer items-center gap-3 rounded-lg p-3 text-sm text-[--foreground] transition-colors duration-200 hover:bg-[--background-faded]`}
+            className={`flex w-full cursor-pointer items-center gap-3 rounded-lg p-3 text-sm text-(--foreground) transition-colors duration-200 hover:bg-(--background-faded)`}
             onClick={() => setIsOpen(!isOpen)}
             onDrop={(e) => dropHandler(e)}
             onDragOver={allowDrop}
@@ -129,15 +133,17 @@ const Folder = ({
             ) : (
               <IconCaretRight size={18} aria-hidden="true" />
             )}
-            <Tooltip
-              label={currentFolder.name}
-              position="top-end"
-              withArrow
-              multiline
-            >
-              <div className="relative max-h-5 min-w-0 flex-1 truncate text-ellipsis whitespace-nowrap break-all text-left text-sm leading-3">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className="relative max-h-5 min-w-0 flex-1 truncate text-left text-sm leading-3 break-all text-ellipsis whitespace-nowrap" />
+                }
+              >
                 {currentFolder.name}
-              </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end" className="text-wrap">
+                {currentFolder.name}
+              </TooltipContent>
             </Tooltip>
           </button>
         )}
@@ -162,7 +168,7 @@ const Folder = ({
               <IconCheck
                 size={18}
                 aria-hidden="true"
-                className="text-[--foreground-faded] hover:text-[--dashboard-button-foreground]"
+                className="text-(--foreground-faded) hover:text-(--dashboard-button-foreground)"
               />
             </SidebarActionButton>
             <SidebarActionButton
@@ -176,7 +182,7 @@ const Folder = ({
               <IconX
                 size={18}
                 aria-hidden="true"
-                className="text-[--foreground-faded] hover:text-[--dashboard-button-foreground]"
+                className="text-(--foreground-faded) hover:text-(--dashboard-button-foreground)"
               />
             </SidebarActionButton>
           </div>

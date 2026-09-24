@@ -1,4 +1,3 @@
-import { Group } from '@mantine/core'
 import { IconExternalLink } from '@tabler/icons-react'
 import { type NextPage } from 'next'
 import Head from 'next/head'
@@ -13,7 +12,7 @@ const DisclaimerPage: NextPage = () => {
         <title>Disclaimer — Illinois Chat</title>
       </Head>
       <MainPageBackground>
-        <p style={{ whiteSpace: 'pre-line' }} className="text-[--foreground]">
+        <p style={{ whiteSpace: 'pre-line' }} className="text-(--foreground)">
           {disclaimer_string}
         </p>
       </MainPageBackground>

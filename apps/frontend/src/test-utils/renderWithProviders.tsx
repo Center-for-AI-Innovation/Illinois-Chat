@@ -1,12 +1,11 @@
 import React, { type PropsWithChildren } from 'react'
-import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderOptions } from '@testing-library/react'
 import { ThemeProvider } from '~/contexts/ThemeContext'
-import HomeContext from '~/pages/api/home/home.context'
+import HomeContext from '~/components/home/home.context'
 import { makeHomeContext, makeHomeState } from './mocks/homeContext'
-import type { HomeContextProps } from '~/pages/api/home/home.context'
-import type { HomeInitialState } from '~/pages/api/home/home.state'
+import type { HomeContextProps } from '~/components/home/home.context'
+import type { HomeInitialState } from '~/components/home/home.state'
 
 type ProvidersOptions = {
   homeContext?: Partial<HomeContextProps>
@@ -40,13 +39,11 @@ export function renderWithProviders(
   function Wrapper({ children }: PropsWithChildren) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MantineProvider withGlobalStyles withNormalizeCSS>
-          <ThemeProvider>
-            <HomeContext.Provider value={homeContextValue}>
-              {children}
-            </HomeContext.Provider>
-          </ThemeProvider>
-        </MantineProvider>
+        <ThemeProvider>
+          <HomeContext.Provider value={homeContextValue}>
+            {children}
+          </HomeContext.Provider>
+        </ThemeProvider>
       </QueryClientProvider>
     )
   }

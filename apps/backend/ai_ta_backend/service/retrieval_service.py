@@ -489,7 +489,9 @@ class RetrievalService:
         try:
             print("Deleting from vector store (Qdrant or pgvector)")
             vdb = self.conn_manager.get_vector_db(course_name)
-            engine_kind = self.conn_manager.get_vector_engine_kind(course_name)
+            # Derive the kind from the instance we just resolved instead of
+            # re-reading project_external_connections.
+            engine_kind = "pgvector" if vdb._using_pgvector() else "qdrant"
 
             if engine_kind == "qdrant":
                 collection_name = vdb.qdrant_config.get(
@@ -590,7 +592,9 @@ class RetrievalService:
 
         # Dynamic resolution: use ConnectionManager to get the right VectorDatabase
         vdb = self.conn_manager.get_vector_db(course_name)
-        engine_kind = self.conn_manager.get_vector_engine_kind(course_name)
+        # Derive the kind from the instance we just resolved instead of
+        # re-reading project_external_connections.
+        engine_kind = "pgvector" if vdb._using_pgvector() else "qdrant"
 
         if engine_kind == "qdrant":
             # External Qdrant only (host default is pgvector). Course-name

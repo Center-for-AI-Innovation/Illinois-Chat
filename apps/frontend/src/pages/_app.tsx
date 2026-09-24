@@ -1,6 +1,5 @@
-import { MantineProvider } from '@mantine/core'
-import { Notifications } from '@mantine/notifications'
-import { appWithTranslation } from 'next-i18next'
+import { appWithTranslation } from 'next-i18next/pages'
+import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
 import Maintenance from '~/components/UIUC-Components/Maintenance'
@@ -20,6 +19,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { useFetchMaintenanceMode } from '~/hooks/queries/useFetchMaintenanceMode'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
+import { Toaster } from '@/components/shadcn/ui/sonner'
 
 // Routes that must stay reachable while maintenance mode is on.
 //
@@ -145,60 +145,17 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
           <PostHogProvider client={posthog}>
             {/* <SpeedInsights /> */}
             <Analytics />
-            <aside
-              aria-label="Notifications"
-              aria-live="assertive"
-              aria-atomic="true"
-            >
-              <Notifications position="bottom-center" zIndex={2077} />
-            </aside>
             <ReactQueryDevtools
               initialIsOpen={false}
               position="left"
               buttonPosition="bottom-right"
             />
-            <MantineProvider
-              withGlobalStyles
-              withNormalizeCSS
-              theme={{
-                colorScheme: 'dark',
-                colors: {
-                  // Using CSS variables for colors
-                  deepBlue: ['var(--illinois-blue)'],
-                  primary: ['var(--illinois-orange)'],
-                  secondary: ['var(--illinois-blue)'],
-                  accent: ['var(--illinois-industrial)'],
-                  background: ['var(--illinois-background-dark)'],
-                  nearlyBlack: ['var(--illinois-background-darker)'],
-                  nearlyWhite: ['var(--illinois-white)'],
-                  disabled: ['var(--illinois-storm-dark)'],
-                  errorBackground: ['var(--illinois-berry)'],
-                  errorBorder: ['var(--illinois-berry)'],
-                },
-                shadows: {
-                  // md: '1px 1px 3px rgba(0, 0, 0, .25)',
-                  // xl: '5px 5px 3px rgba(0, 0, 0, .25)',
-                },
-                headings: {
-                  fontFamily: 'Montserrat, Roboto, sans-serif',
-                  sizes: {
-                    h1: { fontSize: '3rem' },
-                    h2: { fontSize: '2.2rem' },
-                  },
-                },
-                defaultGradient: {
-                  from: 'var(--illinois-berry)',
-                  to: 'var(--illinois-earth)',
-                  deg: 80,
-                },
-              }}
-            >
-              <ThemeProvider>
-                <MaintenanceGate>
-                  <Component {...pageProps} />
-                </MaintenanceGate>
-              </ThemeProvider>
-            </MantineProvider>
+            <ThemeProvider>
+              <Toaster position="bottom-center" />
+              <MaintenanceGate>
+                <Component {...pageProps} />
+              </MaintenanceGate>
+            </ThemeProvider>
           </PostHogProvider>
         </QueryClientProvider>
       </KeycloakProvider>
@@ -208,4 +165,4 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
 
 // export default .withTRPC(MyApp)
 
-export default appWithTranslation(MyApp)
+export default appWithTranslation(MyApp, nextI18NextConfig)

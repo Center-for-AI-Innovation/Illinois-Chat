@@ -1,9 +1,9 @@
-// export { default } from '~/pages/api/home'
+// export { default } from '~/components/home/home'
 
 import { useAuth } from 'react-oidc-context'
 import { type NextPage } from 'next'
 import React, { useEffect, useState } from 'react'
-import Home from '../api/home/home'
+import Home from '~/components/home/home'
 import { useRouter } from 'next/router'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -290,7 +290,7 @@ const ChatPage: NextPage = () => {
       (currentEmail === '' && courseMetadata?.is_private) ? (
         <MainPageBackground>
           <div
-            className={`flex items-center justify-center font-montserratHeading ${montserrat_heading.variable}`}
+            className={`font-montserratHeading flex items-center justify-center ${montserrat_heading.variable}`}
           >
             <span className="mr-2">Warming up the knowledge engines...</span>
             <LoadingSpinner size="sm" />

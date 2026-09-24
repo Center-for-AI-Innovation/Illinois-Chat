@@ -291,11 +291,6 @@ CREATE TABLE "messages" (
 	"llm-monitor-tags" jsonb
 );
 --> statement-breakpoint
-CREATE TABLE "n8n_workflows" (
-	"latest_workflow_id" serial NOT NULL,
-	"is_locked" boolean NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "nal_publications" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -363,14 +358,16 @@ CREATE TABLE "projects" (
 	"course_name" varchar,
 	"doc_map_id" varchar,
 	"convo_map_id" varchar,
-	"n8n_api_key" text,
 	"last_uploaded_doc_id" bigint,
 	"last_uploaded_convo_id" bigint,
 	"subscribed" bigint,
 	"description" text,
 	"metadata_schema" jsonb,
 	"conversation_map_index" text,
-	"document_map_index" text
+	"document_map_index" text,
+	"sim_api_key" jsonb,
+	"sim_base_url" text,
+	"sim_workspace_id" text
 );
 --> statement-breakpoint
 CREATE TABLE "publications" (
@@ -438,6 +435,8 @@ CREATE TABLE "usage_metrics" (
 );
 --> statement-breakpoint
 ALTER TABLE "project_external_connections" ADD CONSTRAINT "project_external_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "documents_doc_groups" ADD CONSTRAINT "documents_doc_groups_document_id_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "documents_doc_groups" ADD CONSTRAINT "documents_doc_groups_doc_group_id_doc_groups_id_fk" FOREIGN KEY ("doc_group_id") REFERENCES "public"."doc_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "doc_groups_name_course_unique" ON "doc_groups" USING btree ("name","course_name");--> statement-breakpoint
 CREATE UNIQUE INDEX "documents_doc_groups_pkey" ON "documents_doc_groups" USING btree ("document_id","doc_group_id");--> statement-breakpoint
 CREATE INDEX "embeddings_embedding_1536_hnsw_idx" ON "embeddings" USING hnsw ((subvector("embedding", 1, 1536)::vector(1536)) vector_cosine_ops) WITH (m=16,ef_construction=64);--> statement-breakpoint
@@ -486,10 +485,17 @@ BEGIN
 
         raise log 'id of document group: %', v_doc_group_id;
 
-        -- Upsert the association in documents_doc_groups
-        INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
-        VALUES (v_document_id, v_doc_group_id)
-        ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        -- Upsert the association in documents_doc_groups.
+        -- Concurrent delete between SELECT and INSERT: no-op (do not fail ingest).
+        BEGIN
+            INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
+            VALUES (v_document_id, v_doc_group_id)
+            ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        EXCEPTION
+            WHEN foreign_key_violation THEN
+                RAISE LOG 'add_document_to_group: skipping FK violation for document_id=% doc_group_id=%',
+                    v_document_id, v_doc_group_id;
+        END;
 
         raise log 'completed for %',v_doc_group_id;
     END LOOP;
@@ -538,10 +544,17 @@ BEGIN
 
         raise log 'id of document group: %', v_doc_group_id;
 
-        -- Upsert the association in documents_doc_groups
-        INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
-        VALUES (v_document_id, v_doc_group_id)
-        ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        -- Upsert the association in documents_doc_groups.
+        -- Concurrent delete between SELECT and INSERT: no-op (do not fail ingest).
+        BEGIN
+            INSERT INTO public.documents_doc_groups(document_id, doc_group_id)
+            VALUES (v_document_id, v_doc_group_id)
+            ON CONFLICT (document_id, doc_group_id) DO NOTHING;
+        EXCEPTION
+            WHEN foreign_key_violation THEN
+                RAISE LOG 'add_document_to_group_url: skipping FK violation for document_id=% doc_group_id=%',
+                    v_document_id, v_doc_group_id;
+        END;
 
         raise log 'completed for %',v_doc_group_id;
     END LOOP;
@@ -640,39 +653,6 @@ BEGIN
         (SELECT total_conversations FROM weekly_data WHERE period = 'previous') AS previous_data
         ON TRUE;
 END;$$;
-
---
--- Name: check_and_lock_flows_v2(integer); Type: FUNCTION; Schema: public; Owner: postgres
---
-CREATE OR REPLACE FUNCTION public.check_and_lock_flows_v2(id integer) RETURNS text
-    LANGUAGE plpgsql
-    AS $$DECLARE
-    workflow_id bigint;
-    workflow_locked boolean;
-BEGIN
-    -- Get the latest workflow id and its lock status
-    select latest_workflow_id, is_locked
-    into workflow_id, workflow_locked
-    from public.n8n_workflows
-    order by latest_workflow_id desc
-    limit 1;
-
-    -- Check if the latest workflow is locked
-    if id = workflow_id then
-        return 'id already exists';
-    elseif workflow_locked then
-        return 'Workflow is locked';
-    else
-        -- Update the latest_workflow_id
-        update public.n8n_workflows
-        set latest_workflow_id = id,
-        is_locked = True
-        where latest_workflow_id = workflow_id;
-        return 'Workflow updated';
-
-    
-    end if;
-end;$$;
 
 --
 -- Name: cn(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -873,24 +853,6 @@ BEGIN
 END;$$;
 
 --
--- Name: get_latest_workflow_id(); Type: FUNCTION; Schema: public; Owner: postgres
---
-CREATE OR REPLACE FUNCTION public.get_latest_workflow_id() RETURNS bigint
-    LANGUAGE plpgsql
-    AS $$DECLARE
-    v_workflow_id bigint;
-BEGIN
-    -- Get the latest workflow id and its lock status
-    SELECT latest_workflow_id INTO v_workflow_id
-    FROM public.n8n_workflows
-    ORDER BY latest_workflow_id DESC
-    LIMIT 1;
-
-    RAISE LOG 'latest_workflow_id: %', v_workflow_id;
-    RETURN v_workflow_id;
-END;$$;
-
---
 -- Name: get_run_data(text, integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
 --
 CREATE OR REPLACE FUNCTION public.get_run_data(p_run_ids text, p_limit integer, p_offset integer) RETURNS json
@@ -953,30 +915,6 @@ CREATE OR REPLACE FUNCTION public.increment(usage integer, apikey text) RETURNS 
     END;
     $$;
 
-
---
--- Name: increment_workflows(); Type: FUNCTION; Schema: public; Owner: postgres
---
-CREATE OR REPLACE FUNCTION public.increment_workflows() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$BEGIN
-    -- Increase doc_count on insert
-    IF TG_OP = 'INSERT' THEN
-        UPDATE n8n_workflows
-        SET latest_workflow_id = NEW.latest_workflow_id,
-        is_locked = True
-        WHERE latest_workflow_id = NEW.latest_workflow_id;
-        RETURN NEW;
-    -- Decrease doc_count on delete
-    ELSIF TG_OP = 'DELETE' THEN
-        UPDATE n8n_workflows
-        SET latest_workflow_id = OLD.latest_workflow_id,
-        is_locked = False
-        WHERE latest_workflow_id = OLD.latest_workflow_id;
-        RETURN OLD;
-    END IF;
-    RETURN NULL; -- Should never reach here
-END;$$;
 
 --
 -- Name: initialize_project_stats(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1381,39 +1319,6 @@ FROM conversation_data cd;
 
     RETURN conversations;
 END;$$;
-
---
--- Name: test_function(integer); Type: FUNCTION; Schema: public; Owner: postgres
---
-CREATE OR REPLACE FUNCTION public.test_function(id integer) RETURNS text
-    LANGUAGE plpgsql
-    AS $$DECLARE
-    workflow_id bigint;
-    workflow_locked boolean;
-BEGIN
-    -- Get the latest workflow id and its lock status
-    select latest_workflow_id, is_locked
-    into workflow_id, workflow_locked
-    from public.n8n_workflows
-    order by latest_workflow_id desc
-    limit 1;
-
-    -- Check if the latest workflow is locked
-    if id = workflow_id then
-        return 'id already exists';
-    elseif workflow_locked then
-        return 'Workflow is locked';
-    else
-        -- Update the latest_workflow_id
-        -- update public.n8n_workflows
-        -- set latest_workflow_id = id,
-        -- is_locked = True
-        -- where latest_workflow_id = workflow_id;
-        return 'Workflow updated';
-
-    
-    end if;
-end;$$;
 
 --
 -- Name: update_doc_count(); Type: FUNCTION; Schema: public; Owner: postgres

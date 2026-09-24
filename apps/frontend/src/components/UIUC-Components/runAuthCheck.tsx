@@ -12,7 +12,7 @@ export const get_user_permission = (
    * a Redis-granted admin cannot be recognised without asking the server.
    *
    * Needed for parity with the API. The middlewares in
-   * `src/pages/api/authorization.ts` grant super admins admin-tier access, so
+   * `src/server/authorization.ts` grant super admins admin-tier access, so
    * without this the browser would render read-only controls for someone whose
    * writes the server accepts. Mirrors that bypass exactly: it grants 'edit',
    * which is the admin tier, and it does not override `is_frozen` or make a

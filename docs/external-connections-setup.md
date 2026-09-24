@@ -12,19 +12,20 @@ This guide covers operator setup:
 1. [Prerequisites](#prerequisites)
 2. [Provisioning an external Postgres (documents + pgvector)](#provisioning-an-external-postgres)
 3. [Registering a project's connections with the CLI](#registering-connections-with-the-cli)
-4. [Verifying and troubleshooting](#verifying-and-troubleshooting)
+4. [Keeping existing external stores up to date](#keeping-existing-external-stores-up-to-date)
+5. [Verifying and troubleshooting](#verifying-and-troubleshooting)
 
 Deeper reference material lives with the apps:
 
 - Feature overview: [`apps/backend/docs/features/external-connections.md`](../apps/backend/docs/features/external-connections.md)
 - Full config reference (all fields, multi-collection search, post-processors):
   [`apps/backend/docs/developers/external-connections-config.md`](../apps/backend/docs/developers/external-connections-config.md)
-- Frontend architecture (ConnectionManager, caching, SSRF-guarded probes):
+- Frontend architecture (ConnectionManager, connection lifecycle, SSRF-guarded probes):
   [`apps/frontend/docs/EXTERNAL_CONNECTIONS.md`](../apps/frontend/docs/EXTERNAL_CONNECTIONS.md)
 
 ## Prerequisites
 
-- **`ENCRYPTION_MASTER_KEY`** must be set to the *same value* for the
+- **`ENCRYPTION_MASTER_KEY`** must be set to the _same value_ for the
   frontend, backend, and ingest worker — configs are stored AES-256-GCM
   encrypted, written by the frontend and decrypted by all three. The dev
   bootstrap (`infra/scripts/start-dev.sh`) generates one and syncs it into
@@ -78,7 +79,7 @@ it; the script runs `CREATE EXTENSION IF NOT EXISTS vector` itself.
 > already holds millions of embeddings, read the notes inside
 > `infra/db/provision_external_pgvector_store.sql` about
 > `maintenance_work_mem` and serial (non-parallel) `CREATE INDEX
-> CONCURRENTLY` builds first — getting this wrong turns a ~1 hour build into
+CONCURRENTLY` builds first — getting this wrong turns a ~1 hour build into
 > days.
 
 ## Registering connections with the CLI
@@ -149,17 +150,18 @@ postgresql://postgres.<ref>:password@<region>.pooler.supabase.com:6543/postgres
 ```
 
 Why: the session-mode pooler (same host, port 5432) pins one database session
-per client connection and caps out around 15 sessions — the frontend and
-backend connection pools can exhaust that on their own, producing
-`EMAXCONNSESSION` / connect timeouts. Direct connections
+per client connection and caps out around 15 sessions. Since every service
+opens its connections per request, concurrent traffic can exhaust that,
+producing `EMAXCONNSESSION` / connect timeouts. Direct connections
 (`db.<ref>.supabase.co`) bypass the pooler entirely (IPv6-only, low
 `max_connections`). Transaction mode multiplexes idle clients and avoids both
-problems.
+problems, which is why it is the required choice rather than a preference.
 
-The app is fully transaction-mode compatible: the frontend opens external
-pools with `prepare: false` (no named prepared statements) and scopes its
-pgvector tuning with `SET LOCAL` inside explicit transactions; the backend's
-psycopg2 driver needs no changes.
+The app is fully transaction-mode compatible: the frontend opens its
+per-request client with `prepare: false` (no named prepared statements) and
+scopes its pgvector tuning with `SET LOCAL` inside explicit transactions; the
+backend and worker use a `NullPool` and their psycopg2 driver needs no
+changes.
 
 Session-mode and direct Supabase URIs are still **accepted** — the `test`
 probe and `upsert` respond with a warning rather than rejecting them. The URI
@@ -176,8 +178,36 @@ is stored verbatim; no automatic port rewriting is done.
 - **Embeddings**: ingest and retrieval use the project's `embedding` config
   (provider must be in `ALLOWED_EMBEDDING_PROVIDERS`, default
   `openai,ollama`); otherwise the environment default.
-- Config changes take effect immediately for new requests (the API
-  invalidates the per-project cache on every successful write).
+- Config changes take effect on the next request in every service.
+  Nothing is cached: each request reads the project's row and builds the
+  connections it needs, so there is no invalidation step and no restart.
+
+## Keeping existing external stores up to date
+
+`npm run db:migrate` only touches the **host** database, and
+`provision_external_pgvector_store.sql` only runs when a store is first
+provisioned. Schema changes to the document/ingest tables therefore never reach
+an already-provisioned external Postgres on their own.
+
+`infra/db/external-migrations/` holds an ordered set of idempotent SQL scripts
+for exactly that. Replay the whole set against each external store after
+pulling a release that changed document schema:
+
+```bash
+infra/db/external-migrations/apply.sh "postgresql://user:password@db-host:5432/dbname"
+```
+
+Every script is safe to re-run, so there is nothing to track per store — a store
+that is already current is left unchanged. As with provisioning, use a direct or
+session-mode connection (not the transaction pooler), with a role that owns the
+document tables.
+
+Freshly provisioned stores do **not** need this: the provisioning script is kept
+in sync and already includes every change.
+
+Contributors: the convention for adding to that directory — and the rule that
+`provision_external_pgvector_store.sql` moves with it — is documented in
+[`infra/db/external-migrations/README.md`](../infra/db/external-migrations/README.md).
 
 ## Verifying and troubleshooting
 
@@ -193,5 +223,12 @@ is stored verbatim; no automatic port rewriting is done.
 - Ingest writes fail against an external Postgres if it was not provisioned —
   the worker expects the RPCs and tables from
   `provision_external_pgvector_store.sql` to exist.
+- Document-group counts that look wrong only for projects on an external
+  Postgres usually mean the store is behind on
+  [external migrations](#keeping-existing-external-stores-up-to-date); replaying
+  them repairs the drift as well as preventing it.
+- A config that appears not to take effect is **not** a caching problem:
+  nothing is cached, so the next request already reads the new row. Check
+  `is_active`, then the `ENCRYPTION_MASTER_KEY` match above.
 - Every write is recorded in `project_connection_audit_log` (actor, action,
   changed field names — never values) on the host database.

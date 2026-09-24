@@ -33,7 +33,6 @@ import {
 import {
   extractRequestMeta,
   formatZodError,
-  invalidateForProject,
 } from '~/utils/projectConnections/handlerShared'
 
 // Exported for unit tests — the route default export wraps this in
@@ -154,7 +153,6 @@ async function handlePost(
       kind,
       encryptedBlob,
     })
-    await invalidateForProject(projectName)
 
     await writeAuditEntry({
       actor_email: actorEmail,
@@ -345,7 +343,6 @@ async function handleDelete(
 
   try {
     const result = await deleteConnection({ projectName: project_name, kind })
-    await invalidateForProject(project_name)
 
     await writeAuditEntry({
       actor_email: actorEmail,

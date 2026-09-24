@@ -32,6 +32,11 @@ jobs:
       #
       # fetch-depth: 0 above is required -- trunk needs the base commit
       # present locally to compute the diff.
+      #
+      # Non-frontend paths (apps/backend, infra, etc.) are ignored repo-wide
+      # in .trunk/trunk.yaml for now, so this stays diff-only while only
+      # ever surfacing frontend issues. Drop that ignore rule once those
+      # trees are ready to be linted too.
       - name: Trunk Check (PR diff only)
         uses: trunk-io/trunk-action@v1
         with:
@@ -52,6 +57,19 @@ jobs:
       - name: Install frontend dependencies
         working-directory: apps/frontend
         run: npm ci
+
+      # The branch that added Sim shipped a `next build` failure — a free
+      # variable left behind by a deleted block — because nothing in CI
+      # typechecks: vitest does not, and trunk runs with check-mode: none.
+      #
+      # Scoped to shipped source via tsconfig.build.json (the same config
+      # `next build` type-checks against). The test files carry pre-existing
+      # errors that predate this workflow; gating on them would fail every PR
+      # regardless of its contents, the same trap the trunk comment above
+      # describes. `npm run typecheck:all` covers tests locally.
+      - name: Frontend typecheck
+        working-directory: apps/frontend
+        run: npm run typecheck
 
       - name: Frontend tests
         working-directory: apps/frontend

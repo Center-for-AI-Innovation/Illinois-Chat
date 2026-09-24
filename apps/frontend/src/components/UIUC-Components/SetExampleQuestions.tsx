@@ -289,7 +289,7 @@ export default function SetExampleQuestions({
   const renderRightSlot = (question: QuestionState, index: number) => {
     // Show spinner when saving
     if (question.status === 'saving') {
-      return <Spinner className="size-4 text-[--foreground-faded]" />
+      return <Spinner className="size-4 text-(--foreground-faded)" />
     }
 
     // Show delete button on hover, otherwise show saved icon
@@ -302,7 +302,7 @@ export default function SetExampleQuestions({
             e.stopPropagation()
             deleteQuestion(index)
           }}
-          className="hover:bg-[--error]/10 flex size-5 items-center justify-center rounded-sm text-[--error] transition-colors"
+          className="flex size-5 items-center justify-center rounded-sm text-(--error) transition-colors hover:bg-(--error)/10"
           aria-label="Delete question"
         >
           <Trash2 className="size-4" />
@@ -312,7 +312,7 @@ export default function SetExampleQuestions({
 
     // Show green check when saved
     if (question.status === 'saved' && question.value.trim() !== '') {
-      return <Check className="size-4 text-[--illinois-prairie]" />
+      return <Check className="size-4 text-(--illinois-prairie)" />
     }
 
     return null
@@ -330,33 +330,37 @@ export default function SetExampleQuestions({
           >
             {question.status === 'error' && question.errorMessage ? (
               <Tooltip open>
-                <TooltipTrigger asChild>
-                  <div>
-                    <FormInput
-                      as="input"
-                      name={`question-${index}`}
-                      placeholder="Add sample queries to illustrate usage of your AI."
-                      className="w-full"
-                      value={question.value}
-                      status="error"
-                      onChange={(e) => handleInputChange(e.target.value, index)}
-                      onBlur={(e) => handleBlur(e, index)}
-                      onKeyDown={(e) =>
-                        handleKeyDown(
-                          e as React.KeyboardEvent<HTMLInputElement>,
-                          index,
-                        )
-                      }
-                      ref={(el) => {
-                        inputRefs.current[index] = el as HTMLInputElement
-                      }}
-                      rightSlot={renderRightSlot(question, index)}
-                    />
-                  </div>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <div>
+                      <FormInput
+                        as="input"
+                        name={`question-${index}`}
+                        placeholder="Add sample queries to illustrate usage of your AI."
+                        className="w-full"
+                        value={question.value}
+                        status="error"
+                        onChange={(e) =>
+                          handleInputChange(e.target.value, index)
+                        }
+                        onBlur={(e) => handleBlur(e, index)}
+                        onKeyDown={(e) =>
+                          handleKeyDown(
+                            e as React.KeyboardEvent<HTMLInputElement>,
+                            index,
+                          )
+                        }
+                        ref={(el) => {
+                          inputRefs.current[index] = el as HTMLInputElement
+                        }}
+                        rightSlot={renderRightSlot(question, index)}
+                      />
+                    </div>
+                  }
+                />
                 <TooltipContent
                   side="top"
-                  className="border-[--error] bg-[--error] text-white"
+                  className="border-(--error) bg-(--error) text-white"
                 >
                   {question.errorMessage}
                 </TooltipContent>

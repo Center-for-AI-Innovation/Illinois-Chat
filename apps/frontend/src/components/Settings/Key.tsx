@@ -1,7 +1,7 @@
 import { IconCheck, IconKey, IconX } from '@tabler/icons-react'
 import { type FC, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
-import { useTranslation } from 'next-i18next'
+import { useTranslation } from 'next-i18next/pages'
 
 import { SidebarButton } from '../Sidebar/SidebarButton'
 
@@ -40,7 +40,7 @@ export const Key: FC<Props> = ({ apiKey, onApiKeyChange }) => {
 
       <input
         ref={inputRef}
-        className="ml-2 h-[20px] flex-1 overflow-hidden overflow-ellipsis border-b border-neutral-400 bg-transparent pr-1 text-left text-[12.5px] leading-3 text-white focus:border-neutral-100"
+        className="ml-2 h-[20px] flex-1 overflow-hidden border-b border-neutral-400 bg-transparent pr-1 text-left text-[12.5px] leading-3 text-ellipsis text-white focus:border-neutral-100"
         type="password"
         value={newKey}
         onChange={(e) => setNewKey(e.target.value)}

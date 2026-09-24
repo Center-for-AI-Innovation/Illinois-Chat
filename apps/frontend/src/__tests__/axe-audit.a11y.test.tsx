@@ -42,6 +42,7 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
 
 vi.mock('~/utils/toastUtils', () => ({
   showToast: vi.fn(),
+  showSuccessToast: vi.fn(),
   showErrorToast: vi.fn(),
   showWarningToast: vi.fn(),
   showInfoToast: vi.fn(),
@@ -57,10 +58,6 @@ vi.mock('@/hooks/__internal__/conversation', async (importOriginal) => {
 
 vi.mock('@/utils/cryptoRandom', () => ({
   generateSecureRandomString: () => 'abc',
-}))
-
-vi.mock('@mantine/notifications', () => ({
-  notifications: { show: vi.fn() },
 }))
 
 // ---------- Tests ----------
@@ -242,9 +239,8 @@ describe('axe accessibility audit', () => {
       AuthMenu: () => React.createElement('div', null, 'AuthMenu'),
     }))
 
-    const { LandingPageHeader } = await import(
-      '~/components/UIUC-Components/navbars/GlobalHeader'
-    )
+    const { LandingPageHeader } =
+      await import('~/components/UIUC-Components/navbars/GlobalHeader')
 
     const { container } = renderWithProviders(<LandingPageHeader />)
 
@@ -259,21 +255,6 @@ describe('axe accessibility audit', () => {
       user: null,
     }
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat', push: vi.fn() }
-
-    vi.mock('@mantine/core', async (importOriginal) => {
-      const actual: any = await importOriginal()
-      return {
-        ...actual,
-        Burger: ({ onClick, opened }: any) =>
-          React.createElement(
-            'button',
-            { type: 'button', 'aria-label': 'Toggle menu', onClick },
-            opened ? 'open' : 'closed',
-          ),
-        Transition: ({ mounted, children }: any) =>
-          mounted ? React.createElement('div', null, children({})) : null,
-      }
-    })
 
     vi.mock('~/components/UIUC-Components/navbars/ThemeToggle', () => ({
       ThemeToggle: () => React.createElement('div'),
@@ -306,9 +287,8 @@ describe('axe accessibility audit', () => {
     const ChatbarContext = (
       await import('~/components/Chatbar/Chatbar.context')
     ).default
-    const { ConversationComponent } = await import(
-      '~/components/Chatbar/components/Conversation'
-    )
+    const { ConversationComponent } =
+      await import('~/components/Chatbar/components/Conversation')
 
     const conversation = makeConversation({
       id: 'c1',

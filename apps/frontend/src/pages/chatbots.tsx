@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from 'react-oidc-context'
-import { Button } from '~/components/shadcn/ui/button'
+import { buttonVariants } from '~/components/shadcn/ui/button'
+import { cn } from '~/components/shadcn/lib/utils'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
 import { ChatbotsGlobalNav } from '~/components/UIUC-Components/chatbots-hub/ChatbotsGlobalNav'
@@ -288,7 +289,7 @@ const ChatbotsHubPage = () => {
       <ChatbotsGlobalNav hideBorder />
       <div className="mx-auto w-full pt-[72px]">
         {/* Search & Filter Bar — sticky just below the global nav */}
-        <div className="sticky top-[72px] z-30 space-y-4 border-b border-[hsl(var(--border))] bg-white px-4 py-6 dark:border-[#32517a] dark:bg-[#081735] sm:px-8">
+        <div className="border-border sticky top-[72px] z-30 space-y-4 border-b bg-white px-4 py-6 sm:px-8 dark:border-[#32517a] dark:bg-[#081735]">
           <ChatbotsSearchBar
             params={searchParams}
             onParamsChange={handleParamsChange}
@@ -324,18 +325,19 @@ const ChatbotsHubPage = () => {
             ))
           ) : (
             <div className="flex flex-col items-center gap-6 px-4 py-20 text-center">
-              <p className="text-lg text-[--illinois-storm-dark] dark:text-[#c8d2e3]">
+              <p className="text-lg text-(--illinois-storm-dark) dark:text-[#c8d2e3]">
                 You don&apos;t have any chatbots yet.
               </p>
-              <Button
-                asChild
-                className="h-10 gap-2 bg-[--illinois-blue] px-8 text-sm text-white hover:bg-[--foreground-dark] dark:bg-white dark:text-[--illinois-blue] dark:hover:bg-[#e5e7eb]"
+              <Link
+                href="/new"
+                className={cn(
+                  buttonVariants(),
+                  'h-10 gap-2 bg-(--illinois-blue) px-8 text-sm text-white hover:bg-(--foreground-dark) dark:bg-white dark:text-(--illinois-blue) dark:hover:bg-[#e5e7eb]',
+                )}
               >
-                <Link href="/new">
-                  <Sparkles className="h-4 w-4" />
-                  Create Your First Chatbot
-                </Link>
-              </Button>
+                <Sparkles className="h-4 w-4" />
+                Create Your First Chatbot
+              </Link>
             </div>
           )}
         </div>

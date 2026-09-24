@@ -1,9 +1,10 @@
-import { Button, Card } from '@mantine/core'
+import { Button, buttonVariants } from '@/components/shadcn/ui/button'
 import { type GetStaticProps, type NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import React, { useState, useEffect, useMemo } from 'react'
-import { ArrowNarrowRight, ExternalLink, Link } from 'tabler-icons-react'
+import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
 import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
@@ -183,27 +184,16 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
       <main
         id="main-content"
         tabIndex={-1}
-        className={`illinois-blue-gradient-bg flex min-h-screen flex-col items-center justify-center overflow-hidden
-          ${montserrat_paragraph.variable} font-montserratParagraph`}
+        className={`illinois-blue-gradient-bg flex min-h-screen flex-col items-center justify-center overflow-hidden ${montserrat_paragraph.variable} font-montserratParagraph`}
       >
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 px-4 py-8 sm:px-8 sm:py-20">
-          <div
-            className="
-            flex w-full
-            max-w-3xl flex-col items-start justify-center
-            gap-8 sm:flex-row
-          "
-          >
-            <div className="sm:w-1/2 ">
+          <div className="flex w-full max-w-3xl flex-col items-start justify-center gap-8 sm:flex-row">
+            <div className="sm:w-1/2">
               <div
                 role="region"
                 aria-labelledby="hero-heading"
                 style={{ color: 'var(--foreground)', lineHeight: '110%' }}
-                className={`
-                  text-3xl font-bold sm:mt-4
-                  sm:text-3xl
-                  ${montserrat_heading.variable} font-montserratHeading
-                `}
+                className={`text-3xl font-bold sm:mt-4 sm:text-3xl ${montserrat_heading.variable} font-montserratHeading`}
               >
                 <h1 id="hero-heading" style={{ fontSize: 'inherit' }}>
                   Create a chatbot with{' '}
@@ -215,27 +205,23 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
                 </h1>
               </div>
 
-              <div className="mb-8 mt-4 text-sm text-[--foreground-subtle]">
+              <div className="mt-4 mb-8 text-sm text-(--foreground-subtle)">
                 Deep search your documents, build an AI-teaching assistant,
                 accelerate your literature review,{' '}
                 <span className="whitespace-nowrap">and get creative.</span>
               </div>
 
               <Button
+                type="button"
                 tabIndex={0}
-                variant="light"
-                style={{
-                  backgroundColor: 'var(--illinois-orange)',
-                  color: 'var(--illinois-white)',
-                }}
-                radius="sm"
+                className="rounded-sm bg-(--illinois-orange) text-(--illinois-white) hover:bg-(--illinois-orange)/90"
                 onClick={() => {
                   // Use Next.js router to navigate
                   router.push('/chat')
                 }}
               >
                 Try it out{' '}
-                <ArrowNarrowRight
+                <IconArrowNarrowRight
                   size={32}
                   strokeWidth={1}
                   color={'white'}
@@ -273,7 +259,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
               </div>
 
               <div
-                className="mr-8 mt-[2px] hidden text-right text-xs sm:mr-4 sm:mt-[-8px]"
+                className="mt-[2px] mr-8 hidden text-right text-xs sm:mt-[-8px] sm:mr-4"
                 style={{ color: 'var(--illinois-orange)' }}
               >
                 Upload almost anything
@@ -282,29 +268,23 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
           </div>
 
           {!useIllinoisChatConfig && (
-            <div className="mt-12 w-[100vw] rounded-lg bg-[--dashboard-background-faded] p-8 pb-14">
+            <div className="mt-12 w-screen rounded-lg bg-(--dashboard-background-faded) p-8 pb-14">
               <div className="mb-0 w-full text-center">
                 <h2
-                  className={`
-                  text-2xl font-bold sm:pt-2 
-                  ${montserrat_heading.variable} font-montserratHeading
-                `}
+                  className={`text-2xl font-bold sm:pt-2 ${montserrat_heading.variable} font-montserratHeading`}
                   style={{ color: 'var(--foreground)' }}
                 >
                   Flagship Chatbots
                 </h2>
                 <p
-                  className={`
-                  text-md mt-2
-                  ${montserrat_paragraph.variable} font-montserratParagraph
-                `}
+                  className={`text-md mt-2 ${montserrat_paragraph.variable} font-montserratParagraph`}
                 >
                   Dive right into our bots trained on everything Illinois
                 </p>
               </div>
 
               <div className="w-full">
-                <div className="ml-auto mr-auto max-w-5xl">
+                <div className="mr-auto ml-auto max-w-5xl">
                   <FlagshipChatbots />
                 </div>
               </div>
@@ -315,34 +295,18 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
         {/* orange banner */}
         <div
           style={{ background: 'var(--illinois-orange-gradient)' }}
-          className="
-          my-14
-          flex w-full items-center justify-center
-          overflow-hidden px-4
-          py-36 sm:my-0
-        "
+          className="my-14 flex w-full items-center justify-center overflow-hidden px-4 py-36 sm:my-0"
         >
           <div
-            className={`
-            whitespace-wrap mx-auto
-            flex max-w-3xl flex-col items-center
-            justify-center gap-3
-
-            text-center text-2xl font-bold
-            text-white sm:flex-row sm:gap-2
-
-            sm:whitespace-nowrap md:text-3xl
-
-            ${montserrat_heading.variable} font-montserratHeading
-          `}
+            className={`whitespace-wrap mx-auto flex max-w-3xl flex-col items-center justify-center gap-3 text-center text-2xl font-bold text-white sm:flex-row sm:gap-2 sm:whitespace-nowrap md:text-3xl ${montserrat_heading.variable} font-montserratHeading`}
           >
             {/* Adjusted container with better spacing */}
             <div className="flex w-full flex-col items-center justify-center sm:flex-row">
-              <div className="pr-2 sm:flex-shrink-0 sm:text-right">
+              <div className="pr-2 sm:shrink-0 sm:text-right">
                 Your AI trained on your
               </div>
 
-              <div className="sm:max-w-[300px] sm:flex-grow">
+              <div className="sm:max-w-[300px] sm:grow">
                 <TypingAnimation />
               </div>
             </div>
@@ -352,12 +316,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
         {/* second section below the orange banner */}
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 overflow-hidden px-4 py-8 sm:px-8 sm:py-20">
           <h2
-            className={`
-              max-w-lg
-              text-3xl font-bold sm:text-center
-              sm:text-4xl
-              ${montserrat_heading.variable} font-montserratHeading
-          `}
+            className={`max-w-lg text-3xl font-bold sm:text-center sm:text-4xl ${montserrat_heading.variable} font-montserratHeading`}
           >
             It&apos;s the easiest way to make your{' '}
             <span className="whitespace-nowrap">own Chatbot</span>
@@ -365,13 +324,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
 
           {/* step 1 */}
           <div className="w-full max-w-3xl">
-            <div
-              className="
-              mt-4 flex
-              flex-col items-center justify-center gap-2
-              sm:flex-row sm:gap-16
-            "
-            >
+            <div className="mt-4 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-16">
               <div
                 className="min-h-8 rounded-xl p-10 sm:order-last sm:w-1/2"
                 style={{ background: 'var(--illinois-orange-gradient)' }}
@@ -386,19 +339,13 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
               <div className="sm:order-first sm:w-1/2">
                 <div className="flex items-center gap-4 sm:mt-8">
                   <div
-                    className={`
-                      text-4xl font-black
-                      ${montserrat_heading.variable} font-montserratHeading
-                    `}
+                    className={`text-4xl font-black ${montserrat_heading.variable} font-montserratHeading`}
                     style={{ color: 'var(--illinois-orange)' }}
                   >
                     1
                   </div>
                   <h3
-                    className={`
-                    text-xl font-bold
-                    ${montserrat_heading.variable} font-montserratHeading
-                  `}
+                    className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
                   >
                     Bring your documents{' '}
                     <span className="whitespace-nowrap">and tools</span>
@@ -443,7 +390,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
                   radius="sm"
                 >
                   Learn More{' '}
-                  <ExternalLink
+                  <IconExternalLink
                     size={20}
                     strokeWidth={1.75}
                     color={'var(--illinois-white)'}
@@ -455,13 +402,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
             </div>
 
             {/* step 2 */}
-            <div
-              className="
-              mt-12 flex
-              flex-col items-center justify-center gap-2
-              sm:flex-row sm:gap-16
-            "
-            >
+            <div className="mt-12 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-16">
               <div
                 className="min-h-8 rounded-xl p-10 sm:w-1/2"
                 style={{ background: 'var(--illinois-orange-gradient)' }}
@@ -476,19 +417,13 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
               <div className="sm:w-1/2">
                 <div className="flex items-center gap-4 sm:mt-8">
                   <div
-                    className={`
-                      text-4xl font-black
-                      ${montserrat_heading.variable} font-montserratHeading
-                    `}
+                    className={`text-4xl font-black ${montserrat_heading.variable} font-montserratHeading`}
                     style={{ color: 'var(--illinois-orange)' }}
                   >
                     2
                   </div>
                   <h3
-                    className={`
-                    text-xl font-bold
-                    ${montserrat_heading.variable} font-montserratHeading
-                  `}
+                    className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
                   >
                     Customize LLMs, prompts, and{' '}
                     <span className="whitespace-nowrap">
@@ -529,7 +464,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
                   radius="sm"
                 >
                   Learn More{' '}
-                  <ExternalLink
+                  <IconExternalLink
                     size={20}
                     strokeWidth={1.75}
                     color={'var(--illinois-white)'}
@@ -541,13 +476,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
             </div>
 
             {/* step 3 */}
-            <div
-              className="
-              mt-12 flex
-              flex-col items-center justify-center gap-2
-              sm:flex-row sm:gap-16
-            "
-            >
+            <div className="mt-12 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-16">
               <div
                 className="min-h-8 rounded-xl p-10 sm:order-last sm:w-1/2"
                 style={{ background: 'var(--illinois-orange-gradient)' }}
@@ -562,19 +491,13 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
               <div className="sm:order-first sm:w-1/2">
                 <div className="flex items-center gap-4 sm:mt-8">
                   <div
-                    className={`
-                      text-4xl font-black
-                      ${montserrat_heading.variable} font-montserratHeading
-                    `}
+                    className={`text-4xl font-black ${montserrat_heading.variable} font-montserratHeading`}
                     style={{ color: 'var(--illinois-orange)' }}
                   >
                     3
                   </div>
                   <h3
-                    className={`
-                    text-xl font-bold
-                    ${montserrat_heading.variable} font-montserratHeading
-                  `}
+                    className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
                   >
                     Share with anyone
                   </h3>
@@ -606,7 +529,7 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
                   radius="sm"
                 >
                   Learn More{' '}
-                  <ExternalLink
+                  <IconExternalLink
                     size={20}
                     strokeWidth={1.75}
                     color={'var(--illinois-white)'}
@@ -622,28 +545,12 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
         {/* blue banner */}
         <div
           style={{ background: 'var(--illinois-blue-gradient)' }}
-          className="
-            my-12
-            w-full overflow-hidden px-4
-            py-8 text-white sm:my-0
-            sm:px-8 sm:py-24
-          "
+          className="my-12 w-full overflow-hidden px-4 py-8 text-white sm:my-0 sm:px-8 sm:py-24"
         >
-          <div
-            className="
-              mx-auto flex
-              w-full
-              max-w-3xl flex-col items-start
-              justify-center gap-4
-              sm:flex-row sm:gap-8
-            "
-          >
+          <div className="mx-auto flex w-full max-w-3xl flex-col items-start justify-center gap-4 sm:flex-row sm:gap-8">
             <div className="sm:w-1/2">
               <h2
-                className={`
-                text-xl font-bold
-                ${montserrat_heading.variable} font-montserratHeading
-              `}
+                className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Ready to build? Use our API.
               </h2>
@@ -656,37 +563,28 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
                 free, hosted here at Illinois.
               </div>
 
-              <Button
+              <a
                 tabIndex={0}
-                className="mt-8 bg-none focus:bg-[--dashboard-button]"
-                variant="light"
-                style={{
-                  color: 'var(--illinois-white)',
-                  border: '1px solid var(--illinois-white)',
-                }}
-                radius="sm"
-                component="a"
+                className={buttonVariants({
+                  className:
+                    'mt-8 rounded-sm border border-(--illinois-white) bg-transparent text-(--illinois-white) hover:bg-white/10 focus:bg-(--dashboard-button)',
+                })}
                 href="https://docs.uiuc.chat/api"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Read the docs{' '}
-                <ExternalLink
+                <IconExternalLink
                   size={20}
                   strokeWidth={1.75}
                   color={'var(--illinois-white)'}
                   className="ml-1"
                   aria-hidden="true"
                 />
-              </Button>
+              </a>
             </div>
 
-            <div
-              className="
-              mt-0
-              sm:mt-0 sm:w-2/3
-            "
-            >
+            <div className="mt-0 sm:mt-0 sm:w-2/3">
               <div className="relative overflow-hidden rounded-xl bg-[#1e1e1e] p-4 text-white">
                 <pre className="overflow-x-auto font-mono text-sm">
                   <code>
@@ -759,21 +657,10 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
             </div>
           </div>
 
-          <div
-            className="
-              mx-auto flex
-              w-full
-
-              max-w-3xl flex-col items-start justify-center
-              gap-16 sm:flex-row
-            "
-          >
+          <div className="mx-auto flex w-full max-w-3xl flex-col items-start justify-center gap-16 sm:flex-row">
             <div className="mt-16">
               <h2
-                className={`
-                text-xl font-bold
-                ${montserrat_heading.variable} font-montserratHeading
-              `}
+                className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Want something custom?
               </h2>
@@ -799,20 +686,14 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
         {/* second section below the blue banner */}
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 overflow-hidden px-4 py-8 sm:px-8 sm:py-20">
           <h2
-            className={`
-            text-4xl font-extrabold tracking-tight
-            ${montserrat_heading.variable} font-montserratHeading
-          `}
+            className={`text-4xl font-extrabold tracking-tight ${montserrat_heading.variable} font-montserratHeading`}
           >
             About Us
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-14 sm:grid-cols-3 md:gap-8">
-            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-[--dashboard-background-faded] p-6">
+            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-(--dashboard-background-faded) p-6">
               <h3
-                className={`
-                text-xl font-bold
-                ${montserrat_heading.variable} font-montserratHeading
-              `}
+                className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Support
               </h3>
@@ -830,12 +711,9 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
               </div>
               {/* <div className="text-lg">Sponsored by the </div> */}
             </div>
-            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-[--dashboard-background-faded] p-6">
+            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-(--dashboard-background-faded) p-6">
               <h3
-                className={`
-                text-xl font-bold
-                ${montserrat_heading.variable} font-montserratHeading
-              `}
+                className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Open source
               </h3>
@@ -852,12 +730,9 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
                 .
               </div>
             </div>
-            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-[--dashboard-background-faded] p-6">
+            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-(--dashboard-background-faded) p-6">
               <h3
-                className={`
-                text-xl font-bold
-                ${montserrat_heading.variable} font-montserratHeading
-              `}
+                className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Developed at Illinois
               </h3>
@@ -1020,34 +895,28 @@ function FlagshipChatbots() {
   ]
 
   return (
-    <div className="ml-auto mr-auto grid grid-cols-1 gap-6 sm:grid-cols-3">
+    <div className="mr-auto ml-auto grid grid-cols-1 gap-6 sm:grid-cols-3">
       {cards.map((card) => (
-        <Card
+        <Link
           key={card.course_slug}
-          component="a"
           href={`/${card.course_slug}/chat`}
-          // target="_blank"
-          radius="md"
-          className="flex h-56 flex-col"
+          className="flex h-56 flex-col overflow-hidden rounded-md"
           style={{
             color: 'var(--illinois-blue)',
             background: 'var(--illinois-white)',
           }}
         >
-          <Card.Section className="h-12">
+          <div className="h-12">
             <div
-              className={`
-                flex items-center px-3 text-sm font-semibold
-                ${montserrat_heading.variable} font-montserratHeading
-              `}
+              className={`flex items-center px-3 text-sm font-semibold ${montserrat_heading.variable} font-montserratHeading`}
               style={{ height: '100%' }}
             >
               {card.title}
             </div>
-          </Card.Section>
+          </div>
 
           {card.imageSrc && (
-            <Card.Section className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden">
               <div className="h-full w-full">
                 <Image
                   src={card.imageSrc}
@@ -1064,22 +933,17 @@ function FlagshipChatbots() {
                   }}
                 />
               </div>
-            </Card.Section>
+            </div>
           )}
 
-          <Card.Section className="h-16 sm:h-20">
+          <div className="h-16 sm:h-20">
             <div className="flex h-full flex-col justify-center px-3 sm:flex-row sm:items-center">
-              <div
-                className="
-                line-clamp-2 max-w-full
-                text-xs sm:line-clamp-5
-                "
-              >
+              <div className="line-clamp-2 max-w-full text-xs sm:line-clamp-5">
                 {card.tagline}
               </div>
 
-              <div className="mt-1 flex justify-end sm:ml-auto sm:mt-0">
-                <ArrowNarrowRight
+              <div className="mt-1 flex justify-end sm:mt-0 sm:ml-auto">
+                <IconArrowNarrowRight
                   size={28}
                   strokeWidth={1.25}
                   color={'#888'}
@@ -1087,8 +951,8 @@ function FlagshipChatbots() {
                 />
               </div>
             </div>
-          </Card.Section>
-        </Card>
+          </div>
+        </Link>
       ))}
     </div>
   )

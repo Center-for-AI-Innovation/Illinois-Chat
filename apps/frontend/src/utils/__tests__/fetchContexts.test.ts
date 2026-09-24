@@ -18,12 +18,19 @@ describe('fetchContexts (browser/jsdom)', () => {
     expect(result).toEqual(data)
   })
 
-  it('sends POST with correct body (course_name, search_query, token_limit, doc_groups, conversation_id)', async () => {
+  it('sends POST with the requested top_n and search parameters', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
 
-    await fetchContexts('CS225', 'binary trees', 2000, ['lectures'], 'conv-1')
+    await fetchContexts(
+      'CS225',
+      'binary trees',
+      2000,
+      ['lectures'],
+      'conv-1',
+      10,
+    )
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [, init] = fetchSpy.mock.calls[0] ?? []
@@ -37,10 +44,11 @@ describe('fetchContexts (browser/jsdom)', () => {
       token_limit: 2000,
       doc_groups: ['lectures'],
       conversation_id: 'conv-1',
+      top_n: 10,
     })
   })
 
-  it('uses default token_limit (4000) and empty doc_groups when omitted', async () => {
+  it('uses default token_limit, doc_groups and top_n when omitted', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
@@ -52,6 +60,7 @@ describe('fetchContexts (browser/jsdom)', () => {
     )
     expect(body.token_limit).toBe(4000)
     expect(body.doc_groups).toEqual([])
+    expect(body.top_n).toBe(100)
   })
 
   it('returns [] when /api/getContexts responds not ok', async () => {
@@ -118,9 +127,8 @@ describe('fetchContextsFromBackend', () => {
   it('throws with the status when the backend rejects the request', async () => {
     // Unlike fetchContexts, the backend helper propagates failures so callers
     // can distinguish "no contexts" from "retrieval broke".
-    const { default: fetchContextsFromBackend } = await import(
-      '../fetchContexts'
-    )
+    const { default: fetchContextsFromBackend } =
+      await import('../fetchContexts')
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response('boom', { status: 503 }),
     )
@@ -131,9 +139,8 @@ describe('fetchContextsFromBackend', () => {
   })
 
   it('returns the parsed contexts when the backend responds ok', async () => {
-    const { default: fetchContextsFromBackend } = await import(
-      '../fetchContexts'
-    )
+    const { default: fetchContextsFromBackend } =
+      await import('../fetchContexts')
     const data = [{ id: 1, text: 't' }]
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify(data), { status: 200 }),

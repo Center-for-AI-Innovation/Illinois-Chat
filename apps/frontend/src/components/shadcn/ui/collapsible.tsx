@@ -1,11 +1,33 @@
 'use client'
 
-import * as CollapsiblePrimitive from '@radix-ui/react-collapsible'
+import { Collapsible as CollapsiblePrimitive } from '@base-ui/react/collapsible'
 
-const Collapsible = CollapsiblePrimitive.Root
+import { cn } from '@/components/shadcn/lib/utils'
 
-const CollapsibleTrigger = CollapsiblePrimitive.CollapsibleTrigger
+function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props) {
+  return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />
+}
 
-const CollapsibleContent = CollapsiblePrimitive.CollapsibleContent
+function CollapsibleTrigger({ ...props }: CollapsiblePrimitive.Trigger.Props) {
+  return (
+    <CollapsiblePrimitive.Trigger data-slot="collapsible-trigger" {...props} />
+  )
+}
+
+function CollapsibleContent({
+  className,
+  ...props
+}: CollapsiblePrimitive.Panel.Props) {
+  return (
+    <CollapsiblePrimitive.Panel
+      data-slot="collapsible-content"
+      className={cn(
+        'h-(--collapsible-panel-height) overflow-hidden data-ending-style:h-0 data-starting-style:h-0',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
 
 export { Collapsible, CollapsibleTrigger, CollapsibleContent }

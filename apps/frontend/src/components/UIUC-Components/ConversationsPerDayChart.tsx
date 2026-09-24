@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'recharts'
 import axios from 'axios'
-import { Text, Title, Switch } from '@mantine/core'
+import { Switch } from '@/components/shadcn/ui/switch'
 import { LoadingSpinner } from './LoadingSpinner'
 import { montserrat_paragraph } from 'fonts'
 
@@ -98,18 +98,19 @@ const ConversationsPerDayChart: React.FC<ChartProps> = ({
 
   if (isLoading) {
     return (
-      <Text>
-        Loading chart <LoadingSpinner size="xs" />
-      </Text>
+      <div className="flex items-center gap-2">
+        <LoadingSpinner size="xs" />
+        <span>Loading chart...</span>
+      </div>
     )
   }
 
   if (error) {
-    return <Text color="red">{error}</Text>
+    return <p className="text-(--error)">{error}</p>
   }
 
   if (!data || Object.keys(data).length === 0) {
-    return <Text>No data available</Text>
+    return <p>No data available</p>
   }
 
   const yAxisDomain = useLogScale
@@ -135,33 +136,20 @@ const ConversationsPerDayChart: React.FC<ChartProps> = ({
   return (
     <div>
       <div className="mb-4 flex items-center justify-end gap-2">
-        <Text size="sm">Linear</Text>
+        <span className="text-sm">Linear</span>
         <Switch
           checked={useLogScale}
-          onChange={(event) => setUseLogScale(event.currentTarget.checked)}
+          onCheckedChange={(checked) => setUseLogScale(checked)}
           size="sm"
-          color="var(--dashboard-button)"
-          label={<span className="sr-only">Toggle scale</span>}
           aria-label="Toggle between linear and logarithmic scale"
           title="Switch between linear and logarithmic scale visualization"
-          styles={{
-            track: {
-              cursor: 'pointer',
-              backgroundColor: useLogScale
-                ? 'var(--dashboard-button) !important'
-                : 'var(--dashboard-background-dark) !important',
-              borderColor: useLogScale
-                ? 'var(--dashboard-button) !important'
-                : 'var(--dashboard-background-darker) !important',
-            },
-            thumb: {
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-            },
-          }}
+          className={
+            useLogScale
+              ? 'cursor-pointer data-checked:border-(--dashboard-button) data-checked:bg-(--dashboard-button)'
+              : 'cursor-pointer data-unchecked:border-(--dashboard-background-darker) data-unchecked:bg-(--dashboard-background-dark)'
+          }
         />
-        <Text size="sm">Logarithmic</Text>
+        <span className="text-sm">Logarithmic</span>
       </div>
 
       <div

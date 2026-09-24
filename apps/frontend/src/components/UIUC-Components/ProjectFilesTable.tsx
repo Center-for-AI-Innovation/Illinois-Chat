@@ -1,39 +1,51 @@
 'use client'
 
 import {
-  ActionIcon,
-  Box,
-  Button,
-  Code,
-  CopyButton,
-  Group,
-  Image,
-  Indicator,
-  Modal,
-  MultiSelect,
-  Paper,
-  Stack,
-  Text,
-  TextInput,
-  Tooltip,
-  createStyles,
-  type MantineTheme,
-} from '@mantine/core'
-import { notifications, showNotification } from '@mantine/notifications'
-import {
-  IconAlertTriangle,
+  IconArrowsSort,
   IconCheck,
+  IconChevronDown,
+  IconChevronUp,
   IconCopy,
   IconEye,
+  IconFilter,
+  IconRefresh,
   IconTrash,
   IconX,
 } from '@tabler/icons-react'
 import axios from 'axios'
-import { DataTable, type DataTableSortStatus } from 'mantine-datatable'
 import { createRef, useEffect, useRef, useState } from 'react'
-import { createGlobalStyle } from 'styled-components'
 
-import { useMediaQuery } from '@mantine/hooks'
+import { Badge } from '@/components/shadcn/ui/badge'
+import { Button } from '@/components/shadcn/ui/button'
+import { Checkbox } from '@/components/shadcn/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
+import { Input } from '@/components/shadcn/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shadcn/ui/popover'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
+
+import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useRouter } from 'next/router'
@@ -45,29 +57,160 @@ import { useAppendToDocGroup } from '@/hooks/queries/useAppendToDocGroup'
 import { useFetchDocumentGroups } from '@/hooks/queries/useFetchDocumentGroups'
 import { useDeleteFromDocGroup } from '@/hooks/queries/useDeleteFromDocGroup'
 
-import handleExport from '~/pages/util/handleExport'
+import { handleExport } from '~/utils/handleExport'
 import { fetchPresignedUrl } from '~/utils/apiUtils'
+import { showErrorToast, showToast } from '~/utils/toastUtils'
+import { DocGroupMultiSelect } from './DocGroupMultiSelect'
 import { LoadingSpinner } from './LoadingSpinner'
 import { showToastOnUpdate } from './MakeQueryAnalysisPage'
-
-// export const getCurrentPageName = () => {
-//   const router = useRouter()
-//   return router.asPath.slice(1).split('/')[0] as string
-// }
-
-const useStyles = createStyles((theme) => ({}))
-
-const GlobalStyle = createGlobalStyle`
-  .mantine-Pagination-control[data-active="true"] {
-    background-color: var(--illinois-orange);
-    color: white;
-  }
-`
+import { TablePaginationFooter } from './TablePaginationFooter'
 
 const PAGE_SIZE = 100
 
-const dataTableTitleStyles = {
-  color: 'var(--table-header)',
+// The table refreshes on a slow interval (plus window-focus refetch and the
+// event-driven invalidations fired by the upload pollers); the refresh button
+// refetches immediately, which also restarts this countdown.
+const TABLE_REFRESH_INTERVAL_MS = 5 * 60_000
+
+/*
+ * react-query hands back freshly constructed objects on every refetch, so
+ * selection has to be tracked by a stable key (the previous table
+ * implementation used its own id accessor) rather than by object identity, or
+ * the checkboxes desync from `selectedRecords` the first time the table
+ * refreshes.
+ */
+const getRecordKey = (record: CourseDocument): string | number | null =>
+  record.id ?? record.s3_path ?? record.url ?? null
+
+const isSameRecord = (a: CourseDocument, b: CourseDocument): boolean => {
+  const aKey = getRecordKey(a)
+  const bKey = getRecordKey(b)
+  return aKey !== null && bKey !== null ? aKey === bKey : a === b
+}
+
+type SortDirection = 'asc' | 'desc'
+interface SortStatus {
+  columnAccessor: string
+  direction: SortDirection
+}
+
+/*
+ * This table is drawn as a full grid. The shared shadcn <Table> only draws row
+ * separators, so the vertical dividers and the `--table-border` color are
+ * applied here rather than in `table.tsx`, which every other table in the app
+ * also renders.
+ */
+const TABLE_GRID_CLASSES = [
+  '[&_tr]:border-(--table-border)',
+  '[&_th]:border-(--table-border)',
+  '[&_td]:border-(--table-border)',
+  '[&_th:not(:last-child)]:border-r',
+  '[&_td:not(:last-child)]:border-r',
+].join(' ')
+
+function SortableColumnHeader({
+  label,
+  accessor,
+  sortStatus,
+  onSortStatusChange,
+}: {
+  label: string
+  accessor: string
+  sortStatus: SortStatus
+  onSortStatusChange: (next: SortStatus) => void
+}) {
+  const isActive = sortStatus.columnAccessor === accessor
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1 font-medium"
+      onClick={() =>
+        onSortStatusChange({
+          columnAccessor: accessor,
+          direction:
+            isActive && sortStatus.direction === 'asc' ? 'desc' : 'asc',
+        })
+      }
+    >
+      {label}
+      {isActive ? (
+        sortStatus.direction === 'asc' ? (
+          <IconChevronUp size={14} aria-hidden="true" />
+        ) : (
+          <IconChevronDown size={14} aria-hidden="true" />
+        )
+      ) : (
+        <IconArrowsSort size={14} aria-hidden="true" className="opacity-50" />
+      )}
+    </button>
+  )
+}
+
+/*
+ * Each column's filter sits behind a funnel icon that opens a popover, which
+ * keeps the header a single compact row — an always-visible input under every
+ * label doubles the header's height.
+ */
+function FilterPopover({
+  label,
+  placeholder,
+  columnKey,
+  filterKey,
+  filterValue,
+  onFilterChange,
+}: {
+  label: string
+  placeholder: string
+  columnKey: string
+  filterKey: string
+  filterValue: string
+  onFilterChange: (key: string, value: string) => void
+}) {
+  const isActive = filterKey === columnKey
+  const hasValue = isActive && filterValue !== ''
+  // The trigger is this column's only filter control, so it takes the
+  // "Filter by ..." name; the input inside the popover keeps the plain
+  // column label.
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Filter by ${label}`}
+            className={`rounded border p-1 transition-colors ${
+              hasValue
+                ? 'border-(--dashboard-button) text-(--dashboard-button)'
+                : 'border-(--table-border) text-(--foreground-faded) hover:text-(--foreground)'
+            }`}
+          />
+        }
+      >
+        <IconFilter size={14} aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 gap-2 p-2">
+        <div className="relative">
+          <Input
+            aria-label={label}
+            placeholder={placeholder}
+            value={isActive ? filterValue : ''}
+            onChange={(e) => onFilterChange(columnKey, e.target.value)}
+            className="h-8 pr-7 text-xs"
+          />
+          {hasValue && (
+            <button
+              type="button"
+              aria-label={`Clear ${label} filter`}
+              onClick={() => onFilterChange(columnKey, '')}
+              className="absolute top-1/2 right-1.5 -translate-y-1/2 text-(--foreground-faded) hover:text-(--foreground)"
+            >
+              <IconX size={14} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 export function ProjectFilesTable({
@@ -90,7 +233,7 @@ export function ProjectFilesTable({
   const [modalOpened, setModalOpened] = useState(false)
   const [recordsToDelete, setRecordsToDelete] = useState<CourseDocument[]>([])
   const [page, setPage] = useState(1)
-  const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
+  const [sortStatus, setSortStatus] = useState<SortStatus>({
     columnAccessor: 'created_at',
     direction: 'desc',
   })
@@ -103,6 +246,7 @@ export function ProjectFilesTable({
   const [exportModalOpened, setExportModalOpened] = useState(false)
   const [showDeleteButton, setShowDeleteButton] = useState(false)
   const [selectedCount, setSelectedCount] = useState(0)
+  const [copiedError, setCopiedError] = useState(false)
   const router = useRouter()
 
   const getCurrentPageName = () => {
@@ -113,35 +257,17 @@ export function ProjectFilesTable({
     setCurrentError(error)
   }
 
+  const handleFilterChange = (key: string, value: string) => {
+    setFilterKey(key)
+    setFilterValue(value)
+  }
+
   const appendToDocGroup = useAppendToDocGroup(course_name, queryClient, page)
   const removeFromDocGroup = useDeleteFromDocGroup(
     course_name,
     queryClient,
     page,
   )
-  const { theme } = useStyles()
-
-  // Patch DataTable filter buttons for accessibility (library doesn't support aria-labels)
-  useEffect(() => {
-    const container = document.querySelector('.project_files_table')
-    if (!container) return
-    // Add aria-label to filter ActionIcon buttons
-    container
-      .querySelectorAll<HTMLButtonElement>(
-        'button.mantine-ActionIcon-root[aria-haspopup="dialog"]:not([aria-label])',
-      )
-      .forEach((btn) => {
-        btn.setAttribute('aria-label', 'Filter column')
-      })
-    // Add role="button" to Popover target divs with aria-expanded
-    container
-      .querySelectorAll<HTMLDivElement>(
-        'div[aria-haspopup="dialog"][aria-expanded]:not([role])',
-      )
-      .forEach((div) => {
-        div.setAttribute('role', 'button')
-      })
-  }, [])
 
   // State to track overflow status of error column in each row of failed documents
   const [overflowStates, setOverflowStates] = useState<{
@@ -149,29 +275,20 @@ export function ProjectFilesTable({
   }>({})
 
   // Refs for each row of failed documents
-  const textRefs = useRef<{ [key: number]: React.RefObject<HTMLDivElement> }>(
-    {},
-  )
+  const textRefs = useRef<{
+    [key: number]: React.RefObject<HTMLDivElement | null>
+  }>({})
   const multiSelectRef = useRef<HTMLDivElement>(null)
   const [selectedDocGroups, setSelectedDocGroups] = useState<string[]>([])
-
-  //   const MultiSelect = styled(MultiSelect)`
-  //   .mantine-MultiSelect-dropdown {
-  //     top: 4px !important;
-  //     // box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.7) !important; // Add shadow
-  //     // margin-top: 0 !important; // Remove space between bar section and data dropdown
-  //   }
-  // `;
 
   // ------------- Queries -------------
   const {
     data: documents,
     isLoading: isLoadingDocuments,
     isError: isErrorDocuments,
-    error: documentsError,
     refetch: refetchDocuments,
   } = useQuery({
-    refetchInterval: 12_000,
+    refetchInterval: TABLE_REFRESH_INTERVAL_MS,
     queryKey: [
       'documents',
       course_name,
@@ -181,7 +298,6 @@ export function ProjectFilesTable({
       sortStatus.columnAccessor,
       sortStatus.direction,
     ],
-    // keepPreviousData: true,
     queryFn: async () => {
       const from = (page - 1) * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
@@ -201,10 +317,9 @@ export function ProjectFilesTable({
   const {
     data: failedDocuments,
     isLoading: isLoadingFailedDocuments,
-    isError: isErrorFailedDocuments,
-    error: failedDocumentsError,
+    refetch: refetchFailedDocuments,
   } = useQuery({
-    refetchInterval: 20_000,
+    refetchInterval: TABLE_REFRESH_INTERVAL_MS,
     queryKey: [
       'failedDocuments',
       course_name,
@@ -232,9 +347,20 @@ export function ProjectFilesTable({
   const {
     data: documentGroups,
     isLoading: isLoadingDocumentGroups,
-    isError: isErrorDocumentGroups,
     refetch: refetchDocumentGroups,
   } = useFetchDocumentGroups(course_name)
+
+  // react-query re-arms refetchInterval after every successful fetch, so a
+  // manual refresh also restarts the countdown.
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false)
+  const handleManualRefresh = () => {
+    setIsManualRefreshing(true)
+    void Promise.allSettled([
+      refetchDocuments(),
+      refetchFailedDocuments(),
+      refetchDocumentGroups(),
+    ]).finally(() => setIsManualRefreshing(false))
+  }
 
   useEffect(() => {
     if (tabValue === 'failed') {
@@ -263,10 +389,8 @@ export function ProjectFilesTable({
       }
     }
 
-    // Bind the event listener
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      // Unbind the event listener on clean up
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
@@ -362,12 +486,17 @@ export function ProjectFilesTable({
         ['documentGroups', course_name],
         (old = []) => {
           return old.map((doc_group) => {
-            recordsToDelete.forEach((record) => {
-              if (doc_group.name in record.doc_groups) {
-                doc_group.doc_count -= 1
+            const decrement = recordsToDelete.reduce((count, record) => {
+              if (record.doc_groups?.includes(doc_group.name)) {
+                return count + 1
               }
-            })
-            return doc_group
+              return count
+            }, 0)
+            if (decrement === 0) return doc_group
+            return {
+              ...doc_group,
+              doc_count: Math.max(0, (doc_group.doc_count || 0) - decrement),
+            }
           })
         },
       )
@@ -390,10 +519,12 @@ export function ProjectFilesTable({
         )
       }
 
-      showToastOnFileDeleted(theme, true)
+      showToastOnFileDeleted(true)
+    },
+    onSuccess: () => {
+      showToastOnFileDeleted()
     },
     onSettled: async () => {
-      showToastOnFileDeleted(theme)
       setShowDeleteButton(false)
       setSelectedCount(0)
       const sleep = (ms: number) =>
@@ -409,213 +540,196 @@ export function ProjectFilesTable({
   })
 
   if (isErrorDocuments) {
-    showNotification({
-      title: 'Error',
-      message: 'Failed to fetch documents',
-      color: 'red',
-      icon: <IconTrash size={24} />,
-    })
+    showErrorToast('Failed to fetch documents', 'Error')
 
-    return errorStateForProjectFilesTable()
+    return <ErrorStateForProjectFilesTable />
   }
 
-  const showToastOnFileDeleted = (theme: MantineTheme, was_error = false) => {
-    return (
-      // docs: https://mantine.dev/others/notifications/
-      notifications.show({
-        id: 'file-deleted-from-materials',
-        withCloseButton: true,
-        // onClose: () => console.debug('unmounted'),
-        // onOpen: () => console.debug('mounted'),
-        autoClose: 5000,
-        // position="top-center",
-        title: was_error ? 'Error deleting file' : 'Deleting file...',
-        message: was_error
-          ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
-          : 'The file is being deleted in the background.',
-        icon: was_error ? <IconAlertTriangle /> : <IconCheck />,
-        styles: {
-          root: {
-            backgroundColor: theme.colors.nearlyWhite,
-            borderColor: was_error
-              ? theme.colors.errorBorder
-              : 'var(--dashboard-background-dark)',
-          },
-          title: {
-            color: theme.colors.nearlyBlack,
-          },
-          description: {
-            color: theme.colors.nearlyBlack,
-          },
-          closeButton: {
-            color: theme.colors.nearlyBlack,
-            '&:hover': {
-              backgroundColor: theme.colors.dark[1],
-            },
-          },
-          icon: {
-            backgroundColor: was_error
-              ? theme.colors.errorBackground
-              : theme.colors.successBackground,
-            padding: '4px',
-          },
-        },
-        loading: false,
-      })
+  const showToastOnFileDeleted = (was_error = false) => {
+    return showToast({
+      autoClose: 5000,
+      title: was_error ? 'Error deleting file' : 'Deleting file...',
+      message: was_error
+        ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
+        : 'The file is being deleted in the background.',
+      type: was_error ? 'error' : 'success',
+    })
+  }
+
+  const activeDocuments = tabValue === 'failed' ? failedDocuments : documents
+  const records: CourseDocument[] = activeDocuments?.final_docs ?? []
+  const totalRecords: number = activeDocuments?.total_count ?? 0
+  const isLoading =
+    isLoadingDocuments ||
+    isLoadingFailedDocuments ||
+    isLoadingDocumentGroups ||
+    isDeletingDocuments ||
+    appendToDocGroup.isPending ||
+    removeFromDocGroup.isPending
+
+  const allSelectableChecked =
+    tabValue !== 'failed' &&
+    records.length > 0 &&
+    records.every((record) =>
+      selectedRecords.some((selected) => isSameRecord(selected, record)),
     )
-  }
+  const someSelected =
+    tabValue !== 'failed' &&
+    records.some((record) =>
+      selectedRecords.some((selected) => isSameRecord(selected, record)),
+    ) &&
+    !allSelectableChecked
 
-  const showToast = (
-    theme: MantineTheme,
-    title: string,
-    message: string,
-    was_error = false,
+  const handleSelectedRecordsChange = (
+    newSelectedRecords: CourseDocument[],
   ) => {
-    return notifications.show({
-      id: 'file-deleted-from-materials',
-      withCloseButton: true,
-      autoClose: 12000,
-      title: title,
-      message: message,
-      icon: was_error ? <IconAlertTriangle /> : <IconCheck />,
-      styles: {
-        root: {
-          backgroundColor: theme.colors.nearlyWhite,
-          borderColor: was_error
-            ? theme.colors.errorBorder
-            : 'var(--dashboard-background-dark)',
+    if (newSelectedRecords.length > 0) {
+      setSelectedRecords(newSelectedRecords)
+      setShowDeleteButton(true)
+      setSelectedCount(newSelectedRecords.length)
+      console.debug('New selection:', newSelectedRecords)
+
+      const commonDocGroups = newSelectedRecords.reduce(
+        (commonGroups: string[], record) => {
+          const recordGroups = record.doc_groups || []
+          return commonGroups.filter((group) => recordGroups.includes(group))
         },
-        title: {
-          color: theme.colors.nearlyBlack,
-        },
-        description: {
-          color: theme.colors.nearlyBlack,
-        },
-        closeButton: {
-          color: theme.colors.nearlyBlack,
-          '&:hover': {
-            backgroundColor: theme.colors.dark[1],
-          },
-        },
-        icon: {
-          backgroundColor: was_error
-            ? theme.colors.errorBackground
-            : theme.colors.successBackground,
-          padding: '4px',
-        },
-      },
-      loading: false,
-    })
+        newSelectedRecords[0]?.doc_groups || [],
+      )
+
+      setSelectedDocGroups(commonDocGroups)
+    } else {
+      setSelectedRecords([])
+      setSelectedDocGroups([])
+      setShowDeleteButton(false)
+      setSelectedCount(0)
+    }
   }
 
-  // const items = [
-  //   {
-  //     name: (
-  //       <span
-  //         className={`${montserrat_heading.variable} font-montserratHeading`}
-  //       >
-  //         Document Groups
-  //       </span>
-  //     )
-  //   },
-  //   // link: ``,  // multiselect dropdown
-  //   {
-  //     name: (
-  //       <span
-  //         className={`${montserrat_heading.variable} font-montserratHeading`}
-  //       >
-  //         Delete Selected Document
-  //       </span>
-  //     ),
-  //   },
-  // ];
+  const toggleRecordSelected = (record: CourseDocument, checked: boolean) => {
+    const without = selectedRecords.filter(
+      (selected) => !isSameRecord(selected, record),
+    )
+    const next = checked ? [...without, record] : without
+    handleSelectedRecordsChange(next)
+  }
+
+  const documentGroupOptions = documentGroups
+    ? documentGroups.map((doc_group) => ({
+        value: doc_group.name || '',
+        label: doc_group.name || '',
+      }))
+    : []
+
+  const fileNameWidth = isSmallScreen ? '35%' : '20%'
+  const urlWidth = isBetweenSmallAndMediumScreen ? '12%' : '14%'
+  const startingUrlWidth = isBetweenSmallAndMediumScreen ? '11%' : '14%'
+
   return (
     <div className="flex h-[80vh] flex-col">
-      <GlobalStyle />
       {/* Fixed Header Section */}
       <div className="flex-none">
-        <div className="flex items-center justify-between px-4 pt-4 sm:px-6 md:px-8 ">
+        <div className="flex items-center justify-between px-4 pt-4 sm:px-6 md:px-8">
           <div className="flex items-center md:space-x-4">
             <button
               onClick={() => onTabChange('success')}
               className={`rounded-t-lg px-4 py-3 font-medium transition-colors duration-200 ${
                 tabValue === 'success'
-                  ? 'border-b-2 border-[--table-header-background] bg-[--table-header-background] text-[--dashboard-foreground]'
-                  : 'bg-[--dashboard-background] text-[--foreground] hover:bg-[--dashboard-background-faded] hover:text-[--foreground]'
+                  ? 'border border-(--table-border) bg-(--background) text-(--dashboard-foreground)'
+                  : 'border border-transparent bg-(--dashboard-background) text-(--foreground) hover:bg-(--dashboard-background-faded) hover:text-(--foreground)'
               } ${montserrat_heading.variable} font-montserratHeading`}
             >
               Success
             </button>
 
-            <Indicator
-              inline
-              disabled={!failedCount}
-              label={failedCount}
-              color="var(--dashboard-button)"
-              offset={6}
-              size={16}
-            >
+            <div className="relative inline-flex">
               <button
                 onClick={() => onTabChange('failed')}
                 className={`rounded-t-lg px-4 py-3 font-medium duration-200 ${
                   tabValue === 'failed'
-                    ? 'border-b-2 border-[--table-header-background] bg-[--table-header-background] text-[--dashboard-foreground]'
-                    : 'bg-[--dashboard-background] text-[--foreground] hover:bg-[--dashboard-background-faded] hover:text-[--foreground]'
+                    ? 'border border-(--table-border) bg-(--background) text-(--dashboard-foreground)'
+                    : 'border border-transparent bg-(--dashboard-background) text-(--foreground) hover:bg-(--dashboard-background-faded) hover:text-(--foreground)'
                 } ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Failed
               </button>
-            </Indicator>
+              {failedCount > 0 && (
+                <Badge className="absolute -top-1.5 -right-1.5 h-4 min-w-4 justify-center rounded-full bg-(--dashboard-button) px-1 text-[10px] text-(--dashboard-button-foreground)">
+                  {failedCount}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    onClick={handleManualRefresh}
+                    aria-label="Refresh documents table"
+                    variant="ghost"
+                    size="icon-lg"
+                    disabled={isManualRefreshing}
+                    className="text-(--foreground) transition-colors duration-300 hover:bg-(--dashboard-background-faded) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
+                  />
+                }
+              >
+                <IconRefresh
+                  size={20}
+                  aria-hidden="true"
+                  className={isManualRefreshing ? 'animate-spin' : undefined}
+                />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[260px] text-wrap">
+                Table auto-refreshes every 5 minutes (and when you return to
+                this tab). Click to refresh now.
+              </TooltipContent>
+            </Tooltip>
             {tabValue !== 'failed' && (
               <Button
+                type="button"
+                variant="dashboard"
                 onClick={() => setExportModalOpened(true)}
-                className={`w-full border-0 bg-[--dashboard-button] px-4 py-2 text-xs transition-colors duration-300 hover:bg-[--dashboard-button-hover] sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+                className={`w-full border-0 bg-(--dashboard-button) px-4 py-2 text-xs text-(--dashboard-button-foreground) transition-colors duration-300 hover:bg-(--dashboard-button-hover) sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
               >
                 Export
               </Button>
             )}
             {tabValue !== 'failed' && selectedRecords.length > 0 && (
-              <Paper className="w-full bg-transparent sm:w-auto">
+              <div className="w-full bg-transparent sm:w-auto">
                 <div className="relative mb-2 flex w-full flex-col items-start gap-4 sm:flex-row sm:items-center">
-                  <Tooltip
-                    label="All selected documents will be added to the group"
-                    position="top"
-                    withArrow
-                    style={{
-                      color: 'var(--tooltip)',
-                      backgroundColor: 'var(--tooltip-background)',
-                    }}
-                  >
-                    <Button
-                      onClick={() => {
-                        setShowMultiSelect(true)
-                      }}
-                      className={`mb-2 w-full bg-[--dashboard-button] px-4 py-2 text-xs transition-colors duration-300 hover:bg-[--dashboard-button-hover] sm:mb-0 sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} border-0 font-montserratParagraph focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="dashboard"
+                          onClick={() => {
+                            setShowMultiSelect(true)
+                          }}
+                          className={`mb-2 w-full bg-(--dashboard-button) px-4 py-2 text-xs text-(--dashboard-button-foreground) transition-colors duration-300 hover:bg-(--dashboard-button-hover) sm:mb-0 sm:w-auto sm:px-6 sm:py-3 ${montserrat_paragraph.variable} font-montserratParagraph border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
+                        />
+                      }
                     >
                       <span className="block sm:hidden">Add to Groups</span>
                       <span className="hidden sm:block">
                         Add Document to Groups
                       </span>
-                    </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      All selected documents will be added to the group
+                    </TooltipContent>
                   </Tooltip>
 
                   {showMultiSelect && (
                     <div
                       ref={multiSelectRef}
-                      className="absolute right-0 top-full z-10 mt-1"
+                      className="absolute top-full right-0 z-10 mt-1 w-[250px]"
                     >
-                      <MultiSelect
-                        data={
-                          documentGroups
-                            ? documentGroups.map((doc_group) => ({
-                                value: doc_group.name || '',
-                                label: doc_group.name || '',
-                              }))
-                            : []
-                        }
+                      <DocGroupMultiSelect
+                        data={documentGroupOptions}
                         aria-label="Filter by document group"
                         value={selectedDocGroups}
                         placeholder={
@@ -623,18 +737,7 @@ export function ProjectFilesTable({
                             ? 'Loading...'
                             : 'Select Group'
                         }
-                        searchable={!isLoadingDocumentGroups}
-                        nothingFound={
-                          isLoadingDocumentGroups
-                            ? 'Loading...'
-                            : 'No groups... Start typing to create a new one ✨'
-                        }
-                        creatable
-                        getCreateLabel={(query) => `+ Create "${query}"`}
-                        onCreate={(doc_group_name) => ({
-                          value: doc_group_name,
-                          label: doc_group_name,
-                        })}
+                        disabled={isLoadingDocumentGroups}
                         onChange={async (newSelectedGroupsFromDropdown) => {
                           const currentDocumentsQueryKey = [
                             'documents',
@@ -664,7 +767,6 @@ export function ProjectFilesTable({
                             documentGroupsQueryKey,
                           )
 
-                          // Optimistically update the document list
                           queryClient.setQueryData(
                             currentDocumentsQueryKey,
                             (oldData: any) => {
@@ -675,15 +777,14 @@ export function ProjectFilesTable({
                                 final_docs: oldData.final_docs.map(
                                   (doc: CourseDocument) => {
                                     if (
-                                      selectedRecords.some(
-                                        (sr) => sr.id === doc.id,
+                                      selectedRecords.some((sr) =>
+                                        isSameRecord(sr, doc),
                                       )
                                     ) {
                                       let updatedDocGroups = [
                                         ...(doc.doc_groups || []),
                                       ]
 
-                                      // Add groups selected in the dropdown if not already present
                                       newSelectedGroupsFromDropdown.forEach(
                                         (groupToAdd) => {
                                           if (
@@ -696,7 +797,6 @@ export function ProjectFilesTable({
                                         },
                                       )
 
-                                      // Remove groups that were part of the initial common selection but are now deselected
                                       const commonGroupsDeselected =
                                         selectedDocGroups.filter(
                                           (commonGroup) =>
@@ -724,7 +824,6 @@ export function ProjectFilesTable({
                             },
                           )
 
-                          // Optimistically update document groups list: add new group names if created
                           queryClient.setQueryData(
                             documentGroupsQueryKey,
                             (oldGroups: DocumentGroup[] = []) => {
@@ -739,13 +838,12 @@ export function ProjectFilesTable({
                                         g.name === groupName,
                                     )
                                   ) {
-                                    // This is a newly created group by the user via 'creatable'
                                     newGroupsData.push({
                                       name: groupName,
                                       doc_count: 0,
                                       id: Date.now(),
                                       enabled: true,
-                                    }) // Mock ID and temp count 0, refetch will get real count
+                                    })
                                   }
                                 },
                               )
@@ -803,49 +901,28 @@ export function ProjectFilesTable({
                             setSelectedRecords([])
                           }
                         }}
-                        disabled={isLoadingDocumentGroups}
-                        classNames={{
-                          value: 'tag-item self-center',
-                        }}
-                        styles={{
-                          input: {
-                            paddingTop: '12px',
-                            paddingBottom: '12px',
-                            width: '250px',
-                          },
-                          value: {
-                            marginTop: '2px',
-                          },
-                          dropdown: {
-                            boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.7)',
-                            marginTop: '0',
-                          },
-                          wrapper: {
-                            width: '100%',
-                          },
-                        }}
                       />
                     </div>
                   )}
                   {showDeleteButton && (
                     <Button
-                      uppercase
-                      leftIcon={<IconTrash size={16} />}
+                      type="button"
                       disabled={!selectedCount}
                       onClick={() => {
                         if (selectedCount > 100) {
-                          showToast(
-                            theme,
-                            'Selection Limit Exceeded',
-                            'You have selected more than 100 documents. Please select less than or equal to 100 documents.',
-                            true,
-                          )
+                          showToast({
+                            title: 'Selection Limit Exceeded',
+                            message:
+                              'You have selected more than 100 documents. Please select less than or equal to 100 documents.',
+                            type: 'error',
+                            autoClose: 12000,
+                          })
                         } else {
                           setRecordsToDelete(selectedRecords)
                           setModalOpened(true)
                         }
                       }}
-                      className={`mb-2 w-full border-0 px-4 py-2 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button] sm:mb-0 sm:w-auto sm:px-6 sm:py-3 ${
+                      className={`mb-2 w-full border-0 px-4 py-2 text-xs uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button) sm:mb-0 sm:w-auto sm:px-6 sm:py-3 ${
                         selectedCount
                           ? 'bg-red-900 hover:bg-red-800'
                           : 'bg-transparent'
@@ -853,6 +930,7 @@ export function ProjectFilesTable({
                         montserrat_paragraph.variable
                       } font-montserratParagraph`}
                     >
+                      <IconTrash size={16} aria-hidden="true" />
                       <span className="block sm:hidden">
                         Delete {selectedCount}
                       </span>
@@ -868,690 +946,449 @@ export function ProjectFilesTable({
                     </Button>
                   )}
                 </div>
-              </Paper>
+              </div>
             )}
           </div>
         </div>
       </div>
 
       {/* Main Table Container */}
-      {/* <div className="flex-1 flex flex-col overflow-hidden h-[90%]"> */}
-      <div className="project_files_table flex h-[90%] flex-1 flex-col overflow-hidden pb-4">
-        <DataTable
-          aria-label="Project documents"
-          records={
-            tabValue === 'failed'
-              ? failedDocuments?.final_docs
-              : documents?.final_docs
-          }
-          totalRecords={
-            tabValue === 'failed'
-              ? failedDocuments?.total_count
-              : documents?.total_count
-          }
-          page={page}
-          onPageChange={setPage}
-          sortStatus={sortStatus}
-          onSortStatusChange={setSortStatus}
-          fetching={
-            isLoadingDocuments ||
-            isLoadingDocumentGroups ||
-            isDeletingDocuments ||
-            appendToDocGroup.isPending ||
-            removeFromDocGroup.isPending
-          }
-          recordsPerPage={PAGE_SIZE}
-          customLoader={<LoadingSpinner />}
-          withColumnBorders
-          borderColor="var(--table-border)"
-          rowBorderColor="var(--table-border)"
-          withBorder={false}
-          paginationColor="var(--dashboard-button)"
-          // c={{pagintation: {backgroundColor: '#1e1f3a'}}}
-          striped
-          highlightOnHover
-          rowStyle={(row, index) => {
-            if (selectedRecords.includes(row)) {
-              return { backgroundColor: 'var(--dashboard-table-selected)' }
-            }
-            return index % 2 === 0
-              ? { backgroundColor: 'var(--background)' }
-              : { backgroundColor: 'var(--background-faded)' }
-          }}
-          styles={{
-            pagination: {
-              backgroundColor: 'var(--background)',
-            },
-          }}
-          columns={[
-            {
-              titleStyle: dataTableTitleStyles,
-              accessor: 'readable_filename',
-              title: 'File Name',
-              // render: ({ readable_filename }) =>
-              //   readable_filename ? `${readable_filename}` : '',
-              render: ({ readable_filename }) =>
-                readable_filename ? (
-                  <div style={{ wordWrap: 'break-word' }} className="">
-                    {readable_filename}
-                  </div>
-                ) : (
-                  ''
-                ),
-              // width: '14vw',
-              width: isSmallScreen ? '35vw' : '20vw',
-              sortable: true,
-              filter: (
-                <TextInput
-                  label="File Name"
-                  description="Show uploaded files that include the specified text"
-                  placeholder="Search files..."
-                  rightSection={
-                    <ActionIcon
-                      size="sm"
-                      variant="transparent"
-                      c="dimmed"
-                      onClick={() => {
-                        setFilterKey('readable_filename')
-                        setFilterValue('')
-                      }}
-                    >
-                      <IconX size={14} />
-                    </ActionIcon>
-                  }
-                  value={filterValue}
-                  onChange={(e) => {
-                    setFilterKey('readable_filename')
-                    setFilterValue(e.currentTarget.value)
-                  }}
-                />
-              ),
-              filtering: filterKey !== null,
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              accessor: 'url',
-              title: 'URL',
-              render: ({ url }) =>
-                url ? (
-                  <div style={{ wordWrap: 'break-word', maxWidth: '14vw' }}>
-                    {url}
-                  </div>
-                ) : (
-                  ''
-                ),
-              sortable: true,
-              width: isBetweenSmallAndMediumScreen ? '12vw' : '14vw',
-              filter: (
-                <TextInput
-                  label="URL"
-                  description="Show all urls that include the specified text"
-                  placeholder="Search urls..."
-                  rightSection={
-                    <ActionIcon
-                      size="sm"
-                      variant="transparent"
-                      c="dimmed"
-                      onClick={() => {
-                        setFilterKey('url')
-                        setFilterValue('')
-                      }}
-                    >
-                      <IconX size={14} />
-                    </ActionIcon>
-                  }
-                  value={filterValue}
-                  onChange={(e) => {
-                    setFilterKey('url')
-                    setFilterValue(e.currentTarget.value)
-                  }}
-                />
-              ),
-              filtering: filterKey !== null,
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              accessor: 'base_url',
-              title: 'The Starting URL of Web Scraping',
-              render: ({ base_url }) =>
-                base_url ? (
-                  <div style={{ wordWrap: 'break-word' }}>{base_url}</div>
-                ) : (
-                  ''
-                ),
-              sortable: true,
-              // width: '10vw',
-              width: isBetweenSmallAndMediumScreen ? '11vw' : '14vw',
-              filter: (
-                <TextInput
-                  label="The Starting URL of Web Scraping"
-                  description="Show all urls that include the specified text"
-                  placeholder="Search urls..."
-                  rightSection={
-                    <ActionIcon
-                      size="sm"
-                      variant="transparent"
-                      c="dimmed"
-                      onClick={() => {
-                        setFilterKey('base_url')
-                        setFilterValue('')
-                      }}
-                    >
-                      <IconX size={14} />
-                    </ActionIcon>
-                  }
-                  value={filterValue}
-                  onChange={(e) => {
-                    setFilterKey('base_url')
-                    setFilterValue(e.currentTarget.value)
-                  }}
-                />
-              ),
-              filtering: filterKey !== null,
-            },
-            {
-              titleStyle: dataTableTitleStyles,
-              accessor: 'created_at',
-              title: 'Date created',
-              render: ({ created_at }) =>
-                created_at ? (
-                  <div style={{ wordWrap: 'break-word' }}>
-                    {new Date(created_at).toLocaleString()}
-                  </div>
-                ) : (
-                  ''
-                ),
-              // width: 130,
-              width: isBetweenSmallAndMediumScreen
-                ? 80
-                : isSmallScreen
-                  ? 60
-                  : 130,
-              sortable: true,
-              // TODO: Think about how to allow filtering on date... need different UI to select date range
-              // filter: (
-              //   <TextInput
-              //     label="Date created"
-              //     description="Show uploaded files that include the specified text"
-              //     placeholder="Search files..."
-              //     rightSection={
-              //       <ActionIcon
-              //         size="sm"
-              //         variant="transparent"
-              //         c="dimmed"
-              //         onClick={() => {
-              //           setFilterKey('readable_filename')
-              //           setFilterValue('')
-              //         }}
-              //       >
-              //         <IconX size={14} />
-              //       </ActionIcon>
-              //     }
-              //     value={filterValue}
-              //     onChange={(e) => {
-              //       setFilterKey('readable_filename')
-              //       setFilterValue(e.currentTarget.value)
-              //     }}
-              //   />
-              // ),
-              // filtering: filterKey !== null,
-            },
-            ...(tabValue === 'failed'
-              ? [
-                  {
-                    titleStyle: dataTableTitleStyles,
-                    accessor: 'error',
-                    title: 'Error',
-                    width: 200,
-                    render: ({ error }: { error: string }, index: number) => {
-                      // Ensure a ref exists for this row
-                      if (!textRefs.current[index]) {
-                        textRefs.current[index] = createRef()
+      <div className="project_files_table mt-2 flex h-[90%] flex-1 flex-col overflow-hidden pb-4">
+        <div className="flex-1 overflow-auto rounded-md border border-(--table-border)">
+          <Table aria-label="Project documents" className={TABLE_GRID_CLASSES}>
+            <TableHeader className="sticky top-0 z-10 bg-(--table-header-background)">
+              <TableRow>
+                {tabValue !== 'failed' && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label="Select all documents on this page"
+                      checked={allSelectableChecked}
+                      indeterminate={someSelected}
+                      onCheckedChange={(checked) =>
+                        handleSelectedRecordsChange(checked ? records : [])
                       }
-
-                      return (
-                        <div>
-                          <Text
-                            ref={textRefs.current[index]}
-                            size="sm"
-                            style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 3,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              maxWidth: '100%',
-                            }}
-                          >
-                            {error}
-                          </Text>
-                          {overflowStates[index] && (
-                            <Text
-                              size="sm"
-                              color="var(--link)"
-                              onClick={() => openModel(true, error)}
-                              className="rounded-md hover:underline"
-                              style={{
-                                cursor: 'pointer',
-                                bottom: 0,
-                                textAlign: 'right',
-                              }}
-                            >
-                              Read more
-                            </Text>
-                          )}
-                        </div>
-                      )
-                    },
-                  },
-                ]
-              : [
-                  {
-                    titleStyle: dataTableTitleStyles,
-                    accessor: 'doc_group',
-                    title: 'Document Groups',
-                    render: (record: CourseDocument) => (
-                      <Group position="apart" spacing="xs">
-                        <MultiSelect
-                          data={
-                            documentGroups
-                              ? [...documentGroups].map((doc_group) => ({
-                                  value: doc_group.name || '',
-                                  label: doc_group.name || '',
-                                }))
-                              : []
-                          }
-                          aria-label="Assign document groups"
-                          value={record.doc_groups ? record.doc_groups : []}
-                          placeholder={
-                            isLoadingDocumentGroups
-                              ? 'Loading...'
-                              : 'Select Group'
-                          }
-                          searchable={!isLoadingDocumentGroups}
-                          nothingFound={
-                            isLoadingDocumentGroups
-                              ? 'Loading...'
-                              : 'No groups... Start typing to create a new one ✨'
-                          }
-                          creatable
-                          getCreateLabel={(query) => `+ Create "${query}"`}
-                          onCreate={(doc_group_name) => {
-                            // createDocumentGroup.mutate({ record, doc_group_name })
-                            return {
-                              value: doc_group_name,
-                              label: doc_group_name,
+                    />
+                  </TableHead>
+                )}
+                <TableHead style={{ width: fileNameWidth }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <SortableColumnHeader
+                      label="File Name"
+                      accessor="readable_filename"
+                      sortStatus={sortStatus}
+                      onSortStatusChange={setSortStatus}
+                    />
+                    <FilterPopover
+                      label="File Name"
+                      placeholder="Search files..."
+                      columnKey="readable_filename"
+                      filterKey={filterKey}
+                      filterValue={filterValue}
+                      onFilterChange={handleFilterChange}
+                    />
+                  </div>
+                </TableHead>
+                <TableHead style={{ width: urlWidth }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <SortableColumnHeader
+                      label="URL"
+                      accessor="url"
+                      sortStatus={sortStatus}
+                      onSortStatusChange={setSortStatus}
+                    />
+                    <FilterPopover
+                      label="URL"
+                      placeholder="Search urls..."
+                      columnKey="url"
+                      filterKey={filterKey}
+                      filterValue={filterValue}
+                      onFilterChange={handleFilterChange}
+                    />
+                  </div>
+                </TableHead>
+                <TableHead style={{ width: startingUrlWidth }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <SortableColumnHeader
+                      label="The Starting URL of Web Scraping"
+                      accessor="base_url"
+                      sortStatus={sortStatus}
+                      onSortStatusChange={setSortStatus}
+                    />
+                    <FilterPopover
+                      label="The Starting URL of Web Scraping"
+                      placeholder="Search urls..."
+                      columnKey="base_url"
+                      filterKey={filterKey}
+                      filterValue={filterValue}
+                      onFilterChange={handleFilterChange}
+                    />
+                  </div>
+                </TableHead>
+                <TableHead
+                  style={{
+                    width: isBetweenSmallAndMediumScreen
+                      ? 80
+                      : isSmallScreen
+                        ? 60
+                        : 130,
+                  }}
+                >
+                  <SortableColumnHeader
+                    label="Date created"
+                    accessor="created_at"
+                    sortStatus={sortStatus}
+                    onSortStatusChange={setSortStatus}
+                  />
+                </TableHead>
+                {tabValue === 'failed' ? (
+                  <TableHead style={{ width: 200 }}>Error</TableHead>
+                ) : (
+                  <>
+                    <TableHead>Document Groups</TableHead>
+                    <TableHead style={{ width: 75 }}>Actions</TableHead>
+                  </>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && records.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={tabValue === 'failed' ? 5 : 7}
+                    className="h-32 text-center"
+                  >
+                    <LoadingSpinner />
+                  </TableCell>
+                </TableRow>
+              ) : records.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={tabValue === 'failed' ? 5 : 7}
+                    className="h-32 text-center text-(--foreground-faded)"
+                  >
+                    No records
+                  </TableCell>
+                </TableRow>
+              ) : (
+                records.map((record, index) => {
+                  const isSelected = selectedRecords.some((selected) =>
+                    isSameRecord(selected, record),
+                  )
+                  return (
+                    <TableRow
+                      key={record.id ?? record.s3_path ?? record.url ?? index}
+                      className={
+                        isSelected
+                          ? 'bg-(--dashboard-table-selected)'
+                          : index % 2 === 0
+                            ? 'bg-(--background)'
+                            : 'bg-(--background-faded)'
+                      }
+                    >
+                      {tabValue !== 'failed' && (
+                        <TableCell>
+                          <Checkbox
+                            aria-label={`Select document ${record.id ?? index + 1}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) =>
+                              toggleRecordSelected(record, Boolean(checked))
                             }
-                          }}
-                          onChange={(newSelectedGroups) => {
-                            handleDocumentGroupsChange(
-                              record,
-                              newSelectedGroups,
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell className="break-words whitespace-normal">
+                        {record.readable_filename ?? ''}
+                      </TableCell>
+                      <TableCell
+                        className="break-words whitespace-normal"
+                        style={{ maxWidth: '14vw' }}
+                      >
+                        {record.url ?? ''}
+                      </TableCell>
+                      <TableCell className="break-words whitespace-normal">
+                        {record.base_url ?? ''}
+                      </TableCell>
+                      <TableCell className="break-words whitespace-normal">
+                        {record.created_at
+                          ? new Date(record.created_at).toLocaleString()
+                          : ''}
+                      </TableCell>
+                      {tabValue === 'failed' ? (
+                        <TableCell>
+                          {(() => {
+                            if (!textRefs.current[index]) {
+                              textRefs.current[index] = createRef()
+                            }
+                            return (
+                              <div>
+                                <div
+                                  ref={textRefs.current[index]}
+                                  className="line-clamp-3 max-w-full text-sm"
+                                >
+                                  {(record as any).error}
+                                </div>
+                                {overflowStates[index] && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openModel(true, (record as any).error)
+                                    }
+                                    className="w-full rounded-md text-right text-sm text-(--link) hover:underline"
+                                  >
+                                    Read more
+                                  </button>
+                                )}
+                              </div>
                             )
-                          }}
-                          disabled={isLoadingDocumentGroups}
-                          sx={{ flex: 1, width: '100%' }}
-                          classNames={{
-                            value: 'tag-item self-center',
-                          }}
-                          styles={{
-                            item: {
-                              color: 'var(--foreground)',
-                              backgroundColor: 'var(--background)',
-                              '&:hover': {},
-                              '&[data-hovered]': {
-                                color: 'var(--dashboard-button-foreground)',
-                                backgroundColor: 'var(--dashboard-button)',
-                              },
-                            },
-                            input: {
-                              color: 'var(--foreground)',
-                              backgroundColor: 'var(--background)',
-                            },
-                            dropdown: {
-                              '.mantine-MultiSelect-nothingFound': {
-                                color: 'var(--foreground)',
-                                textAlign: 'left',
-                                padding: '.5rem',
-                              },
-                            },
-                            value: {
-                              marginTop: '2px',
-                            },
+                          })()}
+                        </TableCell>
+                      ) : (
+                        <>
+                          <TableCell className="whitespace-normal">
+                            <DocGroupMultiSelect
+                              data={documentGroupOptions}
+                              aria-label="Assign document groups"
+                              value={record.doc_groups ?? []}
+                              placeholder={
+                                isLoadingDocumentGroups
+                                  ? 'Loading...'
+                                  : 'Select Group'
+                              }
+                              disabled={isLoadingDocumentGroups}
+                              onChange={(newSelectedGroups) => {
+                                handleDocumentGroupsChange(
+                                  record,
+                                  newSelectedGroups,
+                                )
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="View document"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={async () => {
+                                  let urlToOpen: string | null | undefined =
+                                    record.url
+                                  if (!record.url && record.s3_path) {
+                                    urlToOpen = await fetchPresignedUrl(
+                                      record.s3_path,
+                                      course_name,
+                                      undefined,
+                                      record.readable_filename,
+                                    )
+                                  }
+                                  if (urlToOpen) {
+                                    window.open(urlToOpen, '_blank')
+                                  }
+                                }}
+                              >
+                                <IconEye size={16} aria-hidden="true" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Delete document"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => {
+                                  setRecordsToDelete([record])
+                                  setModalOpened(true)
+                                }}
+                              >
+                                <IconTrash size={16} aria-hidden="true" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePaginationFooter
+          page={page}
+          totalRecords={totalRecords}
+          recordsPerPage={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+
+        <Dialog open={modalOpened} onOpenChange={setModalOpened}>
+          <DialogContent className="bg-(--modal) text-(--modal-text)">
+            <DialogHeader>
+              <DialogTitle className="text-(--modal-text)">
+                Please confirm your action
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-(--modal-text)">
+              Are you sure you want to delete the selected records?
+            </p>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-(--background-faded) text-(--foreground) hover:bg-(--dashboard-button-hover) hover:text-(--dashboard-button-foreground) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
+                onClick={() => setModalOpened(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="dashboard"
+                onClick={async () => {
+                  setModalOpened(false)
+                  setIsDeletingDocuments(true)
+                  console.debug('Deleting records:', recordsToDelete)
+                  deleteDocumentMutation.mutate(recordsToDelete)
+                  setRecordsToDelete([])
+                  setSelectedRecords([])
+                  setSelectedCount(0)
+                  setShowDeleteButton(false)
+                  const sleep = (ms: number) =>
+                    new Promise((resolve) => setTimeout(resolve, ms))
+                  console.debug('sleeping for 1s before refetching')
+                  await sleep(1000)
+                  refetchDocuments()
+                  setIsDeletingDocuments(false)
+                }}
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={errorModalOpened} onOpenChange={setErrorModalOpened}>
+          <DialogContent className="border-(--modal-border) bg-(--modal) text-(--modal-text) sm:max-w-xl">
+            <DialogHeader className="border-b border-(--modal-border) pb-2">
+              <DialogTitle className="text-(--modal-text)">
+                Error Details
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-center p-4">
+              <pre
+                className="w-full overflow-x-auto rounded-md bg-(--modal) p-0 text-sm text-(--modal-text)"
+                style={{ whiteSpace: 'pre-wrap', lineHeight: '165%' }}
+              >
+                <div className="flex justify-end">
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={copiedError ? 'Copied' : 'Copy'}
+                          onClick={() => {
+                            navigator.clipboard.writeText(currentError)
+                            setCopiedError(true)
+                            setTimeout(() => setCopiedError(false), 2000)
                           }}
                         />
-                      </Group>
-                    ),
-                  },
-                ]),
-            ...(tabValue === 'failed'
-              ? []
-              : [
-                  {
-                    titleStyle: dataTableTitleStyles,
-                    accessor: 'actions',
-                    title: <Box mr={6}>Actions</Box>,
-                    width: 75,
-                    render: (materials: any, index: number) => {
-                      const openModal = async (action: string) => {
-                        let urlToOpen = materials.url
-                        if (!materials.url && materials.s3_path) {
-                          const presignedUrl = await fetchPresignedUrl(
-                            materials.s3_path,
-                            course_name,
-                            undefined,
-                            materials.readable_filename,
-                          )
-                          urlToOpen = presignedUrl
-                        }
-                        if (action === 'view' && urlToOpen) {
-                          window.open(urlToOpen, '_blank')
-                        } else if (action === 'delete') {
-                          setRecordsToDelete([materials])
-                          setModalOpened(true)
-                        }
                       }
-
-                      return (
-                        <Group spacing="xs">
-                          <ActionIcon
-                            size="sm"
-                            variant="subtle"
-                            color="green"
-                            aria-label="View document"
-                            onClick={() => openModal('view')}
-                          >
-                            <IconEye size={16} />
-                          </ActionIcon>
-                          <ActionIcon
-                            size="sm"
-                            variant="subtle"
-                            color="red"
-                            aria-label="Delete document"
-                            onClick={() => openModal('delete')}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        </Group>
-                      )
-                    },
-                  },
-                ]),
-          ]}
-          isRecordSelectable={(record) => tabValue !== 'failed'}
-          selectedRecords={tabValue === 'failed' ? [] : selectedRecords}
-          onSelectedRecordsChange={(newSelectedRecords) => {
-            if (newSelectedRecords.length > 0) {
-              setSelectedRecords(newSelectedRecords)
-              setShowDeleteButton(true)
-              setSelectedCount(newSelectedRecords.length)
-              console.debug('New selection:', newSelectedRecords)
-
-              // Use reduce to find the common document groups among all selected records
-              const commonDocGroups = newSelectedRecords.reduce(
-                (commonGroups, record) => {
-                  const recordGroups = record.doc_groups || []
-                  return commonGroups.filter((group) =>
-                    recordGroups.includes(group),
-                  )
-                },
-                newSelectedRecords[0]?.doc_groups || [],
-              )
-
-              setSelectedDocGroups(commonDocGroups)
-              console.log(commonDocGroups)
-            } else {
-              setSelectedRecords([])
-              setSelectedDocGroups([])
-              setShowDeleteButton(false)
-              setSelectedCount(0)
-            }
-          }}
-          // Accessor not necessary when documents have an `id` property
-          // idAccessor={(row: any) => (row.url ? row.url : row.s3_path)}
-        />{' '}
-        {/* End DataTable */}
-        <Modal
-          opened={modalOpened}
-          onClose={() => setModalOpened(false)}
-          title="Please confirm your action"
-          centered
-          styles={{
-            header: {
-              backgroundColor: 'var(--modal)',
-            },
-            title: {
-              color: 'var(--modal-text)',
-              fontWeight: 'bold',
-            },
-            content: {
-              color: 'var(--modal-text)',
-              backgroundColor: 'var(--modal)',
-            },
-          }}
-        >
-          <Text size="sm" style={{ color: 'var(--modal-text)' }}>
-            {`Are you sure you want to delete the selected records?`}
-          </Text>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginTop: '20px',
-            }}
-          >
-            <Button
-              className="min-w-[3rem] -translate-x-1 transform rounded-s-md bg-[--background-faded] text-[--foreground] hover:bg-[--dashboard-button-hover] hover:text-[--dashboard-button-foreground] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
-              onClick={() => {
-                setModalOpened(false)
-              }}
-              style={{
-                marginRight: '7px',
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="btext-[--dashboard-button-foreground] min-w-[3rem] -translate-x-1 transform rounded-s-md bg-[--dashboard-button] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
-              onClick={async () => {
-                setModalOpened(false)
-                setIsDeletingDocuments(true)
-                console.debug('Deleting records:', recordsToDelete)
-                deleteDocumentMutation.mutate(recordsToDelete)
-                // await handleDelete(recordsToDelete)
-                setRecordsToDelete([])
-                setSelectedRecords([])
-                setSelectedCount(0)
-                setShowDeleteButton(false)
-                const sleep = (ms: number) =>
-                  new Promise((resolve) => setTimeout(resolve, ms))
-                console.debug('sleeping for 1s before refetching')
-                await sleep(1000)
-                refetchDocuments()
-                setIsDeletingDocuments(false)
-              }}
-            >
-              Delete
-            </Button>
-          </div>
-        </Modal>
-        <Modal
-          opened={errorModalOpened}
-          onClose={() => setErrorModalOpened(false)}
-          title="Error Details"
-          size={'xl'}
-          closeOnEscape={true}
-          transitionProps={{ transition: 'fade', duration: 200 }}
-          centered
-          radius={'lg'}
-          overlayProps={{ blur: 3, opacity: 0.55 }}
-          styles={{
-            header: {
-              backgroundColor: 'var(--modal)',
-              borderBottom: '1px solid',
-              borderColor: 'var(--modal-border)',
-            },
-            body: {
-              color: 'var(--modal-text)',
-              backgroundColor: 'var(--modal)',
-            },
-            close: {
-              color: 'var(--foreground-faded)',
-            },
-            title: {
-              color: 'var(--modal-text)',
-              fontWeight: 'bold',
-            },
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '100%',
-              padding: '1rem',
-            }}
-          >
-            <Code
-              className="bg-[--modal] p-0 text-[--modal-text]"
-              style={{ whiteSpace: 'pre-wrap', lineHeight: '165%' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <CopyButton value={currentError} timeout={2000}>
-                  {({ copied, copy }) => (
-                    <Tooltip
-                      label={copied ? 'Copied' : 'Copy'}
-                      withArrow
-                      position="right"
                     >
-                      <ActionIcon
-                        color={copied ? 'teal' : 'gray'}
-                        onClick={copy}
-                      >
-                        {copied ? (
-                          <IconCheck
-                            size="1rem"
-                            className="text-[--foreground]"
-                          />
-                        ) : (
-                          <IconCopy
-                            size="1rem"
-                            className="text-[--foreground-faded]"
-                          />
-                        )}
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </CopyButton>
-              </div>
-              {currentError}
-            </Code>
-          </div>
-        </Modal>
-        <Modal
-          opened={exportModalOpened}
-          onClose={() => setExportModalOpened(false)}
-          title="Please confirm your action"
-          centered
-        >
-          <Text size="sm" style={{ color: 'white' }}>
-            {`Are you sure you want to export all the documents and embeddings?`}
-          </Text>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginTop: '20px',
-            }}
-          >
-            <Button
-              className="min-w-[3rem] -translate-x-1 transform rounded-s-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
-              onClick={() => {
-                setExportModalOpened(false)
-              }}
-              style={{
-                backgroundColor: 'transparent',
-                marginRight: '7px',
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="min-w-[3rem] -translate-x-1 transform rounded-s-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
-              onClick={async () => {
-                setExportModalOpened(false)
-                const result = await handleExport(getCurrentPageName())
-                if (result && result.message) {
-                  showToastOnUpdate(theme, false, false, result.message)
-                }
-              }}
-            >
-              Export
-            </Button>
-          </div>
-        </Modal>
+                      {copiedError ? (
+                        <IconCheck
+                          size={16}
+                          aria-hidden="true"
+                          className="text-(--foreground)"
+                        />
+                      ) : (
+                        <IconCopy
+                          size={16}
+                          aria-hidden="true"
+                          className="text-(--foreground-faded)"
+                        />
+                      )}
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      {copiedError ? 'Copied' : 'Copy'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                {currentError}
+              </pre>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={exportModalOpened} onOpenChange={setExportModalOpened}>
+          <DialogContent className="bg-(--modal) text-(--modal-text)">
+            <DialogHeader>
+              <DialogTitle className="text-(--modal-text)">
+                Please confirm your action
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-(--modal-text)">
+              Are you sure you want to export all the documents and embeddings?
+            </p>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-transparent text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover)"
+                onClick={() => setExportModalOpened(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="dashboard"
+                onClick={async () => {
+                  setExportModalOpened(false)
+                  const result = await handleExport(getCurrentPageName())
+                  if (result && result.message) {
+                    showToastOnUpdate(false, false, result.message)
+                  }
+                }}
+              >
+                Export
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
 }
 
-function errorStateForProjectFilesTable() {
+function ErrorStateForProjectFilesTable() {
   return (
-    <DataTable
-      aria-label="Project documents"
-      records={[]}
-      borderRadius="lg"
-      withColumnBorders
-      withBorder={true}
-      striped
-      highlightOnHover
-      height="80vh"
-      noRecordsText="No records"
-      // Error state:
-      noRecordsIcon={
-        <Stack align="center" p={30}>
-          <Text c="dimmed" size="md">
-            Ah! We hit a wall when fetching your documents. The database must be
-            on fire 🔥
-          </Text>
-          <Image
-            // width={"20vw"}
-            style={{ minWidth: 300, maxWidth: '30vw' }}
-            radius="lg"
-            src="https://assets.kastan.ai/this-is-fine.jpg"
-            alt="No data found"
-            // style={{ filter: 'grayscale(1)' }}
-          />
-          <Text c="dimmed" size="md">
-            So.. please try again later.
-          </Text>
-        </Stack>
-      }
-      style={{
-        width: '100%',
-      }}
-      columns={[
-        {
-          titleStyle: dataTableTitleStyles,
-          accessor: 'Name',
-        },
-        {
-          titleStyle: dataTableTitleStyles,
-          accessor: 'URL',
-        },
-        {
-          titleStyle: dataTableTitleStyles,
-          accessor: 'The Starting URL of Web Scraping',
-        },
-        {
-          titleStyle: dataTableTitleStyles,
-          accessor: 'doc_group',
-        },
-        {
-          titleStyle: dataTableTitleStyles,
-          accessor: 'actions',
-        },
-      ]}
-    />
+    <div className="flex h-[80vh] w-full flex-col rounded-lg border border-(--table-border)">
+      <Table aria-label="Project documents" className={TABLE_GRID_CLASSES}>
+        <TableHeader className="bg-(--table-header-background)">
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>URL</TableHead>
+            <TableHead>The Starting URL of Web Scraping</TableHead>
+            <TableHead>Document Groups</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+      </Table>
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <p className="text-center text-base text-(--foreground-faded)">
+          Ah! We hit a wall when fetching your documents. The database must be
+          on fire 🔥
+        </p>
+        {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary
+            external host not in the next/image remotePatterns allowlist */}
+        <img
+          src="https://assets.kastan.ai/this-is-fine.jpg"
+          alt="No data found"
+          className="max-w-[30vw] min-w-[300px] rounded-lg"
+        />
+        <p className="text-center text-base text-(--foreground-faded)">
+          So.. please try again later.
+        </p>
+      </div>
+    </div>
   )
 }
