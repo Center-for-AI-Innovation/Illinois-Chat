@@ -14,10 +14,14 @@ export function useDeleteFolder(
     onMutate: async (deletedFolder: FolderWithConversation) => {
       await queryClient.cancelQueries({ queryKey: ['folders', course_name] })
 
-      const oldFolder = queryClient.getQueryData(['folders', course_name])
+      // The folders query key also carries the search term, so match by
+      // prefix; an exact ['folders', course_name] key never exists.
+      const oldFolder = queryClient.getQueriesData<FolderWithConversation[]>({
+        queryKey: ['folders', course_name],
+      })
 
-      queryClient.setQueryData(
-        ['folders', course_name],
+      queryClient.setQueriesData(
+        { queryKey: ['folders', course_name] },
         (oldData: FolderWithConversation[] | undefined) => {
           const safeOld = Array.isArray(oldData) ? oldData : []
           return safeOld.filter(
@@ -29,7 +33,9 @@ export function useDeleteFolder(
       return { oldFolder, deletedFolder }
     },
     onError: (error, _variables, context) => {
-      queryClient.setQueryData(['folders', course_name], context?.oldFolder)
+      context?.oldFolder?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data)
+      })
       console.error('Error deleting folder from server:', error, context)
     },
     onSuccess: (_data, _variables, _context) => {

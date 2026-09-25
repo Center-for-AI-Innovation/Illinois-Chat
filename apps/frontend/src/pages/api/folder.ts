@@ -1,11 +1,27 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { db, folders, conversations, messages } from '~/db/dbClient'
+import { db, folders, conversations, messages, projects } from '~/db/dbClient'
 import { type FolderWithConversation } from '@/types/folder'
 import { type Database } from 'database.types'
 import { convertDBToChatConversation } from './conversation'
 import { type NewFolders } from '~/db/schema'
 import { eq, desc, and, or, ilike, inArray } from 'drizzle-orm'
+
+/**
+ * Resolve a course name to its `projects.id`, which is what folders are keyed
+ * by. Projects are inserted before a project goes live, so a course the caller
+ * is authorized for always has a row.
+ */
+async function resolveProjectId(courseName: string): Promise<number | null> {
+  const [project] = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(eq(projects.course_name, courseName))
+    .orderBy(projects.id)
+    .limit(1)
+
+  return project?.id ?? null
+}
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getUserIdentifier } from '~/server/userIdentifier'
 
@@ -33,12 +49,14 @@ export default withCourseAccessFromRequest('any')(handler)
 export function convertChatFolderToDBFolder(
   folder: FolderWithConversation,
   email: string,
+  projectId: number,
 ): NewFolders {
   return {
     id: folder.id,
     name: folder.name,
     type: folder.type.toString(),
     user_email: email,
+    project_id: projectId,
     created_at: new Date(folder.createdAt || new Date()),
     updated_at: new Date(),
   }
@@ -47,7 +65,8 @@ export function convertChatFolderToDBFolder(
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { method } = req
   const userIdentifier = getUserIdentifier(req)
-  const courseName = req.query.courseName as string | undefined
+  // Resolved and authorized by withCourseAccessFromRequest (query or body).
+  const courseName = req.courseName
   if (!userIdentifier) {
     return res.status(400).json({
       error: 'No valid user identifier provided',
@@ -58,13 +77,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   switch (method) {
     case 'POST':
+      if (!courseName) {
+        return res
+          .status(400)
+          .json({ error: 'courseName is required to save a folder' })
+      }
+
       const { folder }: { folder: FolderWithConversation } = req.body
-      //   Convert folder to DB type
-      const dbFolder = convertChatFolderToDBFolder(folder, userIdentifier)
 
       try {
-        // Insert or update folder using DrizzleORM
-        await db
+        const projectId = await resolveProjectId(courseName)
+        if (projectId === null) {
+          return res
+            .status(404)
+            .json({ error: `Project '${courseName}' does not exist` })
+        }
+
+        //   Convert folder to DB type
+        const dbFolder = convertChatFolderToDBFolder(
+          folder,
+          userIdentifier,
+          projectId,
+        )
+
+        // Insert or update folder using DrizzleORM. project_id is deliberately
+        // left out of the update: renaming a folder must not move it to
+        // whichever course the caller happens to be viewing.
+        const saved = await db
           .insert(folders)
           .values(dbFolder)
           .onConflictDoUpdate({
@@ -72,10 +111,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             set: {
               name: dbFolder.name,
               type: dbFolder.type,
-              user_email: dbFolder.user_email,
               updated_at: new Date(),
             },
+            where: eq(folders.user_email, userIdentifier),
           })
+          .returning({ id: folders.id })
+
+        if (saved.length === 0) {
+          return res
+            .status(403)
+            .json({ error: 'Not allowed to modify this folder' })
+        }
 
         res.status(200).json({ message: 'Folder saved successfully' })
       } catch (error) {
@@ -95,10 +141,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .json({ error: 'courseName query parameter is required' })
       }
       try {
-        const courseName = req.query.courseName as string
         const searchTerm = req.query.searchTerm as string
         const searchPattern =
           searchTerm && searchTerm.trim() !== '' ? `%${searchTerm}%` : undefined
+
+        const projectId = await resolveProjectId(courseName)
+        if (projectId === null) {
+          return res
+            .status(404)
+            .json({ error: `Project '${courseName}' does not exist` })
+        }
+
         // Query folders and their related conversations and messages using DrizzleORM
 
         // conversations matching by name or message content
@@ -109,9 +162,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .from(conversations)
           .leftJoin(messages, eq(messages.conversation_id, conversations.id))
           .where(
-            or(
-              ilike(conversations.name, searchPattern!),
-              ilike(messages.content_text, searchPattern!),
+            and(
+              eq(conversations.user_email, userIdentifier),
+              eq(conversations.project_name, courseName),
+              or(
+                ilike(conversations.name, searchPattern!),
+                ilike(messages.content_text, searchPattern!),
+              ),
             ),
           )
 
@@ -121,11 +178,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             id: folders.id,
           })
           .from(folders)
-          .where(ilike(folders.name, searchPattern!))
+          .where(
+            and(
+              eq(folders.user_email, userIdentifier),
+              eq(folders.project_id, projectId),
+              ilike(folders.name, searchPattern!),
+            ),
+          )
 
         const fetchedFolders = await db.query.folders.findMany({
           where: and(
             eq(folders.user_email, userIdentifier),
+            // Folders belong to exactly one project. Pre-0018 rows with a NULL
+            // project_id belong to none and are never listed.
+            eq(folders.project_id, projectId),
             searchPattern
               ? or(
                   // folder matched directly
@@ -140,7 +206,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                       })
                       .from(conversations)
                       .where(
-                        inArray(conversations.id, matchingConversationIds),
+                        and(
+                          eq(conversations.user_email, userIdentifier),
+                          eq(conversations.project_name, courseName),
+                          inArray(conversations.id, matchingConversationIds),
+                        ),
                       ),
                   ),
                 )
@@ -150,6 +220,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           with: {
             conversations: {
               where: and(
+                eq(conversations.user_email, userIdentifier),
                 eq(conversations.project_name, courseName),
                 searchPattern
                   ? or(
@@ -199,14 +270,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             },
           },
         })
-
-        if (
-          !fetchedFolders.some(
-            (folder) => folder.conversations && folder.conversations.length > 0,
-          )
-        ) {
-          return res.status(200).json([])
-        }
 
         // Convert the fetched data to match the expected format
         const formattedFolders = fetchedFolders.map((folder) => {
