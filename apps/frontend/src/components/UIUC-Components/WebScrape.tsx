@@ -1,28 +1,22 @@
 // Web Scrape
+import { Button } from '@/components/shadcn/ui/button'
+import { Input } from '@/components/shadcn/ui/input'
 import {
-  Button,
-  Input,
-  Title,
-  useMantineTheme,
   Tooltip,
-  TextInput,
-  Text,
-  SegmentedControl,
-  Center,
-  rem,
-  List,
-} from '@mantine/core'
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import {
   IconHome,
   IconSitemap,
   IconSubtask,
   IconWorld,
   IconWorldDownload,
+  IconHelp,
 } from '@tabler/icons-react'
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useRouter } from 'next/router'
-import { useMediaQuery } from '@mantine/hooks'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -59,11 +53,11 @@ export const WebScrape = ({
 }: WebScrapeProps) => {
   const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [url, setUrl] = useState('')
-  const [icon, setIcon] = useState(<IconWorldDownload size={'50%'} />)
+  const [icon, setIcon] = useState(
+    <IconWorldDownload size={24} aria-hidden="true" />,
+  )
   const [loadingSpinner, setLoadingSpinner] = useState(false)
   const router = useRouter()
-  const isSmallScreen = useMediaQuery('(max-width: 960px)')
-  const theme = useMantineTheme()
   const [maxUrls, setMaxUrls] = useState('50')
   const [scrapeStrategy, setScrapeStrategy] =
     useState<string>('equal-and-below')
@@ -285,308 +279,250 @@ export const WebScrape = ({
 
   return (
     <>
-      <Title
-        order={3}
-        className={`w-full text-center ${montserrat_heading.variable} pt-4 font-montserratHeading`}
+      <h3
+        className={`heading-h3 w-full text-center ${montserrat_heading.variable} font-montserratHeading pt-4`}
       >
         OR
-      </Title>
-      <Title
-        order={4}
-        className={`w-full text-center ${montserrat_heading.variable} mt-4 font-montserratHeading`}
+      </h3>
+      <h4
+        className={`heading-h4 w-full text-center ${montserrat_heading.variable} font-montserratHeading mt-4`}
       >
         Web scrape any website that allows it
-      </Title>
+      </h4>
 
       {loadingSpinner && (
         <>
-          <Input
-            icon={icon}
-            aria-label="Enter URL to scrape"
-            // I can't figure out how to change the background colors.
-            className={`mt-4 w-[80%] min-w-[20rem] disabled:bg-[--background-faded] lg:w-[75%]`}
-            // wrapperProps={{ borderRadius: 'xl' }}
-            // styles={{ input: { backgroundColor: '#1A1B1E' } }}
-            styles={{
-              input: {
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--background)',
-                paddingRight: '6rem', // Adjust right padding to prevent text from hiding behind the button
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-              },
-            }}
-            placeholder="Enter URL..."
-            radius={'xl'}
-            type="url" // Set the type to 'url' to avoid thinking it's a username or pw.
-            value={url}
-            size={'lg'}
-            disabled={isDisabled}
-            onChange={(e) => {
-              setUrl(e.target.value)
-              if (e.target.value.includes('coursera.org')) {
-                setIcon(
-                  <img
-                    src={'/media/coursera_logo_cutout.png'}
-                    alt="Coursera Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else if (e.target.value.includes('ocw.mit.edu')) {
-                setIcon(
-                  <img
-                    src={'/media/mitocw_logo.jpg'}
-                    alt="MIT OCW Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else if (e.target.value.includes('github.com')) {
-                setIcon(
-                  <img
-                    src="/media/github-mark-white.png"
-                    alt="GitHub Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else if (e.target.value.includes('canvas.illinois.edu')) {
-                setIcon(
-                  <img
-                    src="/media/canvas_logo.png"
-                    alt="Canvas Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else {
-                setIcon(<IconWorldDownload />)
-              }
-            }}
-            onKeyPress={(event) => {
-              if (event.key === 'Enter') {
-                handleSubmit()
-              }
-            }}
-            rightSection={
-              <Button
-                onClick={(e) => {
-                  e.preventDefault()
-                  if (validateInputs() && validateUrl(url)) {
-                    handleSubmit()
-                  }
-                }}
-                size="md"
-                radius={'xl'}
-                className={`rounded-s-md ${
-                  isUrlUpdated
-                    ? 'bg-[--dashboard-button]'
-                    : 'border-[--dashboard-button]'
-                } overflow-ellipsis text-ellipsis p-2 ${
-                  isUrlUpdated
-                    ? 'text-[--dashboard-button-foreground]'
-                    : 'text-[--dashboard-button-foreground]'
-                } min-w-[5rem] -translate-x-1 transform hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
-                w={`${isSmallScreen ? 'auto' : 'auto'}`}
-                disabled={isDisabled}
-              >
-                Ingest
-              </Button>
-            }
-            rightSectionWidth={isSmallScreen ? 'auto' : 'auto'}
-          />
+          <div className="relative mt-4 w-[80%] min-w-80 lg:w-[75%]">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 [&_img]:h-6 [&_img]:w-6 [&_img]:object-contain"
+            >
+              {icon}
+            </span>
+            <Input
+              aria-label="Enter URL to scrape"
+              className="h-12 w-full truncate rounded-full border-(--background-dark) bg-(--background) pr-24 pl-11 text-(--foreground) disabled:bg-(--background-faded)"
+              placeholder="Enter URL..."
+              type="url"
+              value={url}
+              disabled={isDisabled}
+              onChange={(e) => {
+                setUrl(e.target.value)
+                if (e.target.value.includes('coursera.org')) {
+                  setIcon(
+                    <img
+                      src={'/media/coursera_logo_cutout.png'}
+                      alt="Coursera Logo"
+                    />,
+                  )
+                } else if (e.target.value.includes('ocw.mit.edu')) {
+                  setIcon(
+                    <img src={'/media/mitocw_logo.jpg'} alt="MIT OCW Logo" />,
+                  )
+                } else if (e.target.value.includes('github.com')) {
+                  setIcon(
+                    <img
+                      src="/media/github-mark-white.png"
+                      alt="GitHub Logo"
+                    />,
+                  )
+                } else if (e.target.value.includes('canvas.illinois.edu')) {
+                  setIcon(
+                    <img src="/media/canvas_logo.png" alt="Canvas Logo" />,
+                  )
+                } else {
+                  setIcon(<IconWorldDownload size={24} aria-hidden="true" />)
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  handleSubmit()
+                }
+              }}
+            />
+            <Button
+              onClick={(e) => {
+                e.preventDefault()
+                if (validateInputs() && validateUrl(url)) {
+                  handleSubmit()
+                }
+              }}
+              className={`absolute top-1/2 right-1 min-w-20 -translate-y-1/2 rounded-full p-2 text-ellipsis ${
+                isUrlUpdated
+                  ? 'bg-(--dashboard-button)'
+                  : 'border-(--dashboard-button)'
+              } text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
+              disabled={isDisabled}
+            >
+              Ingest
+            </Button>
+          </div>
           <div className="pt-4" />
-          {/* <Text className="mt-4 text-lg font-bold text-red-600 underline"> */}
-          <Text
-            style={{ color: '#C1C2C5', fontSize: '16px' }}
-            className={`${montserrat_heading.variable} font-montserratHeading`}
+          <p
+            className={`${montserrat_heading.variable} font-montserratHeading text-base text-(--foreground)`}
           >
             Web scrape in progress...
-          </Text>
-          <Text
-            style={{ color: '#C1C2C5', textAlign: 'center', maxWidth: '80%' }}
-            className={`pb-3 ${montserrat_paragraph.variable} font-montserratParagraph`}
+          </p>
+          <p
+            className={`pb-3 text-center ${montserrat_paragraph.variable} font-montserratParagraph max-w-[80%] text-(--foreground)`}
           >
             Page refreshes upon completion. Your documents stay safe even if you
             navigate away.
-          </Text>
+          </p>
           <LoadingSpinner />
         </>
       )}
 
       {!loadingSpinner && (
         <>
-          <Input
-            //! THIS BOX IS DUPLICATED (from above). KEEP BOTH IN SYNC. For Loading states.
-            icon={icon}
-            aria-label="Enter URL to scrape"
-            // I can't figure out how to change the background colors.
-            className={`mt-4 w-[80%] min-w-[20rem] disabled:bg-[--background-faded] lg:w-[75%]`}
-            // wrapperProps={{ borderRadius: 'xl' }}
-            // styles={{ input: { backgroundColor: '#1A1B1E' } }}
-            styles={{
-              input: {
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--background)',
-                paddingRight: '6rem', // Adjust right padding to prevent text from hiding behind the button
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-              },
-            }}
-            placeholder="Enter URL..."
-            radius={'xl'}
-            type="url" // Set the type to 'url' to avoid thinking it's a username or pw.
-            value={url}
-            size={'lg'}
-            disabled={isDisabled}
-            onChange={(e) => {
-              setUrl(e.target.value)
-              if (e.target.value.includes('coursera.org')) {
-                setIcon(
-                  <img
-                    src={'/media/coursera_logo_cutout.png'}
-                    alt="Coursera Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else if (e.target.value.includes('ocw.mit.edu')) {
-                setIcon(
-                  <img
-                    src={'/media/mitocw_logo.jpg'}
-                    alt="MIT OCW Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else if (e.target.value.includes('github.com')) {
-                setIcon(
-                  <img
-                    src="/media/github-mark-white.png"
-                    alt="GitHub Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else if (e.target.value.includes('canvas.illinois.edu')) {
-                setIcon(
-                  <img
-                    src="/media/canvas_logo.png"
-                    alt="Canvas Logo"
-                    style={{ height: '50%', width: '50%' }}
-                  />,
-                )
-              } else {
-                setIcon(<IconWorldDownload />)
-              }
-            }}
-            onKeyPress={(event) => {
-              if (event.key === 'Enter') {
-                handleSubmit()
-              }
-            }}
-            rightSection={
-              <Button
-                onClick={(e) => {
-                  e.preventDefault()
-                  if (validateInputs() && validateUrl(url)) {
-                    handleSubmit()
-                  }
-                }}
-                size="md"
-                radius={'xl'}
-                className={`rounded-s-md ${
-                  isUrlUpdated
-                    ? 'bg-[--dashboard-button]'
-                    : 'border-[--dashboard-button]'
-                } overflow-ellipsis text-ellipsis p-2 ${
-                  isUrlUpdated
-                    ? 'text-[--dashboard-button-foreground]'
-                    : 'text-[--dashboard-button-foreground]'
-                } min-w-[5rem] -translate-x-1 transform hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]`}
-                w={`${isSmallScreen ? 'auto' : 'auto'}`}
-                disabled={isDisabled}
-              >
-                Ingest
-              </Button>
-            }
-            rightSectionWidth={isSmallScreen ? 'auto' : 'auto'}
-          />
+          {/*! THIS BOX IS DUPLICATED (from above). KEEP BOTH IN SYNC. For Loading states. */}
+          <div className="relative mt-4 w-[80%] min-w-80 lg:w-[75%]">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 [&_img]:h-6 [&_img]:w-6 [&_img]:object-contain"
+            >
+              {icon}
+            </span>
+            <Input
+              aria-label="Enter URL to scrape"
+              className="h-12 w-full truncate rounded-full border-(--background-dark) bg-(--background) pr-24 pl-11 text-(--foreground) disabled:bg-(--background-faded)"
+              placeholder="Enter URL..."
+              type="url"
+              value={url}
+              disabled={isDisabled}
+              onChange={(e) => {
+                setUrl(e.target.value)
+                if (e.target.value.includes('coursera.org')) {
+                  setIcon(
+                    <img
+                      src={'/media/coursera_logo_cutout.png'}
+                      alt="Coursera Logo"
+                    />,
+                  )
+                } else if (e.target.value.includes('ocw.mit.edu')) {
+                  setIcon(
+                    <img src={'/media/mitocw_logo.jpg'} alt="MIT OCW Logo" />,
+                  )
+                } else if (e.target.value.includes('github.com')) {
+                  setIcon(
+                    <img
+                      src="/media/github-mark-white.png"
+                      alt="GitHub Logo"
+                    />,
+                  )
+                } else if (e.target.value.includes('canvas.illinois.edu')) {
+                  setIcon(
+                    <img src="/media/canvas_logo.png" alt="Canvas Logo" />,
+                  )
+                } else {
+                  setIcon(<IconWorldDownload size={24} aria-hidden="true" />)
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  handleSubmit()
+                }
+              }}
+            />
+            <Button
+              onClick={(e) => {
+                e.preventDefault()
+                if (validateInputs() && validateUrl(url)) {
+                  handleSubmit()
+                }
+              }}
+              className={`absolute top-1/2 right-1 min-w-20 -translate-y-1/2 rounded-full p-2 text-ellipsis ${
+                isUrlUpdated
+                  ? 'bg-(--dashboard-button)'
+                  : 'border-(--dashboard-button)'
+              } text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)`}
+              disabled={isDisabled}
+            >
+              Ingest
+            </Button>
+          </div>
 
           {/* Detailed web ingest form */}
 
           <form
-            className="w-[80%] min-w-[20rem] lg:w-[75%]"
+            className="w-[80%] min-w-80 lg:w-[75%]"
             onSubmit={(event) => {
               event.preventDefault()
             }}
           >
-            <div className="pb-2 pt-2">
-              <Tooltip
-                multiline
-                w={400}
-                color="#15162b"
-                arrowPosition="side"
-                arrowSize={8}
-                withArrow
-                position="bottom-start"
-                label="We will attempt to visit this number of pages, but not all will be scraped if they're duplicates, broken or otherwise inaccessible."
-              >
-                <div>
-                  <Text
-                    style={{ color: '#C1C2C5', fontSize: '16px' }}
-                    className={`${montserrat_heading.variable} font-montserratHeading`}
+            <div className="pt-2 pb-2">
+              <div className="flex items-center gap-1">
+                <p
+                  className={`${montserrat_heading.variable} font-montserratHeading text-base text-(--foreground)`}
+                >
+                  Max Pages (1 to 500)
+                </p>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={<span className="inline-flex items-center" />}
                   >
-                    Max Pages (1 to 500)
-                  </Text>
-                  <TextInput
-                    styles={{ input: { backgroundColor: '#1A1B1E' } }}
-                    name="maximumUrls"
-                    aria-label="Max Pages (1 to 500)"
-                    radius="md"
-                    placeholder="Default 50"
-                    value={maxUrls}
-                    onChange={(e) => {
-                      handleInputChange(e, 'maxUrls')
-                    }}
-                    error={inputErrors.maxUrls.error}
-                  />
-                </div>
-              </Tooltip>
+                    <IconHelp
+                      size={16}
+                      aria-hidden="true"
+                      className="text-(--foreground-faded)"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[400px] text-wrap">
+                    We will attempt to visit this number of pages, but not all
+                    will be scraped if they&apos;re duplicates, broken or
+                    otherwise inaccessible.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                name="maximumUrls"
+                aria-label="Max Pages (1 to 500)"
+                placeholder="Default 50"
+                value={maxUrls}
+                onChange={(e) => {
+                  handleInputChange(e, 'maxUrls')
+                }}
+                aria-invalid={inputErrors.maxUrls.error}
+                className="mt-2 h-11 w-full rounded-md border-(--background-dark) bg-(--background-faded) text-(--foreground)"
+              />
             </div>
             {inputErrors.maxUrls.error && (
-              <p style={{ color: 'red' }}>{inputErrors.maxUrls.message}</p>
+              <p className="text-(--destructive)">
+                {inputErrors.maxUrls.message}
+              </p>
             )}
 
-            <Text
-              style={{ color: '#C1C2C5', fontSize: '16px' }}
-              className={`${montserrat_heading.variable} font-montserratHeading`}
+            <p
+              className={`${montserrat_heading.variable} font-montserratHeading text-base text-(--foreground)`}
             >
               Limit web crawl
-            </Text>
-            {/* <Text style={{ color: '#C1C2C5', fontSize: '16px' }} className={`${montserrat_paragraph.variable} font-montserratParagraph`}>Limit web crawl (from least to most inclusive)</Text> */}
+            </p>
             <div className="pl-3">
-              <List>
-                <List.Item>
+              <ul className="list-inside list-disc space-y-2 text-(--foreground)">
+                <li>
                   <strong>Equal and Below:</strong> Only scrape content that
                   starts will the given URL. E.g. nasa.gov/blogs will scrape all
                   blogs like nasa.gov/blogs/new-rocket but never go to
                   nasa.gov/events.
-                </List.Item>
-                <List.Item>
+                </li>
+                <li>
                   <strong>Same subdomain:</strong> Crawl the entire subdomain.
                   E.g. docs.nasa.gov will grab that entire subdomain, but not
                   nasa.gov or api.nasa.gov.
-                </List.Item>
-                <List.Item>
+                </li>
+                <li>
                   <strong>Entire domain:</strong> Crawl as much of this entire
                   website as possible. E.g. nasa.gov also includes docs.nasa.gov
-                </List.Item>
-                <List.Item>
+                </li>
+                <li>
                   <span>
                     <strong>All:</strong> Start on the given URL and wander the
                     web...{' '}
-                    <Text style={{ color: '#C1C2C5' }}>
+                    <span>
                       For more detail{' '}
                       <a
                         className={
-                          'text-[--dashboard-button] hover:text-[--dashboard-button-hover]'
+                          'text-(--dashboard-button) hover:text-(--dashboard-button-hover)'
                         }
                         href="https://docs.uiuc.chat/features/web-crawling-details"
                         target="_blank"
@@ -595,68 +531,59 @@ export const WebScrape = ({
                         read the docs
                       </a>
                       .
-                    </Text>
+                    </span>
                   </span>
-                </List.Item>
-              </List>
+                </li>
+              </ul>
             </div>
 
-            <Text style={{ color: '#C1C2C5' }}>
+            <p className="text-(--foreground)">
               <strong>I suggest starting with Equal and Below</strong>, then
               just re-run this if you need more later.
-            </Text>
+            </p>
             <div className="pt-2"></div>
-            <SegmentedControl
-              fullWidth
-              orientation="vertical"
-              size="sm"
-              radius="md"
-              value={scrapeStrategy}
-              onChange={(strat) => setScrapeStrategy(strat)}
-              data={[
-                {
-                  // Maybe use IconArrowBarDown ??
-                  value: 'equal-and-below',
-                  label: (
-                    <Center style={{ gap: 10 }}>
-                      <IconSitemap
-                        style={{ width: rem(16), height: rem(16) }}
-                      />
-                      <span>Equal and Below</span>
-                    </Center>
-                  ),
-                },
-                {
-                  value: 'same-hostname',
-                  label: (
-                    <Center style={{ gap: 10 }}>
-                      <IconSubtask
-                        style={{ width: rem(16), height: rem(16) }}
-                      />
-                      <span>Subdomain</span>
-                    </Center>
-                  ),
-                },
-                {
-                  value: 'same-domain',
-                  label: (
-                    <Center style={{ gap: 10 }}>
-                      <IconHome style={{ width: rem(16), height: rem(16) }} />
-                      <span>Entire domain</span>
-                    </Center>
-                  ),
-                },
-                {
-                  value: 'all',
-                  label: (
-                    <Center style={{ gap: 10 }}>
-                      <IconWorld style={{ width: rem(16), height: rem(16) }} />
-                      <span>All</span>
-                    </Center>
-                  ),
-                },
-              ]}
-            />
+            <div
+              role="radiogroup"
+              aria-label="Limit web crawl strategy"
+              className="flex flex-col gap-1 rounded-md bg-(--background-faded) p-1"
+            >
+              {(
+                [
+                  {
+                    value: 'equal-and-below',
+                    label: 'Equal and Below',
+                    Icon: IconSitemap,
+                  },
+                  {
+                    value: 'same-hostname',
+                    label: 'Subdomain',
+                    Icon: IconSubtask,
+                  },
+                  {
+                    value: 'same-domain',
+                    label: 'Entire domain',
+                    Icon: IconHome,
+                  },
+                  { value: 'all', label: 'All', Icon: IconWorld },
+                ] as const
+              ).map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={scrapeStrategy === value}
+                  onClick={() => setScrapeStrategy(value)}
+                  className={`flex items-center justify-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+                    scrapeStrategy === value
+                      ? 'bg-(--dashboard-button) text-(--dashboard-button-foreground)'
+                      : 'text-(--foreground) hover:text-(--dashboard-button)'
+                  }`}
+                >
+                  <Icon size={16} aria-hidden="true" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
           </form>
         </>
       )}

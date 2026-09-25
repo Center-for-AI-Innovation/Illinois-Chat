@@ -35,11 +35,9 @@ interface NavigationContentProps {
   courseName: string
 }
 
-// Shared nav-link classes (formerly the Mantine `link` createStyles entry).
-// Mantine tokens resolved: spacing.xs=10px, spacing.sm=12px, spacing.lg=20px, radius.sm=4px.
-// All colors remain the existing --navbar-* CSS variables. See docs/mantine-retirement-styles-notes.md.
+// Shared nav-link classes. Colors come from the --navbar-* CSS variables.
 const navLinkClass =
-  'flex items-center justify-center gap-[0.4rem] rounded px-3 py-2.5 text-[13px] font-bold text-[--navbar-foreground] transition-colors hover:bg-[--navbar-hover-background] hover:text-[--navbar-hover] hover:no-underline data-[active=true]:bg-[--navbar-background] data-[active=true]:text-[--navbar-active] data-[active=true]:no-underline max-md:justify-start max-md:rounded-none max-md:bg-[--navbar-background] max-md:px-3 max-md:py-5'
+  'flex items-center justify-center gap-[0.4rem] rounded px-3 py-2.5 text-[13px] font-bold text-(--navbar-foreground) transition-colors hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) hover:no-underline data-[active=true]:bg-(--navbar-background) data-[active=true]:text-(--navbar-active) data-[active=true]:no-underline max-md:justify-start max-md:rounded-none max-md:bg-(--navbar-background) max-md:px-3 max-md:py-5'
 
 const styles = {
   logoContainerBox: {
@@ -78,8 +76,8 @@ function Logo() {
             />
           </div>
 
-          <div className="text-2xl font-extrabold tracking-tight text-[--illinois-orange-branding] sm:ml-2 sm:text-[1.8rem]">
-            Illinois <span className="text-[--foreground]">Chat</span>
+          <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
+            Illinois <span className="text-(--foreground)">Chat</span>
           </div>
         </div>
       </Link>
@@ -135,11 +133,11 @@ function NavigationContent({
 }: NavigationContentProps) {
   return (
     <>
-      {/* Mobile dropdown (was Mantine <Transition pop-top-right> + <Paper>) */}
+      {/* Mobile dropdown */}
       {opened && (
         <nav
           aria-label="Mobile navigation"
-          className="absolute right-2 top-16 z-[2] w-[calc(100%-1rem)] max-w-[330px] origin-top-right overflow-visible rounded-[10px] border border-[--navbar-border] bg-[--background-faded] shadow-lg duration-200 animate-in fade-in-0 zoom-in-95 lg:hidden"
+          className="animate-in fade-in-0 zoom-in-95 absolute top-16 right-2 z-2 w-[calc(100%-1rem)] max-w-[330px] origin-top-right overflow-visible rounded-[10px] border border-(--navbar-border) bg-(--background-faded) shadow-lg duration-200 lg:hidden"
         >
           {items.map((item, index) => (
             <Link
@@ -187,7 +185,7 @@ function NavigationContent({
         aria-label="Toggle Menu"
         aria-expanded={opened}
         onClick={onToggle}
-        className="p-1 text-[--foreground] md:hidden [&_svg]:size-5"
+        className="p-1 text-(--foreground) md:hidden [&_svg]:size-5"
       >
         {opened ? (
           <IconX size={20} aria-hidden="true" />
@@ -259,12 +257,12 @@ export default function Navbar({
   ]
 
   return (
-    <div className="fixed left-0 right-0 top-0 z-[50] bg-[--navbar-background]">
-      {/* TODO: determine z-index values for major elements (nav, modals, tooltips, etc). for now, changed z-[999] to z-[50] to avoid modals being under the top navigation */}
+    <div className="fixed top-0 right-0 left-0 z-50 bg-(--navbar-background)">
+      {/* TODO: determine z-index values for major elements (nav, modals, tooltips, etc). for now, changed z-999 to z-50 to avoid modals being under the top navigation */}
       {/***************** top navigation for all pages *****************/}
 
       <div className="flex flex-row items-center justify-center">
-        <header className="flex h-20 w-full items-center border-b border-[--navbar-border] bg-[--navbar-background] p-2">
+        <header className="flex h-20 w-full items-center border-b border-(--navbar-border) bg-(--navbar-background) p-2">
           <Logo />
 
           {!isPlain && (

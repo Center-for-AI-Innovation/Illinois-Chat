@@ -1,16 +1,11 @@
 import React, { useState } from 'react'
+import { Button } from '@/components/shadcn/ui/button'
+import { Input } from '@/components/shadcn/ui/input'
 import {
-  Text,
-  Card,
   Tooltip,
-  Button,
-  Input,
-  TextInput,
-  List,
-  SegmentedControl,
-  Center,
-  rem,
-} from '@mantine/core'
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +20,7 @@ import {
   IconWorld,
   IconWorldDownload,
   IconArrowRight,
+  IconHelp,
 } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'
@@ -98,7 +94,13 @@ export default function WebsiteIngestForm({
       }))
     }
   }
-  const icon = <IconWorldDownload size={'50%'} aria-hidden="true" />
+  const icon = (
+    <IconWorldDownload
+      size={20}
+      aria-hidden="true"
+      className="text-(--foreground-faded)"
+    />
+  )
   const [scrapeStrategy, setScrapeStrategy] =
     useState<string>('equal-and-below')
   const [open, setOpen] = useState(false)
@@ -400,29 +402,26 @@ export default function WebsiteIngestForm({
         <DialogTrigger
           tabIndex={0}
           nativeButton={false}
-          className="focus:bg-[--dashboard-background-dark]"
+          className="focus:bg-(--dashboard-background-dark)"
           render={
-            <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-              style={{ height: '100%' }}
-            >
-              <div className="-ml-2 mb-2 flex items-center justify-between">
+            <div className="group relative h-full cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
+              <div className="mb-2 -ml-2 flex items-center justify-between">
                 <div className="flex items-center space-x-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full">
                     <IconWorldDownload className="h-8 w-8" aria-hidden="true" />
                   </div>
-                  <Text className="text-xl font-semibold text-[--dashboard-foreground]">
+                  <p className="text-xl font-semibold text-(--dashboard-foreground)">
                     Website
-                  </Text>
+                  </p>
                 </div>
               </div>
 
-              <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
+              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content from any website by providing the URL. Supports
                 recursive crawling with customizable depth.
-              </Text>
+              </p>
 
-              <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
+              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
                   size={16}
@@ -430,11 +429,11 @@ export default function WebsiteIngestForm({
                   className="ml-2 transition-transform group-hover:translate-x-1"
                 />
               </div>
-            </Card>
+            </div>
           }
         />
 
-        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto !rounded-2xl border-0 bg-[--modal] px-4 py-6 text-[--modal-text] sm:px-6">
+        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto rounded-2xl! border-0 bg-(--modal) px-4 py-6 text-(--modal-text) sm:px-6">
           <DialogHeader>
             <DialogTitle className="mb-2 text-left text-xl font-bold">
               Ingest Website
@@ -449,137 +448,107 @@ export default function WebsiteIngestForm({
                     event.preventDefault()
                   }}
                 >
-                  <Input
-                    icon={icon}
-                    aria-label="Website URL"
-                    className="w-full rounded-full"
-                    styles={{
-                      input: {
-                        color: 'var(--foreground)',
-                        backgroundColor: 'var(--background-faded)',
-                        borderColor: 'var(--background-dark)',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        '&:focus': {
-                          borderColor: 'var(--illinois-orange)',
-                        },
-                      },
-                      wrapper: {
-                        width: '100%',
-                      },
-                    }}
-                    placeholder="Enter URL..."
-                    radius="md"
-                    type="url"
-                    value={url}
-                    size="lg"
-                    onChange={(e) => {
-                      handleUrlChange(e)
-                    }}
-                  />
-                  <div className="pb-2 pt-2">
-                    <Tooltip
-                      multiline
-                      w={400}
-                      color="var(--tooltip-background)"
-                      arrowPosition="side"
-                      arrowSize={8}
-                      withArrow
-                      position="bottom-start"
-                      label="We will attempt to visit this number of pages, but not all will be scraped if they're duplicates, broken or otherwise inaccessible."
-                      styles={{
-                        tooltip: {
-                          color: 'var(--tooltip)',
-                          backgroundColor: 'var(--tooltip-background)',
-                        },
-                      }}
+                  <div className="relative w-full">
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
                     >
-                      <div className="mt-4">
-                        <Text
-                          style={{ fontSize: '16px' }}
-                          className={`${montserrat_heading.variable} font-montserratHeading`}
+                      {icon}
+                    </span>
+                    <Input
+                      aria-label="Website URL"
+                      className="h-12 w-full truncate rounded-full border-(--background-dark) bg-(--background-faded) pl-11 text-(--foreground) focus-visible:border-(--illinois-orange)"
+                      placeholder="Enter URL..."
+                      type="url"
+                      value={url}
+                      onChange={(e) => {
+                        handleUrlChange(e)
+                      }}
+                    />
+                  </div>
+                  <div className="pt-2 pb-2">
+                    <div className="mt-4">
+                      <div className="flex items-center gap-1">
+                        <p
+                          className={`${montserrat_heading.variable} font-montserratHeading text-base`}
                         >
                           Max Pages (1 to 500)
-                        </Text>
-
-                        <TextInput
-                          name="maximumUrls"
-                          aria-label="Max Pages (1 to 500)"
-                          radius="md"
-                          placeholder="Default 50"
-                          value={maxUrls}
-                          onChange={(e) => {
-                            handleInputChange(e, 'maxUrls')
-                          }}
-                          error={inputErrors.maxUrls.error}
-                          className="mt-2 w-full rounded-full"
-                          styles={{
-                            input: {
-                              color: 'var(--foreground)',
-                              backgroundColor:
-                                'var(--background-faded) !important',
-                              borderColor: 'var(--background-dark)',
-                              padding:
-                                'calc(var(--padding) * 1.5) calc(var(--padding) * .75)',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              '&:focus': {
-                                borderColor: 'var(--illinois-orange)',
-                              },
-                            },
-                            wrapper: {
-                              width: '100%',
-                            },
-                          }}
-                        />
+                        </p>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span className="inline-flex items-center" />
+                            }
+                          >
+                            <IconHelp
+                              size={16}
+                              aria-hidden="true"
+                              className="text-(--foreground-faded)"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[400px] text-wrap bg-(--tooltip-background) text-(--tooltip)">
+                            We will attempt to visit this number of pages, but
+                            not all will be scraped if they&apos;re
+                            duplicates, broken or otherwise inaccessible.
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
-                    </Tooltip>
+
+                      <Input
+                        name="maximumUrls"
+                        aria-label="Max Pages (1 to 500)"
+                        placeholder="Default 50"
+                        value={maxUrls}
+                        onChange={(e) => {
+                          handleInputChange(e, 'maxUrls')
+                        }}
+                        aria-invalid={inputErrors.maxUrls.error}
+                        className="mt-2 h-12 w-full rounded-full border-(--background-dark) bg-(--background-faded) text-(--foreground) focus-visible:border-(--illinois-orange)"
+                      />
+                    </div>
                   </div>
                   {inputErrors.maxUrls.error && (
-                    <p style={{ color: 'red' }}>
+                    <p className="text-(--destructive)">
                       {inputErrors.maxUrls.message}
                     </p>
                   )}
                   {inputErrors.maxDepth.error && (
-                    <p style={{ color: 'red' }}>
+                    <p className="text-(--destructive)">
                       {inputErrors.maxDepth.message}
                     </p>
                   )}
 
-                  <Text
-                    style={{ fontSize: '16px' }}
-                    className={`${montserrat_heading.variable} mt-4 font-montserratHeading`}
+                  <p
+                    className={`${montserrat_heading.variable} font-montserratHeading mt-4 text-base`}
                   >
                     Limit web crawl
-                  </Text>
+                  </p>
                   <div className="mt-2 pl-3">
-                    <List className="text-[--modal-text]">
-                      <List.Item>
+                    <ul className="list-inside list-disc space-y-2 text-(--modal-text)">
+                      <li>
                         <strong>Equal and Below:</strong> Only scrape content
                         that starts will the given URL. E.g. nasa.gov/blogs will
                         scrape all blogs like nasa.gov/blogs/new-rocket but
                         never go to nasa.gov/events.
-                      </List.Item>
-                      <List.Item>
+                      </li>
+                      <li>
                         <strong>Same subdomain:</strong> Crawl the entire
                         subdomain. E.g. docs.nasa.gov will grab that entire
                         subdomain, but not nasa.gov or api.nasa.gov.
-                      </List.Item>
-                      <List.Item>
+                      </li>
+                      <li>
                         <strong>Entire domain:</strong> Crawl as much of this
                         entire website as possible. E.g. nasa.gov also includes
                         docs.nasa.gov
-                      </List.Item>
-                      <List.Item>
+                      </li>
+                      <li>
                         <span>
                           <strong>All:</strong> Start on the given URL and
                           wander the web...{' '}
-                          <Text>
+                          <span>
                             For more detail{' '}
                             <a
-                              className={'font-bold text-[--link]'}
+                              className={'font-bold text-(--link)'}
                               href="https://docs.uiuc.chat/features/web-crawling-details"
                               target="_blank"
                               rel="noopener noreferrer"
@@ -587,89 +556,59 @@ export default function WebsiteIngestForm({
                               read the docs
                             </a>
                             .
-                          </Text>
+                          </span>
                         </span>
-                      </List.Item>
-                    </List>
+                      </li>
+                    </ul>
                   </div>
 
-                  <Text className="mt-4">
+                  <p className="mt-4">
                     <strong>I suggest starting with Equal and Below</strong>,
                     then just re-run this if you need more later.
-                  </Text>
+                  </p>
 
-                  <SegmentedControl
-                    fullWidth
-                    orientation="vertical"
-                    size="sm"
-                    radius="none"
-                    value={scrapeStrategy}
-                    onChange={(strat) => setScrapeStrategy(strat)}
-                    className="mt-4 bg-[--background-faded]"
-                    styles={{
-                      indicator: {
-                        color: 'var(--dashboard-button-foreground)',
-                        backgroundColor: 'var(--dashboard-button)',
-                      },
-                      label: {
-                        color: 'var(--foreground)',
-
-                        '&:hover': {
-                          color: 'var(--dashboard-button)',
+                  <div
+                    role="radiogroup"
+                    aria-label="Limit web crawl strategy"
+                    className="mt-4 flex flex-col gap-1 rounded-md bg-(--background-faded) p-1"
+                  >
+                    {(
+                      [
+                        {
+                          value: 'equal-and-below',
+                          label: 'Equal and Below',
+                          Icon: IconSitemap,
                         },
-                      },
-                    }}
-                    data={[
-                      {
-                        value: 'equal-and-below',
-                        label: (
-                          <Center style={{ gap: 10 }}>
-                            <IconSitemap
-                              style={{ width: rem(16), height: rem(16) }}
-                              aria-hidden="true"
-                            />
-                            <span>Equal and Below</span>
-                          </Center>
-                        ),
-                      },
-                      {
-                        value: 'same-hostname',
-                        label: (
-                          <Center style={{ gap: 10 }}>
-                            <IconSubtask
-                              style={{ width: rem(16), height: rem(16) }}
-                              aria-hidden="true"
-                            />
-                            <span>Subdomain</span>
-                          </Center>
-                        ),
-                      },
-                      {
-                        value: 'same-domain',
-                        label: (
-                          <Center style={{ gap: 10 }}>
-                            <IconHome
-                              style={{ width: rem(16), height: rem(16) }}
-                              aria-hidden="true"
-                            />
-                            <span>Entire domain</span>
-                          </Center>
-                        ),
-                      },
-                      {
-                        value: 'all',
-                        label: (
-                          <Center style={{ gap: 10 }}>
-                            <IconWorld
-                              style={{ width: rem(16), height: rem(16) }}
-                              aria-hidden="true"
-                            />
-                            <span>All</span>
-                          </Center>
-                        ),
-                      },
-                    ]}
-                  />
+                        {
+                          value: 'same-hostname',
+                          label: 'Subdomain',
+                          Icon: IconSubtask,
+                        },
+                        {
+                          value: 'same-domain',
+                          label: 'Entire domain',
+                          Icon: IconHome,
+                        },
+                        { value: 'all', label: 'All', Icon: IconWorld },
+                      ] as const
+                    ).map(({ value, label, Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={scrapeStrategy === value}
+                        onClick={() => setScrapeStrategy(value)}
+                        className={`flex items-center justify-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+                          scrapeStrategy === value
+                            ? 'bg-(--dashboard-button) text-(--dashboard-button-foreground)'
+                            : 'text-(--foreground) hover:text-(--dashboard-button)'
+                        }`}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </form>
               </div>
             </div>
@@ -678,7 +617,7 @@ export default function WebsiteIngestForm({
             <Button
               onClick={handleIngest}
               disabled={!isUrlValid}
-              className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
+              className="h-11 w-full rounded-xl bg-(--dashboard-button) text-(--dashboard-button-foreground) transition-colors hover:bg-(--dashboard-button-hover) disabled:bg-(--background-faded) disabled:text-(--background-dark)"
             >
               Ingest the Website
             </Button>

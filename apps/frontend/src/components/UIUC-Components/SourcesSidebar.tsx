@@ -1,4 +1,3 @@
-import { Text } from '@mantine/core'
 import { IconArrowBarRight } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useCallback, useEffect, useRef } from 'react'
@@ -162,7 +161,7 @@ const SourcesSidebar = ({
   const renderContent = () => {
     if (!contexts?.length) {
       return (
-        <div className="mt-8 select-none text-center opacity-50">
+        <div className="mt-8 text-center opacity-50 select-none">
           <span
             className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
           >
@@ -211,13 +210,13 @@ const SourcesSidebar = ({
       <div className="flex flex-col">
         {citedContexts.length > 0 && (
           <div>
-            <div className="sticky top-0 z-10 border-b border-[--sources-border] bg-[--sources-header-background] px-4 py-3">
-              <Text
+            <div className="sticky top-0 z-10 border-b border-(--sources-border) bg-(--sources-header-background) px-4 py-3">
+              <p
                 className={`text-sm font-semibold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 Citations{' '}
                 {citedContexts.length === contexts.length && '(All Sources)'}
-              </Text>
+              </p>
             </div>
             <div className="flex flex-col gap-3 p-4">
               {citedContexts.map(({ context, displayIndex }) => (
@@ -241,12 +240,12 @@ const SourcesSidebar = ({
 
         {remainingContexts.length > 0 && (
           <div>
-            <div className="sticky top-0 z-10 border-b border-[--sources-border] bg-[--sources-header-background] px-4 py-3">
-              <Text
+            <div className="sticky top-0 z-10 border-b border-(--sources-border) bg-(--sources-header-background) px-4 py-3">
+              <p
                 className={`text-sm font-semibold ${montserrat_heading.variable} font-montserratHeading`}
               >
                 {citedContexts.length === 0 ? 'All Sources' : 'More Sources'}
-              </Text>
+              </p>
             </div>
             <div className="flex flex-col gap-3 p-4">
               {remainingContexts.map(({ context, displayIndex }) => (
@@ -277,7 +276,7 @@ const SourcesSidebar = ({
         ref={sidebarRef}
         role="complementary"
         aria-label="Sources sidebar"
-        className="fixed bottom-0 right-0 top-20 z-[1000] flex w-[260px] flex-col bg-[--sources-background] text-[--sources-foreground] shadow-lg"
+        className="fixed top-20 right-0 bottom-0 z-1000 flex w-[260px] flex-col bg-(--sources-background) text-(--sources-foreground) shadow-lg"
         style={{ height: 'calc(100vh - 80px)' }}
       >
         <div className="flex-1 overflow-y-auto">{renderContent()}</div>
@@ -285,7 +284,7 @@ const SourcesSidebar = ({
         <button
           ref={closeButtonRef}
           tabIndex={0}
-          className={`absolute right-[270px] top-5 z-50 h-7 w-7 text-[--foreground-faded] hover:text-[--foreground] sm:top-0.5 sm:h-8 sm:w-8`}
+          className={`absolute top-5 right-[270px] z-50 h-7 w-7 text-(--foreground-faded) hover:text-(--foreground) sm:top-0.5 sm:h-8 sm:w-8`}
           type="button"
           aria-label="Close sources sidebar"
           onClick={handleClose}

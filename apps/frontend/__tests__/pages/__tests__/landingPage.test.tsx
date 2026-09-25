@@ -1,7 +1,6 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MantineProvider } from '@mantine/core'
 
 vi.mock('~/components/UIUC-Components/GlobalFooter', () => ({
   default: () => <footer data-testid="footer" />,
@@ -14,12 +13,7 @@ vi.mock('~/components/UIUC-Components/navbars/GlobalHeader', () => ({
 import Home from '~/pages/index'
 
 describe('Landing page (src/pages/index.tsx)', () => {
-  const renderPage = () =>
-    render(
-      <MantineProvider>
-        <Home />
-      </MantineProvider>,
-    )
+  const renderPage = () => render(<Home />)
 
   it('renders an H1 element for WCAG 2.4.1 compliance', () => {
     renderPage()

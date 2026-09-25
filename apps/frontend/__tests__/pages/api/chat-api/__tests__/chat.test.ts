@@ -371,37 +371,43 @@ describe('chat-api/chat', () => {
       expect.any(Object),
       expect.any(String),
       ['All Documents'],
+      100,
     )
   })
 
-  it('preserves provided doc_groups instead of overriding to All Documents', async () => {
-    hoisted.handleContextSearch.mockClear()
-    const res = createMockRes()
-    await chat(
-      createMockReq({
-        method: 'POST',
-        body: {
-          model: 'gpt-4o',
-          messages: [{ id: 'm1', role: 'user', content: 'hi' }],
-          temperature: 0.1,
-          course_name: 'CS101',
-          stream: false,
-          api_key: 'k',
-          retrieval_only: false,
-          doc_groups: ['Group A'],
-        },
-        socket: { remoteAddress: '127.0.0.1' } as unknown,
-      }) as Parameters<typeof chat>[0],
-      res as Parameters<typeof chat>[1],
-    )
-    expect(hoisted.handleContextSearch).toHaveBeenCalledWith(
-      expect.any(Object),
-      'CS101',
-      expect.any(Object),
-      expect.any(String),
-      ['Group A'],
-    )
-  })
+  it.each([undefined, 10])(
+    'preserves provided doc_groups and forwards top_n=%s',
+    async (top_n) => {
+      hoisted.handleContextSearch.mockClear()
+      const res = createMockRes()
+      await chat(
+        createMockReq({
+          method: 'POST',
+          body: {
+            model: 'gpt-4o',
+            messages: [{ id: 'm1', role: 'user', content: 'hi' }],
+            temperature: 0.1,
+            course_name: 'CS101',
+            stream: false,
+            api_key: 'k',
+            retrieval_only: false,
+            doc_groups: ['Group A'],
+            top_n,
+          },
+          socket: { remoteAddress: '127.0.0.1' } as unknown,
+        }) as Parameters<typeof chat>[0],
+        res as Parameters<typeof chat>[1],
+      )
+      expect(hoisted.handleContextSearch).toHaveBeenCalledWith(
+        expect.any(Object),
+        'CS101',
+        expect.any(Object),
+        expect.any(String),
+        ['Group A'],
+        top_n ?? 100,
+      )
+    },
+  )
 
   it('invokes handleImageContent and handleToolsServer when image content and tools are present', async () => {
     hoisted.fetchToolsServer.mockResolvedValueOnce([{ id: 't1' }])

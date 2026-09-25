@@ -1,5 +1,5 @@
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
-import { Title, Text, Group, Badge } from '@mantine/core'
+import { Badge } from '@/components/shadcn/ui/badge'
 
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { IconSunset2 } from '@tabler/icons-react'
@@ -76,41 +76,37 @@ export default function Unsubscribe() {
     <MainPageBackground>
       <div className="w-full max-w-md space-y-6 rounded-lg bg-[#15162c] p-8 shadow-lg">
         <div className="space-y-2 text-center">
-          <Title
-            size="h3"
-            className={`${montserrat_heading.className} inline-block select-text p-0 text-neutral-200`}
+          <h3
+            className={`heading-h3 ${montserrat_heading.className} inline-block p-0 text-neutral-200 select-text`}
           >
             Unsubscribe <span style={{ fontSize: '22px' }}>🎉</span>
-          </Title>
+          </h3>
         </div>
-        <Text
-          size="md"
-          className={`${montserrat_paragraph.className} inline-block select-text p-0 text-neutral-200`}
+        <p
+          className={`${montserrat_paragraph.className} inline-block p-0 text-base text-neutral-200 select-text`}
         >
           Unsubscribe from the UIUC.chat email newsletter.
-        </Text>
-        <Text
-          size="sm"
-          className={`${montserrat_paragraph.className} select-text p-0 text-neutral-200`}
+        </p>
+        <p
+          className={`${montserrat_paragraph.className} p-0 text-sm text-neutral-200 select-text`}
         >
           I guess your inbox just got a little bit cleaner, but less exciting
           😒{' '}
-        </Text>
-        <Group>
-          <Text
-            size="md"
-            className={`${montserrat_paragraph.className} select-text p-0 text-neutral-200`}
+        </p>
+        <div className="flex items-center gap-2">
+          <p
+            className={`${montserrat_paragraph.className} p-0 text-base text-neutral-200 select-text`}
           >
             Email:
-          </Text>
-          <Badge size="lg" color="var(--link)" radius="md">
+          </p>
+          <Badge className="h-auto rounded-md bg-(--link) px-3 py-1 text-sm text-white">
             {email}
           </Badge>
-        </Group>
+        </div>
 
         <div>
           <button
-            className="flex w-full justify-center rounded-md border border-transparent bg-[--button] px-4 py-2 text-sm font-medium text-[--button-text-color] hover:bg-[--button-hover] hover:text-[--button-hover-text-color] focus:outline-none focus:ring-2"
+            className="flex w-full justify-center rounded-md border border-transparent bg-(--button) px-4 py-2 text-sm font-medium text-(--button-text-color) hover:bg-(--button-hover) hover:text-(--button-hover-text-color) focus:ring-2 focus:outline-hidden"
             onClick={handleSubmit}
           >
             Unsubscribe

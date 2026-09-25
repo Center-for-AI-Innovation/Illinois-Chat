@@ -1,17 +1,29 @@
+import { Button } from '@/components/shadcn/ui/button'
+import { Card } from '@/components/shadcn/ui/card'
+import { Input } from '@/components/shadcn/ui/input'
 import {
-  ActionIcon,
-  Button,
-  Card,
-  Flex,
-  Group,
-  Select,
-  Stack,
-  Text,
-  TextInput,
-  Title,
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxInputGroup,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from '@/components/shadcn/ui/combobox'
+import {
   Tooltip,
-} from '@mantine/core'
-import { IconAlertTriangleFilled, IconX } from '@tabler/icons-react'
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
+import {
+  IconAlertTriangleFilled,
+  IconChevronDown,
+  IconX,
+} from '@tabler/icons-react'
 import {
   type CountryOfConcern,
   getCountryOfConcern,
@@ -25,7 +37,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Head from 'next/head'
 import Image from 'next/image'
-import React, { forwardRef, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { getModelLogo } from '~/components/Chat/ModelSelect'
 import SettingsLayout, {
   getInitialCollapsedState,
@@ -74,12 +86,12 @@ function FieldInfo({ field }: { field: FieldApi<any, any, any, any> }) {
   return (
     <>
       {field.state.meta.isTouched && field.state.meta.errors.length ? (
-        <Text size="xs" color="red">
+        <p className="text-xs text-red-500">
           {field.state.meta.errors.join(', ')}
-        </Text>
+        </p>
       ) : null}
       {field.state.meta.isValidating ? (
-        <Text size="xs">Validating...</Text>
+        <p className="text-xs">Validating...</p>
       ) : null}
     </>
   )
@@ -98,12 +110,16 @@ export const APIKeyInput = ({
     setError(null)
   }, [field.state.value])
 
+  const inputId = `API-key-input-${placeholder.toLowerCase().replace(/\s+/g, '-')}`
+
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <TextInput
-          id={`API-key-input-${placeholder.toLowerCase().replace(/\s+/g, '-')}`}
-          label={placeholder}
+    <div className="relative w-full">
+      <div className="flex items-center">
+        <label htmlFor={inputId} className="sr-only">
+          {placeholder}
+        </label>
+        <Input
+          id={inputId}
           type="password"
           placeholder={placeholder}
           aria-label={placeholder}
@@ -117,50 +133,31 @@ export const APIKeyInput = ({
               field.form.handleSubmit()
             }
           }}
-          style={{ flex: 1 }}
-          styles={{
-            label: { color: 'var(--dashboard-foreground-faded)' },
-            input: {
-              color: 'var(--foreground)',
-              backgroundColor: 'var(--background)',
-              padding: '8px',
-              borderRadius: '4px',
-            },
-          }}
+          className="flex-1 rounded-[4px] bg-(--background) p-2 text-(--foreground)"
         />
-        <ActionIcon
+        <Button
+          type="submit"
+          variant="ghost"
+          size="icon-xs"
           aria-label="Clear"
-          size="xs"
           onClick={(e) => {
             e.preventDefault()
             field.handleChange('')
             field.form.handleSubmit()
           }}
-          type="submit"
-          className="text-[--foreground-faded] hover:bg-[--dashboard-button] hover:text-[--dashboard-button-foreground] hover:text-[white]"
-          style={{ marginLeft: '8px' }}
+          className="ml-2 text-(--foreground-faded) hover:bg-(--dashboard-button) hover:text-(--dashboard-button-foreground) hover:text-white"
         >
           <IconX size={12} aria-hidden="true" />
-        </ActionIcon>
+        </Button>
       </div>
       <FieldInfo field={field} />
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '8px',
-        }}
-      >
-        {error && (
-          <Text color="red" size="sm">
-            {error}
-          </Text>
-        )}
+      <div className="mt-2 flex items-center justify-between">
+        {error && <p className="text-sm text-red-500">{error}</p>}
         <div>
           <Button
-            compact
-            className="bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover]"
+            type="button"
+            size="xs"
+            className="bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover)"
             onClick={() => {
               field.form.handleSubmit()
             }}
@@ -235,26 +232,55 @@ const NewModelDropdown: React.FC<{
     await onChange(next)
   }
 
+  // Grouped by provider, in LLM_PROVIDER_ORDER, nested per Base UI
+  // Combobox's grouping API.
+  const groupedModels: ModelComboboxGroup[] = Object.entries(
+    enabledProvidersAndModels,
+  )
+    .sort(([providerA], [providerB]) => {
+      const indexA = LLM_PROVIDER_ORDER.indexOf(providerA as ProviderNames)
+      const indexB = LLM_PROVIDER_ORDER.indexOf(providerB as ProviderNames)
+      // Providers not in the order list will be placed at the end
+      if (indexA === -1) return 1
+      if (indexB === -1) return -1
+      return indexA - indexB
+    })
+    .map(([, provider]) => ({
+      value: provider.provider as string,
+      items: (provider.models ?? []).map((model: AnySupportedModel) => ({
+        value: model.id,
+        label: model.name,
+        // @ts-ignore -- this being missing is fine
+        downloadSize: model?.downloadSize,
+        modelId: model.id,
+        selectedModelId: value?.id,
+        modelType: provider.provider,
+        // @ts-ignore -- this being missing is fine
+        vram_required_MB: model.vram_required_MB,
+      })),
+    }))
+    .filter((group) => group.items.length > 0)
+
+  const selectedComboboxItem =
+    groupedModels
+      .flatMap((group) => group.items)
+      .find((item) => item.value === value?.id) ?? null
+
   return (
     <>
-      <label
-        id="default-model-label"
-        htmlFor="default-model-select"
-        className="sr-only"
-      >
-        Select default model
-      </label>
-      <Select
-        className="z-[30] flex w-full flex-col flex-wrap p-2 text-sm"
-        size="md"
-        aria-label="Select default model"
-        aria-labelledby="default-model-label"
-        placeholder="Select a model"
-        id="default-model-select"
-        searchable
-        value={value?.id || ''}
-        onChange={async (modelId) => {
-          const nextModel = allModels.find((model) => model.id === modelId)
+      <Combobox
+        items={groupedModels}
+        value={selectedComboboxItem}
+        isItemEqualToValue={(item, val) =>
+          (item as ModelComboboxItem | null)?.value ===
+          (val as ModelComboboxItem | null)?.value
+        }
+        onValueChange={async (item) => {
+          const selected = item as ModelComboboxItem | null
+          if (!selected) return
+          const nextModel = allModels.find(
+            (model) => model.id === selected.value,
+          )
           if (!nextModel) return
           const country = getCountryOfConcern(nextModel.id)
           if (country && !isChatbotCocAcknowledged(chatbotId)) {
@@ -263,44 +289,9 @@ const NewModelDropdown: React.FC<{
           }
           await onChange(nextModel)
         }}
-        data={Object.entries(enabledProvidersAndModels)
-          // Sort by LLM_PROVIDER_ORDER
-          .sort(([providerA], [providerB]) => {
-            const indexA = LLM_PROVIDER_ORDER.indexOf(
-              providerA as ProviderNames,
-            )
-            const indexB = LLM_PROVIDER_ORDER.indexOf(
-              providerB as ProviderNames,
-            )
-            // Providers not in the order list will be placed at the end
-            if (indexA === -1) return 1
-            if (indexB === -1) return -1
-            return indexA - indexB
-          })
-          .flatMap(
-            ([_, provider]) =>
-              provider.models?.map((model: AnySupportedModel) => ({
-                value: model.id,
-                label: model.name,
-                // @ts-ignore -- this being missing is fine
-                downloadSize: model?.downloadSize,
-                modelId: model.id,
-                selectedModelId: value,
-                modelType: provider.provider,
-                group: provider.provider,
-                // @ts-ignore -- this being missing is fine
-                vram_required_MB: model.vram_required_MB,
-              })) || [],
-          )}
-        itemComponent={(props) => (
-          <ModelItem {...props} setLoadingModelId={() => {}} />
-        )}
-        maxDropdownHeight={520}
-        // Reserve a fixed gutter when the warning icon is present so the
-        // absolutely-positioned rightSection never paints over the model name.
-        rightSectionWidth={selectedModelCountry ? 32 : 'auto'}
-        icon={
-          selectedModel ? (
+      >
+        <ComboboxInputGroup className="w-full border-(--button) bg-(--background) text-(--foreground)">
+          {selectedModel && (
             <Image
               // @ts-ignore -- this being missing is fine
               src={getModelLogo(selectedModel.provider)}
@@ -308,97 +299,72 @@ const NewModelDropdown: React.FC<{
               alt={`${selectedModel.provider} logo`}
               width={20}
               height={20}
-              style={{ marginLeft: '4px', borderRadius: '4px' }}
+              aria-hidden="true"
+              style={{ borderRadius: '4px' }}
             />
-          ) : null
-        }
-        rightSection={
-          selectedModelCountry ? (
-            <Tooltip
-              multiline
-              width={280}
-              withArrow
-              label={getCountryOfConcernShortMessage(selectedModelCountry)}
-            >
-              <span
-                aria-label={`Country of concern warning: ${selectedModelCountry}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  pointerEvents: 'auto',
-                }}
-              >
-                <IconAlertTriangleFilled
-                  size="1rem"
-                  aria-hidden="true"
-                  style={{ color: '#eab308' }}
-                />
-              </span>
-            </Tooltip>
-          ) : null
-        }
-        // rightSection={<IconChevronDown size="1rem" className="mr-2" />}
-        classNames={{
-          root: 'w-full',
-          wrapper: 'w-full',
-          input: `${montserrat_paragraph.variable} font-montserratParagraph ${
-            isSmallScreen ? 'text-xs' : 'text-sm'
-          } w-full`,
-          rightSection: 'pointer-events-none',
-          item: `${montserrat_paragraph.variable} font-montserratParagraph ${
-            isSmallScreen ? 'text-xs' : 'text-sm'
-          }`,
-        }}
-        styles={(theme) => ({
-          input: {
-            color: 'var(--foreground)',
-            backgroundColor: 'var(--background)',
-            borderColor: 'var(--button)',
-            // Long model names ellipsis rather than running under the
-            // warning icon in the rightSection.
-            textOverflow: 'ellipsis',
-            // color: theme.white,
-            // borderRadius: theme.radius.md,
-            // width: '24rem',
-            // [`@media (max-width: 960px)`]: {
-            //   width: '17rem', // Smaller width for small screens
-            // },
-          },
-          dropdown: {
-            backgroundColor: 'var(--background)',
-            border: '1px solid var(--background-dark)',
-            borderRadius: theme.radius.md,
-            marginTop: '2px',
-            boxShadow: theme.shadows.xs,
-            width: '100%',
-            maxWidth: '100%',
-            position: 'absolute',
-          },
-          item: {
-            color: 'var(--foreground)',
-            backgroundColor: 'var(--background)',
-            borderRadius: theme.radius.md,
-            margin: '2px',
-            '&[data-selected]': {
-              '&': {
-                color: 'var(--foreground)',
-                backgroundColor: 'transparent',
-              },
-              '&:hover': {
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--foreground-faded)',
-              },
-            },
-            '&[data-hovered]': {
-              color: 'var(--foreground)',
-              backgroundColor: 'var(--foreground-faded)',
-            },
-          },
-        })}
-        dropdownPosition="bottom"
-        withinPortal
-        zIndex={40}
-      />
+          )}
+          <ComboboxInput
+            id="default-model-select"
+            placeholder="Select a model"
+            aria-label="Select a model"
+            className={`${montserrat_paragraph.variable} font-montserratParagraph truncate text-ellipsis ${
+              isSmallScreen ? 'text-xs' : 'text-sm'
+            }`}
+          />
+          <div className="flex items-center gap-1">
+            {selectedModelCountry && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      aria-label={`Country of concern warning: ${selectedModelCountry}`}
+                      className="inline-flex items-center"
+                    />
+                  }
+                >
+                  <IconAlertTriangleFilled
+                    size="1rem"
+                    aria-hidden="true"
+                    className="text-yellow-500"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[280px] text-wrap">
+                  {getCountryOfConcernShortMessage(selectedModelCountry)}
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <ComboboxTrigger className="text-(--foreground)">
+              <IconChevronDown size="1rem" aria-hidden="true" />
+            </ComboboxTrigger>
+          </div>
+        </ComboboxInputGroup>
+        <ComboboxContent
+          className="rounded-md border border-(--background-dark) bg-(--background) text-(--foreground) shadow-xs"
+          style={{ maxHeight: '520px' }}
+        >
+          <ComboboxEmpty>Nothing found</ComboboxEmpty>
+          <ComboboxList>
+            {(group: ModelComboboxGroup) => (
+              <ComboboxGroup key={group.value} items={group.items}>
+                <ComboboxGroupLabel>{group.value}</ComboboxGroupLabel>
+                <ComboboxCollection>
+                  {(item: ModelComboboxItem) => (
+                    <ComboboxItem
+                      key={item.value}
+                      value={item}
+                      className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground) data-highlighted:bg-(--foreground-faded) ${
+                        isSmallScreen ? 'text-xs' : 'text-sm'
+                      }`}
+                    >
+                      <ModelItem {...item} />
+                    </ComboboxItem>
+                  )}
+                </ComboboxCollection>
+              </ComboboxGroup>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
 
       <CountryOfConcernModal
         opened={pendingDefault !== null}
@@ -423,92 +389,58 @@ const NewModelDropdown: React.FC<{
   )
 }
 
-interface ModelItemProps extends React.ComponentPropsWithoutRef<'div'> {
+interface ModelComboboxItem {
+  value: string
   label: string
   downloadSize?: string
-  isDownloaded?: boolean
   modelId: string
   selectedModelId: string | undefined
   modelType: string
   vram_required_MB: number
 }
 
-export const ModelItem = forwardRef<
-  HTMLDivElement,
-  ModelItemProps & {
-    loadingModelId: string | null
-  }
->(
-  (
-    {
-      label,
-      downloadSize,
-      isDownloaded,
-      modelId,
-      selectedModelId,
-      modelType,
-      vram_required_MB,
-      loadingModelId,
-      ...others
-    }: ModelItemProps & {
-      loadingModelId: string | null
-    },
-    ref,
-  ) => {
-    const countryOfConcern = getCountryOfConcern(modelId)
-    return (
-      <>
-        <div ref={ref} {...others}>
-          <Group noWrap>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Image
-                  aria-hidden="true"
-                  src={getModelLogo(modelType) || ''}
-                  alt={`${modelType} logo`}
-                  width={20}
-                  height={20}
-                  style={{ marginRight: '8px', borderRadius: '4px' }}
-                />
-                {/* {selectedModelId === modelId ? (
-                <IconCircleCheck stroke={2} />
-              ) : (
-                <IconCircleDashed stroke={2} />
-              )} */}
-                <Text size="sm" style={{ marginLeft: '8px' }}>
-                  {label}
-                </Text>
-                {countryOfConcern && (
-                  <Tooltip
-                    multiline
-                    width={280}
-                    withArrow
-                    label={getCountryOfConcernShortMessage(countryOfConcern)}
-                  >
-                    <span
-                      aria-label={`Country of concern warning: ${countryOfConcern}`}
-                      style={{
-                        marginLeft: '6px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <IconAlertTriangleFilled
-                        size="0.9rem"
-                        aria-hidden="true"
-                        style={{ color: '#eab308' }}
-                      />
-                    </span>
-                  </Tooltip>
-                )}
-              </div>
-            </div>
-          </Group>
-        </div>
-      </>
-    )
-  },
-)
+interface ModelComboboxGroup {
+  value: string
+  items: ModelComboboxItem[]
+}
+
+export function ModelItem({ label, modelId, modelType }: ModelComboboxItem) {
+  const countryOfConcern = getCountryOfConcern(modelId)
+  return (
+    <div className="flex flex-nowrap items-center">
+      <Image
+        aria-hidden="true"
+        src={getModelLogo(modelType) || ''}
+        alt={`${modelType} logo`}
+        width={20}
+        height={20}
+        style={{ marginRight: '8px', borderRadius: '4px' }}
+      />
+      <span className="ml-2 text-sm">{label}</span>
+      {countryOfConcern && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span
+                aria-label={`Country of concern warning: ${countryOfConcern}`}
+                className="ml-1.5 inline-flex items-center"
+              />
+            }
+          >
+            <IconAlertTriangleFilled
+              size="0.9rem"
+              aria-hidden="true"
+              className="text-yellow-500"
+            />
+          </TooltipTrigger>
+          <TooltipContent className="max-w-[280px] text-wrap">
+            {getCountryOfConcernShortMessage(countryOfConcern)}
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  )
+}
 
 export function findDefaultModel(
   providers: AllLLMProviders,
@@ -727,17 +659,17 @@ export default function APIKeyInputForm({
       >
         <div>
           {/* Default Model Section */}
-          <div className="rounded-lg border border-[--dashboard-border] bg-[--dashboard-sidebar-background] p-4">
-            <h4 className="text-lg font-bold text-[--foreground]">
+          <div className="rounded-lg border border-(--dashboard-border) bg-(--dashboard-sidebar-background) p-4">
+            <h4 className="text-lg font-bold text-(--foreground)">
               Default Model
             </h4>
-            <p className="mb-3 text-sm text-[--foreground-faded]">
+            <p className="mb-3 text-sm text-(--foreground-faded)">
               Choose the default model for your chatbot. Users can still
               override this default.
             </p>
             <div className="flex justify-center">
               {isLoadingLLMProviders ? (
-                <Skeleton className="h-10 w-full rounded-md bg-[--dashboard-background-faded]" />
+                <Skeleton className="h-10 w-full rounded-md bg-(--dashboard-background-faded)" />
               ) : llmProviders ? (
                 <NewModelDropdown
                   value={findDefaultModel(llmProviders) as AnySupportedModel}
@@ -764,20 +696,13 @@ export default function APIKeyInputForm({
           </div>
 
           {/* Open source LLMs */}
-          <h4 className="mt-6 text-lg font-bold text-[--foreground]">
+          <h4 className="mt-6 text-lg font-bold text-(--foreground)">
             Open source LLMs
           </h4>
-          <p className="mb-3 text-sm text-[--foreground-faded]">
+          <p className="mb-3 text-sm text-(--foreground-faded)">
             Your weights, your rules.
           </p>
-          <Flex
-            direction={{ base: 'column', '75rem': 'row' }}
-            wrap="wrap"
-            justify="flex-start"
-            align="flex-start"
-            className="gap-4"
-            w={'100%'}
-          >
+          <div className="flex w-full flex-col flex-wrap items-start justify-start gap-4 xl:flex-row">
             <NCSAHostedLLmsProviderInput
               provider={llmProviders?.NCSAHosted as NCSAHostedProvider}
               form={form}
@@ -798,23 +723,16 @@ export default function APIKeyInputForm({
               form={form}
               isLoading={isLoadingLLMProviders}
             />
-          </Flex>
+          </div>
 
-          <h4 className="mt-6 text-lg font-bold text-[--foreground]">
+          <h4 className="mt-6 text-lg font-bold text-(--foreground)">
             Closed source LLMs
           </h4>
-          <p className="mb-3 text-sm text-[--foreground-faded]">
+          <p className="mb-3 text-sm text-(--foreground-faded)">
             The best performers, but you gotta pay their prices and follow their
             rules.
           </p>
-          <Flex
-            direction={{ base: 'column', '75rem': 'row' }}
-            wrap="wrap"
-            justify="flex-start"
-            align="flex-start"
-            className="gap-4"
-            w={'100%'}
-          >
+          <div className="flex w-full flex-col flex-wrap items-start justify-start gap-4 xl:flex-row">
             <AnthropicProviderInput
               provider={llmProviders?.Anthropic as AnthropicProvider}
               form={form}
@@ -845,7 +763,7 @@ export default function APIKeyInputForm({
               form={form}
               isLoading={isLoadingLLMProviders}
             />
-          </Flex>
+          </div>
         </div>
       </form>
     </div>
@@ -874,58 +792,40 @@ export default function APIKeyInputForm({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main min-w-screen flex min-h-screen flex-col items-center"
+        className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
         <h1 className="sr-only">{projectName} — LLMs — Illinois Chat</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
-          <Flex direction="column" align="center" w="100%">
+          <div className="flex w-full flex-col items-center">
             <Card
-              withBorder
-              padding="none"
-              radius="xl"
-              className={`mt-[2%] ${cardWidthClasses}`}
+              className={`mt-[2%] ${cardWidthClasses} gap-0 rounded-4xl border py-0 text-base shadow-none ring-0`}
               style={{
-                // maxWidth: '90%',
-                // width: '100%',
-                marginTop: '2%',
                 backgroundColor: 'var(--background)',
                 borderColor: 'var(--dashboard-border)',
               }}
             >
-              <Flex className="flex-col md:flex-row">
+              <div className="flex flex-col md:flex-row">
                 <div
                   style={{
                     border: 'None',
-                    color: 'text-[--foreground]',
+                    color: 'text-(--foreground)',
                   }}
-                  className="min-h-full flex-[1_1_100%] bg-[--background] md:flex-[1_1_70%]"
+                  className="min-h-full flex-[1_1_100%] bg-(--background) md:flex-[1_1_70%]"
                 >
-                  <Flex
-                    gap="md"
-                    direction="column"
-                    justify="flex-start"
-                    align="flex-start"
-                    className="lg:ml-4"
-                  >
-                    <Title
-                      order={2}
-                      align="left"
-                      className={`pl-4 pr-2 pt-4 ${montserrat_heading.variable} font-montserratHeading text-[--foreground]`}
+                  <div className="flex flex-col items-start justify-start gap-4 lg:ml-4">
+                    <h2
+                      className={`heading-h2 pt-4 pr-2 pl-4 text-left ${montserrat_heading.variable} font-montserratHeading text-(--foreground)`}
                     >
                       {/* API Keys: Add LLMs to your Chatbot */}
                       Configure LLM Providers for your Chatbot
-                    </Title>
-                    <Title
-                      className={`${montserrat_heading.variable} flex-[1_1_50%] font-montserratHeading text-[--foreground]`}
-                      order={3}
-                      px={18}
-                      ml={'md'}
-                      style={{ textAlign: 'left' }}
+                    </h2>
+                    <h3
+                      className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading ml-4 flex-[1_1_50%] px-[18px] text-left text-(--foreground)`}
                     >
                       Configure which LLMs are available to your users. Enable
                       or disable models to balance price and performance.
-                    </Title>
-                    <Stack align="center" justify="start">
+                    </h3>
+                    <div className="flex flex-col items-center justify-start">
                       <form
                         onSubmit={(e) => {
                           e.preventDefault()
@@ -934,36 +834,20 @@ export default function APIKeyInputForm({
                         }}
                       >
                         {/* Providers */}
-                        <div
-                          className="px-8 pb-8"
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 16,
-                          }}
-                        >
+                        <div className="flex flex-col gap-4 px-8 pb-8">
                           <>
-                            <Title
-                              className={`${montserrat_heading.variable} mt-4 font-montserratHeading text-[--foreground]`}
-                              order={3}
+                            <h3
+                              className={`heading-h3 ${montserrat_heading.variable} font-montserratHeading mt-4 text-(--foreground)`}
                             >
                               Closed source LLMs
-                            </Title>
-                            <Text
-                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-[--foreground-faded]`}
-                              size="md"
+                            </h3>
+                            <p
+                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-base text-(--foreground-faded)`}
                             >
                               The best performers, but you gotta pay their
                               prices and follow their rules.
-                            </Text>
-                            <Flex
-                              direction="row"
-                              wrap="wrap"
-                              justify="flex-start"
-                              align="flex-start"
-                              className="gap-4"
-                              w={'100%'}
-                            >
+                            </p>
+                            <div className="flex w-full flex-row flex-wrap items-start justify-start gap-4">
                               {' '}
                               <AnthropicProviderInput
                                 provider={
@@ -1012,27 +896,18 @@ export default function APIKeyInputForm({
                                 form={form}
                                 isLoading={isLoadingLLMProviders}
                               />
-                            </Flex>
-                            <Title
-                              className={`-mb-3 ${montserrat_heading.variable} mt-4 font-montserratHeading text-[--foreground]`}
-                              order={3}
+                            </div>
+                            <h3
+                              className={`heading-h3 -mb-3 ${montserrat_heading.variable} font-montserratHeading mt-4 text-(--foreground)`}
                             >
                               Open source LLMs
-                            </Title>
-                            <Text
-                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-[--foreground-faded]`}
-                              size="md"
+                            </h3>
+                            <p
+                              className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-base text-(--foreground-faded)`}
                             >
                               Your weights, your rules.
-                            </Text>
-                            <Flex
-                              direction="row"
-                              wrap="wrap"
-                              justify="flex-start"
-                              align="flex-start"
-                              className="gap-4"
-                              w={'100%'}
-                            >
+                            </p>
+                            <div className="flex w-full flex-row flex-wrap items-start justify-start gap-4">
                               {' '}
                               <NCSAHostedLLmsProviderInput
                                 provider={
@@ -1062,12 +937,12 @@ export default function APIKeyInputForm({
                                 form={form}
                                 isLoading={isLoadingLLMProviders}
                               />
-                            </Flex>
+                            </div>
                           </>
                         </div>
                       </form>
-                    </Stack>
-                  </Flex>
+                    </div>
+                  </div>
                 </div>
                 <div
                   className="flex flex-[1_1_100%] md:flex-[1_1_30%]"
@@ -1084,25 +959,23 @@ export default function APIKeyInputForm({
                   <div className="flex h-full flex-col justify-center">
                     <div className="flex flex-auto flex-col gap-2 p-2">
                       <div className="pb-4">
-                        <Title
-                          className={`px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
-                          order={3}
+                        <h3
+                          className={`heading-h3 px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
                         >
                           Default Model
-                        </Title>
+                        </h3>
                         <br />
-                        <Text
-                          className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph`}
-                          size="md"
+                        <p
+                          className={`pl-1 ${montserrat_paragraph.variable} font-montserratParagraph text-base`}
                         >
                           Choose the default model for your chatbot. Users can
                           still override this default to use any of the models
                           enabled on the left.
-                        </Text>
+                        </p>
                         <br />
                         <div className="flex justify-center">
                           {isLoadingLLMProviders ? (
-                            <Skeleton className="h-10 w-full rounded-md bg-[--dashboard-background-faded]" />
+                            <Skeleton className="h-10 w-full rounded-md bg-(--dashboard-background-faded)" />
                           ) : llmProviders ? (
                             <NewModelDropdown
                               value={
@@ -1200,7 +1073,7 @@ export default function APIKeyInputForm({
                     </div>
                   </div>
                 </div>
-              </Flex>
+              </div>
             </Card>
 
             {/* SECTION: OTHER INFO, TBD */}
@@ -1242,7 +1115,7 @@ export default function APIKeyInputForm({
                 </div>
               </Flex>
             </div> */}
-          </Flex>
+          </div>
         </div>
       </main>
 
@@ -1270,4 +1143,3 @@ export const showConfirmationToast = ({
     autoClose: autoClose,
   })
 }
-ModelItem.displayName = 'ModelItem'
