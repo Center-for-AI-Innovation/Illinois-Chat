@@ -17,10 +17,14 @@ export function useCreateFolder(
     onMutate: async (newFolder: FolderWithConversation) => {
       await queryClient.cancelQueries({ queryKey: ['folders', course_name] })
 
-      const oldFolders = queryClient.getQueryData(['folders', course_name])
+      // The folders query key also carries the search term, so match by
+      // prefix; an exact ['folders', course_name] key never exists.
+      const oldFolders = queryClient.getQueriesData<FolderInterface[]>({
+        queryKey: ['folders', course_name],
+      })
 
-      queryClient.setQueryData(
-        ['folders', course_name],
+      queryClient.setQueriesData(
+        { queryKey: ['folders', course_name] },
         (oldData: FolderInterface[] | undefined) => {
           const safeOld = Array.isArray(oldData) ? oldData : []
           return [newFolder, ...safeOld]
@@ -30,7 +34,9 @@ export function useCreateFolder(
       return { newFolder, oldFolders }
     },
     onError: (error, _variables, context) => {
-      queryClient.setQueryData(['folders', course_name], context?.oldFolders)
+      context?.oldFolders?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data)
+      })
       console.error('Error saving updated folder to server:', error, context)
     },
     onSuccess: (_data, _variables, _context) => {
