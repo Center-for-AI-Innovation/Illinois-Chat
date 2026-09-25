@@ -30,12 +30,20 @@ export function ChatbotsGlobalNav({
       <div className="mx-auto flex h-[72px] w-full max-w-[1680px] items-center justify-between px-4 sm:px-8">
         <Link
           href="/"
-          className={`text-xl font-bold text-(--illinois-blue) sm:text-2xl dark:text-white ${montserrat_heading.variable} font-montserratHeading`}
+          className={`relative flex items-center gap-0 font-bold ${montserrat_heading.variable} font-montserratHeading`}
         >
-          <span className="text-(--illinois-orange-branding) dark:text-white">
-            Illinois{' '}
-          </span>
-          <span className="dark:text-white">Chat</span>
+          <div style={{ width: '2.5rem', height: '2.5rem' }}>
+            <img
+              alt="Illinois Logo"
+              src="/media/logo_illinois.png"
+              width="auto"
+              height="100%"
+            ></img>
+          </div>
+
+          <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
+            Illinois <span className="text-(--foreground)">Chat</span>
+          </div>
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">
