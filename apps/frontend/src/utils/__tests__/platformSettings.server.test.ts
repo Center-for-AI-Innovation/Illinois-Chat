@@ -67,9 +67,8 @@ describe('readAnnouncementBanner', () => {
   it('reports configured for a valid stored record', async () => {
     redisReturning({ hGet: vi.fn(async () => JSON.stringify(VALID_BANNER)) })
 
-    const { readAnnouncementBanner } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readAnnouncementBanner } =
+      await import('~/utils/platformSettings.server')
     const result = await readAnnouncementBanner()
 
     expect(result).toEqual({ state: 'configured', value: VALID_BANNER })
@@ -78,18 +77,16 @@ describe('readAnnouncementBanner', () => {
   it('reports absent for an unset field', async () => {
     redisReturning()
 
-    const { readAnnouncementBanner } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readAnnouncementBanner } =
+      await import('~/utils/platformSettings.server')
     expect(await readAnnouncementBanner()).toEqual({ state: 'absent' })
   })
 
   it('reports invalid for malformed JSON instead of throwing', async () => {
     redisReturning({ hGet: vi.fn(async () => '{not json') })
 
-    const { readAnnouncementBanner } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readAnnouncementBanner } =
+      await import('~/utils/platformSettings.server')
     const result = await readAnnouncementBanner()
 
     expect(result.state).toBe('invalid')
@@ -102,18 +99,16 @@ describe('readAnnouncementBanner', () => {
       ),
     })
 
-    const { readAnnouncementBanner } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readAnnouncementBanner } =
+      await import('~/utils/platformSettings.server')
     expect((await readAnnouncementBanner()).state).toBe('invalid')
   })
 
   it('reports unavailable rather than throwing when Redis is down', async () => {
     hoisted.ensureRedisConnected.mockRejectedValue(new Error('ECONNREFUSED'))
 
-    const { readAnnouncementBanner } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readAnnouncementBanner } =
+      await import('~/utils/platformSettings.server')
     const result = await readAnnouncementBanner()
 
     // This is the build-time path. Throwing here fails `next build`.
@@ -125,9 +120,8 @@ describe('readMaintenanceSettings', () => {
   it('treats unset keys as maintenance simply being off', async () => {
     redisReturning()
 
-    const { readMaintenanceSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readMaintenanceSettings } =
+      await import('~/utils/platformSettings.server')
     expect(await readMaintenanceSettings()).toEqual({
       state: 'configured',
       value: { enabled: false, titleText: '', bodyText: '' },
@@ -137,9 +131,8 @@ describe('readMaintenanceSettings', () => {
   it('only treats the exact string "true" as enabled', async () => {
     redisReturning({ get: vi.fn(async () => 'TRUE') })
 
-    const { readMaintenanceSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readMaintenanceSettings } =
+      await import('~/utils/platformSettings.server')
     const result = await readMaintenanceSettings()
     expect(result.state === 'configured' && result.value.enabled).toBe(false)
   })
@@ -147,9 +140,8 @@ describe('readMaintenanceSettings', () => {
   it('reports unavailable when Redis is down', async () => {
     hoisted.ensureRedisConnected.mockRejectedValue(new Error('down'))
 
-    const { readMaintenanceSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readMaintenanceSettings } =
+      await import('~/utils/platformSettings.server')
     expect((await readMaintenanceSettings()).state).toBe('unavailable')
   })
 })
@@ -158,9 +150,8 @@ describe('readPlatformSettings', () => {
   it('surfaces an unreadable banner as a warning, not as saved state', async () => {
     redisReturning({ hGet: vi.fn(async () => '{not json') })
 
-    const { readPlatformSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
     const snapshot = await readPlatformSettings()
 
     // An operator must not be shown a blank form that looks like the saved
@@ -173,9 +164,8 @@ describe('readPlatformSettings', () => {
   it('carries the audit fields through when configured', async () => {
     redisReturning({ hGet: vi.fn(async () => JSON.stringify(VALID_BANNER)) })
 
-    const { readPlatformSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
     const snapshot = await readPlatformSettings()
 
     expect(snapshot).toMatchObject({
@@ -184,6 +174,23 @@ describe('readPlatformSettings', () => {
       updatedBy: VALID_BANNER.updatedBy,
     })
     expect(snapshot.warning).toBeUndefined()
+  })
+
+  it('falls back to empty maintenance copy when that read fails on its own', async () => {
+    hoisted.ensureRedisConnected.mockRejectedValue(new Error('down'))
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.bannerState).toBe('unavailable')
+    expect(snapshot.settings.maintenance).toEqual({
+      enabled: false,
+      titleText: '',
+      bodyText: '',
+    })
+    expect(snapshot.warning).toContain('Maintenance settings could not be read')
+    expect(snapshot.updatedAt).toBeUndefined()
   })
 })
 
@@ -201,20 +208,17 @@ describe('writePlatformSettings', () => {
   it('writes the banner and all three maintenance keys in one MULTI', async () => {
     const { multiCalls, multi } = redisReturning()
 
-    const { writePlatformSettings } = await import(
-      '~/utils/platformSettings.server'
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const { updatedAt } = await writePlatformSettings(
+      input,
+      'admin@example.com',
     )
-    const { updatedAt } = await writePlatformSettings(input, 'admin@example.com')
 
     // One logical save. A partial apply could leave maintenance on with the
     // previous notice copy.
     expect(multi.exec).toHaveBeenCalledTimes(1)
-    expect(multiCalls.map(([op]) => op)).toEqual([
-      'hSet',
-      'set',
-      'set',
-      'set',
-    ])
+    expect(multiCalls.map(([op]) => op)).toEqual(['hSet', 'set', 'set', 'set'])
 
     const stored = JSON.parse(String(multiCalls[0]![1][2]))
     expect(stored).toMatchObject({
@@ -228,9 +232,8 @@ describe('writePlatformSettings', () => {
   it('writes the literal string "false" when maintenance is off', async () => {
     const { multiCalls } = redisReturning()
 
-    const { writePlatformSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
     await writePlatformSettings(
       { ...input, maintenance: { ...input.maintenance, enabled: false } },
       'admin@example.com',
@@ -242,9 +245,8 @@ describe('writePlatformSettings', () => {
   it('rejects an invalid payload before opening the transaction', async () => {
     const { multi } = redisReturning()
 
-    const { writePlatformSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
     await expect(
       writePlatformSettings(
         {
@@ -265,9 +267,8 @@ describe('writePlatformSettings', () => {
   it('propagates a Redis failure rather than reporting a save', async () => {
     hoisted.ensureRedisConnected.mockRejectedValue(new Error('down'))
 
-    const { writePlatformSettings } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
     await expect(
       writePlatformSettings(input, 'admin@example.com'),
     ).rejects.toThrow('down')
@@ -280,9 +281,8 @@ describe('super-admin grants', () => {
       sMembers: vi.fn(async () => ['Zoe@example.com', 'amy@EXAMPLE.com']),
     })
 
-    const { readSuperAdminGrants } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readSuperAdminGrants } =
+      await import('~/utils/platformSettings.server')
     expect(await readSuperAdminGrants()).toEqual({
       state: 'configured',
       value: ['amy@example.com', 'zoe@example.com'],
@@ -292,18 +292,16 @@ describe('super-admin grants', () => {
   it('reports unavailable rather than throwing', async () => {
     hoisted.ensureRedisConnected.mockRejectedValue(new Error('down'))
 
-    const { readSuperAdminGrants } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { readSuperAdminGrants } =
+      await import('~/utils/platformSettings.server')
     expect((await readSuperAdminGrants()).state).toBe('unavailable')
   })
 
   it('normalizes case on write', async () => {
     const { client } = redisReturning()
 
-    const { addSuperAdminGrant, removeSuperAdminGrant } = await import(
-      '~/utils/platformSettings.server'
-    )
+    const { addSuperAdminGrant, removeSuperAdminGrant } =
+      await import('~/utils/platformSettings.server')
     await addSuperAdminGrant('Mixed@Example.com')
     await removeSuperAdminGrant('Mixed@Example.com')
 
