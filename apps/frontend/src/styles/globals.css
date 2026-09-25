@@ -46,6 +46,24 @@
   outline-offset: 2px !important;
 }
 
+/*
+ * Composite inputs (shadcn InputGroup / Combobox input group): the text input
+ * is only part of the visible field, so the indicator moves to the wrapper and
+ * encloses the icons, chips, and buttons too. More specific than the rule
+ * above; the doc-group-multiselect override further down still wins.
+ */
+[data-slot='input-group'] [data-slot='input-group-control']:focus-visible,
+[data-slot='combobox-input-group'] [data-slot='combobox-input']:focus-visible {
+  outline: none !important;
+}
+[data-slot='input-group']:has([data-slot='input-group-control']:focus-visible),
+[data-slot='combobox-input-group']:has(
+    [data-slot='combobox-input']:focus-visible
+  ) {
+  outline: 2px solid var(--illinois-orange) !important;
+  outline-offset: 2px !important;
+}
+
 /* Skip navigation link for keyboard/screen reader users */
 .skip-nav-link {
   position: absolute;

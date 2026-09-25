@@ -4,6 +4,24 @@ import { AuthenticatedUser } from '~/proxy'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
+
+// Platform super admins get project access through a live check here rather
+// than by being written into each project's `course_admins`. A stored snapshot
+// cannot be revoked — every project seeded while someone was listed keeps
+// granting them admin rights invisibly — whereas this re-reads the allowlist
+// on every request, so removing a grant takes effect immediately.
+//
+// Three deliberate limits:
+//   - Admin tier and below only. The owner tier is never bypassed, so
+//     ownership stays meaningful and `withCourseOwnerAccess` is untouched.
+//   - Never bypasses the `is_frozen` 403 or the 404 for a missing project.
+//   - Only consulted *after* the normal check fails. `&&` short-circuits, so
+//     an ordinary authorized request never pays for the extra Redis read.
+//
+// The synchronous predicates (isCourseAdmin, isCourseOwner, hasCourseAccess)
+// stay synchronous on purpose: roughly seventy files read `course_admins`
+// through them, and making them async would ripple through all of it.
 
 // Helper function to get course metadata from Redis
 export async function getCourseMetadata(
@@ -103,8 +121,11 @@ export function withCourseAccess(courseName: string) {
         })
       }
 
-      // Check if user has access to the course
-      if (!hasCourseAccess(req.user, courseMetadata)) {
+      // Check if user has access to the course, or is a platform super admin
+      if (
+        !hasCourseAccess(req.user, courseMetadata) &&
+        !(await isSuperAdminAsync(req.user.email))
+      ) {
         return res.status(403).json({
           error: 'Access denied',
           message: `You don't have access to Project '${courseName}'`,
@@ -146,10 +167,11 @@ export function withCourseAdminAccess(courseName: string) {
         })
       }
 
-      // Check if user is course admin or owner or if course allows logged in users
+      // Check if user is course admin or owner, or a platform super admin
       if (
         !isCourseOwner(req.user, courseMetadata) &&
-        !isCourseAdmin(req.user, courseMetadata)
+        !isCourseAdmin(req.user, courseMetadata) &&
+        !(await isSuperAdminAsync(req.user.email))
       ) {
         return res.status(403).json({
           error: 'Insufficient permissions',
@@ -192,7 +214,8 @@ export function withCourseOwnerAccess(courseName: string) {
         })
       }
 
-      // Check if user is course owner
+      // Owner tier: no super-admin bypass by design. See the note at the top
+      // of this file.
       if (!isCourseOwner(req.user, courseMetadata)) {
         return res.status(403).json({
           error: 'Insufficient permissions',
@@ -244,10 +267,11 @@ export function withCourseOwnerOrAdminAccess() {
         })
       }
 
-      // Check if user has access to the course
+      // Check if user has access to the course, or is a platform super admin
       if (
         !isCourseAdmin(req.user, courseMetadata) &&
-        !isCourseOwner(req.user, courseMetadata)
+        !isCourseOwner(req.user, courseMetadata) &&
+        !(await isSuperAdminAsync(req.user.email))
       ) {
         return res.status(403).json({
           error: 'Access denied',
@@ -367,10 +391,17 @@ export function withCourseAccessFromRequest(
           // Determine required access for this HTTP method
           const method = (req.method || 'GET').toUpperCase() as Method
           const requiredLevel: AccessLevel =
-            typeof access === 'string' ? access : (access[method] ?? 'any')
+            typeof access === 'string' ? access : access[method] ?? 'any'
 
-          // Check access
-          if (!hasAccessForLevel(requiredLevel, req.user, courseMetadata)) {
+          // Check access. The super-admin bypass is gated on the tier: at
+          // 'owner' the stored owner check is the only way through.
+          if (
+            !hasAccessForLevel(requiredLevel, req.user, courseMetadata) &&
+            !(
+              requiredLevel !== 'owner' &&
+              (await isSuperAdminAsync(req.user.email))
+            )
+          ) {
             const label = requiredLevel
             return res.status(403).json({
               error: 'Access denied',

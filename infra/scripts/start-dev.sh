@@ -66,7 +66,7 @@ EOF
 # makes decryption fail and per-project overrides silently fall back to defaults.
 # Generate once into the root .env, then sync into the app-local .env files.
 ensure_encryption_master_key() {
-	if [ -n "${ENCRYPTION_MASTER_KEY:-}" ]; then
+	if [ -n "${ENCRYPTION_MASTER_KEY-}" ]; then
 		return
 	fi
 	print_status "Generating ENCRYPTION_MASTER_KEY (shared by backend, worker, and frontend)..."
@@ -147,7 +147,7 @@ ensure_local_app_envs() {
 	local aws_region="${AWS_REGION:-us-east-1}"
 	local keycloak_admin="${KEYCLOAK_ADMIN_USERNAME:-admin}"
 	local keycloak_password="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
-	local encryption_master_key="${ENCRYPTION_MASTER_KEY:-}"
+	local encryption_master_key="${ENCRYPTION_MASTER_KEY-}"
 	local allowed_embedding_providers="${ALLOWED_EMBEDDING_PROVIDERS:-openai,ollama}"
 	local default_course_admins="${DEFAULT_COURSE_ADMINS:-}"
 
@@ -277,6 +277,11 @@ ensure_local_app_envs() {
 	print_success "App-local .env files are ready."
 }
 
+DEV_APPS_PID_FILE="${REPO_ROOT}/.illinois-chat-dev-apps.pid"
+DEV_APPS_PIDS=()
+DEV_APPS_CLEANED=false
+BACKEND_PYTHON=""
+
 # Function to show usage
 show_usage() {
 	echo "Usage: $0 [OPTIONS]"
@@ -286,6 +291,8 @@ show_usage() {
 	echo "                    (recreates the database schema as part of the reset)"
 	echo "  --create-schema   Create the database schema on an empty database"
 	echo "                    (required on first run; reruns never need it)"
+	echo "  --apps            After infrastructure is up, also start backend, ingest worker,"
+	echo "                    and frontend in the foreground (Flask debug, Next.js dev)"
 	echo "  --no-sim          Start without the Sim AI tool stack (six fewer"
 	echo "                    services; Sim containers from a previous run are"
 	echo "                    left untouched)"
@@ -295,11 +302,13 @@ show_usage() {
 	echo "  $0                  # Start/restart dev infrastructure (schema untouched)"
 	echo "  $0 --create-schema  # First run: also create the database schema"
 	echo "  $0 --clean          # Clear everything and start fresh"
+	echo "  $0 --apps           # Start infrastructure, then backend + worker + frontend"
 }
 
 # Parse command line arguments
 CLEAN_MODE=false
 CREATE_SCHEMA=false
+APPS_MODE=false
 WITH_SIM=true
 
 while [[ $# -gt 0 ]]; do
@@ -310,6 +319,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--create-schema)
 		CREATE_SCHEMA=true
+		shift
+		;;
+	--apps)
+		APPS_MODE=true
 		shift
 		;;
 	--no-sim)
@@ -332,6 +345,170 @@ if [ "$CLEAN_MODE" = true ] && [ "$CREATE_SCHEMA" = true ]; then
 	print_error "--clean and --create-schema cannot be used together (--clean already recreates the schema on the fresh database)."
 	exit 1
 fi
+
+resolve_backend_python() {
+	if [[ -x "${REPO_ROOT}/apps/backend/.venv/bin/python" ]]; then
+		BACKEND_PYTHON="${REPO_ROOT}/apps/backend/.venv/bin/python"
+	elif [[ -x "${REPO_ROOT}/apps/backend/venv/bin/python" ]]; then
+		BACKEND_PYTHON="${REPO_ROOT}/apps/backend/venv/bin/python"
+	elif command -v python3 >/dev/null 2>&1; then
+		BACKEND_PYTHON="$(command -v python3)"
+	elif command -v python >/dev/null 2>&1; then
+		BACKEND_PYTHON="$(command -v python)"
+	else
+		BACKEND_PYTHON=""
+	fi
+}
+
+port_in_use() {
+	local port="$1"
+	if command -v lsof >/dev/null 2>&1; then
+		lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+	else
+		return 1
+	fi
+}
+
+ensure_dev_apps_prereqs() {
+	print_status "Checking backend, worker, and frontend prerequisites..."
+
+	resolve_backend_python
+
+	if [[ -z ${BACKEND_PYTHON} ]]; then
+		print_error "Python 3 is required to start the backend and worker."
+		print_error "Install Python 3.10 or 3.11, then: cd apps/backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -r ai_ta_backend/rabbitmq/requirements.txt"
+		exit 1
+	fi
+
+	if ! "${BACKEND_PYTHON}" -c "import flask" >/dev/null 2>&1; then
+		print_error "Flask is not installed for ${BACKEND_PYTHON}."
+		print_error "From apps/backend: pip install -r requirements.txt && pip install -r ai_ta_backend/rabbitmq/requirements.txt"
+		exit 1
+	fi
+
+	if ! command -v npm >/dev/null 2>&1; then
+		print_error "npm is required to start the frontend."
+		exit 1
+	fi
+
+	if [[ ! -d "${REPO_ROOT}/apps/frontend/node_modules" ]]; then
+		print_error "Frontend dependencies are missing. Run: cd apps/frontend && npm install"
+		exit 1
+	fi
+
+	local port
+	for port in 8000 8001 3000; do
+		if port_in_use "${port}"; then
+			print_error "Port ${port} is already in use. Stop the existing process, then retry."
+			exit 1
+		fi
+	done
+
+	print_success "Dev app prerequisites look good (python: ${BACKEND_PYTHON})"
+}
+
+kill_process_tree() {
+	local pid="$1"
+	local signal="${2:-TERM}"
+	local child
+	if ! kill -0 "${pid}" 2>/dev/null; then
+		return 0
+	fi
+	for child in $(pgrep -P "${pid}" 2>/dev/null || true); do
+		kill_process_tree "${child}" "${signal}"
+	done
+	kill "-${signal}" "${pid}" 2>/dev/null || true
+}
+
+cleanup_dev_apps() {
+	if [[ ${DEV_APPS_CLEANED} == true ]]; then
+		return 0
+	fi
+	DEV_APPS_CLEANED=true
+
+	print_status "Stopping backend, worker, and frontend..."
+	local pid
+	if [[ ${#DEV_APPS_PIDS[@]} -gt 0 ]]; then
+		for pid in "${DEV_APPS_PIDS[@]}"; do
+			kill_process_tree "${pid}" TERM
+		done
+		sleep 1
+		for pid in "${DEV_APPS_PIDS[@]}"; do
+			kill_process_tree "${pid}" KILL
+		done
+	fi
+	rm -f "${DEV_APPS_PID_FILE}"
+	print_success "Dev apps stopped. Infrastructure is still running (use infra/scripts/stop-dev.sh to stop it)."
+}
+
+start_dev_app() {
+	local name="$1"
+	local workdir="$2"
+	local pid
+	shift 2
+	(
+		cd "${workdir}"
+		if [[ -f .env ]]; then
+			set -a
+			# shellcheck disable=SC1091
+			. ./.env
+			set +a
+		fi
+		export PYTHONUNBUFFERED=1
+		export PYTHONPATH="${workdir}${PYTHONPATH:+:${PYTHONPATH}}"
+		exec "$@"
+	) > >(
+		while IFS= read -r line; do
+			printf '[%s] %s\n' "${name}" "${line}"
+		done
+	) 2>&1 &
+	pid=$!
+	DEV_APPS_PIDS+=("${pid}")
+	print_success "Started ${name} (pid ${pid})"
+}
+
+start_dev_apps() {
+	local backend_dir="${REPO_ROOT}/apps/backend"
+	local frontend_dir="${REPO_ROOT}/apps/frontend"
+
+	: >"${DEV_APPS_PID_FILE}"
+	DEV_APPS_PIDS=()
+
+	print_status "Starting backend, ingest worker, and frontend in dev mode..."
+
+	start_dev_app "backend" "${backend_dir}" \
+		"${BACKEND_PYTHON}" -m flask --app ai_ta_backend.main:app --debug run --port 8000
+
+	start_dev_app "worker" "${backend_dir}" \
+		"${BACKEND_PYTHON}" ai_ta_backend/rabbitmq/worker.py
+
+	start_dev_app "frontend" "${frontend_dir}" npm run local
+
+	printf '%s\n' "${DEV_APPS_PIDS[@]}" >"${DEV_APPS_PID_FILE}"
+
+	trap cleanup_dev_apps EXIT
+	trap 'cleanup_dev_apps; exit 130' INT TERM
+
+	echo ""
+	print_success "Dev apps are running. Logs from all three processes follow."
+	echo "   Frontend: http://localhost:3000"
+	echo "   Backend:  http://localhost:8000"
+	echo "   Worker:   http://localhost:8001/api/healthcheck"
+	echo "   Ctrl+C stops the apps; infrastructure stays up."
+	echo ""
+
+	local pid
+	while true; do
+		for pid in "${DEV_APPS_PIDS[@]}"; do
+			if ! kill -0 "${pid}" 2>/dev/null; then
+				wait "${pid}" || true
+				print_error "A dev process exited (pid ${pid}). Stopping the rest..."
+				exit 1
+			fi
+		done
+		sleep 1
+	done
+}
 
 if [ "$WITH_SIM" = true ]; then
 	COMPOSE+=(-f infra/docker/docker-compose.sim.yaml)
@@ -438,6 +615,10 @@ if [ "$WITH_SIM" = true ]; then
 	fi
 fi
 ensure_local_app_envs
+
+if [[ ${APPS_MODE} == true ]]; then
+	ensure_dev_apps_prereqs
+fi
 
 # Start Docker Compose services
 if [ "$WITH_SIM" = true ]; then
@@ -626,7 +807,7 @@ print_success "PostgreSQL schema initialized and verified."
 print_status "Creating Qdrant collection..."
 
 # Ensure QDRANT_URL is defined
-if [[ -z ${QDRANT_URL:-} ]]; then
+if [[ -z ${QDRANT_URL-} ]]; then
 	QDRANT_URL="http://localhost:6333"
 	print_warning "QDRANT_URL not set, using default: $QDRANT_URL"
 fi
@@ -648,7 +829,7 @@ print_status "Creating Qdrant collection..."
 print_status "Checking if Qdrant collection exists..."
 # Build headers (optionally include API key if provided)
 CURL_HEADERS=("-H" "Content-Type: application/json")
-if [[ -n ${QDRANT_API_KEY:-} ]]; then
+if [[ -n ${QDRANT_API_KEY-} ]]; then
 	CURL_HEADERS+=("-H" "api-key: $QDRANT_API_KEY")
 fi
 
@@ -712,12 +893,12 @@ print_success "Qdrant collection ready!"
 print_status "Setting up MinIO bucket..."
 
 # Ensure MinIO environment variables are set
-if [[ -z ${AWS_ACCESS_KEY_ID:-} ]]; then
+if [[ -z ${AWS_ACCESS_KEY_ID-} ]]; then
 	AWS_ACCESS_KEY_ID="minioadmin"
 	print_warning "AWS_ACCESS_KEY_ID not set, using default: $AWS_ACCESS_KEY_ID"
 fi
 
-if [[ -z ${AWS_SECRET_ACCESS_KEY:-} ]]; then
+if [[ -z ${AWS_SECRET_ACCESS_KEY-} ]]; then
 	AWS_SECRET_ACCESS_KEY="minioadmin"
 	print_warning "AWS_SECRET_ACCESS_KEY not set, using default: $AWS_SECRET_ACCESS_KEY"
 fi
@@ -757,15 +938,23 @@ echo "   - Qdrant collection '${QDRANT_COLLECTION_NAME}' ready"
 echo "   - MinIO bucket 'uiuc-chat' ready"
 echo "   - All services healthy and ready"
 echo ""
-echo "🌐 Next steps:"
-echo "1. Update hosted model/API keys in apps/backend/.env, apps/frontend/.env, and apps/crawlee/.env"
-echo "2. Start the backend, worker, and frontend in separate terminals:"
-echo "   cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000"
-echo "   cd apps/backend && python ai_ta_backend/rabbitmq/worker.py"
-echo "   cd apps/frontend && npm run local"
-echo ""
-echo "🔍 To verify everything is working:"
+echo "🔍 To verify infrastructure:"
 echo "   - Check containers: docker ps"
 echo "   - Check logs: docker compose --project-directory . -f infra/docker/docker-compose.dev.yaml logs"
 echo "   - Test Qdrant: curl -H 'api-key: ${QDRANT_API_KEY:-your-strong-key-here}' http://localhost:6333/collections"
 echo "   - Test PostgreSQL: psql -h localhost -p 5432 -U postgres -d postgres"
+echo ""
+
+if [[ ${APPS_MODE} == true ]]; then
+	start_dev_apps
+fi
+
+echo "🌐 Next steps:"
+echo "1. Update hosted model/API keys in apps/backend/.env, apps/frontend/.env, and apps/crawlee/.env"
+echo "2. Start the backend, worker, and frontend together:"
+echo "   bash infra/scripts/start-dev.sh --apps"
+echo "   or in separate terminals:"
+echo "   cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000"
+echo "   cd apps/backend && python ai_ta_backend/rabbitmq/worker.py"
+echo "   cd apps/frontend && npm run local"
+echo ""

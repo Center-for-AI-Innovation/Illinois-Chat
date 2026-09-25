@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
 import { toChatbotCardData, chatbotUserTier } from '~/utils/chatbotCard'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 const MAX_QUERY_LENGTH = 200
 const MAX_RESULTS = 500
@@ -54,21 +55,32 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     .slice(0, 10)
 
   try {
+    // Super admins see every project. Previously that fell out of them being
+    // seeded into every `course_admins` array; with seeding stopped, search
+    // has to grant it explicitly or their results would shrink to what they
+    // personally own.
+    const isPlatformSuperAdmin = await isSuperAdminAsync(userEmail)
+
     // Access predicate: user can see bots where
     //   is_frozen = false AND (
     //     is_private = false OR allow_logged_in_users = true
     //     OR course_owner = :email OR :email = ANY(course_admins)
     //     OR :email = ANY(approved_emails_list)
     //   )
-    const accessPredicate = sql`
-      ${courseMetadata.is_frozen} = false
-      AND (
+    //
+    // `is_frozen = false` sits outside the role check and is not bypassed.
+    const roleVisibility = isPlatformSuperAdmin
+      ? sql`true`
+      : sql`
         ${courseMetadata.is_private} = false
         OR ${courseMetadata.allow_logged_in_users} = true
         OR ${courseMetadata.course_owner} = ${userEmail}
         OR ${userEmail} = ANY(${courseMetadata.course_admins})
         OR ${userEmail} = ANY(${courseMetadata.approved_emails_list})
-      )
+      `
+    const accessPredicate = sql`
+      ${courseMetadata.is_frozen} = false
+      AND (${roleVisibility})
     `
 
     const textPredicate = q
@@ -91,12 +103,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )`
       : sql``
 
-    const myBotsPredicate = myBots
-      ? sql`AND (
+    // A super admin's "my bots" stays unnarrowed, matching what they see
+    // today by virtue of being in every `course_admins` array.
+    const myBotsPredicate =
+      !myBots || isPlatformSuperAdmin
+        ? sql``
+        : sql`AND (
           ${courseMetadata.course_owner} = ${userEmail}
           OR ${userEmail} = ANY(${courseMetadata.course_admins})
         )`
-      : sql``
 
     // Tag predicate: ANY of the provided values matches ANY tag in the array.
     // Uses jsonb_array_elements to flatten tags, then checks t->>'value'.
