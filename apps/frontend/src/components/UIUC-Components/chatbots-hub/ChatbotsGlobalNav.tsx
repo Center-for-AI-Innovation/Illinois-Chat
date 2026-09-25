@@ -36,8 +36,7 @@ export function ChatbotsGlobalNav({
             <img
               alt="Illinois Logo"
               src="/media/logo_illinois.png"
-              width="auto"
-              height="100%"
+              className="h-full w-auto"
             ></img>
           </div>
 
