@@ -3,8 +3,12 @@
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
  * for Docker builds.
  */
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import nextI18NextConfig from './next-i18next.config.mjs'
 import withBundleAnalyzer from '@next/bundle-analyzer'
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 
 const bundleAnalyzerConfig = {
   enabled: process.env.ANALYZE === 'true',
@@ -13,6 +17,27 @@ const bundleAnalyzerConfig = {
 /** @type {import("next").NextConfig} */
 const config = {
   i18n: nextI18NextConfig.i18n,
+  // Turbopack equivalents of the `webpack()` block below. Turbopack handles
+  // async WASM natively, so the `.wasm` module rule isn't needed here; only the
+  // client-side Node-builtin stubs have to be restated, otherwise every route
+  // touching postgres/redis fails with "Module not found: Can't resolve 'net'".
+  turbopack: {
+    // This app is the only package with a lockfile in the repo, so Turbopack's
+    // root inference walks past it and picks the repo root. That makes it scan
+    // sibling directories (Tailwind then picks up class-shaped strings out of
+    // docs/*.md and emits invalid selectors) and changes what the relative
+    // resolveAlias paths below are resolved against. Pin it to this app.
+    root: projectRoot,
+    resolveAlias: {
+      net: { browser: './empty-module.js' },
+      tls: { browser: './empty-module.js' },
+      perf_hooks: { browser: './empty-module.js' },
+      // package.json's `browser` field stubs these for webpack; Turbopack
+      // doesn't honor it, so they're restated here.
+      fs: { browser: './empty-module.js' },
+      path: { browser: './empty-module.js' },
+    },
+  },
   webpack(config, { isServer, webpack }) {
     // Merge existing experiments with the required ones
     config.experiments = {
