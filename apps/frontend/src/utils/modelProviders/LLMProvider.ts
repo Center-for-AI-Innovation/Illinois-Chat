@@ -26,7 +26,6 @@ import {
 import {
   CURRENT_NCSA_DEFAULT_MODEL_ID,
   findAvailableNCSAFallbackModel,
-  LEGACY_NCSA_DEFAULT_MODEL_IDS,
   type NCSAHostedVLMModel,
   NCSAHostedVLMModelID,
   NCSAHostedVLMModels,
@@ -540,59 +539,124 @@ export const preferredModelIds = [
   NCSAHostedVLMModelID.QWEN3_6_27B,
 ]
 
+type StoredModelPreference = {
+  modelId: string
+  // The project default in effect when the user made this pick. An admin saving
+  // a new default makes the pick stale, which is how admin changes reach users
+  // who have already picked a model for themselves.
+  projectDefaultId: string | null
+}
+
+// Scoped per project: one browser-global key would leak a pick made in one
+// project into every other project the user opens.
+const modelPreferenceKey = (projectName?: string): string | null =>
+  projectName ? `defaultModel:${projectName}` : null
+
+const getEnabledProviders = (
+  allLLMProviders: Partial<AllLLMProviders>,
+): LLMProvider[] =>
+  LLM_PROVIDER_ORDER.map((providerName) => allLLMProviders[providerName]).filter(
+    (provider): provider is LLMProvider => Boolean(provider?.enabled),
+  )
+
+// This will always find one record since the default model is unique. If there are two default models (that means default model functionality is broken), this will return the first one.
+const findProjectDefaultModel = (
+  enabledProviders: LLMProvider[],
+): GenericSupportedModel | undefined =>
+  enabledProviders
+    .flatMap((provider) => provider.models || [])
+    .find((model) => model.default) as GenericSupportedModel | undefined
+
+const readModelPreference = (
+  projectName?: string,
+): StoredModelPreference | null => {
+  const key = modelPreferenceKey(projectName)
+  if (!key) return null
+
+  const raw = localStorage.getItem(key)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredModelPreference>
+    if (typeof parsed?.modelId !== 'string') return null
+    return {
+      modelId: parsed.modelId,
+      projectDefaultId:
+        typeof parsed.projectDefaultId === 'string'
+          ? parsed.projectDefaultId
+          : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Remember the model a user picked, so it stays their default for new chats in this project. */
+export const rememberUserModelChoice = (
+  allLLMProviders: Partial<AllLLMProviders>,
+  projectName: string | undefined,
+  modelId: string,
+): void => {
+  const key = modelPreferenceKey(projectName)
+  if (!key) return
+
+  const preference: StoredModelPreference = {
+    modelId,
+    projectDefaultId:
+      findProjectDefaultModel(getEnabledProviders(allLLMProviders))?.id ?? null,
+  }
+  localStorage.setItem(key, JSON.stringify(preference))
+}
+
 export const selectBestModel = (
   allLLMProviders: Partial<AllLLMProviders>,
+  projectName?: string,
 ): GenericSupportedModel => {
-  // Find default model from the local Storage
-  // Currently, if the user ever specified a default model in local storage, this will ALWAYS override the default model specified by the admin,
-  // especially for the creation of new chats.
-  const enabledProviders = LLM_PROVIDER_ORDER.map(
-    (providerName) => allLLMProviders[providerName],
-  ).filter((provider): provider is LLMProvider => Boolean(provider?.enabled))
+  const enabledProviders = getEnabledProviders(allLLMProviders)
 
   const allModels = enabledProviders
     .flatMap((provider) => provider.models || [])
     .filter((model) => model.enabled)
 
-  const storedDefaultModelId = localStorage.getItem('defaultModel')
-  const availableModelIds = allModels.map((model) => model.id)
-  const defaultModelId = resolveStoredNCSADefaultModelId(
-    storedDefaultModelId,
-    availableModelIds,
-  )
+  const projectDefaultModel = findProjectDefaultModel(enabledProviders)
+  const storedPreference = readModelPreference(projectName)
+  const preferenceKey = modelPreferenceKey(projectName)
 
-  if (
-    storedDefaultModelId &&
-    LEGACY_NCSA_DEFAULT_MODEL_IDS.has(storedDefaultModelId) &&
-    defaultModelId &&
-    defaultModelId !== storedDefaultModelId
-  ) {
-    localStorage.setItem('defaultModel', defaultModelId)
-  }
+  if (storedPreference && preferenceKey) {
+    if (
+      storedPreference.projectDefaultId !== (projectDefaultModel?.id ?? null)
+    ) {
+      // The admin changed this project's default since the pick was made, so the
+      // new default wins and the stale pick is dropped.
+      localStorage.removeItem(preferenceKey)
+    } else {
+      const resolvedModelId = resolveStoredNCSADefaultModelId(
+        storedPreference.modelId,
+        allModels.map((model) => model.id),
+      )
 
-  if (defaultModelId && allModels.find((m) => m.id === defaultModelId)) {
-    const defaultModel = allModels
-      .filter((model) => model.enabled)
-      .find((m) => m.id === defaultModelId)
-    if (defaultModel) {
-      return defaultModel
+      if (resolvedModelId && resolvedModelId !== storedPreference.modelId) {
+        localStorage.setItem(
+          preferenceKey,
+          JSON.stringify({ ...storedPreference, modelId: resolvedModelId }),
+        )
+      }
+
+      const pickedModel = allModels.find((m) => m.id === resolvedModelId)
+      if (pickedModel) {
+        return pickedModel
+      }
     }
   }
-  // If the default model that a user specifies is not available, fall back to the admin selected default model.
-  const globalDefaultModel = enabledProviders
-    .flatMap((provider) => provider.models || [])
-    .filter((model) => model.default)
-  if (globalDefaultModel[0]) {
-    // This will always return one record since the default model is unique. If there are two default models (that means default model functionality is broken), this will return the first one.
-    return globalDefaultModel[0] as GenericSupportedModel
+
+  // The admin-selected project default, used until the user picks for themselves.
+  if (projectDefaultModel) {
+    return projectDefaultModel
   }
   // If the conversation model is not available or invalid, use the preferredModelIds
   for (const preferredId of preferredModelIds) {
-    const model = allModels
-      .filter((model) => model.enabled)
-      .find((m) => m.id === preferredId)
+    const model = allModels.find((m) => m.id === preferredId)
     if (model) {
-      // localStorage.setItem('defaultModel', preferredId)
       return model
     }
   }

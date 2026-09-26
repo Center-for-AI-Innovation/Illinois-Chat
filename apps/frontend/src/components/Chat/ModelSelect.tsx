@@ -49,6 +49,7 @@ import {
   LLM_PROVIDER_ORDER,
   type LLMProvider,
   ProviderNames,
+  rememberUserModelChoice,
   selectBestModel,
 } from '~/utils/modelProviders/LLMProvider'
 import {
@@ -688,7 +689,8 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
       dispatch: homeDispatch,
     } = useContext(HomeContext)
     const isSmallScreen = useMediaQuery('(max-width: 960px)')
-    const defaultModel = selectBestModel(llmProviders).id
+    const projectName = selectedConversation?.projectName
+    const defaultModel = selectBestModel(llmProviders, projectName).id
     const [loadingModelId, setLoadingModelId] = useState<string | null>(null)
     const [isAccordionOpen, setIsAccordionOpen] = useState(true)
 
@@ -710,7 +712,7 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
           key: 'model',
           value: model as OpenAIModel,
         })
-      localStorage.setItem('defaultModel', modelId)
+      rememberUserModelChoice(llmProviders, projectName, modelId)
     }
 
     return (

@@ -895,7 +895,8 @@ export const ChatInput = ({
   // covers both: no storage access during render, and dismissal updates
   // visibility directly.
   const cocActiveModelId =
-    selectedConversation?.model?.id ?? selectBestModel(llmProviders)?.id
+    selectedConversation?.model?.id ??
+    selectBestModel(llmProviders, courseName)?.id
   const cocCountry = getCountryOfConcern(cocActiveModelId)
   const [cocBannerVisible, setCocBannerVisible] = useState(false)
 
@@ -1438,11 +1439,11 @@ export const ChatInput = ({
               }}
               style={{ cursor: 'pointer', pointerEvents: 'auto' }}
             >
-              {selectBestModel(llmProviders)?.name}
+              {selectBestModel(llmProviders, courseName)?.name}
               {(() => {
                 const activeModelId =
                   selectedConversation?.model?.id ??
-                  selectBestModel(llmProviders)?.id
+                  selectBestModel(llmProviders, courseName)?.id
                 const country = getCountryOfConcern(activeModelId)
                 if (!country) return null
                 return (

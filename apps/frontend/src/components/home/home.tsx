@@ -146,7 +146,7 @@ const Home = ({
   useEffect(() => {
     // Set model after we fetch available models
     if (Object.keys(llmProviders).length == 0) return
-    const model = selectBestModel(llmProviders)
+    const model = selectBestModel(llmProviders, course_name)
 
     dispatch({
       field: 'defaultModelId',
@@ -285,7 +285,7 @@ const Home = ({
     }
 
     // Determine the model to use for the new conversation
-    const model = selectBestModel(llmProviders)
+    const model = selectBestModel(llmProviders, course_name)
 
     // Ensure link parameters are properly set
     const newLinkParameters = {
