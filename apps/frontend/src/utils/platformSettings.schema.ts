@@ -142,9 +142,114 @@ export const maintenanceSettingsSchema = z.object({
 })
 export type MaintenanceSettings = z.infer<typeof maintenanceSettingsSchema>
 
+export const NAVBAR_WORD_MAX_LENGTH = 24
+export const NAVBAR_LOGO_MAX_BYTES = 256 * 1024
+export const NAVBAR_LOGO_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml',
+] as const
+export const DEFAULT_NAVBAR_LOGO_SRC = '/media/logo_illinois.png'
+
+const LOGO_DATA_URL_PATTERN =
+  /^data:(image\/(?:png|jpeg|webp|gif|svg\+xml));base64,([A-Za-z0-9+/]+={0,2})$/
+
+export interface ParsedLogoDataUrl {
+  contentType: (typeof NAVBAR_LOGO_MIME_TYPES)[number]
+  base64: string
+  byteLength: number
+}
+
+export function parseLogoDataUrl(value: string): ParsedLogoDataUrl | null {
+  const match = LOGO_DATA_URL_PATTERN.exec(value)
+  if (!match) return null
+  const base64 = match[2]!
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return {
+    contentType: match[1] as ParsedLogoDataUrl['contentType'],
+    base64,
+    byteLength: (base64.length * 3) / 4 - padding,
+  }
+}
+
+function navbarWord(label: string) {
+  return z
+    .string()
+    .trim()
+    .min(1, `${label} is required`)
+    .max(
+      NAVBAR_WORD_MAX_LENGTH,
+      `${label} must be ${NAVBAR_WORD_MAX_LENGTH} characters or fewer`,
+    )
+    .regex(/^\S+$/, `${label} must be a single word`)
+}
+
+/**
+ * `logoDataUrl` is `''` for the built-in logo. Uploads travel as a base64 data
+ * URL so the whole Platform tab still saves in one request and one MULTI.
+ */
+export const navbarBrandingSchema = z.object({
+  primaryWord: navbarWord('First word'),
+  secondaryWord: navbarWord('Second word'),
+  logoDataUrl: z.string().superRefine((value, ctx) => {
+    if (value === '') return
+    const parsed = parseLogoDataUrl(value)
+    if (!parsed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Logo must be a PNG, JPG, WebP, GIF, or SVG image',
+      })
+      return
+    }
+    if (parsed.byteLength > NAVBAR_LOGO_MAX_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Logo must be ${NAVBAR_LOGO_MAX_BYTES / 1024} KB or smaller`,
+      })
+    }
+  }),
+})
+export type NavbarBrandingSettings = z.infer<typeof navbarBrandingSchema>
+
+/**
+ * What Redis holds under `navbar_branding`. The logo bytes live in their own
+ * field so the public branding read never drags the image along;
+ * `logoVersion` is `''` for the built-in logo.
+ */
+export const storedNavbarBrandingSchema = z.object({
+  primaryWord: navbarWord('First word'),
+  secondaryWord: navbarWord('Second word'),
+  logoVersion: z.string(),
+  updatedAt: z.string().optional(),
+  updatedBy: z.string().optional(),
+})
+export type StoredNavbarBranding = z.infer<typeof storedNavbarBrandingSchema>
+
+/** What every visitor's navbar renders. `logoUrl: null` means the built-in logo. */
+export interface NavbarBranding {
+  primaryWord: string
+  secondaryWord: string
+  logoUrl: string | null
+}
+
+export const DEFAULT_NAVBAR_BRANDING: NavbarBranding = {
+  primaryWord: 'Illinois',
+  secondaryWord: 'Chat',
+  logoUrl: null,
+}
+
+export const DEFAULT_NAVBAR_BRANDING_SETTINGS: NavbarBrandingSettings = {
+  primaryWord: DEFAULT_NAVBAR_BRANDING.primaryWord,
+  secondaryWord: DEFAULT_NAVBAR_BRANDING.secondaryWord,
+  logoDataUrl: '',
+}
+
 export const platformSettingsSchema = z.object({
   announcementBanner: announcementBannerSchema,
   maintenance: maintenanceSettingsSchema,
+  navbarBranding: navbarBrandingSchema,
 })
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>
 
@@ -155,7 +260,8 @@ export const platformSettingsUpdateSchema = platformSettingsSchema
   .refine(
     (settings) =>
       settings.announcementBanner !== undefined ||
-      settings.maintenance !== undefined,
+      settings.maintenance !== undefined ||
+      settings.navbarBranding !== undefined,
     {
       message: 'Include at least one settings section to update',
     },
