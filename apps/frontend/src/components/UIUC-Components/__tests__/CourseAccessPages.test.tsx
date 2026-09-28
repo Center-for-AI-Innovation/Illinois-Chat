@@ -4,8 +4,8 @@ import { screen } from '@testing-library/react'
 
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
-vi.mock('../navbars/GlobalHeader', () => ({
-  default: () => React.createElement('div', null, 'GlobalHeader'),
+vi.mock('../navbars/Navbar', () => ({
+  default: () => React.createElement('div', null, 'Navbar'),
 }))
 vi.mock('../GlobalFooter', () => ({
   default: () => React.createElement('div', null, 'GlobalFooter'),
