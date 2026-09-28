@@ -344,7 +344,32 @@ export const ChatInput = ({
 
   type Role = 'user' | 'system'
 
+  // Country-of-concern banner.
+
+  const cocActiveModelId =
+    selectedConversation?.model?.id ??
+    (llmProviders && Object.keys(llmProviders).length > 0
+      ? selectBestModel(llmProviders)?.id
+      : undefined)
+  const cocCountry = getCountryOfConcern(cocActiveModelId)
+  const [cocBannerVisible, setCocBannerVisible] = useState(false)
+
+  useEffect(() => {
+    if (!cocCountry || !cocActiveModelId || !courseName) {
+      setCocBannerVisible(false)
+      return
+    }
+    setCocBannerVisible(!isCocBannerDismissed(courseName, cocActiveModelId))
+  }, [cocCountry, cocActiveModelId, courseName])
+
+  // While the country-of-concern banner is visible, the chat input is locked.
+  const isInputLockedByCoc = cocBannerVisible
+
   const handleSend = async () => {
+    if (isInputLockedByCoc) {
+      return
+    }
+
     const hasProcessingFiles = fileUploads.some(
       (fu) =>
         fu.status === 'processing' ||
@@ -598,6 +623,10 @@ export const ChatInput = ({
   }
 
   async function handleFileSelection(newFiles: File[]) {
+    if (isInputLockedByCoc) {
+      return
+    }
+
     const allFiles = [...fileUploads.map((f) => f.file), ...newFiles]
 
     // 1. Validation: number of files
@@ -886,27 +915,6 @@ export const ChatInput = ({
     }
   }, [handleResize])
 
-  // Country-of-concern banner.
-  //
-  // Dismissal state lives in localStorage, which is not available during a
-  // server render. Reading it inline in the JSX also made visibility
-  // non-reactive, which is why a `setCocDismissTick` counter was needed to
-  // force a re-render after dismissal. Resolving it into state via an effect
-  // covers both: no storage access during render, and dismissal updates
-  // visibility directly.
-  const cocActiveModelId =
-    selectedConversation?.model?.id ?? selectBestModel(llmProviders)?.id
-  const cocCountry = getCountryOfConcern(cocActiveModelId)
-  const [cocBannerVisible, setCocBannerVisible] = useState(false)
-
-  useEffect(() => {
-    if (!cocCountry || !cocActiveModelId || !courseName) {
-      setCocBannerVisible(false)
-      return
-    }
-    setCocBannerVisible(!isCocBannerDismissed(courseName, cocActiveModelId))
-  }, [cocCountry, cocActiveModelId, courseName])
-
   // The locality claim in the banner is only true for models we host. Resolve
   // which provider actually serves the active model so the copy can't promise
   // that data stays on university infrastructure for a third-party-served
@@ -939,7 +947,7 @@ export const ChatInput = ({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.25, ease: 'easeInOut' }}
-                className="mx-2 mb-3 md:mx-4 lg:mx-auto lg:max-w-3xl"
+                className="relative z-20 mx-2 mb-16 md:mx-4 lg:mx-auto lg:max-w-3xl"
                 style={{ pointerEvents: 'auto' }}
               >
                 <div
@@ -985,6 +993,10 @@ export const ChatInput = ({
                         if (courseName && activeModelId) {
                           markCocBannerDismissed(courseName, activeModelId)
                           setCocBannerVisible(false)
+                          // Auto-select the textarea once the banner is dismissed
+                          requestAnimationFrame(() => {
+                            textareaRef.current?.focus()
+                          })
                         }
                       }}
                       className="rounded-md border border-[#2A1B3D]/20 bg-white px-3 py-1.5 text-sm font-medium text-[#2A1B3D] transition hover:bg-[#2A1B3D]/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
@@ -1040,13 +1052,20 @@ export const ChatInput = ({
               selectedConversation.messages.length - 1
             ]?.role === 'user' && (
               <button
-                className={`absolute -top-14 right-0 left-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-(--primary) bg-(--primary) px-4 py-2 text-(--illinois-white) hover:brightness-110 md:mt-2 md:mb-0`}
+                type="button"
+                disabled={isInputLockedByCoc}
+                className={`absolute -top-14 right-0 left-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-(--primary) bg-(--primary) px-4 py-2 text-(--illinois-white) hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100 md:mt-2 md:mb-0`}
                 style={{
                   backgroundColor:
                     'color-mix(in srgb, var(--primary), black 15%)',
                   pointerEvents: 'auto',
                 }}
-                onClick={onRegenerate}
+                onClick={() => {
+                  if (isInputLockedByCoc) {
+                    return
+                  }
+                  onRegenerate?.()
+                }}
               >
                 <IconRepeat size={16} aria-hidden="true" />{' '}
                 {t('Regenerate Response')}
@@ -1056,8 +1075,18 @@ export const ChatInput = ({
           {/* Chat input and preview container */}
           <div
             ref={chatInputContainerRef}
-            className="chat-input-container m-0 w-full resize-none p-0"
-            onClick={() => textareaRef.current?.focus()}
+            aria-disabled={isInputLockedByCoc}
+            className={`chat-input-container m-0 w-full resize-none p-0 transition-opacity ${
+              isInputLockedByCoc
+                ? 'cursor-not-allowed opacity-50'
+                : 'opacity-100'
+            }`}
+            onClick={() => {
+              if (isInputLockedByCoc) {
+                return
+              }
+              textareaRef.current?.focus()
+            }}
             style={{
               ...chatInputContainerStyle,
               pointerEvents: 'auto',
@@ -1288,10 +1317,11 @@ export const ChatInput = ({
             <div className="relative flex w-full items-center">
               {/* File upload button */}
               <button
-                className="dark:bg-opacity-50 mr-2 flex items-center justify-center rounded-full p-2 text-neutral-100 opacity-60 hover:bg-neutral-200 hover:text-neutral-900 dark:text-neutral-100 dark:hover:text-neutral-200"
+                className="dark:bg-opacity-50 mr-2 flex items-center justify-center rounded-full p-2 text-neutral-100 opacity-60 hover:bg-neutral-200 hover:text-neutral-900 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-100 dark:text-neutral-100 dark:hover:text-neutral-200"
                 onClick={() => fileUploadRef.current?.click()}
                 type="button"
                 title="Upload files"
+                disabled={isInputLockedByCoc}
                 style={{ pointerEvents: 'auto' }}
               >
                 <IconPaperclip size={20} aria-hidden="true" />
@@ -1300,6 +1330,7 @@ export const ChatInput = ({
                 type="file"
                 multiple
                 ref={fileUploadRef}
+                disabled={isInputLockedByCoc}
                 style={{ display: 'none', pointerEvents: 'auto' }}
                 accept={ALLOWED_FILE_EXTENSIONS.map((ext) => '.' + ext).join(
                   ',',
@@ -1320,8 +1351,9 @@ export const ChatInput = ({
               <textarea
                 ref={textareaRef}
                 aria-label="Message input"
-                autoFocus
-                className="chat-input m-0 h-[24px] max-h-[400px] w-full flex-1 resize-none bg-transparent py-2 pr-12 pl-2 text-white outline-hidden"
+                autoFocus={!isInputLockedByCoc}
+                disabled={isInputLockedByCoc}
+                className="chat-input m-0 h-[24px] max-h-[400px] w-full flex-1 resize-none bg-transparent py-2 pr-12 pl-2 text-white outline-hidden disabled:cursor-not-allowed"
                 style={{
                   resize: 'none',
                   minHeight: '24px',
@@ -1330,7 +1362,11 @@ export const ChatInput = ({
                   overflow: 'hidden',
                   pointerEvents: 'auto',
                 }}
-                placeholder={'Message Illinois Chat'}
+                placeholder={
+                  isInputLockedByCoc
+                    ? 'Accept the notice above to start chatting'
+                    : 'Message Illinois Chat'
+                }
                 value={content}
                 rows={1}
                 onCompositionStart={() => setIsTyping(true)}
@@ -1343,7 +1379,8 @@ export const ChatInput = ({
               <button
                 type="button"
                 aria-label="Send message"
-                className="absolute top-1/2 right-2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-white/30 p-2 opacity-50 hover:opacity-100"
+                disabled={isInputLockedByCoc}
+                className="absolute top-1/2 right-2 flex -translate-y-1/2 transform items-center justify-center rounded-full bg-white/30 p-2 opacity-50 hover:opacity-100 disabled:cursor-not-allowed disabled:hover:opacity-50"
                 onClick={handleSend}
                 style={{ pointerEvents: 'auto' }}
               >
