@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ThemeToggle } from './ThemeToggle'
 
-export default function Footer({ isNavbar = false }: { isNavbar?: boolean }) {
+export default function Footer() {
   return (
     <footer className="rounded bg-(--background) p-10 text-center text-sm text-(--foreground)">
       {/*       <div className="grid grid-flow-col gap-4"> */}
@@ -44,27 +44,16 @@ export default function Footer({ isNavbar = false }: { isNavbar?: boolean }) {
           Privacy
         </Link>
         <span>
-          MIT Licensed{' '}
           <Link
             tabIndex={0}
-            href="https://github.com/Center-for-AI-Innovation/uiuc-chat-frontend"
+            href="https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/LICENSE"
             className="link-underline-hover cursor-pointer text-(--footer-link) hover:text-(--footer-link-hover)"
             target="_blank"
             rel="noopener noreferrer"
           >
-            frontend
+            Apache 2.0 Licensed
           </Link>{' '}
-          and{' '}
-          <Link
-            tabIndex={0}
-            href="https://github.com/Center-for-AI-Innovation/ai-ta-backend"
-            className="link-underline-hover cursor-pointer text-(--footer-link) hover:text-(--footer-link-hover)"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            backend
-          </Link>{' '}
-          code.
+          Illinois Chat code.
         </span>
       </div>
     </footer>
