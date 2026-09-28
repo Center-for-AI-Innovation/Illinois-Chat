@@ -1,7 +1,7 @@
-// The Platform tab: one form over the banner and maintenance cards.
+// The Platform tab: one form over the banner, maintenance, and navbar cards.
 //
-// One form, not two, because `PUT /api/admin/settings` writes the banner field
-// and the three maintenance keys in a single Redis MULTI. Giving each card its
+// One form, not several, because `PUT /api/admin/settings` writes the banner,
+// navbar branding, and maintenance keys in a single Redis MULTI. Giving each card its
 // own Save would mean either two endpoints or a button that quietly writes the
 // other card's on-screen values too.
 
@@ -14,6 +14,7 @@ import { Button } from '~/components/shadcn/ui/button'
 import { useFetchPlatformSettings } from '~/hooks/queries/useFetchPlatformSettings'
 import { useUpdatePlatformSettings } from '~/hooks/queries/useUpdatePlatformSettings'
 import {
+  DEFAULT_NAVBAR_BRANDING_SETTINGS,
   platformSettingsSchema,
   type PlatformSettings,
 } from '~/utils/platformSettings.schema'
@@ -26,6 +27,7 @@ import {
 } from './AdminCard'
 import { AnnouncementBannerCard } from './AnnouncementBannerCard'
 import { MaintenanceModeCard } from './MaintenanceModeCard'
+import { NavbarBrandingCard } from './NavbarBrandingCard'
 
 // Floats only while there is something to save, so on small screens it does
 // not permanently cover a slice of the form.
@@ -68,6 +70,7 @@ export function PlatformSettingsForm({
         linkUrl: '',
       },
       maintenance: { enabled: false, titleText: '', bodyText: '' },
+      navbarBranding: DEFAULT_NAVBAR_BRANDING_SETTINGS,
     },
   })
 
@@ -158,6 +161,9 @@ export function PlatformSettingsForm({
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <AnnouncementBannerCard />
           <MaintenanceModeCard />
+          <div className="lg:col-span-2">
+            <NavbarBrandingCard />
+          </div>
         </div>
 
         <div
