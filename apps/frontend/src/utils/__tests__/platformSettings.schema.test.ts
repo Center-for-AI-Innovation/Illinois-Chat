@@ -9,6 +9,10 @@ import {
   addSuperAdminBodySchema,
   hasBannerLink,
   maintenanceSettingsSchema,
+  NAVBAR_LOGO_MAX_BYTES,
+  NAVBAR_WORD_MAX_LENGTH,
+  navbarBrandingSchema,
+  parseLogoDataUrl,
   platformSettingsSchema,
   storedAnnouncementBannerSchema,
   superAdminEmailSchema,
@@ -19,6 +23,12 @@ const VALID = {
   message: 'Downtime Saturday.',
   linkText: 'Status',
   linkUrl: 'https://status.illinois.edu',
+}
+
+const VALID_BRANDING = {
+  primaryWord: 'OSC',
+  secondaryWord: 'Chat',
+  logoDataUrl: '',
 }
 
 function issuePaths(result: { success: boolean; error?: any }) {
@@ -189,8 +199,85 @@ describe('platformSettingsSchema', () => {
     const result = platformSettingsSchema.safeParse({
       announcementBanner: { ...VALID, linkUrl: 'http://x.example' },
       maintenance: { enabled: false, titleText: '', bodyText: '' },
+      navbarBranding: VALID_BRANDING,
     })
     expect(issuePaths(result)).toContain('announcementBanner.linkUrl')
+  })
+})
+
+function logoOfBytes(byteLength: number, mime = 'image/png') {
+  return `data:${mime};base64,${'A'.repeat(Math.ceil(byteLength / 3) * 4)}`
+}
+
+describe('navbarBrandingSchema', () => {
+  it('accepts the built-in logo and trims the words', () => {
+    const result = navbarBrandingSchema.safeParse({
+      ...VALID_BRANDING,
+      primaryWord: '  OSC ',
+    })
+    expect(result.success && result.data.primaryWord).toBe('OSC')
+  })
+
+  it('requires each word to be a single, non-empty word', () => {
+    for (const primaryWord of ['', '   ', 'Ohio State']) {
+      const result = navbarBrandingSchema.safeParse({
+        ...VALID_BRANDING,
+        primaryWord,
+      })
+      expect(issuePaths(result)).toContain('primaryWord')
+    }
+  })
+
+  it('caps word length', () => {
+    const result = navbarBrandingSchema.safeParse({
+      ...VALID_BRANDING,
+      secondaryWord: 'x'.repeat(NAVBAR_WORD_MAX_LENGTH + 1),
+    })
+    expect(issuePaths(result)).toContain('secondaryWord')
+  })
+
+  it('accepts every supported image type as a base64 data URL', () => {
+    for (const mime of ['png', 'jpeg', 'webp', 'gif', 'svg+xml']) {
+      expect(
+        navbarBrandingSchema.safeParse({
+          ...VALID_BRANDING,
+          logoDataUrl: logoOfBytes(300, `image/${mime}`),
+        }).success,
+      ).toBe(true)
+    }
+  })
+
+  it('rejects non-image and non-data-URL logos', () => {
+    for (const logoDataUrl of [
+      'https://example.com/logo.png',
+      'data:text/html;base64,PHNjcmlwdD4=',
+      'data:image/png,not-base64',
+      'javascript:alert(1)',
+    ]) {
+      expect(
+        navbarBrandingSchema.safeParse({ ...VALID_BRANDING, logoDataUrl })
+          .success,
+      ).toBe(false)
+    }
+  })
+
+  it('rejects a logo over the size cap', () => {
+    const result = navbarBrandingSchema.safeParse({
+      ...VALID_BRANDING,
+      logoDataUrl: logoOfBytes(NAVBAR_LOGO_MAX_BYTES + 3),
+    })
+    expect(issuePaths(result)).toContain('logoDataUrl')
+  })
+})
+
+describe('parseLogoDataUrl', () => {
+  it('computes the decoded byte length, accounting for padding', () => {
+    expect(parseLogoDataUrl('data:image/png;base64,QQ==')).toMatchObject({
+      contentType: 'image/png',
+      byteLength: 1,
+    })
+    expect(parseLogoDataUrl('data:image/png;base64,QUI=')?.byteLength).toBe(2)
+    expect(parseLogoDataUrl('data:image/png;base64,QUJD')?.byteLength).toBe(3)
   })
 })
 

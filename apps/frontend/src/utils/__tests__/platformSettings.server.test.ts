@@ -24,6 +24,21 @@ const VALID_BANNER = {
   updatedBy: 'admin@example.com',
 }
 
+const VALID_BRANDING = {
+  primaryWord: 'OSC',
+  secondaryWord: 'Chat',
+  logoVersion: 'abc123',
+  updatedAt: '2026-09-08T00:00:00.000Z',
+  updatedBy: 'admin@example.com',
+}
+
+const LOGO_DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
+
+/** An `hGet` that answers per hash field, like the real platform:settings hash. */
+function hGetByField(fields: Record<string, string>) {
+  return vi.fn(async (_key: string, field: string) => fields[field])
+}
+
 function redisReturning(overrides: Record<string, unknown> = {}) {
   const multiCalls: Array<[string, unknown[]]> = []
   const multi = {
@@ -189,11 +204,7 @@ describe('readPlatformSettings', () => {
 
   it('carries the audit fields through when configured', async () => {
     redisReturning({
-      hGet: vi.fn(async (_key, field) =>
-        field === 'announcement_banner'
-          ? JSON.stringify(VALID_BANNER)
-          : undefined,
-      ),
+      hGet: hGetByField({ announcement_banner: JSON.stringify(VALID_BANNER) }),
     })
 
     const { readPlatformSettings } =
@@ -224,6 +235,93 @@ describe('readPlatformSettings', () => {
     expect(snapshot.warning).toContain('Maintenance settings could not be read')
     expect(snapshot.updatedAt).toBeUndefined()
   })
+
+  it('returns the default brand when navbar branding was never saved', async () => {
+    redisReturning()
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'Illinois',
+      secondaryWord: 'Chat',
+      logoDataUrl: '',
+    })
+    expect(snapshot.warning).toBeUndefined()
+  })
+
+  it('pairs stored branding with its logo bytes', async () => {
+    redisReturning({
+      hGet: hGetByField({
+        navbar_branding: JSON.stringify(VALID_BRANDING),
+        navbar_logo: LOGO_DATA_URL,
+      }),
+    })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: LOGO_DATA_URL,
+    })
+  })
+
+  it('warns instead of showing defaults as saved when branding is corrupt', async () => {
+    redisReturning({ hGet: hGetByField({ navbar_branding: '{not json' }) })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.warning).toContain('Navbar branding could not be read')
+  })
+})
+
+describe('toPublicNavbarBranding', () => {
+  it('links a versioned logo URL for a custom logo', async () => {
+    const { toPublicNavbarBranding } =
+      await import('~/utils/platformSettings.server')
+
+    expect(
+      toPublicNavbarBranding({ state: 'configured', value: VALID_BRANDING }),
+    ).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoUrl: '/api/UIUC-api/navbarLogo?v=abc123',
+    })
+  })
+
+  it('uses the built-in logo when no logo was uploaded', async () => {
+    const { toPublicNavbarBranding } =
+      await import('~/utils/platformSettings.server')
+
+    expect(
+      toPublicNavbarBranding({
+        state: 'configured',
+        value: { ...VALID_BRANDING, logoVersion: '' },
+      }).logoUrl,
+    ).toBeNull()
+  })
+
+  it.each(['absent', 'invalid', 'unavailable'] as const)(
+    'falls back to the default brand when %s',
+    async (state) => {
+      const { toPublicNavbarBranding } =
+        await import('~/utils/platformSettings.server')
+      const read =
+        state === 'absent' ? { state } : { state, reason: 'test' }
+
+      expect(toPublicNavbarBranding(read)).toEqual({
+        primaryWord: 'Illinois',
+        secondaryWord: 'Chat',
+        logoUrl: null,
+      })
+    },
+  )
 })
 
 describe('writePlatformSettings', () => {
@@ -236,6 +334,11 @@ describe('writePlatformSettings', () => {
       linkUrl: '',
     },
     maintenance: { enabled: true, titleText: 'Back soon', bodyText: 'Body' },
+    navbarBranding: {
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: LOGO_DATA_URL,
+    },
   }
 
   it('sends the expected version and edited sections in one atomic save', async () => {
@@ -257,7 +360,40 @@ describe('writePlatformSettings', () => {
     expect(args.slice(3, 6)).toEqual(['true', 'Back soon', 'Body'])
   })
 
-  it('leaves the legacy banner untouched when saving only maintenance', async () => {
+  it('stores logo bytes apart from the branding record, keyed by a content hash', async () => {
+    const { client } = redisReturning()
+
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    await writePlatformSettings(input, 'admin@example.com')
+
+    const args = client.eval.mock.calls[0]![1].arguments
+    const branding = JSON.parse(args[8]!)
+    expect(branding).toMatchObject({ primaryWord: 'OSC', secondaryWord: 'Chat' })
+    expect(branding.logoVersion).toMatch(/^[0-9a-f]{16}$/)
+    expect(branding).not.toHaveProperty('logoDataUrl')
+    expect(args[9]).toBe(LOGO_DATA_URL)
+  })
+
+  it('clears the logo and its version when reverting to the default', async () => {
+    const { client } = redisReturning()
+
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    await writePlatformSettings(
+      {
+        ...input,
+        navbarBranding: { ...input.navbarBranding, logoDataUrl: '' },
+      },
+      'admin@example.com',
+    )
+
+    const args = client.eval.mock.calls[0]![1].arguments
+    expect(JSON.parse(args[8]!).logoVersion).toBe('')
+    expect(args[9]).toBe('')
+  })
+
+  it('leaves the legacy banner and navbar untouched when saving only maintenance', async () => {
     const { client } = redisReturning()
     const { writePlatformSettings } =
       await import('~/utils/platformSettings.server')
@@ -265,12 +401,10 @@ describe('writePlatformSettings', () => {
       { version: '0', maintenance: { ...input.maintenance, enabled: false } },
       'admin@example.com',
     )
-    expect(client.eval.mock.calls[0]![1].arguments.slice(2, 6)).toEqual([
-      '',
-      'false',
-      'Back soon',
-      'Body',
-    ])
+    const args = client.eval.mock.calls[0]![1].arguments
+    expect(args.slice(2, 6)).toEqual(['', 'false', 'Back soon', 'Body'])
+    expect(args[8]).toBe('')
+    expect(args[9]).toBe('')
   })
 
   it('leaves maintenance untouched when saving only the banner', async () => {
