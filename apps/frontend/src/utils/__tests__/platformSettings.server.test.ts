@@ -244,6 +244,28 @@ describe('readPlatformSettings', () => {
     })
   })
 
+  it('keeps the words but drops the logo when the logo cannot be read', async () => {
+    redisReturning({
+      hGet: vi.fn(async (_key: string, field: string) => {
+        if (field === 'navbar_logo') throw new Error('ECONNRESET')
+        return field === 'navbar_branding'
+          ? JSON.stringify(VALID_BRANDING)
+          : undefined
+      }),
+    })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: '',
+    })
+    expect(snapshot.warning).toContain('Navbar logo could not be read')
+  })
+
   it('warns instead of showing defaults as saved when branding is corrupt', async () => {
     redisReturning({ hGet: hGetByField({ navbar_branding: '{not json' }) })
 
