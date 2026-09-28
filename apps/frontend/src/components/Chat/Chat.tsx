@@ -2098,11 +2098,6 @@ export const Chat = memo(
 
         <SourcesSidebarProvider>
           <div className="overflow-wrap relative flex h-full w-full flex-col overflow-hidden bg-(--background) text-(--foreground)">
-            {/*
-            <div className="justify-center" style={{ height: '40px' }}>
-              <ChatNavbar bannerUrl={bannerUrl as string} isgpt4={true} />
-            </div>
-*/}
             {permission == 'edit' ? (
               <div className="group absolute top-4 right-4 z-20">
                 <button
