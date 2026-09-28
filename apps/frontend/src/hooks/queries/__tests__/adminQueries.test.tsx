@@ -46,6 +46,7 @@ const settings: PlatformSettings = {
     linkUrl: '',
   },
   maintenance: { enabled: false, titleText: '', bodyText: '' },
+  navbarBranding: { primaryWord: 'Illinois', secondaryWord: 'Chat', logoDataUrl: '' },
 }
 
 function jsonResponse(body: unknown, status = 200) {
