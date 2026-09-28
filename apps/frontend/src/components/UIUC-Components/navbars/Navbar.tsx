@@ -1,18 +1,35 @@
 import {
   IconClipboardText,
-  IconFilePlus,
   IconHome,
   IconMenu2,
+  IconShieldCheck,
   IconSparkles,
-  IconX,
+  type TablerIcon,
 } from '@tabler/icons-react'
+import { cva } from 'class-variance-authority'
 import { montserrat_heading } from 'fonts'
-import { Button } from '@/components/shadcn/ui/button'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
-import GlobalHeader from '~/components/UIUC-Components/navbars/GlobalHeader'
+import { usePostHog } from 'posthog-js/react'
+import { useEffect } from 'react'
+import { useAuth } from 'react-oidc-context'
+import { Button } from '~/components/shadcn/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/shadcn/ui/dropdown-menu'
+import { Skeleton } from '~/components/shadcn/ui/skeleton'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
+import { useFetchNavbarBranding } from '~/hooks/queries/useFetchNavbarBranding'
+import {
+  DEFAULT_NAVBAR_BRANDING,
+  DEFAULT_NAVBAR_LOGO_SRC,
+} from '~/utils/platformSettings.schema'
+import { AuthMenu } from './AuthMenu'
+import { NavbarBrand, NavbarBrandSkeleton } from './NavbarBrand'
 
 interface NavbarProps {
   course_name?: string
@@ -21,208 +38,81 @@ interface NavbarProps {
 }
 
 interface NavItem {
-  name: React.ReactNode
-  icon: React.ReactElement
-  link: string
+  label: string
+  href: string
+  icon: TablerIcon
+  external?: boolean
 }
 
-interface NavigationContentProps {
-  items: NavItem[]
-  opened: boolean
-  activeLink: string
-  onLinkClick: () => void
-  onToggle: () => void
-  courseName: string
+const navLinkVariants = cva(
+  `flex items-center gap-[0.4rem] rounded-md text-[13px] font-bold whitespace-nowrap text-(--navbar-foreground) no-underline transition-colors hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) data-[active=true]:bg-(--navbar-background) data-[active=true]:text-(--navbar-active) ${montserrat_heading.variable} font-montserratHeading`,
+  {
+    variants: {
+      placement: {
+        bar: 'justify-center px-3 py-2.5',
+        menu: 'w-full justify-start px-3 py-3 focus:bg-(--navbar-hover-background) focus:text-(--navbar-hover)',
+      },
+    },
+  },
+)
+
+const GLOBAL_NAV_ITEMS: readonly NavItem[] = [
+  {
+    label: 'Docs',
+    href: 'https://docs.uiuc.chat/',
+    icon: IconClipboardText,
+    external: true,
+  },
+  { label: 'My Chatbots', href: '/chatbots', icon: IconHome },
+  { label: 'Create Your Own Bot', href: '/new', icon: IconSparkles },
+]
+
+const ADMIN_NAV_ITEM: NavItem = {
+  label: 'Admin',
+  href: '/admin',
+  icon: IconShieldCheck,
 }
 
-// Shared nav-link classes. Colors come from the --navbar-* CSS variables.
-const navLinkClass =
-  'flex items-center justify-center gap-[0.4rem] rounded px-3 py-2.5 text-[13px] font-bold text-(--navbar-foreground) transition-colors hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) hover:no-underline data-[active=true]:bg-(--navbar-background) data-[active=true]:text-(--navbar-active) data-[active=true]:no-underline max-md:justify-start max-md:rounded-none max-md:bg-(--navbar-background) max-md:px-3 max-md:py-5'
+function externalLinkProps(item: NavItem) {
+  return item.external
+    ? { target: '_blank', rel: 'noopener noreferrer' }
+    : undefined
+}
 
-const styles = {
-  logoContainerBox: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-    height: '100%',
-    maxWidth:
-      typeof window !== 'undefined' && window.innerWidth > 600 ? '80%' : '100%',
-    paddingRight:
-      typeof window !== 'undefined' && window.innerWidth > 600 ? '4px' : '25px',
-    paddingLeft: '25px',
-  },
-  thumbnailImage: {
-    objectFit: 'cover',
-    objectPosition: 'center',
-    height: '100%',
-    width: 'auto',
-  },
-} as const
+function Brand() {
+  const { data, isError } = useFetchNavbarBranding()
+  const branding = data ?? (isError ? DEFAULT_NAVBAR_BRANDING : undefined)
 
-function Logo() {
+  if (!branding) return <NavbarBrandSkeleton />
+
   return (
-    <div className="flex flex-1 items-center">
-      <Link href="/" tabIndex={0} aria-label="Home Page">
-        <div
-          className={`ms-4 flex items-center gap-0 font-bold ${montserrat_heading.variable} font-montserratHeading`}
-        >
-          <div style={{ width: '2.5rem', height: '2.5rem' }}>
-            <img
-              src="/media/logo_illinois.png"
-              width="auto"
-              height="100%"
-              alt="Illinois Logo"
-            />
-          </div>
-
-          <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
-            Illinois <span className="text-(--foreground)">Chat</span>
-          </div>
-        </div>
-      </Link>
-    </div>
+    <Link
+      href="/"
+      aria-label={`${branding.primaryWord} ${branding.secondaryWord} home`}
+      className="flex min-w-0 items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-(--illinois-orange)"
+    >
+      <NavbarBrand
+        primaryWord={branding.primaryWord}
+        secondaryWord={branding.secondaryWord}
+        logoSrc={branding.logoUrl ?? DEFAULT_NAVBAR_LOGO_SRC}
+      />
+    </Link>
   )
 }
 
-function BannerImage({
-  url,
-  courseName,
-}: {
-  url: string
-  courseName?: string
-}) {
+function BannerImage({ url, courseName }: { url: string; courseName: string }) {
   const altText = courseName ? `${courseName} logo` : 'Course chatbot logo'
   return (
-    <div style={styles.logoContainerBox}>
+    <div className="flex h-full min-w-0 flex-1 items-center overflow-hidden px-4 sm:px-6">
       <Image
         src={url}
-        style={styles.thumbnailImage}
+        className="h-full w-auto object-contain object-left"
         width={2000}
         height={2000}
         alt={altText}
-        aria-label={altText}
         onError={(e) => (e.currentTarget.style.display = 'none')}
       />
     </div>
-  )
-}
-
-function NavText({ children }: { children: React.ReactNode }) {
-  return (
-    <span className={`${montserrat_heading.variable} font-montserratHeading`}>
-      {children}
-    </span>
-  )
-}
-
-function getCurrentPageName(link: string, items: NavItem[]) {
-  const found: any = items.filter(
-    (item: NavItem) => item.link && link == item.link,
-  )
-
-  return found.length > 0 ? found.shift().name : ''
-}
-
-function NavigationContent({
-  items,
-  opened,
-  activeLink,
-  onLinkClick,
-  onToggle,
-}: NavigationContentProps) {
-  return (
-    <>
-      {/* Mobile dropdown */}
-      {opened && (
-        <nav
-          aria-label="Mobile navigation"
-          className="animate-in fade-in-0 zoom-in-95 absolute top-16 right-2 z-2 w-[calc(100%-1rem)] max-w-[330px] origin-top-right overflow-visible rounded-[10px] border border-(--navbar-border) bg-(--background-faded) shadow-lg duration-200 lg:hidden"
-        >
-          {items.map((item, index) => (
-            <Link
-              tabIndex={0}
-              key={index}
-              href={item.link}
-              onClick={() => onLinkClick()}
-              data-active={activeLink === item.link}
-              className={navLinkClass}
-            >
-              {item.icon}
-              {item.name}
-            </Link>
-          ))}
-        </nav>
-      )}
-
-      <nav
-        className="flex items-start justify-between"
-        style={{ paddingLeft: '0px' }}
-        aria-label="Main navigation"
-      >
-        <div className="hidden flex-row justify-between md:flex">
-          {items.map((item, index) => (
-            <Link
-              tabIndex={0}
-              key={index}
-              href={item.link}
-              onClick={() => onLinkClick()}
-              data-active={activeLink === item.link}
-              className={navLinkClass}
-            >
-              {item.icon}
-              {item.name}
-            </Link>
-          ))}
-        </div>
-      </nav>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        tabIndex={0}
-        aria-label="Toggle Menu"
-        aria-expanded={opened}
-        onClick={onToggle}
-        className="p-1 text-(--foreground) md:hidden [&_svg]:size-5"
-      >
-        {opened ? (
-          <IconX size={20} aria-hidden="true" />
-        ) : (
-          <IconMenu2 size={20} aria-hidden="true" />
-        )}
-      </Button>
-    </>
-  )
-}
-
-// Icon Components
-export function DashboardIcon() {
-  return <IconHome size={20} strokeWidth={2} aria-hidden="true" />
-}
-
-export function FileIcon() {
-  return (
-    <IconFilePlus
-      color="var(--foreground)"
-      size={20}
-      strokeWidth={2}
-      aria-hidden="true"
-      style={{ margin: '0' }}
-    />
-  )
-}
-
-export function ClipboardIcon() {
-  return (
-    <IconClipboardText
-      color="var(--foreground)"
-      size={20}
-      strokeWidth={2}
-      aria-hidden="true"
-      style={{ margin: '0' }}
-    />
   )
 }
 
@@ -231,58 +121,108 @@ export default function Navbar({
   bannerUrl = '',
   isPlain = false,
 }: NavbarProps) {
-  const [opened, setOpened] = useState(false)
-  const toggle = () => setOpened((o) => !o)
-  const close = () => setOpened(false)
   const router = useRouter()
-  const [activeLink, setActiveLink] = useState<string>('')
+  const auth = useAuth()
+  const posthog = usePostHog()
+  // Gated on the server's answer, not the NEXT_PUBLIC env list: a
+  // Redis-granted super admin is invisible to the client bundle.
+  const { data: isSuperAdmin } = useFetchIsSuperAdmin({
+    enabled: auth.isAuthenticated,
+  })
 
   useEffect(() => {
-    if (!router.isReady) return
-    const path = router.asPath.split('?')[0]
-    if (path) setActiveLink(path)
-  }, [router.asPath, router.isReady])
+    if (auth.isLoading || !auth.isAuthenticated) return
+    posthog?.identify(auth.user?.profile.sub || 'unknown', {
+      email: auth.user?.profile.email || 'no_email',
+    })
+  }, [auth.isLoading, auth.isAuthenticated])
 
-  const navItems: NavItem[] = [
-    {
-      name: <NavText>My Chatbots</NavText>,
-      icon: <DashboardIcon />,
-      link: '/chatbots', // Add conditional course_name ? `/${course_name}/dashboard` :
-    },
-    {
-      name: <NavText>Create Your Own Bot</NavText>,
-      icon: <IconSparkles aria-hidden="true" />,
-      link: '/new',
-    },
-  ]
+  const navItems =
+    isSuperAdmin === true
+      ? [...GLOBAL_NAV_ITEMS, ADMIN_NAV_ITEM]
+      : GLOBAL_NAV_ITEMS
+  const activePath = router.asPath?.split('?')[0]
 
   return (
     <div className="fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-(--navbar-background)">
-      {/* TODO: determine z-index values for major elements (nav, modals, tooltips, etc). for now, changed z-999 to z-50 to avoid modals being under the top navigation */}
-      {/***************** top navigation for all pages *****************/}
+      <header className="flex h-20 w-full items-center gap-2 border-b border-(--navbar-border) bg-(--navbar-background) px-4 sm:px-6">
+        <Brand />
 
-      <div className="flex flex-row items-center justify-center">
-        <header className="flex h-20 w-full items-center border-b border-(--navbar-border) bg-(--navbar-background) p-2">
-          <Logo />
+        {bannerUrl ? (
+          <BannerImage url={bannerUrl} courseName={course_name} />
+        ) : (
+          <div className="flex-1" />
+        )}
 
-          {!isPlain && (
-            <NavigationContent
-              items={navItems}
-              opened={opened}
-              activeLink={activeLink}
-              onLinkClick={close}
-              onToggle={toggle}
-              courseName={course_name}
-            />
+        {!isPlain && (
+          <nav aria-label="Main navigation" className="hidden lg:block">
+            <ul className="m-0 flex list-none items-center gap-1 p-0">
+              {navItems.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    data-active={activePath === item.href}
+                    className={navLinkVariants({ placement: 'bar' })}
+                    {...externalLinkProps(item)}
+                  >
+                    <item.icon size={20} strokeWidth={2} aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+
+        <div className="flex shrink-0 items-center gap-2">
+          {auth.isLoading ? (
+            <Skeleton className="size-[34px] rounded-full" aria-hidden="true" />
+          ) : (
+            <AuthMenu />
           )}
 
-          <div className="flex items-center">
-            <div className="hidden items-center md:flex">
-              <GlobalHeader isNavbar={true} />
-            </div>
-          </div>
-        </header>
-      </div>
+          {!isPlain && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Toggle Menu"
+                    className="rounded-md text-(--foreground) lg:hidden [&_svg]:size-5"
+                  />
+                }
+              >
+                <IconMenu2 aria-hidden="true" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                sideOffset={8}
+                className="w-64 rounded-md border border-(--navbar-border) bg-(--background-faded) p-1"
+              >
+                {navItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.href}
+                    className="p-0"
+                    render={
+                      <Link
+                        href={item.href}
+                        data-active={activePath === item.href}
+                        className={navLinkVariants({ placement: 'menu' })}
+                        {...externalLinkProps(item)}
+                      />
+                    }
+                  >
+                    <item.icon size={20} strokeWidth={2} aria-hidden="true" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </header>
     </div>
   )
 }
