@@ -30,6 +30,7 @@ const validSettings = {
     linkUrl: 'https://status.illinois.edu',
   },
   maintenance: { enabled: false, titleText: '', bodyText: '' },
+  navbarBranding: { primaryWord: 'Illinois', secondaryWord: 'Chat', logoDataUrl: '' },
 }
 
 beforeEach(() => {
