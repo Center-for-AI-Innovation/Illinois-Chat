@@ -6,25 +6,38 @@
 //
 // Redis layout (additive — nothing existing is renamed or migrated):
 //   platform:settings      hash  field `announcement_banner` holds JSON
+//                                field `navbar_branding` holds JSON
+//                                field `navbar_logo` holds a data URL or ''
 //   platform:super_admins  set   lowercased emails granted through the UI
 //   maintenance-mode       string 'true' | anything else
 //   maintenance-title-text string
 //   maintenance-body-text  string
 
+import { createHash } from 'crypto'
+import type { ZodType, ZodTypeDef } from 'zod'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import {
+  DEFAULT_NAVBAR_BRANDING,
+  DEFAULT_NAVBAR_BRANDING_SETTINGS,
   EMPTY_ANNOUNCEMENT_BANNER,
   EMPTY_MAINTENANCE_SETTINGS,
   platformSettingsSchema,
   storedAnnouncementBannerSchema,
+  storedNavbarBrandingSchema,
   type AnnouncementBanner,
   type MaintenanceSettings,
+  type NavbarBranding,
+  type NavbarBrandingSettings,
   type PlatformSettings,
   type StoredAnnouncementBanner,
+  type StoredNavbarBranding,
 } from '~/utils/platformSettings.schema'
 
 export const PLATFORM_SETTINGS_KEY = 'platform:settings'
 export const ANNOUNCEMENT_BANNER_FIELD = 'announcement_banner'
+export const NAVBAR_BRANDING_FIELD = 'navbar_branding'
+export const NAVBAR_LOGO_FIELD = 'navbar_logo'
+export const NAVBAR_LOGO_ENDPOINT = '/api/UIUC-api/navbarLogo'
 export const SUPER_ADMINS_KEY = 'platform:super_admins'
 export const MAINTENANCE_MODE_KEY = 'maintenance-mode'
 export const MAINTENANCE_TITLE_KEY = 'maintenance-title-text'
@@ -66,19 +79,17 @@ function describeError(error: unknown): string {
  * Docker build time when Redis is unreachable — throwing there fails the
  * image build. ISR fills in the real value on the first live request.
  */
-export async function readAnnouncementBanner(): Promise<
-  SettingsRead<StoredAnnouncementBanner>
-> {
+async function readJsonField<T>(
+  field: string,
+  schema: ZodType<T, ZodTypeDef, unknown>,
+): Promise<SettingsRead<T>> {
   let raw: string | undefined
   try {
     const redis = await ensureRedisConnected()
-    raw = await redis.hGet(PLATFORM_SETTINGS_KEY, ANNOUNCEMENT_BANNER_FIELD)
+    raw = await redis.hGet(PLATFORM_SETTINGS_KEY, field)
   } catch (error) {
     const reason = describeError(error)
-    console.error(
-      '[platformSettings] Redis unavailable reading banner:',
-      reason,
-    )
+    console.error(`[platformSettings] Redis unavailable reading ${field}:`, reason)
     return { state: 'unavailable', reason }
   }
 
@@ -88,23 +99,70 @@ export async function readAnnouncementBanner(): Promise<
   try {
     parsedJson = JSON.parse(raw)
   } catch (error) {
-    const reason = `announcement_banner is not valid JSON: ${describeError(
-      error,
-    )}`
+    const reason = `${field} is not valid JSON: ${describeError(error)}`
     console.error('[platformSettings]', reason)
     return { state: 'invalid', reason }
   }
 
-  const parsed = storedAnnouncementBannerSchema.safeParse(parsedJson)
+  const parsed = schema.safeParse(parsedJson)
   if (!parsed.success) {
     const reason = parsed.error.issues
-      .map((issue) => `${issue.path.join('.') || 'banner'}: ${issue.message}`)
+      .map((issue) => `${issue.path.join('.') || field}: ${issue.message}`)
       .join('; ')
-    console.error('[platformSettings] Stored banner failed validation:', reason)
+    console.error(`[platformSettings] Stored ${field} failed validation:`, reason)
     return { state: 'invalid', reason }
   }
 
   return { state: 'configured', value: parsed.data }
+}
+
+export function readAnnouncementBanner(): Promise<
+  SettingsRead<StoredAnnouncementBanner>
+> {
+  return readJsonField(ANNOUNCEMENT_BANNER_FIELD, storedAnnouncementBannerSchema)
+}
+
+/** Never throws, for the same build-time reason as `readAnnouncementBanner`. */
+export function readNavbarBranding(): Promise<
+  SettingsRead<StoredNavbarBranding>
+> {
+  return readJsonField(NAVBAR_BRANDING_FIELD, storedNavbarBrandingSchema)
+}
+
+/** The uploaded logo as a data URL, or `''` when the built-in logo is in use. */
+export async function readNavbarLogo(): Promise<AvailabilityRead<string>> {
+  try {
+    const redis = await ensureRedisConnected()
+    const raw = await redis.hGet(PLATFORM_SETTINGS_KEY, NAVBAR_LOGO_FIELD)
+    return { state: 'configured', value: raw ?? '' }
+  } catch (error) {
+    const reason = describeError(error)
+    console.error('[platformSettings] Redis unavailable reading logo:', reason)
+    return { state: 'unavailable', reason }
+  }
+}
+
+/**
+ * Every state other than `configured` renders the built-in branding: unlike
+ * the banner there is no legacy chain, and a navbar must always have a name.
+ */
+export function toPublicNavbarBranding(
+  read: SettingsRead<StoredNavbarBranding>,
+): NavbarBranding {
+  if (read.state !== 'configured') return DEFAULT_NAVBAR_BRANDING
+  const { primaryWord, secondaryWord, logoVersion } = read.value
+  return {
+    primaryWord,
+    secondaryWord,
+    logoUrl: logoVersion
+      ? `${NAVBAR_LOGO_ENDPOINT}?v=${encodeURIComponent(logoVersion)}`
+      : null,
+  }
+}
+
+function logoVersionOf(logoDataUrl: string): string {
+  if (logoDataUrl === '') return ''
+  return createHash('sha256').update(logoDataUrl).digest('hex').slice(0, 16)
 }
 
 /**
@@ -173,9 +231,11 @@ export interface PlatformSettingsSnapshot {
  * as a warning rather than as saved state.
  */
 export async function readPlatformSettings(): Promise<PlatformSettingsSnapshot> {
-  const [banner, maintenance] = await Promise.all([
+  const [banner, maintenance, branding, logo] = await Promise.all([
     readAnnouncementBanner(),
     readMaintenanceSettings(),
+    readNavbarBranding(),
+    readNavbarLogo(),
   ])
 
   const warnings: string[] = []
@@ -187,6 +247,26 @@ export async function readPlatformSettings(): Promise<PlatformSettingsSnapshot> 
       `Maintenance settings could not be read (${maintenance.reason})`,
     )
   }
+  if (branding.state === 'invalid' || branding.state === 'unavailable') {
+    warnings.push(`Navbar branding could not be read (${branding.reason})`)
+  }
+  if (logo.state === 'unavailable') {
+    warnings.push(`Navbar logo could not be read (${logo.reason})`)
+  }
+
+  const navbarBranding: NavbarBrandingSettings =
+    branding.state === 'configured'
+      ? {
+          primaryWord: branding.value.primaryWord,
+          secondaryWord: branding.value.secondaryWord,
+          // A version with no bytes behind it would render a broken image, so
+          // the form only shows a logo when both halves are present.
+          logoDataUrl:
+            branding.value.logoVersion && logo.state === 'configured'
+              ? logo.value
+              : '',
+        }
+      : DEFAULT_NAVBAR_BRANDING_SETTINGS
 
   return {
     settings: {
@@ -203,6 +283,7 @@ export async function readPlatformSettings(): Promise<PlatformSettingsSnapshot> 
         maintenance.state === 'configured'
           ? maintenance.value
           : EMPTY_MAINTENANCE_SETTINGS,
+      navbarBranding,
     },
     bannerState: banner.state,
     warning: warnings.length > 0 ? warnings.join('. ') : undefined,
@@ -216,8 +297,8 @@ export async function readPlatformSettings(): Promise<PlatformSettingsSnapshot> 
 /**
  * Validates then persists every settings key in one `MULTI`.
  *
- * The transaction matters: the banner field and the three maintenance keys are
- * one logical save, and a partial apply could leave maintenance on with the
+ * The transaction matters: the banner, navbar branding, and logo fields and
+ * the three maintenance keys are one logical save, and a partial apply could leave maintenance on with the
  * previous notice copy — or, worse, the banner updated while maintenance
  * silently did not change. Validation runs before the transaction opens so a
  * bad payload never touches Redis.
@@ -238,15 +319,22 @@ export async function writePlatformSettings(
     updatedAt,
     updatedBy,
   }
+  const { logoDataUrl, ...words } = settings.navbarBranding
+  const storedBranding: StoredNavbarBranding = {
+    ...words,
+    logoVersion: logoVersionOf(logoDataUrl),
+    updatedAt,
+    updatedBy,
+  }
 
   const redis = await ensureRedisConnected()
   await redis
     .multi()
-    .hSet(
-      PLATFORM_SETTINGS_KEY,
-      ANNOUNCEMENT_BANNER_FIELD,
-      JSON.stringify(storedBanner),
-    )
+    .hSet(PLATFORM_SETTINGS_KEY, {
+      [ANNOUNCEMENT_BANNER_FIELD]: JSON.stringify(storedBanner),
+      [NAVBAR_BRANDING_FIELD]: JSON.stringify(storedBranding),
+      [NAVBAR_LOGO_FIELD]: logoDataUrl,
+    })
     .set(MAINTENANCE_MODE_KEY, settings.maintenance.enabled ? 'true' : 'false')
     .set(MAINTENANCE_TITLE_KEY, settings.maintenance.titleText)
     .set(MAINTENANCE_BODY_KEY, settings.maintenance.bodyText)
