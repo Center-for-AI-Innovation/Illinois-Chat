@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { PlatformSettingsUpdate } from '~/utils/platformSettings.schema'
 import { ANNOUNCEMENT_BANNER_QUERY_KEY } from './useFetchAnnouncementBanner'
+import { NAVBAR_BRANDING_QUERY_KEY } from './useFetchNavbarBranding'
 import {
   PLATFORM_SETTINGS_QUERY_KEY,
   type PlatformSettingsResponse,
@@ -69,6 +70,9 @@ export function useUpdatePlatformSettings() {
       void queryClient.invalidateQueries({ queryKey: ['maintenanceDetails'] })
       void queryClient.invalidateQueries({
         queryKey: ANNOUNCEMENT_BANNER_QUERY_KEY,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: NAVBAR_BRANDING_QUERY_KEY,
       })
     },
   })
