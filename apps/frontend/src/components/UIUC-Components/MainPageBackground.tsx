@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import Head from 'next/head'
 import React, { type ReactNode } from 'react'
-import { LandingPageHeader } from './navbars/GlobalHeader'
 import Navbar from './navbars/Navbar'
 import { useRouter } from 'next/router'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -16,7 +15,6 @@ export const MainPageBackground: React.FC<MainPageBackgroundProps> = ({
 }) => {
   return (
     <>
-      {/* <LandingPageHeader forGeneralPurposeNotLandingpage={true} /> */}
       <main
         id="main-content"
         tabIndex={-1}
