@@ -44,16 +44,17 @@ export default function Footer() {
           Privacy
         </Link>
         <span>
+        Apache 2.0 Licensed{' '}
           <Link
             tabIndex={0}
-            href="https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/LICENSE"
+            href="https://github.com/Center-for-AI-Innovation/Illinois-Chat/"
             className="link-underline-hover cursor-pointer text-(--footer-link) hover:text-(--footer-link-hover)"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Apache 2.0 Licensed
-          </Link>{' '}
-          Illinois Chat code.
+            Illinois Chat code.
+          </Link>
+          
         </span>
       </div>
     </footer>
