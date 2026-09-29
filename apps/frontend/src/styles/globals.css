@@ -151,6 +151,11 @@
      follow the app theme. */
   color-scheme: light;
 
+  /* Height of the site-wide announcement bar, set at runtime by
+     SiteAnnouncementBanner. Fixed/sticky chrome offsets by it and full-viewport
+     layouts subtract it; 0px whenever no bar is showing. */
+  --announcement-banner-height: 0px;
+
   /* Primary Colors */
   --illinois-orange: #ff5f05; /* will override below to be accessible orange, left here for reference */
   --illinois-orange-branding: #ff5f05; /* official logo color for branding ONLY - used for illinois chat logo / branding to match I logo */

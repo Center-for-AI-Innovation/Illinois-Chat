@@ -17,6 +17,7 @@ import {
   EMPTY_MAINTENANCE_SETTINGS,
   platformSettingsSchema,
   storedAnnouncementBannerSchema,
+  type AnnouncementBanner,
   type MaintenanceSettings,
   type PlatformSettings,
   type StoredAnnouncementBanner,
@@ -104,6 +105,22 @@ export async function readAnnouncementBanner(): Promise<
   }
 
   return { state: 'configured', value: parsed.data }
+}
+
+/**
+ * The banner as public pages may see it. Only a genuinely configured record
+ * becomes non-null; every other state maps to null, which is what makes the
+ * legacy fallback fire for those cases and *only* those cases.
+ *
+ * `updatedAt`/`updatedBy` are stripped rather than spread: `updatedBy` is an
+ * administrator's email address.
+ */
+export function toPublicAnnouncementBanner(
+  read: SettingsRead<StoredAnnouncementBanner>,
+): AnnouncementBanner | null {
+  if (read.state !== 'configured') return null
+  const { enabled, message, linkText, linkUrl } = read.value
+  return { enabled, message, linkText, linkUrl }
 }
 
 /**

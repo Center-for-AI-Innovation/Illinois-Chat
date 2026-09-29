@@ -3,6 +3,7 @@ import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
 import Maintenance from '~/components/UIUC-Components/Maintenance'
+import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import '~/styles/citation-tooltips.css'
 import '~/styles/globals.css'
 
@@ -18,6 +19,7 @@ import { Analytics } from '@vercel/analytics/next'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { useFetchMaintenanceMode } from '~/hooks/queries/useFetchMaintenanceMode'
+import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
 import { Toaster } from '@/components/shadcn/ui/sonner'
 
@@ -90,6 +92,11 @@ if (typeof window !== 'undefined') {
   }
 }
 
+/** Set only by pages whose getStaticProps reads the banner (the home page). */
+interface SiteBannerPageProps {
+  announcementBanner?: AnnouncementBanner | null
+}
+
 const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
   const router = useRouter()
   // Held in state so the cache survives re-renders. The maintenance gate reads
@@ -153,6 +160,11 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
             <ThemeProvider>
               <Toaster position="bottom-center" />
               <MaintenanceGate>
+                <SiteAnnouncementBanner
+                  initialBanner={
+                    (pageProps as SiteBannerPageProps).announcementBanner
+                  }
+                />
                 <Component {...pageProps} />
               </MaintenanceGate>
             </ThemeProvider>

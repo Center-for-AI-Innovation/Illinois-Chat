@@ -58,6 +58,10 @@ vi.mock('~/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn() }),
 }))
 
+vi.mock('~/components/UIUC-Components/SiteAnnouncementBanner', () => ({
+  SiteAnnouncementBanner: () => null,
+}))
+
 vi.mock('~/components/UIUC-Components/Maintenance', () => ({
   default: () =>
     React.createElement('div', null, 'Site is under maintenance'),

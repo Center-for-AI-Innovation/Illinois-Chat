@@ -95,16 +95,18 @@ export function PlatformSettingsForm({
       // form does not flicker back to stale content.
       form.reset(values)
       if (result.revalidated) {
-        setSaveStatus('Saved. The home page is already showing the new banner.')
+        setSaveStatus(
+          'Saved. New page loads show it now; open tabs update within a minute.',
+        )
         showSuccessToast('Platform settings saved', 'Saved')
       } else {
         // A durable save whose on-demand page regeneration did not land. Not a
         // failure: the home page is statically regenerated every 30 seconds.
         setSaveStatus(
-          'Saved. Home page refresh is pending and will appear within 30 seconds.',
+          'Saved. Open tabs update within a minute; fresh home page loads within 30 seconds.',
         )
         showSuccessToast(
-          'Saved. Home page refresh pending — it appears within 30 seconds.',
+          'Saved. Open tabs update within a minute.',
           'Saved',
         )
       }
