@@ -7,7 +7,7 @@ site_url: https://center-for-ai-innovation.github.io/Illinois-Chat/
 repo_url: https://github.com/Center-for-AI-Innovation/Illinois-Chat
 repo_name: Center-for-AI-Innovation/Illinois-Chat
 edit_uri: edit/main/docs/
-copyright: MIT Licensed
+copyright: Apache 2.0
 
 theme:
   name: material
