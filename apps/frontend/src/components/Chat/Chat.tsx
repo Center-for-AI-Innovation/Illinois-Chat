@@ -65,6 +65,7 @@ import { useUpdateConversation } from '@/hooks/queries/useUpdateConversation'
 import { CropwizardLicenseDisclaimer } from '~/pages/cropwizard-licenses'
 
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 import {
   handleFunctionCall,
@@ -162,7 +163,14 @@ export const Chat = memo(
       error: toolLoadingError,
     } = useFetchAllWorkflows(getCurrentPageName())
 
-    const permission = get_user_permission(courseMetadata, auth)
+    const { data: isPlatformSuperAdmin } = useFetchIsSuperAdmin({
+      enabled: auth.isAuthenticated,
+    })
+    const permission = get_user_permission(
+      courseMetadata,
+      auth,
+      isPlatformSuperAdmin === true,
+    )
 
     useEffect(() => {
       if (
@@ -675,8 +683,8 @@ export const Chat = memo(
                               .map((content) => content.text!)
                               .join(' ')
                           : typeof msg.content === 'string'
-                            ? msg.content
-                            : ''
+                          ? msg.content
+                          : ''
                         return `${msg.role}: ${contentText.trim()}`
                       })
                       .filter((text) => text.length > 0)
@@ -695,8 +703,8 @@ export const Chat = memo(
                               .map((content) => content.text!)
                               .join(' ')
                           : typeof msg.content === 'string'
-                            ? msg.content
-                            : ''
+                          ? msg.content
+                          : ''
                         return `${msg.role}: ${contentText.trim()}`
                       })
                       .filter((text) => text.length > 0)
@@ -724,11 +732,11 @@ export const Chat = memo(
                       typeof msg.content === 'string'
                         ? msg.content.trim()
                         : Array.isArray(msg.content)
-                          ? msg.content
-                              .map((c) => c.text)
-                              .join(' ')
-                              .trim()
-                          : '',
+                        ? msg.content
+                            .map((c) => c.text)
+                            .join(' ')
+                            .trim()
+                        : '',
                   })),
                 },
                 key: getOpenAIKey(llmProviders, courseMetadata, apiKey),

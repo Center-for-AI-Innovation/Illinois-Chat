@@ -99,7 +99,13 @@ class ProjectService:
             value = {
                 "is_private": is_private,
                 "course_owner": project_owner_email,
-                "course_admins": get_default_course_admins(),
+                # Starts empty. Seeding from DEFAULT_COURSE_ADMINS (or a
+                # hardcoded allowlist) would bake those emails into every new
+                # project's admin list — access that could not then be revoked,
+                # since the array is a stored snapshot. The frontend grants
+                # super admins project access with a live check instead (see
+                # apps/frontend/src/server/authorization.ts).
+                "course_admins": [],
                 "approved_emails_list": None,
                 "example_questions": None,
                 "banner_image_s3": None,
