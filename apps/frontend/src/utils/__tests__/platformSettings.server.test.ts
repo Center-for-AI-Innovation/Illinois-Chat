@@ -24,6 +24,21 @@ const VALID_BANNER = {
   updatedBy: 'admin@example.com',
 }
 
+const VALID_BRANDING = {
+  primaryWord: 'OSC',
+  secondaryWord: 'Chat',
+  logoVersion: 'abc123',
+  updatedAt: '2026-09-08T00:00:00.000Z',
+  updatedBy: 'admin@example.com',
+}
+
+const LOGO_DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
+
+/** An `hGet` that answers per hash field, like the real platform:settings hash. */
+function hGetByField(fields: Record<string, string>) {
+  return vi.fn(async (_key: string, field: string) => fields[field])
+}
+
 function redisReturning(overrides: Record<string, unknown> = {}) {
   const multiCalls: Array<[string, unknown[]]> = []
   const multi = {
@@ -162,7 +177,9 @@ describe('readPlatformSettings', () => {
   })
 
   it('carries the audit fields through when configured', async () => {
-    redisReturning({ hGet: vi.fn(async () => JSON.stringify(VALID_BANNER)) })
+    redisReturning({
+      hGet: hGetByField({ announcement_banner: JSON.stringify(VALID_BANNER) }),
+    })
 
     const { readPlatformSettings } =
       await import('~/utils/platformSettings.server')
@@ -192,6 +209,115 @@ describe('readPlatformSettings', () => {
     expect(snapshot.warning).toContain('Maintenance settings could not be read')
     expect(snapshot.updatedAt).toBeUndefined()
   })
+
+  it('returns the default brand when navbar branding was never saved', async () => {
+    redisReturning()
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'Illinois',
+      secondaryWord: 'Chat',
+      logoDataUrl: '',
+    })
+    expect(snapshot.warning).toBeUndefined()
+  })
+
+  it('pairs stored branding with its logo bytes', async () => {
+    redisReturning({
+      hGet: hGetByField({
+        navbar_branding: JSON.stringify(VALID_BRANDING),
+        navbar_logo: LOGO_DATA_URL,
+      }),
+    })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: LOGO_DATA_URL,
+    })
+  })
+
+  it('keeps the words but drops the logo when the logo cannot be read', async () => {
+    redisReturning({
+      hGet: vi.fn(async (_key: string, field: string) => {
+        if (field === 'navbar_logo') throw new Error('ECONNRESET')
+        return field === 'navbar_branding'
+          ? JSON.stringify(VALID_BRANDING)
+          : undefined
+      }),
+    })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: '',
+    })
+    expect(snapshot.warning).toContain('Navbar logo could not be read')
+  })
+
+  it('warns instead of showing defaults as saved when branding is corrupt', async () => {
+    redisReturning({ hGet: hGetByField({ navbar_branding: '{not json' }) })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.warning).toContain('Navbar branding could not be read')
+  })
+})
+
+describe('toPublicNavbarBranding', () => {
+  it('links a versioned logo URL for a custom logo', async () => {
+    const { toPublicNavbarBranding } =
+      await import('~/utils/platformSettings.server')
+
+    expect(
+      toPublicNavbarBranding({ state: 'configured', value: VALID_BRANDING }),
+    ).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoUrl: '/api/UIUC-api/navbarLogo?v=abc123',
+    })
+  })
+
+  it('uses the built-in logo when no logo was uploaded', async () => {
+    const { toPublicNavbarBranding } =
+      await import('~/utils/platformSettings.server')
+
+    expect(
+      toPublicNavbarBranding({
+        state: 'configured',
+        value: { ...VALID_BRANDING, logoVersion: '' },
+      }).logoUrl,
+    ).toBeNull()
+  })
+
+  it.each(['absent', 'invalid', 'unavailable'] as const)(
+    'falls back to the default brand when %s',
+    async (state) => {
+      const { toPublicNavbarBranding } =
+        await import('~/utils/platformSettings.server')
+      const read =
+        state === 'absent' ? { state } : { state, reason: 'test' }
+
+      expect(toPublicNavbarBranding(read)).toEqual({
+        primaryWord: 'Illinois',
+        secondaryWord: 'Chat',
+        logoUrl: null,
+      })
+    },
+  )
 })
 
 describe('writePlatformSettings', () => {
@@ -203,9 +329,18 @@ describe('writePlatformSettings', () => {
       linkUrl: '',
     },
     maintenance: { enabled: true, titleText: 'Back soon', bodyText: 'Body' },
+    navbarBranding: {
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: LOGO_DATA_URL,
+    },
   }
 
-  it('writes the banner and all three maintenance keys in one MULTI', async () => {
+  function storedHashFields(multiCalls: Array<[string, unknown[]]>) {
+    return multiCalls[0]![1][1] as Record<string, string>
+  }
+
+  it('writes every settings field and maintenance key in one MULTI', async () => {
     const { multiCalls, multi } = redisReturning()
 
     const { writePlatformSettings } =
@@ -220,13 +355,43 @@ describe('writePlatformSettings', () => {
     expect(multi.exec).toHaveBeenCalledTimes(1)
     expect(multiCalls.map(([op]) => op)).toEqual(['hSet', 'set', 'set', 'set'])
 
-    const stored = JSON.parse(String(multiCalls[0]![1][2]))
-    expect(stored).toMatchObject({
+    const fields = storedHashFields(multiCalls)
+    expect(JSON.parse(fields.announcement_banner!)).toMatchObject({
       message: 'Downtime Saturday.',
       updatedBy: 'admin@example.com',
       updatedAt,
     })
     expect(multiCalls[1]![1][1]).toBe('true')
+  })
+
+  it('stores logo bytes apart from the branding record, keyed by a content hash', async () => {
+    const { multiCalls } = redisReturning()
+
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    await writePlatformSettings(input, 'admin@example.com')
+
+    const fields = storedHashFields(multiCalls)
+    const branding = JSON.parse(fields.navbar_branding!)
+    expect(branding).toMatchObject({ primaryWord: 'OSC', secondaryWord: 'Chat' })
+    expect(branding.logoVersion).toMatch(/^[0-9a-f]{16}$/)
+    expect(branding).not.toHaveProperty('logoDataUrl')
+    expect(fields.navbar_logo).toBe(LOGO_DATA_URL)
+  })
+
+  it('clears the logo and its version when reverting to the default', async () => {
+    const { multiCalls } = redisReturning()
+
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    await writePlatformSettings(
+      { ...input, navbarBranding: { ...input.navbarBranding, logoDataUrl: '' } },
+      'admin@example.com',
+    )
+
+    const fields = storedHashFields(multiCalls)
+    expect(JSON.parse(fields.navbar_branding!).logoVersion).toBe('')
+    expect(fields.navbar_logo).toBe('')
   })
 
   it('writes the literal string "false" when maintenance is off', async () => {
