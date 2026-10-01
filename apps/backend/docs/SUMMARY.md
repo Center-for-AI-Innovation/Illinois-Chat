@@ -7,6 +7,7 @@
 ## Features
 
 * [Tool use in conversation](features/tool-use-in-conversation.md)
+  * [Build a tool in Sim: arXiv example](features/build-a-sim-tool.md)
 * [Retrieval Methods](features/retrieval-methods.md)
 * [Web Crawling Details](features/web-crawling-details.md)
 * [Bulk Export Documents or Conversation History](features/bulk-export-documents-or-conversation-history.md)

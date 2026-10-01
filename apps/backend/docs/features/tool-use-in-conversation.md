@@ -21,6 +21,8 @@ The full walkthrough, from signing in to Sim through connecting a workspace to a
 3. In Illinois Chat, open `/<YOUR-PROJECT>/tools`, save your Sim API key and workspace, and enable the workflows you want active.
 4. Start chatting. Tools are invoked as needed.
 
+For a full worked example, from an empty workflow to a tool the chatbot calls, see [Build a tool in Sim: arXiv example](build-a-sim-tool.md).
+
 ### Inputs
 
 The workflow's declared inputs become the tool's parameters. Name and describe them so the LLM can fill them in correctly. Workflows with no inputs are advertised as taking no arguments.
