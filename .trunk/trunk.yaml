@@ -55,6 +55,8 @@ lint:
         - apps/backend/**
         - apps/crawlee/**
         - docs/**
+        - overrides/**
+        - mkdocs.yml
         - infra/**
         - media/**
         - qdrant_data/**

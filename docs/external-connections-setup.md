@@ -205,7 +205,7 @@ in sync and already includes every change.
 
 Contributors: the convention for adding to that directory — and the rule that
 `provision_external_pgvector_store.sql` moves with it — is documented in
-[`infra/db/external-migrations/README.md`](../infra/db/external-migrations/README.md).
+[`infra/db/external-migrations/README.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/infra/db/external-migrations/README.md).
 
 ## Verifying and troubleshooting
 

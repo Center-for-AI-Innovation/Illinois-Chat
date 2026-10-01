@@ -48,4 +48,4 @@ Learn more in [Concepts → Retrieval](concepts/retrieval.md).
 
 ## Acknowledgements
 
-Illinois Chat is developed by the [Center for AI Innovation (CAII)](https://ai.ncsa.illinois.edu/) at the National Center for Supercomputing Applications (NCSA), University of Illinois Urbana-Champaign, with support from the Office of the CIO, the Healthcare Innovation Office at NCSA, and the Gies College of Business, among others.
+Illinois Chat is developed by the [Center for AI Innovation (CAII)](https://ai.ncsa.illinois.edu/) at the National Center for Supercomputing Applications (NCSA), University of Illinois Urbana-Champaign, with support from the Office of the CIO, the Healthcare Innovation Program Office at NCSA, and the Gies College of Business, among others.
