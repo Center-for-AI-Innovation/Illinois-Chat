@@ -114,6 +114,7 @@ const Switch = React.forwardRef<HTMLElement, SwitchProps>(
 
     const switchElement = (
       <SwitchPrimitives.Root
+        data-slot="switch"
         className={cn(switchVariants({ variant, size }), className)}
         disabled={disabled}
         checked={isChecked}

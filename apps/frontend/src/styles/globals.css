@@ -491,13 +491,34 @@ button:disabled {
   animation: icon_scrolling 20s linear 0s infinite;
 }
 
-/* Global focus-visible styles for keyboard accessibility */
+/*
+ * WCAG 2.4.7 – Focus Visible (Level AA): a fallback focus indicator for
+ * elements that don't draw their own, in the design system's focus style
+ * (Figma "focus/default": 3px ring at 50%).
+ */
 *:focus-visible {
-  outline: 3px solid var(--illinois-orange);
-  outline-offset: 2px;
+  outline: 3px solid color-mix(in srgb, var(--ring) 50%, transparent);
+  outline-offset: 0;
 }
 *:focus:not(:focus-visible) {
   outline: none;
+}
+
+/*
+/*
+ * shadcn primitives draw their own design-system focus ring (border-ring +
+ * 3px ring-ring/50), so the global outline above would double it up. Higher
+ * specificity than `*:focus-visible`, and !important so it beats the global
+ * rule's !important.
+ */
+[data-slot='button']:focus-visible,
+[data-slot='switch']:focus-visible,
+[data-slot='input']:focus-visible,
+[data-slot='textarea']:focus-visible,
+[data-slot='select-trigger']:focus-visible,
+[data-slot='combobox-input']:focus-visible,
+[data-slot='input-group-control']:focus-visible {
+  outline: none !important;
 }
 
 /*
@@ -535,8 +556,7 @@ button:disabled {
 html[data-input-modality='keyboard']
   .chat_input_container:has(textarea.chat-input:focus) {
   box-shadow:
-    0 0 0 2px var(--background),
-    0 0 0 4px var(--illinois-orange);
+    0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
 }
 
 /* use existing formulas dark/light as described above as much as possible and only change the primary colors as needed */

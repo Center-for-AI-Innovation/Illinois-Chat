@@ -87,7 +87,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 <SelectItem
                   key={option.value}
                   value={option.value}
-                  className="data-highlighted:bg-(--dashboard-button) data-highlighted:text-(--dashboard-button-foreground)"
                 >
                   {option.label}
                 </SelectItem>
