@@ -2,7 +2,8 @@
 
 This plan covers moving the whole frontend onto the new Illinois Chat design.
 
-**Design sources (Figma)**
+## Design sources (Figma)
+
 - Screens: [Illinois.Chat](https://www.figma.com/design/uOvStAqvMso6iCGJ5AV7HK/Illinois.Chat). The pilot page is the
   "AI Models" section, node `2445-33636`.
 - Component library: [Illinois Chat shadcn Official](https://www.figma.com/design/cNT8WmeLqGDKceb2uUzNLR/Illinois-Chat-shadcn-Official).
