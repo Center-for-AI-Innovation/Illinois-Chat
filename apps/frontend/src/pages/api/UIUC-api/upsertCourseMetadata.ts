@@ -10,7 +10,6 @@ import { encrypt, isEncrypted } from '~/utils/crypto'
 import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { upsertChatbotTags } from '~/utils/chatbotTagsRegistry'
-import { superAdmins } from '~/utils/superAdmins'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -47,13 +46,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       )
     }
 
-    // Check if combined_metadata doesn't have anything in the field course_admins
-    if (
-      !combined_metadata.course_admins ||
-      combined_metadata.course_admins.length === 0
-    ) {
-      combined_metadata.course_admins = superAdmins
-      console.log('course_admins field was empty. Added default admin emails.')
+    // An empty admin list stays empty. It used to be seeded with the
+    // super-admin allowlist, but persisting platform admins into per-project
+    // metadata makes their access unrevocable: the stored array is a snapshot,
+    // so every project seeded while someone was listed keeps granting them
+    // admin rights after the grant is removed. Super admins now get project
+    // access from the live check in `~/server/authorization.ts` instead.
+    if (!combined_metadata.course_admins) {
+      combined_metadata.course_admins = []
     }
 
     // Check if combined_metadata doesn't have anything in the field is_private

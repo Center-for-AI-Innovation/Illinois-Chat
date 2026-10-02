@@ -28,6 +28,14 @@ just run it without flags; the schema is left untouched:
 bash infra/scripts/start-dev.sh
 ```
 
+To also start the backend, ingest worker, and frontend in this terminal (Flask debug + Next.js hot reload):
+
+```bash
+bash infra/scripts/start-dev.sh --apps
+```
+
+`--apps` can be combined with `--create-schema` or `--clean`. `Ctrl+C` stops the three app processes; infrastructure stays up until you run `stop-dev.sh`.
+
 This script will:
 
 - Create a repository-root `.env` file from `.env.template` if needed
@@ -91,6 +99,14 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:10000
 `http://localhost:9001` is the MinIO management console and should not be used for S3 uploads.
 
 ### 3. Start Development Services
+
+Start all three in the same terminal (after infrastructure is already up):
+
+```bash
+bash infra/scripts/start-dev.sh --apps
+```
+
+Or start them yourself in separate terminals:
 
 ```bash
 cd apps/backend
@@ -204,20 +220,23 @@ SQLITE_DB_NAME=uiuc_chat_local.db
 
 ## Development Workflow
 
-1. **Start infrastructure**: `bash infra/scripts/start-dev.sh`
-2. **Start backend**: `cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000`
-3. **Start worker**: `cd apps/backend && python ai_ta_backend/rabbitmq/worker.py`
-4. **Start frontend**: `cd apps/frontend && npm run local`
-5. **Make changes** to your code
-6. **Stop services**: `Ctrl+C` in each app terminal
+1. **Start infrastructure and apps**: `bash infra/scripts/start-dev.sh --apps`
+2. **Or start infrastructure only**: `bash infra/scripts/start-dev.sh`, then in separate terminals:
+   - **Backend**: `cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000`
+   - **Worker**: `cd apps/backend && python ai_ta_backend/rabbitmq/worker.py`
+   - **Frontend**: `cd apps/frontend && npm run local`
+3. **Make changes** to your code
+4. **Stop apps**: `Ctrl+C` in the `--apps` terminal (or in each app terminal)
+5. **Stop infrastructure**: `bash infra/scripts/stop-dev.sh`
 
 ## Stopping Everything
 
 ```bash
-# Stop development services
-# Press Ctrl+C in the backend, worker, and frontend terminals
+# Stop backend, worker, and frontend
+# Press Ctrl+C in the start-dev.sh --apps terminal
+# (or in each app terminal if you started them separately)
 
-# Stop infrastructure services
+# Stop infrastructure services (also stops leftover --apps processes)
 bash infra/scripts/stop-dev.sh
 
 # Stop infrastructure and remove local volumes/data
