@@ -9,6 +9,7 @@ export const PLATFORM_SETTINGS_QUERY_KEY = ['platformSettings'] as const
 
 export interface PlatformSettingsResponse {
   settings: PlatformSettings
+  version: string
   /**
    * Why the stored banner did not load, when it did not. `absent` and
    * `invalid` both hand the admin an empty form, so the UI needs this to say

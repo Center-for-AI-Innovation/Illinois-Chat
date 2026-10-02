@@ -11,14 +11,16 @@
 //   maintenance-title-text string
 //   maintenance-body-text  string
 
+import { randomUUID } from 'node:crypto'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import {
   EMPTY_ANNOUNCEMENT_BANNER,
   EMPTY_MAINTENANCE_SETTINGS,
-  platformSettingsSchema,
+  platformSettingsUpdateSchema,
   storedAnnouncementBannerSchema,
   type MaintenanceSettings,
   type PlatformSettings,
+  type PlatformSettingsUpdate,
   type StoredAnnouncementBanner,
 } from '~/utils/platformSettings.schema'
 
@@ -81,6 +83,12 @@ export async function readAnnouncementBanner(): Promise<
     return { state: 'unavailable', reason }
   }
 
+  return parseAnnouncementBanner(raw)
+}
+
+function parseAnnouncementBanner(
+  raw: string | null | undefined,
+): SettingsRead<StoredAnnouncementBanner> {
   if (!raw) return { state: 'absent' }
 
   let parsedJson: unknown
@@ -144,6 +152,7 @@ export async function readMaintenanceSettings(): Promise<
 
 export interface PlatformSettingsSnapshot {
   settings: PlatformSettings
+  version: string
   bannerState: SettingsRead<StoredAnnouncementBanner>['state']
   /** Present when the banner or maintenance read did not succeed. */
   warning?: string
@@ -156,10 +165,43 @@ export interface PlatformSettingsSnapshot {
  * as a warning rather than as saved state.
  */
 export async function readPlatformSettings(): Promise<PlatformSettingsSnapshot> {
-  const [banner, maintenance] = await Promise.all([
-    readAnnouncementBanner(),
-    readMaintenanceSettings(),
-  ])
+  let banner: SettingsRead<StoredAnnouncementBanner>
+  let maintenance: AvailabilityRead<MaintenanceSettings>
+  let version = '0'
+  let updatedAt: string | undefined
+  let updatedBy: string | undefined
+  try {
+    const redis = await ensureRedisConnected()
+    // Read the version and its values in one transaction, so a concurrent save
+    // cannot pair old form values with a new version.
+    const [rawBanner, mode, title, body, rawVersion, savedAt, savedBy] =
+      await redis
+        .multi()
+        .hGet(PLATFORM_SETTINGS_KEY, ANNOUNCEMENT_BANNER_FIELD)
+        .get(MAINTENANCE_MODE_KEY)
+        .get(MAINTENANCE_TITLE_KEY)
+        .get(MAINTENANCE_BODY_KEY)
+        .hGet(PLATFORM_SETTINGS_KEY, 'version')
+        .hGet(PLATFORM_SETTINGS_KEY, 'updated_at')
+        .hGet(PLATFORM_SETTINGS_KEY, 'updated_by')
+        .exec()
+    banner = parseAnnouncementBanner(rawBanner as string | null)
+    maintenance = {
+      state: 'configured',
+      value: {
+        enabled: mode === 'true',
+        titleText: (title as string | null) ?? '',
+        bodyText: (body as string | null) ?? '',
+      },
+    }
+    version = (rawVersion as string | null) ?? '0'
+    updatedAt = (savedAt as string | null) ?? undefined
+    updatedBy = (savedBy as string | null) ?? undefined
+  } catch (error) {
+    const reason = describeError(error)
+    banner = { state: 'unavailable', reason }
+    maintenance = { state: 'unavailable', reason }
+  }
 
   const warnings: string[] = []
   if (banner.state === 'invalid' || banner.state === 'unavailable') {
@@ -187,55 +229,88 @@ export async function readPlatformSettings(): Promise<PlatformSettingsSnapshot> 
           ? maintenance.value
           : EMPTY_MAINTENANCE_SETTINGS,
     },
+    version,
     bannerState: banner.state,
     warning: warnings.length > 0 ? warnings.join('. ') : undefined,
     updatedAt:
-      banner.state === 'configured' ? banner.value.updatedAt : undefined,
+      updatedAt ??
+      (banner.state === 'configured' ? banner.value.updatedAt : undefined),
     updatedBy:
-      banner.state === 'configured' ? banner.value.updatedBy : undefined,
+      updatedBy ??
+      (banner.state === 'configured' ? banner.value.updatedBy : undefined),
   }
 }
 
-/**
- * Validates then persists every settings key in one `MULTI`.
- *
- * The transaction matters: the banner field and the three maintenance keys are
- * one logical save, and a partial apply could leave maintenance on with the
- * previous notice copy — or, worse, the banner updated while maintenance
- * silently did not change. Validation runs before the transaction opens so a
- * bad payload never touches Redis.
- *
- * Throws on validation failure and on Redis failure; the caller maps those to
- * 400 and 503. Unlike the read path this must not swallow errors, since a
- * silent write failure would read as a successful save.
- */
-export async function writePlatformSettings(
-  input: PlatformSettings,
-  updatedBy: string,
-): Promise<{ updatedAt: string }> {
-  const settings = platformSettingsSchema.parse(input)
-  const updatedAt = new Date().toISOString()
-
-  const storedBanner: StoredAnnouncementBanner = {
-    ...settings.announcementBanner,
-    updatedAt,
-    updatedBy,
-  }
-
-  const redis = await ensureRedisConnected()
-  await redis
-    .multi()
-    .hSet(
-      PLATFORM_SETTINGS_KEY,
-      ANNOUNCEMENT_BANNER_FIELD,
-      JSON.stringify(storedBanner),
+export class PlatformSettingsConflictError extends Error {
+  constructor() {
+    super(
+      'Settings changed since you loaded this form. Reload the latest settings before saving.',
     )
-    .set(MAINTENANCE_MODE_KEY, settings.maintenance.enabled ? 'true' : 'false')
-    .set(MAINTENANCE_TITLE_KEY, settings.maintenance.titleText)
-    .set(MAINTENANCE_BODY_KEY, settings.maintenance.bodyText)
-    .exec()
+  }
+}
 
-  return { updatedAt }
+// Lua keeps the version check and writes atomic without WATCH state on the
+// shared Redis connection. Omitted sections remain untouched.
+const SAVE_SETTINGS_SCRIPT = `
+for i, key in ipairs(KEYS) do
+  local kind = redis.call('TYPE', key).ok
+  local expected = i == 1 and 'hash' or 'string'
+  if kind ~= 'none' and kind ~= expected then
+    return redis.error_reply('Unexpected settings key type')
+  end
+end
+local version = redis.call('HGET', KEYS[1], 'version') or '0'
+if version ~= ARGV[1] then return 0 end
+if ARGV[3] ~= '' then
+  redis.call('HSET', KEYS[1], 'announcement_banner', ARGV[3])
+end
+if ARGV[4] ~= '' then
+  redis.call('SET', KEYS[2], ARGV[4])
+  redis.call('SET', KEYS[3], ARGV[5])
+  redis.call('SET', KEYS[4], ARGV[6])
+end
+redis.call('HSET', KEYS[1], 'version', ARGV[2], 'updated_at', ARGV[7], 'updated_by', ARGV[8])
+return 1
+`
+
+export async function writePlatformSettings(
+  input: PlatformSettingsUpdate,
+  updatedBy: string,
+): Promise<{ updatedAt: string; version: string }> {
+  const settings = platformSettingsUpdateSchema.parse(input)
+  const updatedAt = new Date().toISOString()
+  const version = randomUUID()
+  const redis = await ensureRedisConnected()
+  const saved = await redis.eval(SAVE_SETTINGS_SCRIPT, {
+    keys: [
+      PLATFORM_SETTINGS_KEY,
+      MAINTENANCE_MODE_KEY,
+      MAINTENANCE_TITLE_KEY,
+      MAINTENANCE_BODY_KEY,
+    ],
+    arguments: [
+      settings.version,
+      version,
+      settings.announcementBanner
+        ? JSON.stringify({
+            ...settings.announcementBanner,
+            updatedAt,
+            updatedBy,
+          })
+        : '',
+      settings.maintenance
+        ? settings.maintenance.enabled
+          ? 'true'
+          : 'false'
+        : '',
+      settings.maintenance?.titleText ?? '',
+      settings.maintenance?.bodyText ?? '',
+      updatedAt,
+      updatedBy,
+    ],
+  })
+  if (saved === 0) throw new PlatformSettingsConflictError()
+  return { updatedAt, version }
 }
 
 /**

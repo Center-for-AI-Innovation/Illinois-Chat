@@ -4,8 +4,9 @@
 
 import type { NextApiResponse } from 'next'
 import type { AuthenticatedRequest } from '~/utils/authMiddleware'
-import { platformSettingsSchema } from '~/utils/platformSettings.schema'
+import { platformSettingsUpdateSchema } from '~/utils/platformSettings.schema'
 import {
+  PlatformSettingsConflictError,
   readPlatformSettings,
   writePlatformSettings,
 } from '~/utils/platformSettings.server'
@@ -37,7 +38,7 @@ async function handleGet(res: NextApiResponse) {
 }
 
 async function handlePut(req: AuthenticatedRequest, res: NextApiResponse) {
-  const parsed = platformSettingsSchema.safeParse(req.body)
+  const parsed = platformSettingsUpdateSchema.safeParse(req.body)
   if (!parsed.success) {
     return res.status(400).json({ error: formatZodError(parsed.error) })
   }
@@ -45,9 +46,22 @@ async function handlePut(req: AuthenticatedRequest, res: NextApiResponse) {
   const actorEmail = req.user?.email ?? 'unknown'
 
   let updatedAt: string
+  let version: string
   try {
-    ;({ updatedAt } = await writePlatformSettings(parsed.data, actorEmail))
+    ;({ updatedAt, version } = await writePlatformSettings(
+      parsed.data,
+      actorEmail,
+    ))
   } catch (err) {
+    if (err instanceof PlatformSettingsConflictError) {
+      return res
+        .status(409)
+        .json({
+          saved: false,
+          error: err.message,
+          current: await readPlatformSettings(),
+        })
+    }
     console.error('[admin/settings] write failed:', err)
     return res.status(503).json({
       saved: false,
@@ -81,6 +95,7 @@ async function handlePut(req: AuthenticatedRequest, res: NextApiResponse) {
     saved: true,
     revalidated,
     updatedAt,
+    version,
     updatedBy: actorEmail,
     ...(revalidationError ? { revalidationError } : {}),
   })

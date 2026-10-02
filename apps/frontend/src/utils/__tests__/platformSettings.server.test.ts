@@ -35,15 +35,35 @@ function redisReturning(overrides: Record<string, unknown> = {}) {
       multiCalls.push(['set', args])
       return multi
     },
-    exec: vi.fn(async () => []),
+    hGet: (...args: unknown[]) => {
+      multiCalls.push(['hGet', args])
+      return multi
+    },
+    get: (...args: unknown[]) => {
+      multiCalls.push(['get', args])
+      return multi
+    },
+    exec: vi.fn(async () =>
+      Promise.all(
+        multiCalls.map(([op, args]) =>
+          op === 'hGet' ? client.hGet(...args) : client.get(...args),
+        ),
+      ),
+    ),
   }
 
   const client = {
-    hGet: vi.fn(async () => undefined),
-    get: vi.fn(async () => null),
+    hGet: vi.fn(async (..._args: unknown[]) => undefined),
+    get: vi.fn(async (..._args: unknown[]) => null),
     sMembers: vi.fn(async () => [] as string[]),
     sAdd: vi.fn(async () => 1),
     sRem: vi.fn(async () => 1),
+    eval: vi.fn(
+      async (
+        _script: string,
+        _options: { arguments: string[]; keys: string[] },
+      ) => 1,
+    ),
     multi: () => multi,
     ...overrides,
   }
@@ -65,7 +85,13 @@ afterEach(() => {
 
 describe('readAnnouncementBanner', () => {
   it('reports configured for a valid stored record', async () => {
-    redisReturning({ hGet: vi.fn(async () => JSON.stringify(VALID_BANNER)) })
+    redisReturning({
+      hGet: vi.fn(async (_key, field) =>
+        field === 'announcement_banner'
+          ? JSON.stringify(VALID_BANNER)
+          : undefined,
+      ),
+    })
 
     const { readAnnouncementBanner } =
       await import('~/utils/platformSettings.server')
@@ -162,7 +188,13 @@ describe('readPlatformSettings', () => {
   })
 
   it('carries the audit fields through when configured', async () => {
-    redisReturning({ hGet: vi.fn(async () => JSON.stringify(VALID_BANNER)) })
+    redisReturning({
+      hGet: vi.fn(async (_key, field) =>
+        field === 'announcement_banner'
+          ? JSON.stringify(VALID_BANNER)
+          : undefined,
+      ),
+    })
 
     const { readPlatformSettings } =
       await import('~/utils/platformSettings.server')
@@ -196,6 +228,7 @@ describe('readPlatformSettings', () => {
 
 describe('writePlatformSettings', () => {
   const input = {
+    version: '0',
     announcementBanner: {
       enabled: true,
       message: 'Downtime Saturday.',
@@ -205,41 +238,48 @@ describe('writePlatformSettings', () => {
     maintenance: { enabled: true, titleText: 'Back soon', bodyText: 'Body' },
   }
 
-  it('writes the banner and all three maintenance keys in one MULTI', async () => {
-    const { multiCalls, multi } = redisReturning()
-
+  it('sends the expected version and edited sections in one atomic save', async () => {
+    const { client } = redisReturning()
     const { writePlatformSettings } =
       await import('~/utils/platformSettings.server')
-    const { updatedAt } = await writePlatformSettings(
+    const { updatedAt, version } = await writePlatformSettings(
       input,
       'admin@example.com',
     )
-
-    // One logical save. A partial apply could leave maintenance on with the
-    // previous notice copy.
-    expect(multi.exec).toHaveBeenCalledTimes(1)
-    expect(multiCalls.map(([op]) => op)).toEqual(['hSet', 'set', 'set', 'set'])
-
-    const stored = JSON.parse(String(multiCalls[0]![1][2]))
-    expect(stored).toMatchObject({
-      message: 'Downtime Saturday.',
-      updatedBy: 'admin@example.com',
+    expect(client.eval).toHaveBeenCalledTimes(1)
+    const args = client.eval.mock.calls[0]![1].arguments
+    expect(args.slice(0, 2)).toEqual(['0', version])
+    expect(JSON.parse(args[2]!)).toMatchObject({
+      message: input.announcementBanner.message,
       updatedAt,
+      updatedBy: 'admin@example.com',
     })
-    expect(multiCalls[1]![1][1]).toBe('true')
+    expect(args.slice(3, 6)).toEqual(['true', 'Back soon', 'Body'])
   })
 
-  it('writes the literal string "false" when maintenance is off', async () => {
-    const { multiCalls } = redisReturning()
-
+  it('leaves the legacy banner untouched when saving only maintenance', async () => {
+    const { client } = redisReturning()
     const { writePlatformSettings } =
       await import('~/utils/platformSettings.server')
     await writePlatformSettings(
-      { ...input, maintenance: { ...input.maintenance, enabled: false } },
+      { version: '0', maintenance: { ...input.maintenance, enabled: false } },
       'admin@example.com',
     )
+    expect(client.eval.mock.calls[0]![1].arguments.slice(2, 6)).toEqual([
+      '',
+      'false',
+      'Back soon',
+      'Body',
+    ])
+  })
 
-    expect(multiCalls[1]![1][1]).toBe('false')
+  it('reports a version conflict without reporting a successful save', async () => {
+    redisReturning({ eval: vi.fn(async () => 0) })
+    const { writePlatformSettings, PlatformSettingsConflictError } =
+      await import('~/utils/platformSettings.server')
+    await expect(
+      writePlatformSettings(input, 'admin@example.com'),
+    ).rejects.toBeInstanceOf(PlatformSettingsConflictError)
   })
 
   it('rejects an invalid payload before opening the transaction', async () => {

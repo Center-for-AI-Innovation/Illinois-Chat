@@ -1,9 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { PlatformSettings } from '~/utils/platformSettings.schema'
-import { PLATFORM_SETTINGS_QUERY_KEY } from './useFetchPlatformSettings'
+import type { PlatformSettingsUpdate } from '~/utils/platformSettings.schema'
+import {
+  PLATFORM_SETTINGS_QUERY_KEY,
+  type PlatformSettingsResponse,
+} from './useFetchPlatformSettings'
 
 export interface UpdatePlatformSettingsResponse {
   saved: true
+  version: string
   /**
    * Whether the home page was regenerated on the spot. Reported separately
    * from `saved` because on-demand revalidation only reaches the replica that
@@ -17,8 +21,17 @@ export interface UpdatePlatformSettingsResponse {
   revalidationError?: string
 }
 
+export class PlatformSettingsConflictError extends Error {
+  constructor(
+    message: string,
+    public current: PlatformSettingsResponse,
+  ) {
+    super(message)
+  }
+}
+
 export async function updatePlatformSettings(
-  settings: PlatformSettings,
+  settings: PlatformSettingsUpdate,
 ): Promise<UpdatePlatformSettingsResponse> {
   const response = await fetch('/api/admin/settings', {
     method: 'PUT',
@@ -27,6 +40,9 @@ export async function updatePlatformSettings(
   })
 
   const body = await response.json().catch(() => null)
+  if (response.status === 409) {
+    throw new PlatformSettingsConflictError(body.error, body.current)
+  }
   if (!response.ok) {
     throw new Error(
       body?.error ?? `Failed to save settings (${response.status})`,

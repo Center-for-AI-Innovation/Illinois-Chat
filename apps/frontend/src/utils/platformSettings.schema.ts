@@ -148,6 +148,22 @@ export const platformSettingsSchema = z.object({
 })
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>
 
+export const platformSettingsUpdateSchema = platformSettingsSchema
+  .partial()
+  .extend({ version: z.string().min(1) })
+  .strict()
+  .refine(
+    (settings) =>
+      settings.announcementBanner !== undefined ||
+      settings.maintenance !== undefined,
+    {
+      message: 'Include at least one settings section to update',
+    },
+  )
+export type PlatformSettingsUpdate = z.infer<
+  typeof platformSettingsUpdateSchema
+>
+
 export const superAdminEmailSchema = z
   .string()
   .trim()
