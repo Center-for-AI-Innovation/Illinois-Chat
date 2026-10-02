@@ -189,7 +189,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
                   'stroke-3 dark:text-(--illinois-blue)',
                   disabled
                     ? 'text-gray-400'
-                    : 'text-(--dashboard-button,hsl(var(--primary)))',
+                    : 'text-(--dashboard-button,var(--primary))',
                 )}
               />
             ) : (
@@ -223,7 +223,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
           <span
             className={cn(
               'ml-3 flex items-center text-sm transition-colors duration-200 ease-in-out',
-              'text-(--dashboard-foreground,hsl(var(--foreground)))',
+              'text-(--dashboard-foreground,var(--foreground))',
             )}
           >
             {label}
@@ -246,7 +246,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
                   />
                   <TooltipContent
                     side="bottom"
-                    className="max-w-[220px] bg-(--tooltip-background,hsl(var(--popover))) text-(--tooltip,hsl(var(--popover-foreground))) shadow-lg"
+                    className="max-w-[220px] bg-(--tooltip-background,var(--popover)) text-(--tooltip,var(--popover-foreground)) shadow-lg"
                   >
                     <p className="text-sm">{tooltip}</p>
                   </TooltipContent>

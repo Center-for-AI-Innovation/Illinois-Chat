@@ -40,7 +40,7 @@ export function ChatbotsHeroSection() {
             href="/disclaimer"
             className={cn(
               buttonVariants({ variant: 'secondary' }),
-              'h-10 bg-[hsl(var(--muted))] px-8 text-sm text-(--illinois-blue) dark:bg-white/10 dark:text-white dark:hover:bg-white/15',
+              'h-10 bg-muted px-8 text-sm text-(--illinois-blue) dark:bg-white/10 dark:text-white dark:hover:bg-white/15',
             )}
           >
             More Info
