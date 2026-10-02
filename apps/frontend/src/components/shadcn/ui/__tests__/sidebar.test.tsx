@@ -145,3 +145,61 @@ describe('shadcn sidebar', () => {
     expect(maybeSheet === null || maybeSheet instanceof HTMLElement).toBe(true)
   })
 })
+
+describe('Sidebar design (Figma admin sidebar)', () => {
+  it('styles menu, sub-menu and labels to the Figma spec', () => {
+    render(
+      <SidebarProvider>
+        <Sidebar collapsible="none">
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
+              <SidebarMenu data-testid="menu">
+                <SidebarMenuItem>
+                  <SidebarMenuButton>AI Models</SidebarMenuButton>
+                  <SidebarMenuSub data-testid="sub">
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton href="#open-source" isActive>
+                        Open Source LLMs
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+        <SidebarTrigger />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByText('Project Settings')).toHaveClass(
+      'h-8',
+      'pt-3',
+      'text-xs',
+      'font-medium',
+      'text-(--foreground-subtle)',
+    )
+    expect(screen.getByTestId('menu')).not.toHaveClass('gap-1')
+    expect(screen.getByRole('button', { name: 'AI Models' })).toHaveClass(
+      'h-8',
+      'p-2',
+      'gap-2',
+      'text-sm',
+      'font-medium',
+      'leading-none',
+    )
+    expect(screen.getByTestId('sub')).toHaveClass(
+      'mx-4',
+      'border-l',
+      'pl-[7px]',
+      'pr-2',
+    )
+    const sub = screen.getByRole('link', { name: 'Open Source LLMs' })
+    expect(sub).toHaveClass('h-7', 'px-2', 'data-active:bg-sidebar-accent')
+    expect(sub).toHaveAttribute('data-active')
+    expect(screen.getByRole('button', { name: 'Toggle Sidebar' })).toHaveClass(
+      'size-7',
+    )
+  })
+})
