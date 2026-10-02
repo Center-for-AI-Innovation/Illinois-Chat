@@ -8,6 +8,7 @@ import { cn } from '@/components/shadcn/lib/utils'
 function Avatar({
   className,
   size = 'default',
+  shape = 'circle',
   ...props
 }: AvatarPrimitive.Root.Props & {
   size?: 'xs' | 'sm' | 'default' | 'lg' | 'xl'
