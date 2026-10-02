@@ -22,6 +22,7 @@ function makeRes(options: { revalidate?: () => Promise<void> } = {}) {
 }
 
 const validSettings = {
+  version: '0',
   announcementBanner: {
     enabled: true,
     message: 'Scheduled maintenance Saturday.',
@@ -42,7 +43,12 @@ afterEach(() => {
 })
 
 function mockStore(overrides: Record<string, unknown> = {}) {
-  vi.doMock('~/utils/platformSettings.server', () => ({
+  vi.doMock('~/utils/platformSettings.server', async () => ({
+    PlatformSettingsConflictError: (
+      await vi.importActual<typeof import('~/utils/platformSettings.server')>(
+        '~/utils/platformSettings.server',
+      )
+    ).PlatformSettingsConflictError,
     readPlatformSettings: vi.fn(async () => ({
       settings: validSettings,
       bannerState: 'configured',
@@ -135,6 +141,48 @@ describe('GET|PUT /api/admin/settings', () => {
       res,
     )
 
+    expect(res.statusCode).toBe(400)
+    expect(writePlatformSettings).not.toHaveBeenCalled()
+  })
+
+  it('returns 409 with the current snapshot and never revalidates a stale save', async () => {
+    const { PlatformSettingsConflictError } = await vi.importActual<
+      typeof import('~/utils/platformSettings.server')
+    >('~/utils/platformSettings.server')
+    mockStore({
+      writePlatformSettings: vi.fn(async () => {
+        throw new PlatformSettingsConflictError()
+      }),
+    })
+    const { handler } = await import('~/pages/api/admin/settings')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'PUT',
+        user: { email: 'admin@example.com' },
+        body: validSettings,
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(409)
+    expect(res.body.current.settings).toEqual(validSettings)
+    expect(res.revalidate).not.toHaveBeenCalled()
+  })
+
+  it('requires a version before writing', async () => {
+    const writePlatformSettings = vi.fn()
+    mockStore({ writePlatformSettings })
+    const { handler } = await import('~/pages/api/admin/settings')
+    const res = makeRes()
+    const { version, ...unversioned } = validSettings
+    await handler(
+      {
+        method: 'PUT',
+        user: { email: 'admin@example.com' },
+        body: unversioned,
+      } as any,
+      res,
+    )
     expect(res.statusCode).toBe(400)
     expect(writePlatformSettings).not.toHaveBeenCalled()
   })

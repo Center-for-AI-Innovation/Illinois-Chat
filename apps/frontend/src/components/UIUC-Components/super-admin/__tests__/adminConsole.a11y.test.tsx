@@ -21,6 +21,7 @@ vi.mock('~/utils/toastUtils', () => ({
 }))
 
 const SETTINGS = {
+  version: '0',
   settings: {
     announcementBanner: {
       enabled: true,

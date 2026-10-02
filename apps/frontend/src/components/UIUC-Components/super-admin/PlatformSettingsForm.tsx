@@ -1,9 +1,5 @@
-// The Platform tab: one form over the banner and maintenance cards.
-//
-// One form, not two, because `PUT /api/admin/settings` writes the banner field
-// and the three maintenance keys in a single Redis MULTI. Giving each card its
-// own Save would mean either two endpoints or a button that quietly writes the
-// other card's on-screen values too.
+// One form for banner and maintenance settings. Saves include only edited
+// sections and the version of the snapshot loaded into the form.
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { cva } from 'class-variance-authority'
@@ -12,10 +8,14 @@ import { useEffect, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { Button } from '~/components/shadcn/ui/button'
 import { useFetchPlatformSettings } from '~/hooks/queries/useFetchPlatformSettings'
-import { useUpdatePlatformSettings } from '~/hooks/queries/useUpdatePlatformSettings'
+import {
+  PlatformSettingsConflictError,
+  useUpdatePlatformSettings,
+} from '~/hooks/queries/useUpdatePlatformSettings'
 import {
   platformSettingsSchema,
   type PlatformSettings,
+  type PlatformSettingsUpdate,
 } from '~/utils/platformSettings.schema'
 import { showErrorToast, showSuccessToast } from '~/utils/toastUtils'
 import {
@@ -52,6 +52,8 @@ export function PlatformSettingsForm({
   const { data, isPending, isError, error, refetch, isFetching } =
     useFetchPlatformSettings()
   const updateSettings = useUpdatePlatformSettings()
+  const [loadedVersion, setLoadedVersion] = useState<string | null>(null)
+  const [hasConflict, setHasConflict] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<string | null>(null)
 
@@ -72,12 +74,16 @@ export function PlatformSettingsForm({
   })
 
   const isDirty = form.formState.isDirty
+  // Only an unreachable store blocks editing. A malformed banner record must
+  // stay editable, since overwriting it from here is the recovery path.
+  const isUnreadable = data?.bannerState === 'unavailable'
 
   // Seed the form once the server value lands. Guarded on `isDirty` so a
   // background refetch cannot overwrite what an operator is typing.
   useEffect(() => {
-    if (data && !form.formState.isDirty) {
+    if (data && data.bannerState !== 'unavailable' && !form.formState.isDirty) {
       form.reset(data.settings)
+      setLoadedVersion(data.version)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
@@ -87,10 +93,17 @@ export function PlatformSettingsForm({
   }, [isDirty, onDirtyChange])
 
   async function onSubmit(values: PlatformSettings) {
+    if (isUnreadable || loadedVersion === null || hasConflict) return
     setSaveError(null)
     setSaveStatus(null)
+    const changes: PlatformSettingsUpdate = { version: loadedVersion }
+    if (form.formState.dirtyFields.announcementBanner)
+      changes.announcementBanner = values.announcementBanner
+    if (form.formState.dirtyFields.maintenance)
+      changes.maintenance = values.maintenance
     try {
-      const result = await updateSettings.mutateAsync(values)
+      const result = await updateSettings.mutateAsync(changes)
+      setLoadedVersion(result.version)
       // Clearing dirty from the submitted values, not from a refetch, so the
       // form does not flicker back to stale content.
       form.reset(values)
@@ -109,10 +122,22 @@ export function PlatformSettingsForm({
         )
       }
     } catch (err) {
+      if (err instanceof PlatformSettingsConflictError) setHasConflict(true)
       const message = err instanceof Error ? err.message : 'Unknown error'
       setSaveError(message)
       showErrorToast(message, 'Could not save settings')
     }
+  }
+
+  async function reloadLatest() {
+    const result = await refetch()
+    if (result.isError || !result.data) return
+    if (result.data.bannerState === 'unavailable') return
+    form.reset(result.data.settings)
+    setLoadedVersion(result.data.version)
+    setHasConflict(false)
+    setSaveError(null)
+    setSaveStatus('Latest settings loaded. Reapply your changes before saving.')
   }
 
   if (isPending) {
@@ -135,6 +160,17 @@ export function PlatformSettingsForm({
     )
   }
 
+  if (isUnreadable) {
+    return (
+      <AdminInlineError
+        title="Could not load platform settings"
+        message={data?.warning ?? 'The settings store is unreachable.'}
+        onRetry={() => void refetch()}
+        isRetrying={isFetching}
+      />
+    )
+  }
+
   return (
     <FormProvider {...form}>
       <form
@@ -142,9 +178,21 @@ export function PlatformSettingsForm({
         className="flex flex-col gap-6"
         noValidate
       >
-        {data?.warning && <AdminInlineWarning message={data.warning} />}
         {data?.bannerState === 'invalid' && (
-          <AdminInlineWarning message="The stored banner could not be read, so the fields below are blank rather than showing the saved value. Saving will overwrite the stored record." />
+          <AdminInlineWarning message="The stored banner could not be read, so the announcement fields below are blank rather than showing the saved value. Editing and saving the announcement section overwrites the stored record; saving maintenance alone leaves it as is." />
+        )}
+        {data?.bannerState === 'absent' && (
+          <AdminInlineWarning message="The home page uses its default banner, if configured. Editing and saving the announcement section replaces that banner; saving maintenance alone keeps it." />
+        )}
+        {hasConflict && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isFetching}
+            onClick={() => void reloadLatest()}
+          >
+            Reload latest settings and discard my edits
+          </Button>
         )}
         {saveError && (
           <AdminInlineError
@@ -196,11 +244,18 @@ export function PlatformSettingsForm({
               variant="outline"
               className="flex-1 sm:flex-none"
               onClick={() => {
+                // After a conflict the cached snapshot is stale; resetting to
+                // it would only produce another conflict on the next save.
+                if (hasConflict) {
+                  void reloadLatest()
+                  return
+                }
                 form.reset(data?.settings)
+                setLoadedVersion(data?.version ?? null)
                 setSaveError(null)
                 setSaveStatus(null)
               }}
-              disabled={!isDirty || updateSettings.isPending}
+              disabled={!isDirty || updateSettings.isPending || isFetching}
             >
               Discard
             </Button>
@@ -208,7 +263,13 @@ export function PlatformSettingsForm({
               type="submit"
               variant="dashboard"
               className="flex-1 sm:flex-none"
-              disabled={!isDirty || updateSettings.isPending}
+              disabled={
+                !isDirty ||
+                updateSettings.isPending ||
+                isUnreadable ||
+                loadedVersion === null ||
+                hasConflict
+              }
             >
               {updateSettings.isPending ? (
                 <Loader2 className="animate-spin" aria-hidden="true" />

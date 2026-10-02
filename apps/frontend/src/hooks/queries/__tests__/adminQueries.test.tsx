@@ -36,9 +36,10 @@ import {
   updateSuperAdmins,
   useUpdateSuperAdmins,
 } from '../useUpdateSuperAdmins'
-import type { PlatformSettings } from '~/utils/platformSettings.schema'
+import type { PlatformSettingsUpdate } from '~/utils/platformSettings.schema'
 
-const settings: PlatformSettings = {
+const settings: PlatformSettingsUpdate = {
+  version: '0',
   announcementBanner: {
     enabled: false,
     message: '',
