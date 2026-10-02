@@ -247,10 +247,13 @@ Concretely, that means:
   `project_service.py` no longer seed or re-inject super admins.
 - `EmailListAccordion` filters known platform admins out of the displayed
   admin list, because entries left over from the old behaviour represent a
-  platform role rather than a project role.
-- Those leftover entries are **not** cleaned up automatically. They are inert
-  for authorization (the live check is what grants access) but they do remain
-  in the stored metadata.
+  platform role rather than a project role. These hidden entries still grant
+  project access and need explicit cleanup.
+- Those leftover entries are **not** cleaned up automatically: they still grant
+  project-admin access and can receive export emails. Revoking a platform grant does not revoke these stored memberships.
+  A separate cleanup must use an explicit list of former platform admins and
+  update both Redis `course_metadatas` and Postgres `course_metadata`; seeded
+  entries cannot be distinguished automatically from intentional membership.
 
 ### Where the grant comes from
 
@@ -274,7 +277,7 @@ the API will actually allow.
 
 ### Exactly what the bypass covers
 
-Applied in both `src/pages/api/authorization.ts` and
+Applied in both `src/server/authorization.ts` and
 `src/app/api/authorization.ts`:
 
 | Gate                                    | Super admin bypasses? |
@@ -298,14 +301,19 @@ matches what the authorization layer will let them open.
 
 ### Redis keys
 
-| Key                     | Type | Contents                                                         |
-| ----------------------- | ---- | ---------------------------------------------------------------- |
-| `platform:super_admins` | set  | Lowercased emails granted super admin through `/admin`.          |
-| `platform:settings`     | hash | Announcement banner record plus its audit fields.                |
+| Key                     | Type | Contents                                                      |
+| ----------------------- | ---- | ------------------------------------------------------------- |
+| `platform:super_admins` | set  | Lowercased emails granted super admin through `/admin`.       |
+| `platform:settings`     | hash | Announcement banner, settings version, and save audit fields. |
 
 Maintenance mode continues to use its existing keys; `PUT /api/admin/settings`
-writes the banner field and the maintenance keys in a single `MULTI` so the two
-cards cannot land half-applied.
+accepts `version` plus only the edited sections. A Lua script checks that
+version, writes the selected keys, and replaces the version atomically. A stale
+save returns 409 with the current snapshot; the form keeps the operator's edits
+until they choose to reload. Reads fetch settings and version in one `MULTI`.
+An unchanged announcement section is omitted so saving maintenance preserves
+the legacy home banner. Unreadable settings block editing and saving until a
+successful retry.
 
 ### The /admin console
 
