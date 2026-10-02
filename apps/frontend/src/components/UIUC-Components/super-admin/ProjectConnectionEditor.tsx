@@ -200,7 +200,7 @@ export function ProjectConnectionEditor({
       const value = values[field.name]
       if (field.type === 'secret') {
         if (
-          editingSecrets.has(field.name) &&
+          (editingSecrets.has(field.name) || !storedConfig?.[field.name]) &&
           value !== '' &&
           // Belt and braces: a mask must never leave here even if it somehow
           // ends up in the input.
@@ -210,12 +210,12 @@ export function ProjectConnectionEditor({
         }
         continue
       }
-      if (value !== initialValues[field.name] && value !== '') {
-        patch[field.name] = value
+      if (value !== initialValues[field.name]) {
+        patch[field.name] = value === '' && !field.required ? null : value
       }
     }
     return patch
-  }, [meta.fields, values, initialValues, editingSecrets])
+  }, [meta.fields, values, initialValues, editingSecrets, storedConfig])
 
   const hasChanges = Object.keys(changedFields).length > 0
 
