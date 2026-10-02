@@ -1121,7 +1121,7 @@ CRITICAL: The optimized prompt must:
                                 <ComboboxItem
                                   key={item.value}
                                   value={item}
-                                  className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-(--foreground) data-highlighted:bg-(--foreground-faded)`}
+                                  className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-(--foreground)`}
                                 >
                                   <div className="w-full pl-1">
                                     <div className="flex items-center">

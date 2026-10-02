@@ -657,7 +657,7 @@ const ModelDropdown: React.FC<
                       <ComboboxItem
                         key={item.value}
                         value={item}
-                        className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-button-text) data-highlighted:bg-(--modal-button-hover) data-highlighted:text-(--modal-button-text-hover) ${
+                        className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-button-text) ${
                           isSmallScreen ? 'text-xs' : 'text-sm'
                         }`}
                       >

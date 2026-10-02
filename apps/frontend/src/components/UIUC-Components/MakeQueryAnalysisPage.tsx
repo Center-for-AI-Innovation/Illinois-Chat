@@ -866,7 +866,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                               <SelectItem
                                 key={option.value}
                                 value={option.value}
-                                className="data-highlighted:bg-(--foreground-faded)"
                               >
                                 {option.label}
                               </SelectItem>
@@ -1005,7 +1004,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                                 <SelectItem
                                   key={option.value}
                                   value={option.value}
-                                  className="data-highlighted:bg-(--foreground-faded)"
                                 >
                                   {option.label}
                                 </SelectItem>

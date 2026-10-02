@@ -352,7 +352,7 @@ const NewModelDropdown: React.FC<{
                     <ComboboxItem
                       key={item.value}
                       value={item}
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground) data-highlighted:bg-(--foreground-faded) ${
+                      className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground) ${
                         isSmallScreen ? 'text-xs' : 'text-sm'
                       }`}
                     >
