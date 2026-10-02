@@ -87,8 +87,6 @@ export function ModelToggles({
                   <div className="flex items-center gap-2">
                     <Switch
                       variant="labeled"
-                      showLabels
-                      showThumbIcon
                       size="sm"
                       label={modelData.name}
                       checked={field.state.value}

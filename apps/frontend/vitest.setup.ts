@@ -278,6 +278,7 @@ vi.mock('next/font/google', () => {
   return {
     Montserrat: makeFont,
     Courier_Prime: makeFont,
+    Source_Sans_3: makeFont,
   }
 })
 

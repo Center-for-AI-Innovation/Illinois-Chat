@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Switch as SwitchPrimitives } from '@base-ui/react/switch'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { IconCheck, IconX, IconInfoCircle } from '@tabler/icons-react'
+import { IconInfoCircle } from '@tabler/icons-react'
 import {
   Tooltip,
   TooltipContent,
@@ -15,65 +15,44 @@ import { cn } from '@/components/shadcn/lib/utils'
 
 // Ported from the Radix-based custom Switch to Base UI (@base-ui/react/switch).
 // Base UI exposes state via data-checked / data-unchecked (vs Radix's
-// data-[state=checked|unchecked]); the custom variants/labels/tooltip are unchanged.
+// data-[state=checked|unchecked]).
 
 const switchVariants = cva(
-  'peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+  'peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
       variant: {
         default:
-          'border-transparent data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-white/15',
+          'border-transparent data-checked:bg-primary data-unchecked:bg-input',
         labeled:
           'data-checked:border-(--dashboard-button) data-checked:bg-(--dashboard-button) data-unchecked:border-(--dashboard-background-darker) data-unchecked:bg-(--dashboard-background-dark) dark:data-unchecked:border-white/25 dark:data-unchecked:bg-white/15',
       },
       size: {
-        sm: 'h-5 w-10',
+        sm: 'h-5 w-9',
         default: 'h-6 w-12',
         lg: 'h-7 w-14',
       },
     },
     defaultVariants: {
       variant: 'default',
-      size: 'default',
+      size: 'sm',
     },
   },
 )
 
 const switchThumbVariants = cva(
-  'pointer-events-none flex items-center justify-center rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.2)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.4)] ring-0 transition-all duration-300',
+  'pointer-events-none block rounded-full bg-background shadow-lg ring-0 transition-all duration-300',
   {
     variants: {
       size: {
-        sm: 'h-4 w-4 data-checked:translate-x-5 data-unchecked:translate-x-0',
+        sm: 'size-4 data-checked:translate-x-4 data-unchecked:translate-x-0',
         default:
           'h-5 w-5 data-checked:translate-x-6 data-unchecked:translate-x-0',
         lg: 'h-[24px] w-[24px] data-checked:translate-x-7 data-unchecked:translate-x-0',
       },
     },
     defaultVariants: {
-      size: 'default',
-    },
-  },
-)
-
-const switchTrackLabelVariants = cva(
-  'absolute font-semibold transition-opacity duration-200',
-  {
-    variants: {
-      size: {
-        sm: 'text-[6px]',
-        default: 'text-[9px]',
-        lg: 'text-[9px]',
-      },
-      position: {
-        on: 'left-1.5',
-        off: 'right-1',
-      },
-    },
-    defaultVariants: {
-      size: 'default',
-      position: 'on',
+      size: 'sm',
     },
   },
 )
@@ -97,14 +76,6 @@ interface SwitchProps
   extends
     Omit<SwitchPrimitives.Root.Props, 'onCheckedChange' | 'defaultChecked'>,
     VariantProps<typeof switchVariants> {
-  /** Show ON/OFF labels on track */
-  showLabels?: boolean
-  /** Custom on label text */
-  onLabel?: string
-  /** Custom off label text */
-  offLabel?: string
-  /** Show check/x icons in thumb */
-  showThumbIcon?: boolean
   /** Text label displayed next to switch */
   label?: string
   /** Tooltip text for the info icon */
@@ -116,21 +87,18 @@ interface SwitchProps
 // Base UI latches controlled-vs-uncontrolled on the first render: a `checked`
 // that starts out `undefined` (form data still loading, for example) leaves the
 // switch uncontrolled for its whole lifetime, so it ignores every later
-// `checked` value and its track stays stuck in the off position while the
-// labels and thumb icon below show the real value. Always hand Base UI a
+// `checked` value and its track stays stuck in the off position. Always hand
+// Base UI a
 // boolean so the switch is controlled from the very first render.
 const toChecked = (checked: boolean | undefined) => checked ?? false
 
-const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
+// Base UI renders a <span role="switch">, not a <button>.
+const Switch = React.forwardRef<HTMLElement, SwitchProps>(
   (
     {
       className,
       variant,
       size,
-      showLabels = false,
-      onLabel = 'ON',
-      offLabel = 'OFF',
-      showThumbIcon = false,
       label,
       tooltip,
       disabled,
@@ -154,48 +122,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         {...props}
         ref={ref}
       >
-        {/* Track Labels */}
-        {showLabels && (
-          <>
-            <span
-              className={cn(
-                switchTrackLabelVariants({ size, position: 'on' }),
-                checked
-                  ? 'text-white opacity-100 dark:text-(--illinois-blue)'
-                  : 'opacity-0',
-              )}
-            >
-              {onLabel}
-            </span>
-            <span
-              className={cn(
-                switchTrackLabelVariants({ size, position: 'off' }),
-                !isChecked
-                  ? 'text-gray-400 opacity-100 dark:text-gray-300'
-                  : 'opacity-0',
-              )}
-            >
-              {offLabel}
-            </span>
-          </>
-        )}
-
-        <SwitchPrimitives.Thumb className={cn(switchThumbVariants({ size }))}>
-          {showThumbIcon &&
-            (isChecked ? (
-              <IconCheck
-                size={12}
-                className={cn(
-                  'stroke-3 dark:text-(--illinois-blue)',
-                  disabled
-                    ? 'text-gray-400'
-                    : 'text-(--dashboard-button,var(--primary))',
-                )}
-              />
-            ) : (
-              <IconX size={12} className="stroke-3 text-gray-400" />
-            ))}
-        </SwitchPrimitives.Thumb>
+        <SwitchPrimitives.Thumb className={cn(switchThumbVariants({ size }))} />
       </SwitchPrimitives.Root>
     )
 
@@ -261,11 +188,5 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
 )
 Switch.displayName = 'Switch'
 
-export {
-  Switch,
-  switchVariants,
-  switchThumbVariants,
-  switchTrackLabelVariants,
-  switchContainerVariants,
-}
+export { Switch, switchVariants, switchThumbVariants, switchContainerVariants }
 export type { SwitchProps }
