@@ -223,11 +223,12 @@
   --muted: #f2f2f2;
   --muted-foreground: #9a9d9c;
 
-  --accent: #f5f5f5;
-  --accent-foreground: #171717;
+  --accent: #e3ebf5;
+  --accent-foreground: #0b1d41;
+  --accent-border: #adc5e0;
 
   --destructive: #dc2626;
-  --destructive-foreground: #fafafa;
+  --destructive-foreground: #fef2f2;
 
   --border: #e5e5e5;
   --input: #e5e5e5;
@@ -240,7 +241,6 @@
   /* Font Variables */
   --font-montserrat-heading: 'Montserrat', sans-serif;
   --ring: #a3a3a3;
-  --ring-offset-background: var(--background);
 
   --padding: 1rem;
   --padding-xs: calc(var(--padding) * 0.1);
@@ -538,6 +538,7 @@ html[data-input-modality='keyboard']
   --muted-foreground: #8291a3;
   --accent: color-mix(in srgb, var(--foreground) 10%, var(--background));
   --accent-foreground: var(--foreground);
+  --accent-border: color-mix(in srgb, var(--foreground) 25%, var(--background));
   --border: #ffffff1a;
   --input: #ffffff1f;
   --ring: color-mix(in srgb, var(--foreground) 40%, var(--background));
