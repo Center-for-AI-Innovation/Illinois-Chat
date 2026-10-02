@@ -1,6 +1,15 @@
-import { Montserrat, Courier_Prime } from 'next/font/google'
+import { Montserrat, Courier_Prime, Source_Sans_3 } from 'next/font/google'
 
 // Docs: https://nextjs.org/docs/pages/building-your-application/optimizing/fonts#with-tailwind-css
+
+// App-wide sans (Tailwind `font-sans`). Exposed as `--font-source-sans` on
+// :root from _app.tsx so portalled content (popovers, dialogs) inherits it.
+export const source_sans = Source_Sans_3({
+  weight: ['400', '500', '600'],
+  subsets: ['latin'],
+  variable: '--font-source-sans',
+  display: 'swap',
+})
 
 export const montserrat_heading = Montserrat({
   weight: '700',
