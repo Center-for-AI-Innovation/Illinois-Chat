@@ -239,7 +239,11 @@ async function handlePatch(
           (await decryptProjectConfig<Record<string, unknown>>(current)) ?? {}
         // Patch on top of the stored config, so fields the UI never received
         // in plaintext (secrets arrive masked) keep their real values.
-        const merged = { ...stored, ...patch }
+        const merged = { ...stored }
+        for (const [field, value] of Object.entries(patch)) {
+          if (value === null) delete merged[field]
+          else merged[field] = value
+        }
 
         // Validated against the *full* schema, not the partial one: the point
         // of the merge is that the result must be a complete, valid config.

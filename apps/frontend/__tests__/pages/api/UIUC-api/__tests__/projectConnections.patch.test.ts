@@ -40,11 +40,7 @@ async function mockRepo(options: {
   status?: 'ok' | 'row_not_found' | 'kind_not_configured'
 }) {
   const { encryptProjectConfig } = await import('~/utils/crypto')
-  const {
-    storedConfig = null,
-    isActive = true,
-    status = 'ok',
-  } = options
+  const { storedConfig = null, isActive = true, status = 'ok' } = options
   const captured: { encrypted?: string } = {}
 
   vi.doMock('~/db/projectConnectionsRepo', () => ({
@@ -107,6 +103,82 @@ afterEach(() => {
 })
 
 describe('projectConnections PATCH', () => {
+  it('rejects masked credentials before opening the repository transaction', async () => {
+    await mockRepo({
+      storedConfig: {
+        provider: 'openai',
+        model: 'embedding',
+        api_key: 'real-key',
+      },
+    })
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
+    const { patchConnectionField } = await import('~/db/projectConnectionsRepo')
+    const res = makeRes()
+    await handler(
+      patchReq({
+        project_name: 'demo',
+        kind: 'embedding',
+        config: { api_key: '****k3f9' },
+      }),
+      res,
+    )
+    expect(res.statusCode).toBe(400)
+    expect(patchConnectionField).not.toHaveBeenCalled()
+  })
+
+  it('removes an optional field while preserving the secret and validating the final config', async () => {
+    const captured = await mockRepo({
+      storedConfig: {
+        provider: 'openai',
+        model: 'embedding',
+        api_key: 'real-key',
+        api_base: 'https://old.example.com',
+      },
+    })
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
+    const res = makeRes()
+    await handler(
+      patchReq({
+        project_name: 'demo',
+        kind: 'embedding',
+        config: { api_base: null },
+      }),
+      res,
+    )
+    expect(res.statusCode).toBe(200)
+    const { decryptProjectConfig } = await import('~/utils/crypto')
+    const stored = await decryptProjectConfig({
+      encrypted: captured.encrypted!,
+    })
+    expect(stored).toEqual({
+      provider: 'openai',
+      model: 'embedding',
+      api_key: 'real-key',
+    })
+  })
+
+  it('does not remove a field that is required by the selected provider', async () => {
+    const captured = await mockRepo({
+      storedConfig: {
+        provider: 'ollama',
+        model: 'embedding',
+        base_url: 'https://old.example.com',
+      },
+    })
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
+    const res = makeRes()
+    await handler(
+      patchReq({
+        project_name: 'demo',
+        kind: 'embedding',
+        config: { base_url: null },
+      }),
+      res,
+    )
+    expect(res.statusCode).toBe(400)
+    expect(captured.encrypted).toBeUndefined()
+  })
+
   it('leaves a disabled connection disabled', async () => {
     await mockRepo({
       storedConfig: {

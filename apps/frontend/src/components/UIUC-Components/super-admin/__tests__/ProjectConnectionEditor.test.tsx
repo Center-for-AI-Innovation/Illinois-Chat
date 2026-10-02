@@ -112,6 +112,44 @@ function renderEditor() {
 }
 
 describe('ProjectConnectionEditor', () => {
+  it('saves a previously absent optional secret without needing a Change button', async () => {
+    const user = userEvent.setup()
+    useDetail({
+      embedding_config: { provider: 'openai', model: 'text-embedding-3-small' },
+    })
+    renderEditor()
+    await screen.findByText('****cdef')
+    await user.click(screen.getByRole('tab', { name: /Embedding/ }))
+    await user.type(await screen.findByLabelText(/API key/), 'new-key')
+    await user.click(screen.getByRole('button', { name: /Save changes/ }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0]).toMatchObject({
+      method: 'PATCH',
+      body: { kind: 'embedding', config: { api_key: 'new-key' } },
+    })
+  })
+
+  it('sends an explicit removal when an optional URL is cleared', async () => {
+    const user = userEvent.setup()
+    useDetail({
+      embedding_config: {
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        api_base: 'https://old.example.com',
+      },
+    })
+    renderEditor()
+    await screen.findByText('****cdef')
+    await user.click(screen.getByRole('tab', { name: /Embedding/ }))
+    await user.clear(await screen.findByLabelText(/API base/))
+    await user.click(screen.getByRole('button', { name: /Save changes/ }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0]).toMatchObject({
+      method: 'PATCH',
+      body: { kind: 'embedding', config: { api_base: null } },
+    })
+  })
+
   it('masks the stored secret and hides its input until Change is pressed', async () => {
     const user = userEvent.setup()
     useDetail()

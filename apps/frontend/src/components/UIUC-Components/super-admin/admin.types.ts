@@ -205,12 +205,4 @@ export const CONNECTION_KIND_META: Record<ConnectionKind, ConnectionKindMeta> =
     },
   }
 
-/**
- * Whether a value read back from the API is a mask rather than a real secret.
- *
- * `maskConfig` emits `****` plus at most the last 4 characters, so a value of
- * that exact shape must never be sent back as if it were the credential.
- */
-export function isMaskedSecret(value: unknown): boolean {
-  return typeof value === 'string' && /^\*{4}.{0,4}$/.test(value)
-}
+export { isMaskedSecret } from '~/utils/projectConnections/validation'
