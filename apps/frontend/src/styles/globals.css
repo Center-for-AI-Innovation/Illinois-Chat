@@ -540,7 +540,7 @@ html[data-input-modality='keyboard']
   --accent-foreground: var(--foreground);
   --accent-border: color-mix(in srgb, var(--foreground) 25%, var(--background));
   --border: #ffffff1a;
-  --input: #ffffff1f;
+  --input: #ffffff26;
   --ring: color-mix(in srgb, var(--foreground) 40%, var(--background));
   --card: var(--background);
   --popover: var(--background);

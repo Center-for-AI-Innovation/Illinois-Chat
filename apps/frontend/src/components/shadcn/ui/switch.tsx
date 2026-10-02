@@ -23,7 +23,7 @@ const switchVariants = cva(
     variants: {
       variant: {
         default:
-          'border-transparent data-checked:bg-primary data-unchecked:bg-input',
+          'border-transparent data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80',
         labeled:
           'data-checked:border-(--dashboard-button) data-checked:bg-(--dashboard-button) data-unchecked:border-(--dashboard-background-darker) data-unchecked:bg-(--dashboard-background-dark) dark:data-unchecked:border-white/25 dark:data-unchecked:bg-white/15',
       },
