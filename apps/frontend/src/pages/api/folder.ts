@@ -6,11 +6,14 @@ import { type Database } from 'database.types'
 import { convertDBToChatConversation } from './conversation'
 import { type NewFolders } from '~/db/schema'
 import { eq, desc, and, or, ilike, inArray } from 'drizzle-orm'
+import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getUserIdentifier } from '~/server/userIdentifier'
 
 /**
  * Resolve a course name to its `projects.id`, which is what folders are keyed
- * by. Projects are inserted before a project goes live, so a course the caller
- * is authorized for always has a row.
+ * by. Returns null when the course has no `projects` row at all: only
+ * /createProject inserts one, so a course whose metadata was written straight
+ * to Redis (seeded, imported, or predating that path) will not have one.
  */
 async function resolveProjectId(courseName: string): Promise<number | null> {
   const [project] = await db
@@ -22,8 +25,6 @@ async function resolveProjectId(courseName: string): Promise<number | null> {
 
   return project?.id ?? null
 }
-import { withCourseAccessFromRequest } from '~/server/authorization'
-import { getUserIdentifier } from '~/server/userIdentifier'
 
 type Folder = Database['public']['Tables']['folders']['Row']
 
@@ -88,9 +89,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       try {
         const projectId = await resolveProjectId(courseName)
         if (projectId === null) {
-          return res
-            .status(404)
-            .json({ error: `Project '${courseName}' does not exist` })
+          // Folders carry a foreign key to projects, so there is nothing to
+          // point at. Name the missing row rather than claiming the project
+          // itself is gone: its Redis metadata may well exist.
+          console.error(
+            `Cannot save folder: no projects row for '${courseName}'`,
+          )
+          return res.status(404).json({
+            error: `Project '${courseName}' has no database record, so folders cannot be saved for it`,
+          })
         }
 
         //   Convert folder to DB type
@@ -147,9 +154,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         const projectId = await resolveProjectId(courseName)
         if (projectId === null) {
-          return res
-            .status(404)
-            .json({ error: `Project '${courseName}' does not exist` })
+          // A course with no projects row cannot own folders, because POST
+          // refuses to create one without a project to reference. Returning an
+          // error here would take down the whole folder sidebar for courses
+          // whose metadata was written straight to Redis, so report the empty
+          // list that is actually true.
+          console.warn(
+            `No projects row for '${courseName}'; returning an empty folder list`,
+          )
+          return res.status(200).json([])
         }
 
         // Query folders and their related conversations and messages using DrizzleORM

@@ -143,7 +143,7 @@ describe('folder API', () => {
     expect(res.status).toHaveBeenCalledWith(400)
   })
 
-  it('POST returns 404 when the project does not exist', async () => {
+  it('POST returns 404 when the course has no projects row', async () => {
     hoisted.projectRows.mockResolvedValueOnce([])
 
     const res = createMockRes()
@@ -290,7 +290,11 @@ describe('folder API', () => {
     expect(body[0]).toMatchObject({ id: 'f1', conversations: [] })
   })
 
-  it('GET returns 404 when the project does not exist', async () => {
+  it('GET returns an empty list when the course has no projects row', async () => {
+    // Only /createProject inserts into projects, so a course whose metadata was
+    // written straight to Redis has no row. Such a course cannot own folders
+    // (POST refuses to create them), so the honest answer is an empty list.
+    // Failing here instead would take down the whole folder sidebar.
     hoisted.projectRows.mockResolvedValueOnce([])
 
     const res = createMockRes()
@@ -298,13 +302,14 @@ describe('folder API', () => {
       createMockReq({
         method: 'GET',
         user: { email: 'u@example.com' },
-        courseName: 'NOPE',
-        query: { courseName: 'NOPE' },
+        courseName: 'NO-PROJECT-ROW',
+        query: { courseName: 'NO-PROJECT-ROW' },
       }) as any,
       res as any,
     )
 
-    expect(res.status).toHaveBeenCalledWith(404)
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(res.json).toHaveBeenCalledWith([])
     expect(hoisted.findMany).not.toHaveBeenCalled()
   })
 
