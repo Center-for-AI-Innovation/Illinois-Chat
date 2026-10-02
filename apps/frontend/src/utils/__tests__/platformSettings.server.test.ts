@@ -349,9 +349,9 @@ describe('super-admin grants', () => {
       'platform:super_admins',
       'mixed@example.com',
     )
-    expect(client.sRem).toHaveBeenCalledWith(
-      'platform:super_admins',
-      'mixed@example.com',
-    )
+    expect(client.eval).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['platform:super_admins'],
+      arguments: ['mixed@example.com', 'false'],
+    })
   })
 })

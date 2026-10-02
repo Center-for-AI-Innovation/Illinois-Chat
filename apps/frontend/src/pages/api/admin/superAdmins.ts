@@ -115,7 +115,14 @@ async function handleDelete(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    await removeSuperAdminGrant(email)
+    if ((await removeSuperAdminGrant(email)) === false) {
+      return res
+        .status(400)
+        .json({
+          error:
+            'Cannot remove the last super admin. Add another admin first, or set SUPER_ADMIN_EMAILS.',
+        })
+    }
   } catch (err) {
     console.error('[admin/superAdmins] revoke failed:', err)
     return res.status(503).json({

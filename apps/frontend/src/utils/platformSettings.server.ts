@@ -326,7 +326,7 @@ export async function readSuperAdminGrants(): Promise<
     const members = await redis.sMembers(SUPER_ADMINS_KEY)
     return {
       state: 'configured',
-      value: members.map((email) => email.toLowerCase()).sort(),
+      value: [...new Set(members.map((email) => email.toLowerCase()))].sort(),
     }
   } catch (error) {
     const reason = describeError(error)
@@ -343,7 +343,32 @@ export async function addSuperAdminGrant(email: string): Promise<void> {
   await redis.sAdd(SUPER_ADMINS_KEY, email.toLowerCase())
 }
 
-export async function removeSuperAdminGrant(email: string): Promise<void> {
+// Remove all case variants and check the last-admin rule in the same operation.
+const REMOVE_GRANT_SCRIPT = `
+local members = redis.call('SMEMBERS', KEYS[1])
+local others = 0
+local matches = {}
+for _, email in ipairs(members) do
+  if string.lower(email) == ARGV[1] then
+    table.insert(matches, email)
+  else
+    others = others + 1
+  end
+end
+if ARGV[2] == 'true' and #matches > 0 and others == 0 then return 0 end
+for _, email in ipairs(matches) do redis.call('SREM', KEYS[1], email) end
+return 1
+`
+
+export async function removeSuperAdminGrant(
+  email: string,
+  protectLast = false,
+): Promise<boolean> {
   const redis = await ensureRedisConnected()
-  await redis.sRem(SUPER_ADMINS_KEY, email.toLowerCase())
+  return (
+    (await redis.eval(REMOVE_GRANT_SCRIPT, {
+      keys: [SUPER_ADMINS_KEY],
+      arguments: [email.toLowerCase(), String(protectLast)],
+    })) === 1
+  )
 }

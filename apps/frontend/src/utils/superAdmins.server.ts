@@ -8,7 +8,7 @@
 import {
   addSuperAdminGrant,
   readSuperAdminGrants,
-  removeSuperAdminGrant,
+  removeSuperAdminGrant as removeGrant,
 } from '~/utils/platformSettings.server'
 import { isSuperAdmin, superAdmins } from '~/utils/superAdmins'
 
@@ -21,7 +21,7 @@ import { isSuperAdmin, superAdmins } from '~/utils/superAdmins'
  * /admin to fix it.
  *
  * Grants are checked live on every call rather than persisted into project
- * metadata, which is what makes revocation immediate and complete.
+ * metadata, which is what makes revocation immediate for live grants.
  */
 export async function isSuperAdminAsync(
   email?: string | null,
@@ -70,4 +70,8 @@ export async function readSuperAdminRoster(): Promise<SuperAdminRoster> {
   }
 }
 
-export { addSuperAdminGrant, removeSuperAdminGrant }
+export { addSuperAdminGrant }
+
+export function removeSuperAdminGrant(email: string): Promise<boolean> {
+  return removeGrant(email, superAdmins.length === 0)
+}

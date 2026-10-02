@@ -165,6 +165,26 @@ describe('/api/admin/superAdmins', () => {
     expect(removeSuperAdminGrant).toHaveBeenCalledWith('one@example.com')
   })
 
+  it('refuses a removal when a concurrent request already removed the other admin', async () => {
+    mockRoster({
+      envAdmins: [],
+      grantedAdmins: ['one@example.com', 'two@example.com'],
+      removeSuperAdminGrant: vi.fn(async () => false),
+    })
+    const { handler } = await import('~/pages/api/admin/superAdmins')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'DELETE',
+        query: { email: 'one@example.com' },
+        user: { email: 'one@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(400)
+    expect(res.body.error).toContain('last super admin')
+  })
+
   it('does not apply a removal it could not verify against the roster', async () => {
     const { removeSuperAdminGrant } = mockRoster({
       envAdmins: [],
