@@ -76,7 +76,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
             </div>
           </div>
 
-          <Separator className="w-full bg-gray-300" />
+          <Separator className="w-full" />
 
           {/* Accordion info button */}
           <AnimatePresence>

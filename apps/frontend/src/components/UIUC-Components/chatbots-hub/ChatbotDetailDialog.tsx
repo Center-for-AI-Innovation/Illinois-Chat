@@ -156,7 +156,7 @@ export function ChatbotDetailDialog({
               {createdAt && lastAccessedAt && (
                 <Separator
                   orientation="vertical"
-                  className="h-3 dark:bg-[#32517a]"
+                  className="h-3"
                 />
               )}
               {lastAccessedAt && (
@@ -178,7 +178,7 @@ export function ChatbotDetailDialog({
             </div>
           </div>
 
-          <Separator className="mx-6 my-3 dark:bg-[#32517a]" />
+          <Separator className="mx-6 my-3" />
 
           {/* About This Chatbot */}
           {aboutText && (
@@ -333,7 +333,7 @@ function DocumentSummarySection({
       <h3 className="px-4 pt-4 text-base font-semibold">
         Data in This Project
       </h3>
-      <Separator className="mx-4 my-3 dark:bg-[#32517a]" />
+      <Separator className="mx-4 my-3" />
 
       <Collapsible
         open={hasFiles && isOpen}

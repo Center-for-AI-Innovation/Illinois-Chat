@@ -185,7 +185,7 @@ export function ChatbotHubCard(card: ChatbotCardData) {
           </div>
 
           <div className="mt-auto">
-            <Separator className="my-3 dark:bg-[#32517a]" />
+            <Separator className="my-3" />
             <div className="flex items-center justify-between gap-2">
               {/* `min-w-0` is required for the owner-email <span>'s `truncate`
                   to actually shrink inside this flex row — without it, the
