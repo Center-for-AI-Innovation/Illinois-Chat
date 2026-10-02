@@ -28,7 +28,7 @@ def is_valid_project_name(project_name: str) -> bool:
 
 
 def get_default_course_admins() -> list:
-    """Parse DEFAULT_COURSE_ADMINS (comma-separated emails) into a deduped list."""
+    """Deprecated parser; project creation no longer uses DEFAULT_COURSE_ADMINS."""
     raw = os.getenv('DEFAULT_COURSE_ADMINS', '')
     admins = []
     for part in raw.split(','):
