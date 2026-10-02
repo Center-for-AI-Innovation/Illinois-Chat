@@ -47,6 +47,7 @@ import {
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
 import {
+  AdminInlineError,
   adminTabsListClass,
   adminTabsTriggerClass,
 } from '~/components/UIUC-Components/super-admin/AdminCard'
@@ -61,8 +62,13 @@ import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 export default function AdminPage() {
   const auth = useAuth()
-  const { data: isSuperAdmin, isPending: isCheckPending } =
-    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
+  const {
+    data: isSuperAdmin,
+    isPending: isCheckPending,
+    isError: isCheckError,
+    refetch,
+    isFetching,
+  } = useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
 
   const [tab, setTab] = useState<AdminTab>('platform')
   const [isPlatformDirty, setIsPlatformDirty] = useState(false)
@@ -105,6 +111,13 @@ export default function AdminPage() {
             <div className="flex justify-center py-24">
               <LoadingSpinner />
             </div>
+          ) : auth.isAuthenticated && isCheckError ? (
+            <AdminInlineError
+              title="Couldn't check your admin access"
+              message="Please retry the access check."
+              onRetry={() => void refetch()}
+              isRetrying={isFetching}
+            />
           ) : !auth.isAuthenticated || isSuperAdmin !== true ? (
             // Nothing about what this console controls renders until the
             // server has confirmed super-admin status.

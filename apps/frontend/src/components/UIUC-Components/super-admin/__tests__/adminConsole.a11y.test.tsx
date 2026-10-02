@@ -258,6 +258,17 @@ describe('admin console accessibility', () => {
     expect(results).toHaveNoViolations()
   })
 
+  it('shows a retryable access-check error instead of denying a real admin', async () => {
+    server.use(http.get('*/api/admin/me', () => HttpResponse.json({ error: 'Unavailable' }, { status: 500 })))
+    const AdminPage = (await import('~/pages/admin')).default
+    renderWithProviders(<AdminPage />)
+    await screen.findByText("Couldn't check your admin access", undefined, { timeout: 5000 })
+    expect(screen.queryByText('Not a super admin')).not.toBeInTheDocument()
+    server.use(http.get('*/api/admin/me', () => HttpResponse.json({ isSuperAdmin: true })))
+    await userEvent.setup().click(screen.getByRole('button', { name: /Retry/ }))
+    await screen.findByDisplayValue('Scheduled maintenance Saturday.')
+  })
+
   it('the users tab has no violations', async () => {
     const user = userEvent.setup()
     const AdminPage = (await import('~/pages/admin')).default

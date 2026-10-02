@@ -69,6 +69,30 @@ afterEach(() => {
 })
 
 describe('super admin queries', () => {
+  it('checks again when the signed-in account changes instead of reusing cached access', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ isSuperAdmin: true }))
+      .mockResolvedValueOnce(jsonResponse({ isSuperAdmin: false }))
+    globalThis.__TEST_AUTH__ = {
+      isAuthenticated: true,
+      user: { profile: { sub: 'first', email: 'admin@example.com' } },
+    }
+    const { Wrapper } = createClient()
+    const { result, rerender } = renderHook(() => useFetchIsSuperAdmin(), {
+      wrapper: Wrapper,
+    })
+    await waitFor(() => expect(result.current.data).toBe(true))
+    globalThis.__TEST_AUTH__ = {
+      isAuthenticated: true,
+      user: { profile: { sub: 'second', email: 'other@example.com' } },
+    }
+    rerender()
+    expect(result.current.data).toBeUndefined()
+    await waitFor(() => expect(result.current.data).toBe(false))
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
   it('treats 401 and 403 as not a super admin', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ error: 'Missing token' }, 401))

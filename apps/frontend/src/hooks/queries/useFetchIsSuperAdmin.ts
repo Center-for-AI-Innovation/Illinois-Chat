@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from 'react-oidc-context'
 
 interface UseFetchIsSuperAdminOptions {
   enabled?: boolean
@@ -36,8 +37,13 @@ export async function fetchIsSuperAdmin(): Promise<boolean> {
 export function useFetchIsSuperAdmin({
   enabled = true,
 }: UseFetchIsSuperAdminOptions = {}) {
+  const auth = useAuth()
   return useQuery({
-    queryKey: ['isSuperAdmin'],
+    queryKey: [
+      'isSuperAdmin',
+      auth.user?.profile.sub ?? null,
+      auth.user?.profile.email ?? null,
+    ],
     queryFn: fetchIsSuperAdmin,
     enabled,
     retry: 1,
