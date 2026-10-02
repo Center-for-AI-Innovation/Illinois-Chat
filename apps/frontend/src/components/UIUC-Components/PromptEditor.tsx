@@ -1454,8 +1454,6 @@ CRITICAL: The optimized prompt must:
                   <Switch
                     size="lg"
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Smart Document Search"
                     tooltip="Optimizes queries to better search through course materials."
                     checked={vectorSearchRewrite}
@@ -1469,8 +1467,6 @@ CRITICAL: The optimized prompt must:
                   <Switch
                     size="lg"
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Guided Learning"
                     tooltip="AI provides hints instead of direct answers to encourage learning."
                     checked={guidedLearning}
@@ -1482,8 +1478,6 @@ CRITICAL: The optimized prompt must:
                   <Switch
                     size="lg"
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Document-Based References Only"
                     tooltip="Restricts AI to only use information from provided documents."
                     checked={documentsOnly}
@@ -1495,8 +1489,6 @@ CRITICAL: The optimized prompt must:
                   <Switch
                     size="lg"
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Hide citations in chat responses"
                     tooltip="Disables the display of citations and sources on the chat screen."
                     checked={disableCitations}
@@ -1508,8 +1500,6 @@ CRITICAL: The optimized prompt must:
                   <Switch
                     size="lg"
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Bypass Illinois Chat's internal prompting"
                     tooltip="Full control over bot behavior without internal prompting."
                     checked={systemPromptOnly}
@@ -1521,8 +1511,6 @@ CRITICAL: The optimized prompt must:
                   <Switch
                     size="lg"
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Enable Agent Mode"
                     tooltip="Runs a multi-step server-side agent loop that can iteratively search documents and execute tools before generating the final answer."
                     checked={agentModeFeatureEnabled}
@@ -1700,8 +1688,6 @@ CRITICAL: The optimized prompt must:
 
               <Switch
                 variant="labeled"
-                showLabels
-                showThumbIcon
                 label="Smart Document Search"
                 tooltip="When enabled, Illinois Chat optimizes your queries to better search through course materials and find relevant content. Note: This only affects how documents are searched - your chat messages remain exactly as you write them."
                 checked={vectorSearchRewrite}
@@ -1731,8 +1717,6 @@ CRITICAL: The optimized prompt must:
                 <div className="flex flex-col gap-1">
                   <Switch
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Guided Learning"
                     tooltip="When enabled course-wide, this setting applies to all students and cannot be disabled by them. The AI will encourage independent problem-solving by providing hints and questions instead of direct answers, while still finding and citing relevant course materials. This promotes critical thinking while ensuring students have access to proper resources."
                     checked={guidedLearning}
@@ -1743,8 +1727,6 @@ CRITICAL: The optimized prompt must:
 
                   <Switch
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Document-Based References Only"
                     tooltip="Restricts the AI to use only information from the provided documents. Useful for maintaining accuracy in fields like legal research where external knowledge could be problematic."
                     checked={documentsOnly}
@@ -1755,8 +1737,6 @@ CRITICAL: The optimized prompt must:
 
                   <Switch
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Hide citations in chat responses"
                     tooltip="Disables the display of citations and sources on the chat screen."
                     checked={disableCitations}
@@ -1767,8 +1747,6 @@ CRITICAL: The optimized prompt must:
 
                   <Switch
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Bypass Illinois Chat's internal prompting"
                     tooltip="Internally, we prompt the model to (1) add citations and (2) always be as helpful as possible. You can bypass this for full un-modified control over your bot."
                     checked={systemPromptOnly}
@@ -1779,8 +1757,6 @@ CRITICAL: The optimized prompt must:
 
                   <Switch
                     variant="labeled"
-                    showLabels
-                    showThumbIcon
                     label="Enable Agent Mode"
                     tooltip="Enables the Agent Mode feature for this project. Agent Mode runs a multi-step server-side loop that can iteratively search documents and execute tools before generating the final answer."
                     checked={agentModeFeatureEnabled}

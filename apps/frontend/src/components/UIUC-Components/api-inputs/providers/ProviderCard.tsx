@@ -122,8 +122,6 @@ function ProviderSwitch({
   return (
     <Switch
       variant="labeled"
-      showLabels
-      showThumbIcon
       checked={checked}
       onCheckedChange={onCheckedChange}
       aria-label={`Enable ${providerName} provider`}
