@@ -87,7 +87,6 @@ export default {
         border: 'var(--border)',
         input: 'var(--input)',
         ring: 'var(--ring)',
-        'ring-offset-background': 'var(--ring-offset-background)',
         sidebar: {
           DEFAULT: 'var(--sidebar-background)',
           foreground: 'var(--sidebar-foreground)',
