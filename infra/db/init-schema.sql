@@ -205,7 +205,8 @@ CREATE TABLE "folders" (
 	"user_email" varchar(255) NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"type" text,
-	"updated_at" timestamp with time zone DEFAULT now()
+	"updated_at" timestamp with time zone DEFAULT now(),
+	"project_id" bigint
 );
 --> statement-breakpoint
 CREATE TABLE "user_entity" (
@@ -435,12 +436,16 @@ CREATE TABLE "usage_metrics" (
 );
 --> statement-breakpoint
 ALTER TABLE "project_external_connections" ADD CONSTRAINT "project_external_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "folders" ADD CONSTRAINT "folders_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "conversations" ADD CONSTRAINT "conversations_folder_id_folders_id_fk" FOREIGN KEY ("folder_id") REFERENCES "public"."folders"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "documents_doc_groups" ADD CONSTRAINT "documents_doc_groups_document_id_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "documents_doc_groups" ADD CONSTRAINT "documents_doc_groups_doc_group_id_doc_groups_id_fk" FOREIGN KEY ("doc_group_id") REFERENCES "public"."doc_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "doc_groups_name_course_unique" ON "doc_groups" USING btree ("name","course_name");--> statement-breakpoint
 CREATE UNIQUE INDEX "documents_doc_groups_pkey" ON "documents_doc_groups" USING btree ("document_id","doc_group_id");--> statement-breakpoint
 CREATE INDEX "embeddings_embedding_1536_hnsw_idx" ON "embeddings" USING hnsw ((subvector("embedding", 1, 1536)::vector(1536)) vector_cosine_ops) WITH (m=16,ef_construction=64);--> statement-breakpoint
-CREATE INDEX "project_connection_audit_log_project_idx" ON "project_connection_audit_log" USING btree ("project_name","occurred_at" DESC);
+CREATE INDEX "project_connection_audit_log_project_idx" ON "project_connection_audit_log" USING btree ("project_name","occurred_at" DESC);--> statement-breakpoint
+CREATE INDEX "folders_user_email_project_id_idx" ON "folders" USING btree ("user_email","project_id");--> statement-breakpoint
+CREATE INDEX "conversations_folder_id_idx" ON "conversations" USING btree ("folder_id");
 -- ---------------------------------------------------------------------------
 -- Functions and triggers (0001_custom_functions.sql, verbatim)
 -- ---------------------------------------------------------------------------
