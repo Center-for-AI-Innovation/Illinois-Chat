@@ -25,8 +25,7 @@ interface MaintenanceNotice {
   body: string
 }
 
-// The details endpoint requires a session, so signed-out visitors fall back to
-// the defaults rather than seeing an empty card.
+// The notice is public; use defaults only when the request fails or copy is blank.
 async function fetchNotice(signal: AbortSignal): Promise<MaintenanceNotice> {
   try {
     const response = await fetch('/api/UIUC-api/getMaintenanceModeDetails', {
