@@ -792,18 +792,21 @@ pre:has(div.codeblock) {
   );
 }
 
-/* Standard list properties. Didn't work before manually adding this. */
-ul {
+/* Standard list properties. Didn't work before manually adding this.
+ * Skipped for shadcn primitives (they all set data-slot), whose menus and
+ * breadcrumbs are lists that must not get bullets, indents or item gaps.
+ * :where() keeps the original element-only specificity, so utilities win. */
+ul:where(:not([data-slot])) {
   list-style-type: disc;
   padding-left: 20px;
 }
 
-ol {
+ol:where(:not([data-slot])) {
   list-style-type: decimal;
   padding-left: 20px;
 }
 
-li {
+li:where(:not([data-slot])) {
   margin-bottom: 5px;
 }
 
