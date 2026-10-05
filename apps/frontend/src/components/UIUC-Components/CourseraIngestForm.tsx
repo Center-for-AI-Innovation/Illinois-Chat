@@ -16,6 +16,7 @@ import {
 // import { Checkbox } from '@radix-ui/react-checkbox'
 import NextLink from 'next/link'
 import Image from 'next/image'
+import { SUPPORT_EMAIL } from '~/utils/app/const'
 export default function CourseraIngestForm(): JSX.Element {
   const [isUrlUpdated, setIsUrlUpdated] = useState(false)
   const [isUrlValid, setIsUrlValid] = useState(false)
@@ -50,7 +51,7 @@ export default function CourseraIngestForm(): JSX.Element {
     if (url.includes('coursera.org')) {
       // TODO: coursera ingest
       alert(
-        'Coursera ingest is not yet automated (auth is hard). Please email rohan13@illinois.edu to do it for you',
+        `Coursera ingest is not yet automated (auth is hard). Please email ${SUPPORT_EMAIL} to do it for you`,
       )
     }
   }

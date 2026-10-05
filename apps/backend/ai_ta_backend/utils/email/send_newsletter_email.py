@@ -14,6 +14,7 @@ from retry import retry
 
 import supabase
 from ai_ta_backend.types.types import ClerkUser
+from ai_ta_backend.utils.email.constants import SUPPORT_EMAIL
 
 load_dotenv(override=True)
 
@@ -180,7 +181,7 @@ if __name__ == "__main__":
     success_or_fail = send_html_email(
         subject="UIUC.chat Product Update 1",
         html_text=html_content,
-        sender="rohan13@illinois.edu",
+        sender=SUPPORT_EMAIL,
     )
-    # receipients=["rohan13@illinois.edu"])
+    # receipients=[SUPPORT_EMAIL])
     print("success_or_fail:", success_or_fail)

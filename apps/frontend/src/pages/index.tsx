@@ -9,6 +9,7 @@ import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
 import router from 'next/router'
 
 // Typing animation component
@@ -705,9 +706,9 @@ const Home: NextPage = () => {
                   tabIndex={0}
                   className="underline"
                   style={{ color: 'var(--illinois-orange)' }}
-                  href="mailto:caii_ai@lists.illinois.edu"
+                  href={SUPPORT_MAILTO}
                 >
-                  contact us
+                  {SUPPORT_EMAIL}
                 </a>
                 .
               </div>
@@ -735,7 +736,7 @@ const Home: NextPage = () => {
                   tabIndex={0}
                   className="underline"
                   style={{ color: '#9e3010' }}
-                  href="mailto:genaisupport@mx.uillinois.edu"
+                  href={SUPPORT_MAILTO}
                 >
                   email us
                 </a>
