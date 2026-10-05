@@ -320,6 +320,24 @@ describe('app/api/agent POST', () => {
     expect(callArgs.conversation.agentModeEnabled).toBe(true)
   })
 
+  it('forwards disabledTools to runAgentConversation', async () => {
+    const req = makeRequest(validBody({ disabledTools: ['tool_a'] }))
+    const res = await POST(req as any)
+    await readSSEEvents(res)
+
+    const callArgs = hoisted.runAgentConversation.mock.calls[0]![0]
+    expect(callArgs.disabledTools).toEqual(['tool_a'])
+  })
+
+  it('defaults disabledTools to an empty list when absent', async () => {
+    const req = makeRequest(validBody())
+    const res = await POST(req as any)
+    await readSSEEvents(res)
+
+    const callArgs = hoisted.runAgentConversation.mock.calls[0]![0]
+    expect(callArgs.disabledTools).toEqual([])
+  })
+
   it('passes array content through for userMessage', async () => {
     const arrayContent = [
       { type: 'text', text: 'Hello' },

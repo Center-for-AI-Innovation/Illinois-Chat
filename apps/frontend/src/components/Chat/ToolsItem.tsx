@@ -46,7 +46,7 @@ export const ToolsItem = ({}) => {
     homeDispatch({
       field: 'tools',
       value: tools.map((tool) =>
-        tool.id === id ? { ...tool, checked: !tool.enabled } : tool,
+        tool.id === id ? { ...tool, enabled: !tool.enabled } : tool,
       ),
     })
   }

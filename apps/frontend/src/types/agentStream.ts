@@ -196,6 +196,8 @@ export interface AgentRunRequest {
     imageUrls?: string[]
   }
   documentGroups: string[]
+  // Names of tools the user switched off in Chat Settings; the server omits them
+  disabledTools?: string[]
   model: {
     id: string
     name: string

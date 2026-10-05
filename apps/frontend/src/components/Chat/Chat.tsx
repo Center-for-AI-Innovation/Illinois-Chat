@@ -937,7 +937,7 @@ export const Chat = memo(
         }
 
         // Action 3: Tool Execution (with Agent Mode support)
-        if (tools.length > 0 || agentModeEnabled) {
+        if (tools.some((tool) => tool.enabled !== false) || agentModeEnabled) {
           if (agentModeEnabled) {
             if (courseMetadata?.agent_mode_enabled !== true) {
               handleUpdateConversation(updatedConversation, {
@@ -957,6 +957,9 @@ export const Chat = memo(
               conversations,
               courseName,
               enabledDocumentGroups: documentGroups,
+              disabledTools: tools
+                .filter((tool) => tool.enabled === false)
+                .map((tool) => tool.name),
               errorToast,
               homeDispatch,
               message,
@@ -980,7 +983,7 @@ export const Chat = memo(
             )
 
             // Non-agent mode: just use the provided tools directly
-            const toolsToUse = tools
+            const toolsToUse = tools.filter((tool) => tool.enabled !== false)
 
             homeDispatch({ field: 'isRouting', value: true })
 
