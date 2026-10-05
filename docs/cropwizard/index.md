@@ -12,7 +12,7 @@ CropWizard is built on the Illinois Chat platform and is its flagship example of
 
 Enter a text question in the chat bar at the bottom of the Chat page and you'll receive a response within a few seconds. You can also upload one or more images and ask about them, or ask questions that trigger registered computational tools — tools are invoked automatically when relevant.
 
-The tools functionality can also analyze your own data, including spreadsheets (CSV) and databases (SQL); this is preliminary — contact the team if you're interested.
+The tools functionality can also analyze your own data, including spreadsheets (CSV) and databases (SQL); this is preliminary — contact the team at [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu) if you're interested.
 
 ## Customizing user settings
 

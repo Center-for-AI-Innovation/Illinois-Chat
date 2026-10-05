@@ -40,7 +40,7 @@
   --ic-shadow-sm:
     0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
 
-  --md-text-font: "Montserrat", system-ui, sans-serif;
+  --md-text-font: "Source Sans 3", "Source Sans Pro", system-ui, sans-serif;
   --md-code-font: "Roboto Mono", ui-monospace, monospace;
 
   --md-primary-fg-color: var(--illinois-blue);
@@ -315,10 +315,10 @@ html {
   }
 }
 
-/* 16px root, 16px body — frontend default without Material's 125% html. */
+/* 16px root, 18px body — Source Sans runs small next to Montserrat headings. */
 
 .md-typeset {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 500;
   line-height: 1.6;
   color: var(--ic-foreground);
@@ -327,7 +327,7 @@ html {
 .md-typeset h1 {
   font-family: Montserrat, var(--md-text-font);
   font-weight: 700;
-  font-size: 1.65rem;
+  font-size: 1.75rem;
   line-height: 1.35;
   letter-spacing: -0.02em;
   color: var(--ic-foreground);
@@ -336,7 +336,7 @@ html {
 .md-typeset h2 {
   font-family: Montserrat, var(--md-text-font);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   line-height: 1.4;
   letter-spacing: 0;
   color: var(--ic-foreground);
@@ -352,18 +352,18 @@ html {
 }
 
 .md-typeset h3 {
-  font-size: 1.0625rem;
+  font-size: 1.1875rem;
   line-height: 1.45;
 }
 
 .md-typeset h4 {
-  font-size: 0.9375rem;
+  font-size: 1.125rem;
   line-height: 1.5;
 }
 
 .md-typeset h5,
 .md-typeset h6 {
-  font-size: 0.8125rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
 
@@ -456,14 +456,14 @@ html {
   background-color: var(--ic-slate-25);
   color: var(--ic-text-secondary);
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 1rem;
   height: 2.5rem;
   border-bottom: 1px solid var(--ic-border);
 }
 
 .md-typeset table:not([class]) td {
   border-bottom: 1px solid var(--ic-border);
-  font-size: 0.875rem;
+  font-size: 1rem;
 }
 
 .md-typeset table:not([class]) tr:hover td {
@@ -488,6 +488,7 @@ html {
 
 .md-typeset .admonition,
 .md-typeset details {
+  font-size: 1rem;
   border-radius: var(--ic-radius-lg);
   border-color: var(--ic-border);
   box-shadow: var(--ic-shadow-xs);
@@ -562,7 +563,15 @@ html {
 }
 
 .md-copyright {
-  font-size: 0.8rem;
+  font-size: 0.9375rem;
+}
+
+.md-footer__title {
+  font-size: 1.0625rem;
+}
+
+.md-footer__direction {
+  font-size: 0.8125rem;
 }
 
 .ic-footer-links {
