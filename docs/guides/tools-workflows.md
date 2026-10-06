@@ -11,7 +11,7 @@ Tools let your assistant take real actions during a conversation: search the lit
 3. If a tool matches, the LLM generates the input parameters and the platform invokes it (multiple tools can run in parallel).
 4. The tool output — text and/or images — is passed back to the LLM to generate the final response.
 
-Tools are invoked automatically based on the LLM's judgment; there is no way to force invocation, but you can encourage it through prompting. For reliable instruction-following, a strong commercial model is always used for tool selection, regardless of the project's default model. Users can toggle individual tools on or off per conversation from the **Tools** tab of the settings panel on the chat page.
+Tools are invoked automatically based on the LLM's judgment; there is no way to force invocation, but you can encourage it through prompting. Tool selection does not use the project's default chat model. It is routed through the project's own OpenAI or OpenAI-compatible provider when one is configured on the **LLMs** page, and otherwise through the Illinois-hosted default router. The Tools page shows which of these is in effect (**Custom router**, **Default router**, or **Offline** when neither is available). Users can toggle individual tools on or off per conversation from the **Tools** tab of the settings panel on the chat page.
 
 ## Building tools with Sim AI
 
