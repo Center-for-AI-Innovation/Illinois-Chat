@@ -115,6 +115,7 @@ nav:
       - Canvas Integration: guides/canvas-integration.md
       - Analytics: guides/analytics.md
       - Bulk Export: guides/bulk-export.md
+      - External Connections: guides/external-connections.md
   - API Reference:
       - api/index.md
       - Authentication: api/authentication.md
@@ -129,13 +130,17 @@ nav:
       - External Connections Setup: external-connections-setup.md
       - Tools Platform (Sim AI): sim-developer-guide.md
       - System Architecture: self-hosting/architecture.md
-  - CropWizard:
-      - cropwizard/index.md
-      - CropWizard Documents: cropwizard/documents.md
-      - Pest Detection Tool: cropwizard/pest-detection.md
-      - Document Licenses: cropwizard/licenses.md
+  - Use Cases:
+      - use-cases/index.md
+      - CropWizard:
+          - use-cases/cropwizard/index.md
+          - CropWizard Documents: use-cases/cropwizard/documents.md
+          - Pest Detection Tool: use-cases/cropwizard/pest-detection.md
+          - Seasonal Characterization Tool: use-cases/cropwizard/seasonal-characterization.md
+          - Document Licenses: use-cases/cropwizard/licenses.md
   - Developers:
       - Development Setup: developers/dev-setup.md
       - Cloud Deployment: developers/deployment.md
       - Monorepo Migration: developers/monorepo-migration.md
+      - Lightweight Ingest Bridge: developers/ingest-bridge.md
   - Blog: blog/index.md
