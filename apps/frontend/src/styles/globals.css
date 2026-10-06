@@ -515,6 +515,9 @@ html[data-input-modality='keyboard']
 
   --chat-background: color-mix(in srgb, var(--background), black 20%);
 
+  --citation-foreground: hsl(from var(--link) h s 61%);
+  --citation-hover-border: var(--citation-foreground);
+
   --dashboard-background: var(--illinois-blue);
   --dashboard-background-faded: color-mix(
     in srgb,
