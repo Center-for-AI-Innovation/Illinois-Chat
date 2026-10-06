@@ -128,25 +128,18 @@ take your own connection string.
 
 ### What is not available, and why
 
-**Vendors that sign you in with a Connect button are switched off for this release.**
+**Vendors that sign you in with a Connect button are not available in this release.**
 That covers Google Drive, Docs, Sheets, Calendar and Gmail, along with Notion, Jira,
 Confluence, Box, Dropbox, Zoom, Slack, Asana, ClickUp, Monday, HubSpot, Salesforce,
-Linear, Airtable, Microsoft 365 and the rest.
+Linear, Airtable, Microsoft 365 and the rest. Entering your own credentials in one of these
+blocks does not change that; they stay unavailable until support for them is added.
 
-This is a deliberate decision, not a bug, and it is not something you can work around by
-supplying your own credentials. Connecting any of these requires us to register an
-application with that vendor first, under an account the team still has to agree on. Until
-that happens the connection cannot be completed by anyone. We plan to enable a first group
-of these, and the list will grow from there.
+**Some other tools are not enabled yet**, including the cloud infrastructure and security
+tools such as AWS, SSH, SFTP, Okta and 1Password.
 
-**A number of other tools are switched off for now** simply because we started small.
-That includes the cloud infrastructure and security tools such as AWS, SSH, SFTP, Okta and
-1Password. If you need one, ask — expanding the list is a configuration change, not
-development work.
-
-**Some blocks you may have seen before are gone**, because they do not work on this
-deployment or would send data to a service we do not control: Search, Sim Chat, Data
-Enrichment, Connected Accounts, Credential, Pi, A2A, Circleback and Video Generator.
+**Some blocks you may have seen in Sim's own documentation are not offered here**: Search,
+Sim Chat, Data Enrichment, Connected Accounts, Credential, Pi, A2A, Circleback and Video
+Generator.
 
 ### If something you built stops working
 
@@ -166,10 +159,8 @@ because the tool list is built from what is deployed in Sim.
 
 ### Asking for a block to be added
 
-[Contact support](#getting-help) describing the block you need and what you are building
-with it. Adding a tool you authenticate yourself is a small configuration change. Adding a
-Connect-button vendor depends on registering an application with that vendor first, so it
-takes longer.
+[Contact support](#getting-help) with the block you need and what you are building with
+it. Requests like these help decide which blocks are added next.
 
 ## Learning more about Sim itself
 
