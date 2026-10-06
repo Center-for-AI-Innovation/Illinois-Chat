@@ -513,6 +513,8 @@ html[data-input-modality='keyboard']
   --foreground: var(--illinois-white);
   --background: var(--illinois-blue);
 
+  --muted-foreground: rgba(from var(--foreground) r g b / 0.8);
+
   --chat-background: color-mix(in srgb, var(--background), black 20%);
 
   --citation-foreground: hsl(from var(--link) h s 61%);
