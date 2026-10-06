@@ -108,7 +108,10 @@ nav:
       - Uploading Materials: guides/uploading-materials.md
       - Web Crawling: guides/web-crawling.md
       - Sharing & Access Control: guides/sharing-access.md
-      - Tools & Workflows: guides/tools-workflows.md
+      - Tools & Workflows:
+          - guides/tools-workflows.md
+          - Sim AI User Guide: sim-user-guide.md
+          - Build a Tool in Sim: guides/build-a-sim-tool.md
       - Canvas Integration: guides/canvas-integration.md
       - Analytics: guides/analytics.md
       - Bulk Export: guides/bulk-export.md
@@ -134,4 +137,5 @@ nav:
       - Development Setup: developers/dev-setup.md
       - Cloud Deployment: developers/deployment.md
       - Monorepo Migration: developers/monorepo-migration.md
+      - Sim AI Developer Guide: sim-developer-guide.md
   - Blog: blog/index.md
