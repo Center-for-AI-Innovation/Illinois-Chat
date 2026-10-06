@@ -12,7 +12,7 @@ CropWizard is built on the Illinois Chat platform and is its flagship example of
 
 Enter a text question in the chat bar at the bottom of the Chat page and you'll receive a response within a few seconds. You can also upload one or more images and ask about them, or ask questions that trigger registered computational tools — tools are invoked automatically when relevant.
 
-The tools functionality can also analyze your own data, including spreadsheets (CSV) and databases (SQL); this is preliminary — contact the team if you're interested.
+The tools functionality can also analyze your own data, including spreadsheets (CSV) and databases (SQL); this is preliminary — contact the team at [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu) if you're interested.
 
 ## Customizing user settings
 
@@ -66,4 +66,4 @@ Upload pest images and ask a question; the AI automatically invokes the relevant
 
 CropWizard is a research project launched as part of **AIFARMS**, the national AI institute for agriculture, funded by USDA NIFA under award number 2020-67021-32799. Additional funding comes from **Intel** Corporation, Amazon AWS through the **Amazon-Illinois Center on AI for Conversational Experiences (AICE)**, and the University of Illinois system through the **Discovery Partners Institute** Science program.
 
-CropWizard is built on the **Illinois Chat** platform, funded by the NCSA [Center for AI Innovation (CAII)](https://ai.ncsa.illinois.edu/), the [Office of the CIO](https://cio.illinois.edu/) of the University of Illinois Urbana-Champaign, the [Healthcare Innovation Office](https://www.ncsa.illinois.edu/research/health-sciences/healthcare-innovation-program-office/) at NCSA, and the [Gies College of Business](https://giesbusiness.illinois.edu/), among others.
+CropWizard is built on the **Illinois Chat** platform, funded by the NCSA [Center for AI Innovation (CAII)](https://ai.ncsa.illinois.edu/), the [Office of the CIO](https://cio.illinois.edu/) of the University of Illinois Urbana-Champaign, the [Healthcare Innovation Program Office](https://www.ncsa.illinois.edu/research/health-sciences/healthcare-innovation-program-office/) at NCSA, and the [Gies College of Business](https://giesbusiness.illinois.edu/), among others.

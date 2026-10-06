@@ -1,0 +1,275 @@
+{
+  "version": "1.0",
+  "exportedAt": "2026-09-29T16:25:12.043Z",
+  "state": {
+    "blocks": {
+      "0dfe6986-2f0d-4612-b232-fc12fc6e456c": {
+        "id": "0dfe6986-2f0d-4612-b232-fc12fc6e456c",
+        "type": "function",
+        "name": "queryBuilder",
+        "position": {
+          "x": 262.14351125902135,
+          "y": -18.985174036928356
+        },
+        "subBlocks": {
+          "code": {
+            "id": "code",
+            "type": "code",
+            "value": "const topic = <start.topic>;\nconst author = <start.author>;\nconst limit = <start.limit>;\n\n// Treat undefined, null and whitespace-only the same: \"not provided\".\nconst clean = (v) => (v == null ? '' : String(v).trim());\n// arXiv uses double quotes for phrase search, so drop any the user typed.\nconst phrase = (v) => clean(v).replace(/\"/g, '');\n\nconst clauses = [];\n\nif (clean(topic)) {\n  clauses.push(`all:\"${phrase(topic)}\"`);\n}\n\nif (clean(author)) {\n  clauses.push(`au:\"${phrase(author)}\"`);\n}\n\nif (clauses.length === 0) {\n  throw new Error('Provide a topic, an author, or both');\n}\n\nconst parsed = Number.parseInt(clean(limit), 10);\nconst maxResults =\n  Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 2000) : 10;\n\nreturn {\n  query: clauses.join(' AND '),\n  maxResults,\n};"
+          },
+          "language": {
+            "id": "language",
+            "type": "dropdown",
+            "value": "javascript"
+          },
+          "sandboxId": {
+            "id": "sandboxId",
+            "type": "combobox",
+            "value": null
+          },
+          "secretScope": {
+            "id": "secretScope",
+            "type": "dropdown",
+            "value": "all"
+          },
+          "mountedSecrets": {
+            "id": "mountedSecrets",
+            "type": "dropdown",
+            "value": null
+          }
+        },
+        "outputs": {
+          "files": {
+            "type": "file[]",
+            "description": "Files the code wrote to /tmp/sim/outputs, ready to attach or upload downstream"
+          },
+          "result": {
+            "type": "json",
+            "description": "Structured result emitted by the executed code"
+          },
+          "stdout": {
+            "type": "string",
+            "description": "Console log output and debug messages from function execution"
+          }
+        },
+        "enabled": true,
+        "horizontalHandles": true,
+        "height": 0,
+        "advancedMode": false,
+        "errorEnabled": false,
+        "triggerMode": false,
+        "data": {},
+        "locked": false
+      },
+      "c841233e-8475-4c98-93c7-d29214f9f010": {
+        "id": "c841233e-8475-4c98-93c7-d29214f9f010",
+        "type": "arxiv",
+        "name": "ArXiv",
+        "position": {
+          "x": 617.9223397522293,
+          "y": -25.866942588819995
+        },
+        "subBlocks": {
+          "sortBy": {
+            "id": "sortBy",
+            "type": "dropdown",
+            "value": "relevance"
+          },
+          "paperId": {
+            "id": "paperId",
+            "type": "short-input",
+            "value": null
+          },
+          "operation": {
+            "id": "operation",
+            "type": "dropdown",
+            "value": "arxiv_search"
+          },
+          "sortOrder": {
+            "id": "sortOrder",
+            "type": "dropdown",
+            "value": "descending"
+          },
+          "authorName": {
+            "id": "authorName",
+            "type": "short-input",
+            "value": null
+          },
+          "maxResults": {
+            "id": "maxResults",
+            "type": "short-input",
+            "value": "<querybuilder.result.maxResults>"
+          },
+          "searchField": {
+            "id": "searchField",
+            "type": "dropdown",
+            "value": "all"
+          },
+          "searchQuery": {
+            "id": "searchQuery",
+            "type": "long-input",
+            "value": "<querybuilder.result.query>"
+          }
+        },
+        "outputs": {
+          "papers": {
+            "type": "json",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "doi": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "authors": {
+                  "type": "string"
+                },
+                "comment": {
+                  "type": "string"
+                },
+                "pdfLink": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "updated": {
+                  "type": "string"
+                },
+                "published": {
+                  "type": "string"
+                },
+                "categories": {
+                  "type": "string"
+                },
+                "journalRef": {
+                  "type": "string"
+                },
+                "primaryCategory": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Array of papers matching the search query"
+          },
+          "totalResults": {
+            "type": "number",
+            "description": "Total number of results found for the search query"
+          }
+        },
+        "enabled": true,
+        "horizontalHandles": true,
+        "height": 0,
+        "advancedMode": false,
+        "errorEnabled": false,
+        "triggerMode": false,
+        "data": {},
+        "locked": false
+      },
+      "cfc7d637-9492-4502-a5f6-57502c65d77f": {
+        "id": "cfc7d637-9492-4502-a5f6-57502c65d77f",
+        "type": "start_trigger",
+        "name": "Start",
+        "position": {
+          "x": -112.26095928764133,
+          "y": 1.403261991095519
+        },
+        "subBlocks": {
+          "inputFormat": {
+            "id": "inputFormat",
+            "type": "input-format",
+            "value": [
+              {
+                "id": "1717f69f-566d-4629-ac69-af6bbc6fea76",
+                "name": "topic",
+                "type": "string",
+                "value": "",
+                "collapsed": false,
+                "description": "Subject or keywords to search for, e.g. \"diffusion models\" or \"protein folding\". Searched across title, abstract, and full text. Optional if author is given."
+              },
+              {
+                "id": "5203a332-dac5-4070-b1a8-e44780d2671c",
+                "name": "author",
+                "type": "string",
+                "value": "",
+                "collapsed": false,
+                "description": "Author name to filter by, e.g. \"Yang Song\" or just \"Song\". Optional if topic is given."
+              },
+              {
+                "id": "ac69e115-3617-42ba-9c24-6c6ed4f12f2e",
+                "name": "limit",
+                "type": "number",
+                "value": "10",
+                "collapsed": false,
+                "description": "Optional. Maximum number of papers to return. Defaults to 10, maximum 2000."
+              }
+            ]
+          },
+          "runMetadata": {
+            "id": "runMetadata",
+            "type": "switch",
+            "value": false
+          }
+        },
+        "outputs": {
+          "files": {
+            "type": "file[]",
+            "description": "User uploaded files"
+          },
+          "input": {
+            "type": "string",
+            "description": "Primary user input or message"
+          },
+          "conversationId": {
+            "type": "string",
+            "description": "Conversation thread identifier"
+          }
+        },
+        "enabled": true,
+        "horizontalHandles": true,
+        "height": 0,
+        "advancedMode": false,
+        "errorEnabled": false,
+        "triggerMode": false,
+        "data": {},
+        "locked": false
+      }
+    },
+    "edges": [
+      {
+        "id": "eefac9cd-c3fd-4fee-ad71-3c06688b59f9",
+        "source": "cfc7d637-9492-4502-a5f6-57502c65d77f",
+        "target": "0dfe6986-2f0d-4612-b232-fc12fc6e456c",
+        "sourceHandle": "source",
+        "targetHandle": "target",
+        "type": "default",
+        "data": {}
+      },
+      {
+        "id": "f9c16239-ab32-41d9-a78e-3a3f2337aecc",
+        "source": "0dfe6986-2f0d-4612-b232-fc12fc6e456c",
+        "target": "c841233e-8475-4c98-93c7-d29214f9f010",
+        "sourceHandle": "source",
+        "targetHandle": "target",
+        "type": "default",
+        "data": {}
+      }
+    ],
+    "loops": {},
+    "parallels": {},
+    "metadata": {
+      "name": "Research Paper Search tool",
+      "description": "Searches arXiv for research papers. Provide a topic, an author, or both: a topic alone finds papers on that subject, an author alone lists that author's papers, and both together finds that author's papers on the topic. Returns each paper's title, authors, abstract, publication date, categories, and links to the abstract page and PDF. Results are sorted by relevance. Use limit to control how many papers come back (default 10).",
+      "exportedAt": "2026-09-29T16:25:12.041Z"
+    },
+    "variables": {}
+  }
+}

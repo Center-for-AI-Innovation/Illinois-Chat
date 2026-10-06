@@ -1,12 +1,11 @@
 ---
 date: 2026-05-05
+title: Illinois Chat is now a self-hostable monorepo
 categories:
   - Releases
 authors:
   - caii
 ---
-
-# Illinois Chat is now a self-hostable monorepo
 
 Illinois Chat's frontend, backend, and crawler now live together in a single repository — [Center-for-AI-Innovation/Illinois-Chat](https://github.com/Center-for-AI-Innovation/Illinois-Chat) — and the entire platform can be started with one command.
 
