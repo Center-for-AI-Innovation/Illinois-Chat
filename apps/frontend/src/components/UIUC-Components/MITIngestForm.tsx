@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Text, Card, Button, Input, Image } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import { Input } from '@/components/shadcn/ui/input'
 import { IconArrowRight } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import {
@@ -10,6 +11,7 @@ import {
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
 import NextLink from 'next/link'
+import Image from 'next/image'
 import axios from 'axios'
 import { type FileUpload } from './UploadNotification'
 import { type QueryClient } from '@tanstack/react-query'
@@ -150,13 +152,12 @@ export default function MITIngestForm({
         <DialogTrigger
           tabIndex={0}
           nativeButton={false}
-          className="focus:bg-[--dashboard-background-dark]"
+          className="focus:bg-(--dashboard-background-dark)"
           render={
-            <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-              style={{ height: '100%' }}
+            <div
+              className="group relative h-full cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
             >
-              <div className="-ml-2 mb-2 flex items-center justify-between">
+              <div className="mb-2 -ml-2 flex items-center justify-between">
                 <div className="flex items-center space-x-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full">
                     <Image
@@ -167,15 +168,15 @@ export default function MITIngestForm({
                       className="rounded-full object-contain"
                     />
                   </div>
-                  <Text className="text-xl font-semibold">MIT Course</Text>
+                  <p className="text-xl font-semibold">MIT Course</p>
                 </div>
               </div>
 
-              <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
+              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content from MIT OpenCourseWare, including lecture notes,
                 assignments, and course materials.
-              </Text>
-              <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
+              </p>
+              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
                   size={16}
@@ -183,11 +184,11 @@ export default function MITIngestForm({
                   className="ml-2 transition-transform group-hover:translate-x-1"
                 />
               </div>
-            </Card>
+            </div>
           }
         />
 
-        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto !rounded-2xl border-0 bg-[--modal] px-4 py-6 text-[--modal-text] sm:px-6">
+        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto rounded-2xl! border-0 bg-(--modal) px-4 py-6 text-(--modal-text) sm:px-6">
           <DialogHeader>
             <DialogTitle className="mb-4 text-left text-xl font-bold">
               Ingest MIT Course
@@ -196,13 +197,13 @@ export default function MITIngestForm({
           <div className="">
             <div className="">
               <div>
-                <div className="break-words text-sm sm:text-base">
-                  <Text className="mb-2 text-sm font-semibold text-[--illinois-orange]">
+                <div className="text-sm wrap-break-word sm:text-base">
+                  <p className="mb-2 text-sm font-semibold text-(--illinois-orange)">
                     Coming soon: MIT ingest is temporarily unavailable.
-                  </Text>
+                  </p>
                   <strong>For MIT Open Course Ware</strong>, just enter a URL
                   like{' '}
-                  <code className="inline-flex items-center rounded-md bg-[--illinois-orange] px-2 py-1 font-mono text-xs text-[--illinois-white] sm:text-sm">
+                  <code className="inline-flex items-center rounded-md bg-(--illinois-orange) px-2 py-1 font-mono text-xs text-(--illinois-white) sm:text-sm">
                     ocw.mit.edu/courses/ANY_COURSE
                   </code>
                   ,<br />
@@ -215,7 +216,7 @@ export default function MITIngestForm({
                         'https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017'
                       }
                       onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      className="text-[--dashboard-button]"
+                      className="text-(--dashboard-button)"
                     >
                       https://ocw.mit.edu/courses/8-321-quantum-theory-i-fall-2017
                     </NextLink>
@@ -223,44 +224,26 @@ export default function MITIngestForm({
                   .
                 </div>
 
-                <Input
-                  icon={
-                    <Image
-                      src="/media/mitocw_logo.jpg"
-                      alt="MIT OCW Logo"
-                      width={24}
-                      height={24}
-                      className="object-contain"
-                    />
-                  }
-                  aria-label="MIT OCW course URL"
-                  className="mt-4 w-full rounded-full"
-                  styles={{
-                    input: {
-                      color: 'var(--foreground)',
-                      backgroundColor: 'var(--background-faded)',
-                      borderColor: 'var(--background-dark)',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      '&:focus': {
-                        borderColor: 'var(--illinois-orange)',
-                      },
-                    },
-                    wrapper: {
-                      width: '100%',
-                    },
-                  }}
-                  placeholder="Enter URL..."
-                  radius="md"
-                  type="url"
-                  value={url}
-                  size="lg"
-                  onChange={(e) => {
-                    handleUrlChange(e)
-                  }}
-                  disabled
-                />
+                <div className="relative mt-4 w-full">
+                  <Image
+                    src="/media/mitocw_logo.jpg"
+                    alt="MIT OCW Logo"
+                    width={24}
+                    height={24}
+                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 object-contain"
+                  />
+                  <Input
+                    aria-label="MIT OCW course URL"
+                    className="h-12 w-full truncate rounded-full border-(--background-dark) bg-(--background-faded) pl-11 text-(--foreground) focus-visible:border-(--illinois-orange)"
+                    placeholder="Enter URL..."
+                    type="url"
+                    value={url}
+                    onChange={(e) => {
+                      handleUrlChange(e)
+                    }}
+                    disabled
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -268,7 +251,7 @@ export default function MITIngestForm({
             <Button
               onClick={handleIngest}
               disabled
-              className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
+              className="h-11 w-full rounded-xl bg-(--dashboard-button) text-(--dashboard-button-foreground) transition-colors hover:bg-(--dashboard-button-hover) disabled:bg-(--background-faded) disabled:text-(--background-dark)"
             >
               Ingest MIT Course
             </Button>

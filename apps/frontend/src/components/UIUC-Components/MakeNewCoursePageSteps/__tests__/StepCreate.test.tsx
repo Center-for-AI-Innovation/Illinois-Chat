@@ -213,6 +213,16 @@ describe('StepCreate', () => {
     )
   })
 
+  it('shows the placeholder, not a sentinel, when nothing is selected', () => {
+    render(<StepCreate {...defaultProps} />)
+    expect(
+      screen.getByRole('combobox', { name: /^Project Type$/ }),
+    ).toHaveTextContent('Pick a category')
+    expect(
+      screen.getByRole('combobox', { name: /^Organization$/ }),
+    ).toHaveTextContent('Pick an organization')
+  })
+
   it('reflects the controlled project_type and organization values', () => {
     render(
       <StepCreate
@@ -279,5 +289,16 @@ describe('StepCreate', () => {
     await pickOption('None')
 
     expect(onUpdateProjectType).toHaveBeenCalledWith(undefined)
+  })
+
+  it('returns to the placeholder after clearing a selection', () => {
+    const { rerender } = render(
+      <StepCreate {...defaultProps} organization="Computer Science" />,
+    )
+    const trigger = screen.getByRole('combobox', { name: /^Organization$/ })
+    expect(trigger).toHaveTextContent('Computer Science')
+
+    rerender(<StepCreate {...defaultProps} organization={undefined} />)
+    expect(trigger).toHaveTextContent('Pick an organization')
   })
 })

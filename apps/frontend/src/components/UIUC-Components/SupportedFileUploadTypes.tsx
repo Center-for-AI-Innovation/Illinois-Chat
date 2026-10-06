@@ -1,5 +1,3 @@
-import { createStyles } from '@mantine/core'
-
 import React from 'react'
 import {
   IconFileTypePdf,
@@ -26,88 +24,7 @@ interface FileType {
   label: string
   color: string
 }
-const useStyles = createStyles((theme) => ({
-  // For Logos
-  logos: {
-    // width: '30%',
-    aspectRatio: '3/2',
-    objectFit: 'contain',
-    width: '80px',
-  },
-
-  smallLogos: {
-    // width: '30%',
-    aspectRatio: '1/1',
-    objectFit: 'contain',
-    width: '45px',
-  },
-
-  codeStyledText: {
-    backgroundColor: '#020307',
-    borderRadius: '5px',
-    padding: '1px 5px',
-    fontFamily: 'monospace',
-    alignItems: 'center',
-    justifyItems: 'center',
-  },
-
-  // For Accordion
-  root: {
-    borderRadius: theme.radius.lg,
-    paddingLeft: 25,
-    width: '400px',
-    // outline: 'none',
-    paddingTop: 20,
-    paddingBottom: 20,
-
-    '&[data-active]': {
-      paddingTop: 20,
-    },
-  },
-  control: {
-    borderRadius: theme.radius.lg,
-    // outline: '0.5px solid ',
-    '&:hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)', // 20% white on hover
-    },
-  },
-  content: {
-    borderRadius: theme.radius.lg,
-  },
-  panel: {
-    borderRadius: theme.radius.lg,
-  },
-  item: {
-    backgroundColor: 'bg-transparent',
-    // border: `${rem(1)} solid transparent`,
-    border: `solid transparent`,
-    borderRadius: theme.radius.lg,
-    position: 'relative',
-    // zIndex: 0,
-    transition: 'transform 150ms ease',
-    outline: 'none',
-
-    '&[data-active]': {
-      transform: 'scale(1.03)',
-      backgroundColor: '#15162b',
-      borderRadius: theme.radius.lg,
-      boxShadow: theme.shadows.xl,
-    },
-    '&:hover': {
-      backgroundColor: 'bg-transparent',
-    },
-  },
-
-  chevron: {
-    '&[data-rotate]': {
-      transform: 'rotate(180deg)',
-    },
-  },
-}))
-
 const SupportedFileUploadTypes = () => {
-  const { classes, theme } = useStyles()
-  // className={classes.wrapper}
   // FIXME: disable audio and video temporarily until figure out Whisper model
   const fileTypes: FileType[] = [
     { icon: IconFileTypePdf, label: 'PDF', color: 'text-red-500' },
@@ -121,14 +38,14 @@ const SupportedFileUploadTypes = () => {
     {
       icon: IconFileTypeTxt,
       label: 'Text',
-      color: 'text-[--foreground-faded]',
+      color: 'text-(--foreground-faded)',
     },
   ]
 
   return (
     <>
       <TooltipProvider>
-        <div className="mb-6 mt-8 flex flex-wrap justify-center gap-4">
+        <div className="mt-8 mb-6 flex flex-wrap justify-center gap-4">
           {fileTypes.map((type, index) => {
             if (!type.icon) {
               console.error(`Missing icon for type: ${type.label}`)

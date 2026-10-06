@@ -167,8 +167,8 @@ def test_legacy_embedding_nested_in_qdrant_config(monkeypatch):
     # Avoid building a real Qdrant client for the legacy-fallback path.
     monkeypatch.setattr(
         cr.WorkerConnectionResolver,
-        "_get_or_create_qdrant",
-        lambda self, project_name, cfg: object(),
+        "_create_qdrant",
+        staticmethod(lambda project_name, cfg: object()),
     )
     resolver = _build_resolver(
         {
@@ -197,3 +197,25 @@ def test_legacy_embedding_nested_in_qdrant_config(monkeypatch):
     assert result.embedding_provider == "openai"
     assert result.embedding_model == "legacy-model"
     assert result.embedding_api_base == "https://legacy.example.com/v1"
+
+
+def test_config_edit_is_visible_to_the_next_resolve():
+    """No cache (issue #228): a changed row must not be served stale."""
+    rows = {
+        PROJECT: {
+            "qdrant_config": None,
+            "database_config": None,
+            "s3_config": None,
+            "embedding_config": {
+                "encrypted": {"provider": "openai", "model": "model-a"}
+            },
+        }
+    }
+    resolver = _build_resolver(rows)
+    assert resolver.resolve(PROJECT).embedding_model == "model-a"
+
+    rows[PROJECT]["embedding_config"]["encrypted"]["model"] = "model-b"
+    assert resolver.resolve(PROJECT).embedding_model == "model-b"
+
+    rows[PROJECT] = None
+    assert resolver.resolve(PROJECT).embedding_model is None

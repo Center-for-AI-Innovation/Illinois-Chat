@@ -11,9 +11,8 @@ interface ToastOptions {
   icon?: ReactNode
 }
 
-// Default auto-close durations per type, preserved from the previous
-// @mantine/notifications behavior. Sonner's <Toaster> (mounted in _app)
-// supplies the per-type icons + theming, so we no longer pass those here.
+// Default auto-close durations per type. Sonner's <Toaster> (mounted in
+// _app) supplies the per-type icons + theming, so we don't pass those here.
 const DEFAULT_AUTO_CLOSE: Record<ToastType, number> = {
   success: 5000,
   error: 8000,
@@ -30,9 +29,9 @@ export const showToast = ({
 }: ToastOptions) => {
   const duration = autoClose ?? DEFAULT_AUTO_CLOSE[type]
 
-  // Mantine had a bold `title` heading + `message` body. Sonner uses the first
-  // argument as the heading and `description` as the body, so when a title is
-  // provided it becomes the heading and the message becomes the description.
+  // Sonner uses the first argument as the heading and `description` as the
+  // body, so when a title is provided it becomes the heading and the message
+  // becomes the description.
   const heading = title ?? message
   const description = title ? message : undefined
 

@@ -23,38 +23,37 @@ export function ChatbotsGlobalNav({
 
   return (
     <header
-      className={`fixed left-0 right-0 top-0 z-50 bg-white/95 backdrop-blur-sm dark:bg-[#13294b] ${
-        hideBorder
-          ? ''
-          : 'border-b border-[hsl(var(--border))] dark:border-[#32517a]'
+      className={`fixed top-0 right-0 left-0 z-50 bg-white/95 backdrop-blur-xs dark:bg-[#13294b] ${
+        hideBorder ? '' : 'border-border border-b dark:border-[#32517a]'
       }`}
     >
       <div className="mx-auto flex h-[72px] w-full max-w-[1680px] items-center justify-between px-4 sm:px-8">
         <Link
           href="/"
-          className={`text-xl font-bold text-[--illinois-blue] dark:text-white sm:text-2xl ${montserrat_heading.variable} font-montserratHeading`}
+          className={`relative flex items-center gap-0 font-bold ${montserrat_heading.variable} font-montserratHeading`}
         >
-          <span className="text-[--illinois-orange-branding] dark:text-white">
-            Illinois{' '}
-          </span>
-          <span className="dark:text-white">Chat</span>
+          <div style={{ width: '2.5rem', height: '2.5rem' }}>
+            <img
+              alt="Illinois Logo"
+              src="/media/logo_illinois.png"
+              className="h-full w-auto"
+            ></img>
+          </div>
+
+          <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
+            Illinois <span className="text-(--foreground)">Chat</span>
+          </div>
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">
           {navItems.map((item) => {
-            const isActive = activePath === item.link
             return (
               <Link
                 key={item.link}
                 href={item.link}
-                data-active={isActive}
                 className={`${
                   montserrat_heading.variable
-                } flex items-center gap-2 rounded-md px-3 py-2 font-montserratHeading text-xs font-bold text-[--illinois-blue] transition-colors dark:text-white sm:px-4 sm:text-sm ${
-                  isActive
-                    ? 'bg-[--illinois-orange]/10 dark:bg-white/10'
-                    : 'hover:bg-[--illinois-orange]/10 dark:hover:bg-white/10'
-                }`}
+                } font-montserratHeading flex items-center gap-2 rounded-md px-3 py-2 text-xs font-bold text-(--illinois-blue) transition-colors sm:px-4 sm:text-sm dark:text-white`}
               >
                 <item.icon size={20} strokeWidth={2} />
                 {item.label}

@@ -256,21 +256,6 @@ describe('axe accessibility audit', () => {
     }
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat', push: vi.fn() }
 
-    vi.mock('@mantine/core', async (importOriginal) => {
-      const actual: any = await importOriginal()
-      return {
-        ...actual,
-        Burger: ({ onClick, opened }: any) =>
-          React.createElement(
-            'button',
-            { type: 'button', 'aria-label': 'Toggle menu', onClick },
-            opened ? 'open' : 'closed',
-          ),
-        Transition: ({ mounted, children }: any) =>
-          mounted ? React.createElement('div', null, children({})) : null,
-      }
-    })
-
     vi.mock('~/components/UIUC-Components/navbars/ThemeToggle', () => ({
       ThemeToggle: () => React.createElement('div'),
     }))

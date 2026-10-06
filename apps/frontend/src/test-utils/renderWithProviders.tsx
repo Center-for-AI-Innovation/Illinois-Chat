@@ -1,5 +1,4 @@
 import React, { type PropsWithChildren } from 'react'
-import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderOptions } from '@testing-library/react'
 import { ThemeProvider } from '~/contexts/ThemeContext'
@@ -40,13 +39,11 @@ export function renderWithProviders(
   function Wrapper({ children }: PropsWithChildren) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MantineProvider withGlobalStyles withNormalizeCSS>
-          <ThemeProvider>
-            <HomeContext.Provider value={homeContextValue}>
-              {children}
-            </HomeContext.Provider>
-          </ThemeProvider>
-        </MantineProvider>
+        <ThemeProvider>
+          <HomeContext.Provider value={homeContextValue}>
+            {children}
+          </HomeContext.Provider>
+        </ThemeProvider>
       </QueryClientProvider>
     )
   }

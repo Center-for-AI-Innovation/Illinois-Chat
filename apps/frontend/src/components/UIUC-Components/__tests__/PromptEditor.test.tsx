@@ -452,7 +452,10 @@ describe('PromptEditor', () => {
       const guideToggle = screen.getByRole('button', {
         name: /Prompt Engineering Guide/i,
       })
+      // Base UI's non-native button semantics match real <button> elements:
+      // Enter activates on keydown, Space activates on keyup.
       fireEvent.keyDown(guideToggle, { key: ' ' })
+      fireEvent.keyUp(guideToggle, { key: ' ' })
 
       await waitFor(() => {
         expect(
@@ -752,6 +755,115 @@ describe('PromptEditor', () => {
       )
     })
 
+    it('swaps the citation blocks in the prompt as Hide citations is toggled', async () => {
+      const user = userEvent.setup()
+      const { CITATION_DISABLED_PROMPT, CITATION_GUIDELINES_PROMPT } =
+        await import('~/utils/app/const')
+
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'You are a helpful assistant.',
+          disableCitations: false,
+        }),
+      })
+
+      const label = 'Hide citations in chat responses'
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeInTheDocument()
+      })
+      const promptValue = () =>
+        (screen.getByLabelText('System Prompt') as HTMLTextAreaElement).value
+
+      // Toggle on: the no-citation block is present, the guidelines are not.
+      await user.click(screen.getByLabelText(label))
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeChecked()
+      })
+      expect(promptValue()).toContain(CITATION_DISABLED_PROMPT)
+      expect(promptValue()).not.toContain(CITATION_GUIDELINES_PROMPT)
+
+      // Toggle off: the no-citation block is gone, replaced by the guidelines.
+      await user.click(screen.getByLabelText(label))
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).not.toBeChecked()
+      })
+      expect(promptValue()).not.toContain(CITATION_DISABLED_PROMPT)
+      expect(promptValue()).toContain(CITATION_GUIDELINES_PROMPT)
+
+      // The admin's own text survives both flips.
+      expect(promptValue()).toContain('You are a helpful assistant.')
+    })
+
+    it('does not accumulate citation blocks over repeated toggling', async () => {
+      const user = userEvent.setup()
+      const { CITATION_DISABLED_PROMPT, CITATION_GUIDELINES_PROMPT } =
+        await import('~/utils/app/const')
+
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'You are a helpful assistant.',
+          disableCitations: false,
+        }),
+      })
+
+      const label = 'Hide citations in chat responses'
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeInTheDocument()
+      })
+
+      for (let i = 0; i < 3; i++) {
+        await user.click(screen.getByLabelText(label))
+        await waitFor(() => {
+          expect(screen.getByLabelText(label)).toBeChecked()
+        })
+        await user.click(screen.getByLabelText(label))
+        await waitFor(() => {
+          expect(screen.getByLabelText(label)).not.toBeChecked()
+        })
+      }
+
+      const value = (
+        screen.getByLabelText('System Prompt') as HTMLTextAreaElement
+      ).value
+      expect(value.split(CITATION_GUIDELINES_PROMPT).length - 1).toBe(1)
+      expect(value).not.toContain(CITATION_DISABLED_PROMPT)
+    })
+
+    it('saves the prompt with the citation block matching the toggle', async () => {
+      const user = userEvent.setup()
+      const { CITATION_DISABLED_PROMPT } = await import('~/utils/app/const')
+
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'You are a helpful assistant.',
+          disableCitations: false,
+        }),
+      })
+
+      const label = 'Hide citations in chat responses'
+      await waitFor(() => {
+        expect(screen.getByLabelText(label)).toBeInTheDocument()
+      })
+
+      await user.click(screen.getByLabelText(label))
+
+      await waitFor(
+        () => {
+          expect(mockCallSetCourseMetadata).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+              disableCitations: true,
+              system_prompt: `You are a helpful assistant.${CITATION_DISABLED_PROMPT}`,
+            }),
+          )
+        },
+        { timeout: 2000 },
+      )
+    })
+
     it('shows error toast when settings save fails', async () => {
       const user = userEvent.setup()
       mockCallSetCourseMetadata.mockResolvedValueOnce(false)
@@ -826,11 +938,10 @@ describe('PromptEditor', () => {
       // Click Cancel in the modal
       const cancelButtons = screen.getAllByRole('button', { name: /Cancel/i })
       const modalCancel =
-        cancelButtons.find(
-          (btn) =>
-            btn.closest('[class*="Modal"]') ||
-            btn.closest('.mantine-Modal-body'),
+        cancelButtons.find((btn) =>
+          btn.closest('[data-slot="dialog-content"]'),
         ) ?? cancelButtons[0]!
+      expect(modalCancel.closest('[data-slot="dialog-content"]')).not.toBeNull()
       await user.click(modalCancel)
 
       await waitFor(() => {
@@ -1417,9 +1528,7 @@ describe('showPromptToast', () => {
   it('calls showToast with correct structure', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showPromptToast(theme, 'Test Title', 'Test message', false)
+    showPromptToast('Test Title', 'Test message', false)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1433,9 +1542,7 @@ describe('showPromptToast', () => {
   it('uses error styling when isError is true', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showPromptToast(theme, 'Error Title', 'Error message', true)
+    showPromptToast('Error Title', 'Error message', true)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1449,10 +1556,8 @@ describe('showPromptToast', () => {
   it('calculates auto-close duration based on message length', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
     const longMessage = 'A'.repeat(300)
-    showPromptToast(theme, 'Title', longMessage)
+    showPromptToast('Title', longMessage)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1465,9 +1570,7 @@ describe('showPromptToast', () => {
   it('uses minimum 5000ms for short messages', async () => {
     const { showPromptToast } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showPromptToast(theme, 'Title', 'Hi')
+    showPromptToast('Title', 'Hi')
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1481,9 +1584,7 @@ describe('showToastOnPromptUpdate', () => {
   it('shows success message by default', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showToastOnPromptUpdate(theme)
+    showToastOnPromptUpdate()
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1496,9 +1597,7 @@ describe('showToastOnPromptUpdate', () => {
   it('shows error message when was_error is true', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showToastOnPromptUpdate(theme, true)
+    showToastOnPromptUpdate(true)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1510,9 +1609,7 @@ describe('showToastOnPromptUpdate', () => {
   it('shows reset message when isReset is true', async () => {
     const { showToastOnPromptUpdate } = await import('../PromptEditor')
     const { showToast } = await import('~/utils/toastUtils')
-
-    const theme = { colors: { gray: [] } } as any
-    showToastOnPromptUpdate(theme, false, true)
+    showToastOnPromptUpdate(false, true)
 
     expect(showToast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1552,5 +1649,50 @@ describe('showToastNotification', () => {
         type: 'error',
       }),
     )
+  })
+})
+
+describe('System prompt autosize', () => {
+  // jsdom reports scrollHeight as 0, so stub it to a fixed value - content
+  // whose height doesn't change between keystrokes.
+  function stubScrollHeight(px: number) {
+    const original = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollHeight',
+    )
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return this.tagName === 'TEXTAREA' ? px : 0
+      },
+    })
+    return () => {
+      if (original) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollHeight', original)
+      } else {
+        delete (HTMLElement.prototype as any).scrollHeight
+      }
+    }
+  }
+
+  it('keeps the measured inline height when typing does not change it', async () => {
+    const restore = stubScrollHeight(420)
+    try {
+      const user = userEvent.setup()
+      await renderPromptEditor({ metadata: makeCourseMetadata() })
+
+      const textarea = (await screen.findByLabelText(
+        'System Prompt',
+      )) as HTMLTextAreaElement
+      expect(textarea.style.height).toBe('420px')
+
+      await user.type(textarea, 'a')
+
+      // Same height re-measured, so `setHeight` bails out - the inline height
+      // must survive that rather than collapsing to the `rows` size.
+      expect(textarea.style.height).toBe('420px')
+    } finally {
+      restore()
+    }
   })
 })

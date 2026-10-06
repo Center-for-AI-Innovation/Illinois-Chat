@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { Title, Text } from '@mantine/core'
 import Link from 'next/link'
 
 const Maintenance = ({}: {
@@ -31,7 +30,7 @@ const Maintenance = ({}: {
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[--background] to-[--background-dark]"
+        className="flex min-h-screen flex-col items-center justify-center bg-linear-to-b from-(--background) to-(--background-dark)"
       >
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-8 text-center">
           <Link href="/">
@@ -40,13 +39,13 @@ const Maintenance = ({}: {
             </h1>
           </Link>
 
-          <Title className="mt-8 text-amber-400" order={2}>
+          <h2 className="heading-h2 mt-8 text-amber-400">
             {maintenanceTitleText}
-          </Title>
+          </h2>
 
-          <Text size="xl" className="max-w-2xl text-gray-200">
+          <p className="max-w-2xl text-xl text-gray-200">
             {maintenanceBodyText}
-          </Text>
+          </p>
 
           <div className="mt-8 animate-pulse">
             <div className="h-2 w-24 rounded bg-amber-400"></div>

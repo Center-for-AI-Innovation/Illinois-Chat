@@ -4,7 +4,7 @@ Routing tests for ConnectionManager. Pure unit tests — no live Postgres / Qdra
 We bypass the heavy default constructor by allocating ConnectionManager with
 ``object.__new__`` and wiring only the fields the routing decisions actually
 touch. Decryption is short-circuited by patching ``decrypt_config`` to be an
-identity function so the cached rows can carry plain dicts directly.
+identity function so the rows can carry plain dicts directly.
 
 Cases (driven by the table in §13 of the dual-engine plan):
 
@@ -13,15 +13,17 @@ Cases (driven by the table in §13 of the dual-engine plan):
   database_config only         -> pgvector, per-project pg engine
   qdrant_config + database     -> qdrant (vector); per-project pg engine
                                   still used for documents SQL
+
+Plus the no-cache guarantee from issue #228: every call re-reads the row, so a
+connection edit is visible to the very next call.
 """
 
 from __future__ import annotations
 
-import threading
 from unittest.mock import patch
 
 import pytest
-from cachetools import TTLCache
+from sqlalchemy.pool import NullPool
 
 from ai_ta_backend.database import connection_manager as cm
 
@@ -33,29 +35,21 @@ def _build_manager(rows: dict[str, dict | None]):
     """Return a ConnectionManager wired with mock rows and identity decryption.
 
     ``rows`` maps project_name → external-connection row (or None for no row).
+    Mutating ``rows`` between calls simulates a config edit.
     """
     mgr = object.__new__(cm.ConnectionManager)
 
     # Mock sql_db with a getExternalConnection that hits the rows table.
     class _SqlStub:
+        def __init__(self):
+            self.reads = 0
+
         def getExternalConnection(self, project_name):
+            self.reads += 1
             return rows.get(project_name)
 
     mgr._sql_db = _SqlStub()
-    mgr._vector_db = object()  # placeholder — replaced by per-project resolution
     mgr._aws = object()
-
-    mgr._config_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._engine_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._sql_db_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._qdrant_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._vdb_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._s3_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._pgvector_store_cache = TTLCache(maxsize=8, ttl=60)
-    mgr._pgvector_vdb_cache = TTLCache(maxsize=8, ttl=60)
-
-    mgr._locks = {}
-    mgr._master_lock = threading.Lock()
     mgr._default_qdrant_collection = "default-coll"
     mgr._default_s3_bucket = "default-bucket"
     return mgr
@@ -73,49 +67,51 @@ def identity_decrypt(monkeypatch):
     monkeypatch.setattr(cm, "decrypt_config", _identity)
 
 
+def _qdrant_row(**overrides):
+    row = {
+        "qdrant_config": {
+            "encrypted": {
+                "url": "https://q.example.com",
+                "api_key": "k",
+                "port": 6333,
+                "default_collection": "c",
+            }
+        },
+        "database_config": None,
+        "s3_config": None,
+        "embedding_config": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def _database_row(uri: str = "postgres://u:p@h/db", **overrides):
+    row = {
+        "qdrant_config": None,
+        "database_config": {"encrypted": {"connection_uri": uri}},
+        "s3_config": None,
+        "embedding_config": None,
+    }
+    row.update(overrides)
+    return row
+
+
 def test_no_override_routes_to_pgvector_host():
     mgr = _build_manager({PROJECT: None})
     assert mgr.get_vector_engine_kind(PROJECT) == "pgvector"
 
 
 def test_qdrant_config_only_routes_to_qdrant():
-    mgr = _build_manager(
-        {
-            PROJECT: {
-                "qdrant_config": {
-                    "encrypted": {
-                        "url": "https://q.example.com",
-                        "api_key": "k",
-                        "port": 6333,
-                        "default_collection": "c",
-                    }
-                },
-                "database_config": None,
-                "s3_config": None,
-                "embedding_config": None,
-            }
-        }
-    )
+    mgr = _build_manager({PROJECT: _qdrant_row()})
     assert mgr.get_vector_engine_kind(PROJECT) == "qdrant"
 
 
 def test_database_config_only_routes_to_pgvector():
-    mgr = _build_manager(
-        {
-            PROJECT: {
-                "qdrant_config": None,
-                "database_config": {
-                    "encrypted": {"connection_uri": "postgres://u:p@h/db"}
-                },
-                "s3_config": None,
-                "embedding_config": None,
-            }
-        }
-    )
+    mgr = _build_manager({PROJECT: _database_row()})
     assert mgr.get_vector_engine_kind(PROJECT) == "pgvector"
 
-    # get_pgvector_store(project_name) should not return the host singleton
-    # — it builds a per-project store bound to the connection_uri engine.
+    # The pgvector branch must not use the host store — it builds a
+    # per-project store bound to an engine for the row's connection_uri.
     with patch.object(cm, "create_engine") as create_engine_mock:
         engine_sentinel = object()
         create_engine_mock.return_value = engine_sentinel
@@ -123,14 +119,13 @@ def test_database_config_only_routes_to_pgvector():
             "ai_ta_backend.database.vector_store.PgVectorStore"
         ) as PgVecCtor:
             PgVecCtor.return_value = "per-project-store"
-            got = mgr.get_pgvector_store(PROJECT)
-    assert got == "per-project-store"
+            vdb = mgr.get_vector_db(PROJECT)
+
+    assert vdb.pgvector_store == "per-project-store"
     create_engine_mock.assert_called_once()
-    # Deliberate small pool: budget shared with the frontend pool against the
-    # same external DB (Supabase session-mode poolers cap at ~15 sessions).
-    engine_kwargs = create_engine_mock.call_args.kwargs
-    assert engine_kwargs["pool_size"] == 3
-    assert engine_kwargs["max_overflow"] == 2
+    # NullPool: the engine lives for one request, so connection reuse is
+    # delegated to the external database's own pooler.
+    assert create_engine_mock.call_args.kwargs["poolclass"] is NullPool
     # The PgVectorStore should be constructed with the engine kwarg.
     _, kwargs = PgVecCtor.call_args
     assert kwargs.get("engine") is engine_sentinel
@@ -138,23 +133,7 @@ def test_database_config_only_routes_to_pgvector():
 
 def test_qdrant_plus_database_routes_qdrant_for_vector():
     mgr = _build_manager(
-        {
-            PROJECT: {
-                "qdrant_config": {
-                    "encrypted": {
-                        "url": "https://q.example.com",
-                        "api_key": "k",
-                        "port": 6333,
-                        "default_collection": "c",
-                    }
-                },
-                "database_config": {
-                    "encrypted": {"connection_uri": "postgres://u:p@h/db"}
-                },
-                "s3_config": None,
-                "embedding_config": None,
-            }
-        }
+        {PROJECT: _qdrant_row(database_config={"encrypted": {"connection_uri": "postgres://u:p@h/db"}})}
     )
     assert mgr.get_vector_engine_kind(PROJECT) == "qdrant"
 
@@ -170,31 +149,48 @@ def test_no_vector_engine_env_branch():
         os.environ.pop("VECTOR_ENGINE", None)
 
 
-class _FakeEngine:
-    def __init__(self):
-        self.disposed = 0
+def test_documents_db_builds_a_fresh_engine_per_call():
+    """No cache: each call re-reads the row and builds its own engine."""
+    mgr = _build_manager({PROJECT: _database_row()})
 
-    def dispose(self):
-        self.disposed += 1
+    with patch.object(cm, "create_engine") as create_engine_mock:
+        create_engine_mock.side_effect = [object(), object()]
+        first = mgr.get_documents_sql_db(PROJECT)
+        second = mgr.get_documents_sql_db(PROJECT)
 
-
-def test_disposing_ttl_cache_disposes_on_expiry():
-    now = [0.0]
-    cache = cm.DisposingTTLCache(maxsize=8, ttl=10, timer=lambda: now[0])
-    engine = _FakeEngine()
-    cache["p"] = engine
-
-    now[0] = 11.0  # past TTL
-    cache.expire()
-    assert engine.disposed == 1
-    assert "p" not in cache
+    assert create_engine_mock.call_count == 2
+    assert mgr._sql_db.reads == 2
+    assert first is not second
 
 
-def test_disposing_ttl_cache_disposes_on_size_eviction():
-    cache = cm.DisposingTTLCache(maxsize=1, ttl=1000)
-    first = _FakeEngine()
-    second = _FakeEngine()
-    cache["a"] = first
-    cache["b"] = second  # evicts "a" via popitem()
-    assert first.disposed == 1
-    assert second.disposed == 0
+def test_config_edit_is_visible_to_the_next_call():
+    """The bug behind issue #228: a changed row must not be served stale."""
+    rows: dict[str, dict | None] = {
+        PROJECT: {
+            "qdrant_config": None,
+            "database_config": None,
+            "s3_config": {
+                "encrypted": {
+                    "aws_access_key_id": "k",
+                    "aws_secret_access_key": "s",
+                    "bucket_name": "bucket-a",
+                }
+            },
+            "embedding_config": None,
+        }
+    }
+    mgr = _build_manager(rows)
+
+    with patch.object(cm.ConnectionManager, "_create_s3", staticmethod(lambda p, c: object())):
+        _, bucket = mgr.get_s3_client(PROJECT)
+        assert bucket == "bucket-a"
+
+        rows[PROJECT]["s3_config"]["encrypted"]["bucket_name"] = "bucket-b"
+        _, bucket = mgr.get_s3_client(PROJECT)
+        assert bucket == "bucket-b"
+
+        # A deactivated row reads as absent (getExternalConnection filters on
+        # is_active), so the project falls back to the env default bucket.
+        rows[PROJECT] = None
+        _, bucket = mgr.get_s3_client(PROJECT)
+        assert bucket == "default-bucket"

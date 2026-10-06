@@ -1,83 +1,27 @@
 'use client'
 
+import { Input } from '@/components/shadcn/ui/input'
+import { ScrollArea } from '@/components/shadcn/ui/scroll-area'
 import {
-  TextInput,
-  Text,
-  ScrollArea,
   Table,
-  Switch,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/ui/table'
+import { Switch } from '@/components/shadcn/ui/switch'
+import {
   Tooltip,
-} from '@mantine/core'
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { IconHelp, IconSearch } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
-import { createGlobalStyle } from 'styled-components'
 
 import { useFetchDocumentGroups } from '@/hooks/queries/useFetchDocumentGroups'
 import { useUpdateDocGroup } from '@/hooks/queries/useUpdateDocGroup'
 import { useQueryClient } from '@tanstack/react-query'
-
-const GlobalStyle = createGlobalStyle`
-  .mantine-Checkbox-input:checked {
-    background-color: var(--illinois-orange);
-    border-color: var(--illinois-orange);
-  } 
-
-  .mantine-Table-root thead tr {
-    background-color: var(--dashboard-background-dark);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .mantine-Table-root thead th {
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 600;
-  }
-
-  .mantine-Table-root tbody tr {
-    color: var(--foreground);
-    background-color: var(--background);
-  }
-
-  .mantine-Table-root tbody tr:nth-of-type(odd) {
-    color: var(--foreground);
-    background-color: var(--background-faded);
-  }
-
-  .mantine-TextInput-input {
-    color: var(--foreground);
-    background-color: var(--background);
-    border: 1px solid var(--foreground);
-  }
-
-  .mantine-TextInput-input:focus {
-    border-color: var(--illinois-orange);
-  }
-
-  .mantine-ScrollArea-root {
-    background-color: var(--dashboard-background-dark);
-    overflow: hidden;
-    border-radius: 0.75rem;
-  }
-
-  .mantine-Table-root {
-    margin: 0;
-  }
-
-  .mantine-Table-root thead tr th {
-    background-color: var(--dashboard-background-dark);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    border-bottom: 1px solid var(--dashboard-foreground);
-  }
-
-  .mantine-ScrollArea-scrollbar {
-    background-color: var(--dashboard-background-dark);
-  }
-
-  .mantine-ScrollArea-thumb {
-    background-color: var(--dashboard-background);
-  }
-`
 
 export function DocGroupsTable({ course_name }: { course_name: string }) {
   const queryClient = useQueryClient()
@@ -114,82 +58,73 @@ export function DocGroupsTable({ course_name }: { course_name: string }) {
 
   return (
     <>
-      <GlobalStyle />
       <div className="w-full px-0 py-4 md:px-2">
-        <TextInput
-          placeholder="Search by Document Group"
-          aria-label="Search by Document Group"
-          mb="sm"
-          radius="md"
-          icon={<IconSearch aria-hidden="true" />}
-          value={documentGroupSearch}
-          onChange={handleDocumentGroupSearchChange}
-          className="sticky top-0 z-10"
-        />
-        {/*@ts-expect-error TODO: fix ScrollArea prop mismatch*/}
-        <ScrollArea.Autosize
-          mah="calc(80vh - 16rem)"
-          type="always"
-          offsetScrollbars
-          className="overflow-hidden"
-          styles={{
-            root: {
-              borderRadius: '0px !important',
-            },
-          }}
-        >
+        <div className="relative sticky top-0 z-10 mb-2">
+          <IconSearch
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-(--foreground-faded)"
+          />
+          <Input
+            placeholder="Search by Document Group"
+            aria-label="Search by Document Group"
+            value={documentGroupSearch}
+            onChange={handleDocumentGroupSearchChange}
+            className="rounded-md border-(--foreground) bg-(--background) pl-9 text-(--foreground) focus-visible:border-(--illinois-orange)"
+          />
+        </div>
+        <ScrollArea className="max-h-[calc(80vh-16rem)] overflow-hidden rounded-xl bg-(--dashboard-background-dark)">
           <Table
             aria-label="Document groups"
-            className="document_groups_table"
-            style={{
-              tableLayout: 'fixed',
-              position: 'relative',
-              borderCollapse: 'separate',
-              borderSpacing: 0,
-              overflow: 'hidden',
-            }}
-            // withBorder
-            withColumnBorders
+            className="document_groups_table border-separate border-spacing-0 overflow-hidden"
+            style={{ tableLayout: 'fixed' }}
           >
-            <thead>
-              <tr>
-                <th className="w-[50%] sm:w-[60%] md:w-[70%]">
+            <TableHeader>
+              <TableRow className="sticky top-0 z-10 bg-(--dashboard-background-dark) hover:bg-(--dashboard-background-dark)">
+                <TableHead className="w-[50%] font-semibold text-white/90 sm:w-[60%] md:w-[70%]">
                   Document Group
-                </th>
-                <th className="w-[30%] sm:w-[25%] md:w-[15%]">
+                </TableHead>
+                <TableHead className="w-[30%] font-semibold text-white/90 sm:w-[25%] md:w-[15%]">
                   Number of Docs
-                </th>
-                <th className="w-[20%] text-center sm:w-[15%]">
-                  <Tooltip
-                    multiline
-                    color="var(--illinois-orange)"
-                    arrowPosition="center"
-                    arrowSize={8}
-                    width={220}
-                    withArrow
-                    label="If a document is included in ANY enabled group, it will be included in chatbot results. Enabled groups take precedence over disabled groups."
-                  >
-                    <span className="flex items-center justify-center whitespace-nowrap">
+                </TableHead>
+                <TableHead className="w-[20%] text-center font-semibold text-white/90 sm:w-[15%]">
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="flex items-center justify-center whitespace-nowrap" />
+                      }
+                    >
                       <span className="hidden sm:inline">Enabled</span>
-                      <IconHelp size={16} aria-hidden="true" className="ml-1" />
-                    </span>
+                      <IconHelp
+                        size={16}
+                        aria-hidden="true"
+                        className="ml-1"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      className="max-w-[220px] text-wrap bg-(--illinois-orange)"
+                      arrowClassName="bg-(--illinois-orange) fill-(--illinois-orange)"
+                    >
+                      If a document is included in ANY enabled group, it will
+                      be included in chatbot results. Enabled groups take
+                      precedence over disabled groups.
+                    </TooltipContent>
                   </Tooltip>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="[&>tr]:bg-(--background) [&>tr:nth-of-type(odd)]:bg-(--background-faded)">
               {filteredDocumentGroups.map((doc_group_obj, index) => (
-                <tr key={index}>
-                  <td style={{ wordWrap: 'break-word' }}>
-                    <Text>{doc_group_obj.name}</Text>
-                  </td>
-                  {/* <td style={{ wordWrap: 'break-word' }}>
-                      <Text>{doc_group_obj.description}</Text>
-                    </td> */}
-                  <td style={{ wordWrap: 'break-word' }}>
-                    <Text>{doc_group_obj.doc_count}</Text>
-                  </td>
-                  <td
+                <TableRow key={index}>
+                  <TableCell style={{ wordWrap: 'break-word' }}>
+                    <span>{doc_group_obj.name}</span>
+                  </TableCell>
+                  {/* <TableCell style={{ wordWrap: 'break-word' }}>
+                      <span>{doc_group_obj.description}</span>
+                    </TableCell> */}
+                  <TableCell style={{ wordWrap: 'break-word' }}>
+                    <span>{doc_group_obj.doc_count}</span>
+                  </TableCell>
+                  <TableCell
                     style={{
                       display: 'flex',
                       justifyContent: 'center',
@@ -198,37 +133,33 @@ export function DocGroupsTable({ course_name }: { course_name: string }) {
                   >
                     <Switch
                       checked={doc_group_obj.enabled}
-                      onChange={(event) =>
+                      onCheckedChange={(checked) =>
                         updateDocGroup.mutate({
                           doc_group_obj,
-                          enabled: event.currentTarget.checked,
+                          enabled: checked,
                         })
                       }
-                      className="cursor-pointer"
-                      styles={{
-                        track: {
-                          backgroundColor: doc_group_obj.enabled
-                            ? 'var(--dashboard-button) !important'
-                            : 'var(--dashboard-background-dark)',
-                          borderColor: doc_group_obj.enabled
-                            ? 'var(--dashboard-button) !important'
-                            : 'var(--dashboard-background-dark)',
-                        },
-                      }}
+                      className={
+                        doc_group_obj.enabled
+                          ? 'data-checked:bg-(--dashboard-button) data-checked:border-(--dashboard-button)'
+                          : 'data-unchecked:bg-(--dashboard-background-dark) data-unchecked:border-(--dashboard-background-dark)'
+                      }
                     />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {filteredDocumentGroups.length === 0 && (
-                <tr>
-                  <td colSpan={4}>
-                    <Text align="center">No document groups found</Text>
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <span className="block text-center">
+                      No document groups found
+                    </span>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
+            </TableBody>
           </Table>
-        </ScrollArea.Autosize>
+        </ScrollArea>
       </div>
     </>
   )

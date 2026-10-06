@@ -4,7 +4,6 @@ import { WebStorageStateStore } from 'oidc-client-ts'
 import { getKeycloakBaseUrl } from '~/utils/authHelpers'
 import Link from 'next/link'
 import { montserrat_heading } from '../../fonts'
-import { Flex, Title } from '@mantine/core'
 import { AuthCookie } from '~/providers/AuthCookie'
 
 interface AuthProviderProps {
@@ -218,26 +217,24 @@ export const KeycloakProvider = ({ children }: AuthProviderProps) => {
                     className={`text-5xl font-extrabold tracking-tight text-white sm:text-[5rem] ${montserrat_heading.variable} font-montserratHeading`}
                   >
                     {' '}
-                    <span className="${inter.style.fontFamily} mr-2 text-[--illinois-orange]">
+                    <span className="${inter.style.fontFamily} mr-2 text-(--illinois-orange)">
                       Illinois
                     </span>
-                    <span className="${inter.style.fontFamily} text-[--foreground]">
+                    <span className="${inter.style.fontFamily} text-(--foreground)">
                       Chat
                     </span>{' '}
                   </h1>
                 </Link>
               </div>
               <div className="items-left container flex flex-col justify-center gap-2 py-0">
-                <Flex direction="column" align="center" justify="center">
-                  <Title
-                    className={`${montserrat_heading.variable} font-montserratHeading text-[--foreground]`}
-                    order={2}
-                    p="xl"
+                <div className="flex flex-col items-center justify-center">
+                  <h2
+                    className={`heading-h2 p-8 ${montserrat_heading.variable} font-montserratHeading text-(--foreground)`}
                   >
                     {' '}
                     Signing you in, please wait...
-                  </Title>
-                </Flex>
+                  </h2>
+                </div>
               </div>
             </main>
           </>

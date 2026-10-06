@@ -10,7 +10,6 @@ import {
 import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
-import { Text } from '@mantine/core'
 import { Montserrat } from 'next/font/google'
 import { montserrat_heading } from 'fonts'
 
@@ -57,7 +56,7 @@ function TagBadge({
   return (
     <span
       role="listitem"
-      className="inline-flex items-center gap-1.5 rounded-full border border-[--dashboard-border] bg-[--background] px-3 py-1 text-xs text-[--foreground]"
+      className="inline-flex items-center gap-1.5 rounded-full border border-(--dashboard-border) bg-(--background) px-3 py-1 text-xs text-(--foreground)"
     >
       <span className="font-medium">{tag.value}</span>
       <button
@@ -65,7 +64,7 @@ function TagBadge({
         aria-label={`Remove tag ${CHATBOT_TAG_CATEGORY_LABEL[tag.category]}: ${
           tag.value
         }`}
-        className="hover:bg-[--error]/10 ml-1 rounded-full p-0.5 text-[--foreground-faded] transition-colors hover:text-[--error]"
+        className="ml-1 rounded-full p-0.5 text-(--foreground-faded) transition-colors hover:bg-(--error)/10 hover:text-(--error)"
         onClick={onRemove}
         disabled={disabled}
       >
@@ -257,17 +256,19 @@ export default function ChatbotTagsEditor({
   const isSaving = status === 'saving'
 
   return (
-    <div className="chatbot_tags form-control">
+    <div className="chatbot_tags flex flex-col">
       <label
-        className={`label ${montserrat_heading.variable} font-montserratHeading`}
+        className={`flex items-center px-1 py-2 ${montserrat_heading.variable} font-montserratHeading`}
       >
         <span className="label-text-unused text-lg">Tags</span>
       </label>
-      <Text size={'sm'} className={`label !mt-0 ${montserrat_light.className}`}>
+      <p
+        className={`mt-0! px-1 py-2 text-sm ${montserrat_light.className}`}
+      >
         Add up to {MAX_CHATBOT_TAGS} tags to help people discover your bot in
         the chatbot hub. Project Type and Organization are set when you create
         the chatbot.
-      </Text>
+      </p>
 
       <div
         className="mt-2 flex flex-wrap gap-2"
@@ -275,7 +276,7 @@ export default function ChatbotTagsEditor({
         role="list"
       >
         {tags.length === 0 ? (
-          <span className="text-sm text-[--foreground-faded]">
+          <span className="text-sm text-(--foreground-faded)">
             No tags yet.
           </span>
         ) : (
@@ -294,7 +295,7 @@ export default function ChatbotTagsEditor({
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
         <div className="relative w-full flex-1">
           <div
-            className="flex w-full items-center rounded-md border border-[--dashboard-border] bg-[--background] transition-colors focus-within:border-[--illinois-orange] data-[disabled=true]:opacity-50"
+            className="flex w-full items-center rounded-md border border-(--dashboard-border) bg-(--background) transition-colors focus-within:border-(--illinois-orange) data-[disabled=true]:opacity-50"
             data-disabled={isFull || undefined}
           >
             <input
@@ -309,7 +310,7 @@ export default function ChatbotTagsEditor({
               aria-expanded={showSuggestions}
               aria-autocomplete="list"
               aria-controls="chatbot-tag-suggestions"
-              className="w-full bg-transparent px-3 py-2 text-sm text-[--foreground] outline-none placeholder:text-[--foreground-faded] disabled:cursor-not-allowed"
+              className="w-full bg-transparent px-3 py-2 text-sm text-(--foreground) outline-hidden placeholder:text-(--foreground-faded) disabled:cursor-not-allowed"
               onChange={(e) => {
                 setInputValue(sanitizeGeneralTagInput(e.target.value))
                 setStatus('idle')
@@ -338,7 +339,7 @@ export default function ChatbotTagsEditor({
                   left: dropdownRect.left,
                   width: dropdownRect.width,
                 }}
-                className="z-[1000] m-0 max-h-56 list-none overflow-auto rounded-md border border-[--dashboard-border] bg-[--background] p-1 shadow-md"
+                className="z-1000 m-0 max-h-56 list-none overflow-auto rounded-md border border-(--dashboard-border) bg-(--background) p-1 shadow-md"
               >
                 {suggestions.map((s) => (
                   <li key={s.value} role="option" aria-selected={false}>
@@ -351,10 +352,10 @@ export default function ChatbotTagsEditor({
                         if (s.alreadyAdded) return
                         void addGeneralTagWithValue(s.value)
                       }}
-                      className="enabled:hover:bg-[--dashboard-border]/40 flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1 text-left text-sm leading-tight text-[--foreground] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1 text-left text-sm leading-tight text-(--foreground) enabled:hover:bg-(--dashboard-border)/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span className="truncate">{s.value}</span>
-                      <span className="shrink-0 text-xs text-[--foreground-faded]">
+                      <span className="shrink-0 text-xs text-(--foreground-faded)">
                         {s.alreadyAdded ? 'added' : s.usage_count}
                       </span>
                     </button>
@@ -378,14 +379,14 @@ export default function ChatbotTagsEditor({
       </div>
 
       {isFull && (
-        <div className="mt-2 text-xs text-[--foreground-faded]">
+        <div className="mt-2 text-xs text-(--foreground-faded)">
           Maximum of {MAX_CHATBOT_TAGS} tags reached. Remove one to add another.
         </div>
       )}
 
       {status === 'error' && errorMessage && (
         <div
-          className="mt-2 text-xs text-[--error]"
+          className="mt-2 text-xs text-(--error)"
           role="alert"
           aria-live="polite"
         >

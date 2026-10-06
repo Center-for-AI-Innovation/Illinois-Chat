@@ -33,10 +33,10 @@ blocked_dirs: []
 # docs:
 #   - PyGitHub: ["https://pygithub.readthedocs.io/en/latest/", "We use pygithub to interact with the GitHub API"]
 docs:
-  - PyGitHub:
+  - shadcn/ui:
       [
-        'https://mantine.dev/overview/',
-        'We use Mantine for most UI components.',
+        'https://ui.shadcn.com/docs',
+        'We use shadcn/ui and Tailwind for most UI components.',
       ]
 
 # Sandbox executes commands in a sandboxed environment to validate code changes after every edit to guarantee pristine code. For more details, see the [Sandbox](./sandbox) page.

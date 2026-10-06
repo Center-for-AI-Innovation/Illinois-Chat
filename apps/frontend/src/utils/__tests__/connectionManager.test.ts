@@ -35,31 +35,7 @@ async function encryptJson(obj: unknown) {
   return { encrypted: ct as string }
 }
 
-function setupRedisFake() {
-  const store = new Map()
-  const redisFake = {
-    get: vi.fn(async (k: string) => store.get(k) ?? null),
-    set: vi.fn(async (k: string, v: string) => {
-      store.set(k, v)
-      return 'OK'
-    }),
-    del: vi.fn(async (k: string) => {
-      const had = store.delete(k)
-      return had ? 1 : 0
-    }),
-    isOpen: true,
-  }
-  vi.doMock('~/utils/redisClient', () => ({
-    ensureRedisConnected: vi.fn(async () => redisFake),
-  }))
-  return { store, redisFake }
-}
-
 beforeEach(() => {
-  // The manager is cached on globalThis (survives vi.resetModules()); drop it
-  // so every test gets a fresh instance wired to that test's mocks.
-  delete (globalThis as { __illinoisChatConnectionManager?: unknown })
-    .__illinoisChatConnectionManager
   vi.resetModules()
   vi.unstubAllEnvs()
   vi.stubEnv('ENCRYPTION_MASTER_KEY', MASTER_KEY)
@@ -74,7 +50,6 @@ afterEach(() => {
   vi.doUnmock('~/db/dbClient')
   vi.doUnmock('~/utils/s3Client')
   vi.doUnmock('~/utils/qdrantClient')
-  vi.doUnmock('~/utils/redisClient')
   vi.doUnmock('@aws-sdk/client-s3')
   vi.doUnmock('@qdrant/js-client-rest')
   vi.doUnmock('postgres')
@@ -90,18 +65,17 @@ describe('ConnectionManager — defaults (no row)', () => {
     const defaultS3 = { kind: 'default-s3' }
     vi.doMock('~/utils/s3Client', () => ({ s3Client: defaultS3 }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: { kind: 'default-q' } }))
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     const got = await connectionManager.getS3Client('cs101')
     expect(got.client).toBe(defaultS3)
     expect(got.bucket).toBe('default-bucket')
+    expect(got.isOverride).toBe(false)
   })
 
   it('resolveVectorEngine returns pgvector when no row exists', async () => {
     vi.doMock('~/db/dbClient', () => ({ db: makeHostDbStub([]).db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     const got = await connectionManager.resolveVectorEngine('cs101')
@@ -115,7 +89,6 @@ describe('ConnectionManager — defaults (no row)', () => {
     vi.stubEnv('QDRANT_URL', 'http://qdrant.local:6333')
     vi.stubEnv('QDRANT_API_KEY', 'shared-key')
     vi.stubEnv('QDRANT_COLLECTION_NAME', 'shared-coll')
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     const got = await connectionManager.resolveVectorEngine('cs101')
@@ -127,7 +100,6 @@ describe('ConnectionManager — defaults (no row)', () => {
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     const docsDb = await connectionManager.getDocumentsDb('cs101')
@@ -152,7 +124,6 @@ describe('ConnectionManager — defaults (no row)', () => {
     const defaultS3 = { kind: 'default-s3' }
     vi.doMock('~/utils/s3Client', () => ({ s3Client: defaultS3 }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     const got = await connectionManager.getS3Client('inactive-proj')
@@ -181,7 +152,6 @@ describe('ConnectionManager — overrides', () => {
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
 
     const ctor = vi.fn()
     vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: ctor }))
@@ -191,6 +161,7 @@ describe('ConnectionManager — overrides', () => {
     expect(got.bucket).toBe('override-bucket')
     expect(got.endpoint).toBe('https://minio.example.com')
     expect(got.region).toBe('eu-west-1')
+    expect(got.isOverride).toBe(true)
     expect(ctor).toHaveBeenCalledWith(
       expect.objectContaining({
         region: 'eu-west-1',
@@ -221,7 +192,6 @@ describe('ConnectionManager — overrides', () => {
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
     const ctor = vi.fn()
     vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: ctor }))
 
@@ -250,13 +220,13 @@ describe('ConnectionManager — overrides', () => {
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
     const ctor = vi.fn()
     vi.doMock('@qdrant/js-client-rest', () => ({ QdrantClient: ctor }))
 
     const { connectionManager } = await import('../connectionManager')
-    const got = await connectionManager.getQdrantClient('p')
-    expect(got.collection).toBe('override-coll')
+    const got = await connectionManager.resolveVectorEngine('p')
+    expect(got.kind).toBe('qdrant')
+    if (got.kind === 'qdrant') expect(got.collection).toBe('override-coll')
     expect(ctor).toHaveBeenCalledWith({
       url: 'https://qdrant.override.com:6333',
       apiKey: 'override-qkey',
@@ -277,7 +247,6 @@ describe('ConnectionManager — overrides', () => {
     ])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
 
     const pgFn = vi.fn(() => ({ end: vi.fn() }))
     vi.doMock('postgres', () => ({ default: pgFn }))
@@ -310,7 +279,6 @@ describe('ConnectionManager — overrides', () => {
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
 
     const pgEnd = vi.fn()
     const pgFn = vi.fn(() => ({ end: pgEnd }))
@@ -322,41 +290,27 @@ describe('ConnectionManager — overrides', () => {
     const got = await connectionManager.getDocumentsDb('p')
     expect(pgFn).toHaveBeenCalledWith(
       'postgres://u:p@host:5432/db',
-      expect.objectContaining({ max: 3, idle_timeout: 20, prepare: false }),
+      expect.objectContaining({ max: 1, idle_timeout: 5, prepare: false }),
     )
     expect(got).toEqual({ kind: 'external-drizzle' })
   })
 })
 
-describe('ConnectionManager — caching and invalidation', () => {
-  it('caches the resolved config after the first lookup', async () => {
+describe('ConnectionManager — resolves per call (no cache)', () => {
+  it('re-reads the host db on every lookup', async () => {
     const hostStub = makeHostDbStub([])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     await connectionManager.getS3Client('p1')
     await connectionManager.getS3Client('p1')
     await connectionManager.getS3Client('p1')
-    expect(hostStub.select).toHaveBeenCalledTimes(1)
+    expect(hostStub.select).toHaveBeenCalledTimes(3)
   })
 
-  it('serves the second project independently', async () => {
-    const hostStub = makeHostDbStub([])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
-
-    const { connectionManager } = await import('../connectionManager')
-    await connectionManager.getS3Client('p1')
-    await connectionManager.getS3Client('p2')
-    expect(hostStub.select).toHaveBeenCalledTimes(2)
-  })
-
-  it('invalidate() drops in-process + Redis cache and disposes pg pool', async () => {
+  it('builds a new pg client on every getDocumentsDb call', async () => {
     const dbField = await encryptJson({
       connection_uri: 'postgres://u:p@host:5432/db',
     })
@@ -371,10 +325,8 @@ describe('ConnectionManager — caching and invalidation', () => {
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    const { redisFake } = setupRedisFake()
 
-    const pgEnd = vi.fn()
-    const pgFn = vi.fn(() => ({ end: pgEnd }))
+    const pgFn = vi.fn(() => ({ end: vi.fn() }))
     vi.doMock('postgres', () => ({ default: pgFn }))
     vi.doMock('drizzle-orm/postgres-js', () => ({
       drizzle: vi.fn(() => ({ kind: 'external' })),
@@ -382,65 +334,89 @@ describe('ConnectionManager — caching and invalidation', () => {
 
     const { connectionManager } = await import('../connectionManager')
     await connectionManager.getDocumentsDb('p')
-    await connectionManager.invalidate('p')
-    expect(redisFake.del).toHaveBeenCalledWith('pec:config:p')
-    expect(pgEnd).toHaveBeenCalled()
-
-    // Next call hits the host DB again
     await connectionManager.getDocumentsDb('p')
+    expect(pgFn).toHaveBeenCalledTimes(2)
     expect(hostStub.select).toHaveBeenCalledTimes(2)
   })
 
-  it('disposes a TTL-expired external pool after the grace period', async () => {
-    const dbField = await encryptJson({
-      connection_uri: 'postgres://u:p@host:5432/db',
+  // The bug issue #228 is about: a config edit must be visible to the very
+  // next request, with no invalidation step anywhere.
+  it('serves an updated row on the next call', async () => {
+    const bucketA = await encryptJson({
+      aws_access_key_id: 'k',
+      aws_secret_access_key: 's',
+      bucket_name: 'bucket-a',
     })
-    const hostStub = makeHostDbStub([
-      {
-        is_active: true,
-        s3_config: null,
-        database_config: dbField,
-        qdrant_config: null,
-      },
-    ])
+    const bucketB = await encryptJson({
+      aws_access_key_id: 'k',
+      aws_secret_access_key: 's',
+      bucket_name: 'bucket-b',
+    })
+    const hostStub = makeHostDbStub([])
+    hostStub.limit
+      .mockResolvedValueOnce([
+        {
+          is_active: true,
+          s3_config: bucketA,
+          database_config: null,
+          qdrant_config: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          is_active: true,
+          s3_config: bucketB,
+          database_config: null,
+          qdrant_config: null,
+        },
+      ])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
+    vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: vi.fn() }))
 
-    // Each postgres() call yields a distinct pool whose end() resolves (the
-    // disposal path chains .catch() on it).
-    const pools: Array<{ end: ReturnType<typeof vi.fn> }> = []
-    const pgFn = vi.fn(() => {
-      const pool = { end: vi.fn().mockResolvedValue(undefined) }
-      pools.push(pool)
-      return pool
+    const { connectionManager } = await import('../connectionManager')
+    expect((await connectionManager.getS3Client('p')).bucket).toBe('bucket-a')
+    expect((await connectionManager.getS3Client('p')).bucket).toBe('bucket-b')
+  })
+
+  it('stops serving an override as soon as the row is deactivated', async () => {
+    const s3Field = await encryptJson({
+      aws_access_key_id: 'k',
+      aws_secret_access_key: 's',
+      bucket_name: 'override-bucket',
     })
-    vi.doMock('postgres', () => ({ default: pgFn }))
-    vi.doMock('drizzle-orm/postgres-js', () => ({
-      drizzle: vi.fn(() => ({ kind: 'external' })),
-    }))
+    const hostStub = makeHostDbStub([])
+    hostStub.limit
+      .mockResolvedValueOnce([
+        {
+          is_active: true,
+          s3_config: s3Field,
+          database_config: null,
+          qdrant_config: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          is_active: false,
+          s3_config: s3Field,
+          database_config: null,
+          qdrant_config: null,
+        },
+      ])
+    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
+    const defaultS3 = { kind: 'default-s3' }
+    vi.doMock('~/utils/s3Client', () => ({ s3Client: defaultS3 }))
+    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
+    vi.doMock('@aws-sdk/client-s3', () => ({ S3Client: vi.fn() }))
 
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
-    try {
-      const { connectionManager, DISPOSE_GRACE_MS } =
-        await import('../connectionManager')
-      await connectionManager.getDocumentsDb('p')
-      expect(pgFn).toHaveBeenCalledTimes(1)
-
-      // Past the 30-min client TTL (also expires the 5-min config cache).
-      vi.setSystemTime(Date.now() + 31 * 60 * 1000)
-      await connectionManager.getDocumentsDb('p')
-      expect(pgFn).toHaveBeenCalledTimes(2)
-
-      // The replaced pool is disposed only after the grace period elapses.
-      expect(pools[0]!.end).not.toHaveBeenCalled()
-      vi.advanceTimersByTime(DISPOSE_GRACE_MS + 1)
-      expect(pools[0]!.end).toHaveBeenCalledWith({ timeout: 5 })
-      expect(pools[1]!.end).not.toHaveBeenCalled()
-    } finally {
-      vi.useRealTimers()
-    }
+    const { connectionManager } = await import('../connectionManager')
+    expect((await connectionManager.getS3Client('p')).bucket).toBe(
+      'override-bucket',
+    )
+    const after = await connectionManager.getS3Client('p')
+    expect(after.client).toBe(defaultS3)
+    expect(after.bucket).toBe('default-bucket')
   })
 })
 
@@ -448,7 +424,6 @@ describe('ConnectionManager — getEmbeddingClient', () => {
   it('returns env-default openai client when no row exists', async () => {
     vi.doMock('~/db/dbClient', () => ({ db: makeHostDbStub([]).db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
     vi.stubEnv('OPENAI_API_KEY', 'sk-env')
     vi.stubEnv('EMBEDDING_API_BASE', 'https://env.example/v1')
     vi.stubEnv('EMBEDDING_MODEL', 'text-embedding-3-small')
@@ -495,7 +470,6 @@ describe('ConnectionManager — getEmbeddingClient', () => {
     ])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
 
     const openaiCtor = vi.fn()
     vi.doMock('openai', () => ({
@@ -516,6 +490,60 @@ describe('ConnectionManager — getEmbeddingClient', () => {
     })
   })
 
+  it('applies the qwen query instruction for a qwen model from the row', async () => {
+    const embeddingField = await encryptJson({
+      provider: 'openai',
+      model: 'Qwen3-Embedding-8B',
+      query_instruction: 'row instruction',
+    })
+    const hostStub = makeHostDbStub([
+      {
+        is_active: true,
+        s3_config: null,
+        database_config: null,
+        qdrant_config: null,
+        embedding_config: embeddingField,
+      },
+    ])
+    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
+    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
+    vi.doMock('openai', () => ({ default: class {} }))
+
+    const { connectionManager } = await import('../connectionManager')
+    const got = await connectionManager.getEmbeddingClient('p')
+    expect(got.kind).toBe('openai')
+    if (got.kind === 'openai') {
+      expect(got.applyQwenInstruction).toBe(true)
+      expect(got.queryInstruction).toBe('row instruction')
+    }
+  })
+
+  it('falls back to a legacy embedding block nested in qdrant_config', async () => {
+    const qField = await encryptJson({
+      url: 'https://qdrant.example.com',
+      api_key: 'qkey',
+      default_collection: 'coll',
+      embedding: { provider: 'openai', model: 'legacy-model' },
+    })
+    const hostStub = makeHostDbStub([
+      {
+        is_active: true,
+        s3_config: null,
+        database_config: null,
+        qdrant_config: qField,
+        embedding_config: null,
+      },
+    ])
+    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
+    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
+    vi.doMock('openai', () => ({ default: class {} }))
+
+    const { connectionManager } = await import('../connectionManager')
+    const got = await connectionManager.getEmbeddingClient('p')
+    expect(got.kind).toBe('openai')
+    if (got.kind === 'openai') expect(got.model).toBe('legacy-model')
+  })
+
   it('returns ollama discriminant when embedding_config.provider="ollama" with base_url', async () => {
     const embeddingField = await encryptJson({
       provider: 'ollama',
@@ -533,7 +561,6 @@ describe('ConnectionManager — getEmbeddingClient', () => {
     ])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
     vi.doMock('openai', () => ({ default: class {} }))
 
     const { connectionManager } = await import('../connectionManager')
@@ -561,7 +588,6 @@ describe('ConnectionManager — getEmbeddingClient', () => {
     ])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
     vi.doMock('openai', () => ({ default: class {} }))
     vi.stubEnv('OLLAMA_SERVER_URL', 'http://env-ollama:11434')
 
@@ -589,7 +615,6 @@ describe('ConnectionManager — getEmbeddingClient', () => {
     ])
     vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
     vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    setupRedisFake()
     vi.doMock('openai', () => ({ default: class {} }))
     // No OLLAMA_BASE_URL / OLLAMA_SERVER_URL — assert vi.stubEnv unset state.
     vi.stubEnv('OLLAMA_BASE_URL', '')
@@ -602,101 +627,16 @@ describe('ConnectionManager — getEmbeddingClient', () => {
   })
 })
 
-describe('ConnectionManager — preserved lock test', () => {
-  it('coalesces concurrent lookups into a single DB read (lock)', async () => {
-    let resolveLimit: (rows: Row[]) => void
-    const limitPromise = new Promise((r) => {
-      resolveLimit = r
-    })
-    const limit = vi.fn().mockReturnValue(limitPromise)
-    const where = vi.fn(() => ({ limit }))
-    const from = vi.fn(() => ({ where }))
-    const select = vi.fn(() => ({ from }))
-    vi.doMock('~/db/dbClient', () => ({
-      db: { select, query: {} },
-    }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
-
-    const { connectionManager } = await import('../connectionManager')
-    const a = connectionManager.getS3Client('p')
-    const b = connectionManager.getS3Client('p')
-    const c = connectionManager.getS3Client('p')
-    resolveLimit!([])
-    await Promise.all([a, b, c])
-    expect(select).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('ConnectionManager — error and degraded paths', () => {
-  it('getHostDb exposes the host drizzle instance', async () => {
-    const hostStub = makeHostDbStub([])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
-
-    const { connectionManager } = await import('../connectionManager')
-    expect(connectionManager.getHostDb()).toBe(hostStub.db)
-  })
-
-  it('resolveVectorEngine returns the qdrant client when qdrant_config is set', async () => {
-    const qField = await encryptJson({
-      url: 'https://qdrant.example.com',
-      api_key: 'qkey',
-      default_collection: 'proj-coll',
-    })
-    const hostStub = makeHostDbStub([
-      {
-        is_active: true,
-        s3_config: null,
-        database_config: null,
-        qdrant_config: qField,
-      },
-    ])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    const qdrantCtor = vi.fn(function (this: any) {
-      this.kind = 'project-qdrant'
-    })
-    vi.doMock('@qdrant/js-client-rest', () => ({ QdrantClient: qdrantCtor }))
-    setupRedisFake()
-
-    const { connectionManager } = await import('../connectionManager')
-    const got = await connectionManager.resolveVectorEngine('p')
-    expect(got.kind).toBe('qdrant')
-    expect(got).toMatchObject({ collection: 'proj-coll' })
-    expect(qdrantCtor).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'qkey' }),
-    )
-  })
-
+describe('ConnectionManager — error paths', () => {
   it('throws when a project has no S3 override and no default client is configured', async () => {
     vi.doMock('~/db/dbClient', () => ({ db: makeHostDbStub([]).db }))
     // AWS_REGION/KEY/SECRET unset in the deployment → s3Client is undefined.
     vi.doMock('~/utils/s3Client', () => ({ s3Client: undefined }))
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
     await expect(connectionManager.getS3Client('p')).rejects.toThrow(
       /default S3 client is not configured/,
-    )
-  })
-
-  it('getQdrantClient throws when the project has no qdrant_config', async () => {
-    // Callers must route through resolveVectorEngine(); reaching here means
-    // a pgvector project was handed to the Qdrant path.
-    vi.doMock('~/db/dbClient', () => ({ db: makeHostDbStub([]).db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
-
-    const { connectionManager } = await import('../connectionManager')
-    await expect(connectionManager.getQdrantClient('p')).rejects.toThrow(
-      /use resolveVectorEngine\(\)/,
     )
   })
 
@@ -718,176 +658,11 @@ describe('ConnectionManager — error and degraded paths', () => {
     vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
     vi.doMock('@qdrant/js-client-rest', () => ({ QdrantClient: vi.fn() }))
     vi.stubEnv('QDRANT_COLLECTION_NAME', '')
-    setupRedisFake()
 
     const { connectionManager } = await import('../connectionManager')
-    await expect(connectionManager.getQdrantClient('p')).rejects.toThrow(
+    await expect(connectionManager.resolveVectorEngine('p')).rejects.toThrow(
       /no default_collection/,
     )
-  })
-
-  it('serves a cached config straight from Redis without touching the host DB', async () => {
-    const hostStub = makeHostDbStub([])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: { kind: 'default' } }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    const { store } = setupRedisFake()
-    store.set(
-      'pec:config:p',
-      JSON.stringify({ s3: null, pg: null, qdrant: null, embedding: null }),
-    )
-
-    const { connectionManager } = await import('../connectionManager')
-    const got = await connectionManager.getS3Client('p')
-    expect(got.bucket).toBe('default-bucket')
-    expect(hostStub.select).not.toHaveBeenCalled()
-  })
-
-  it('continues with the in-process cache when the Redis write fails', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    vi.doMock('~/db/dbClient', () => ({ db: makeHostDbStub([]).db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    vi.doMock('~/utils/redisClient', () => ({
-      ensureRedisConnected: vi.fn(async () => ({
-        get: vi.fn(async () => null),
-        set: vi.fn(async () => {
-          throw new Error('redis write failed')
-        }),
-        del: vi.fn(async () => 1),
-      })),
-    }))
-
-    const { connectionManager } = await import('../connectionManager')
-    await expect(connectionManager.getS3Client('p')).resolves.toBeTruthy()
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Redis write failed'),
-      expect.any(Error),
-    )
-    warn.mockRestore()
-  })
-
-  it('falls through to the host DB when the Redis read fails', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const hostStub = makeHostDbStub([])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    vi.doMock('~/utils/redisClient', () => ({
-      ensureRedisConnected: vi.fn(async () => {
-        throw new Error('redis unreachable')
-      }),
-    }))
-
-    const { connectionManager } = await import('../connectionManager')
-    await expect(connectionManager.getS3Client('p')).resolves.toBeTruthy()
-    expect(hostStub.select).toHaveBeenCalledTimes(1)
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Redis read failed'),
-      expect.any(Error),
-    )
-    warn.mockRestore()
-  })
-
-  it('invalidate() warns but completes when pool disposal and Redis del fail', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const dbField = await encryptJson({
-      connection_uri: 'postgres://u:p@host:5432/db',
-    })
-    const hostStub = makeHostDbStub([
-      {
-        is_active: true,
-        s3_config: null,
-        database_config: dbField,
-        qdrant_config: null,
-      },
-    ])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    vi.doMock('~/utils/redisClient', () => ({
-      ensureRedisConnected: vi.fn(async () => ({
-        get: vi.fn(async () => null),
-        set: vi.fn(async () => 'OK'),
-        del: vi.fn(async () => {
-          throw new Error('redis del failed')
-        }),
-      })),
-    }))
-    vi.doMock('postgres', () => ({
-      default: vi.fn(() => ({
-        end: vi.fn().mockRejectedValue(new Error('pool stuck')),
-      })),
-    }))
-    vi.doMock('drizzle-orm/postgres-js', () => ({
-      drizzle: vi.fn(() => ({ kind: 'external' })),
-    }))
-
-    const { connectionManager } = await import('../connectionManager')
-    await connectionManager.getDocumentsDb('p')
-
-    // Neither failure may propagate: the in-process cache was already dropped.
-    await expect(connectionManager.invalidate('p')).resolves.toBeUndefined()
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('failed to dispose pg pool for p'),
-      expect.any(Error),
-    )
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('redis invalidation failed for p'),
-      expect.any(Error),
-    )
-    warn.mockRestore()
-  })
-
-  it('warns when disposing a TTL-expired pool fails', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const dbField = await encryptJson({
-      connection_uri: 'postgres://u:p@host:5432/db',
-    })
-    const hostStub = makeHostDbStub([
-      {
-        is_active: true,
-        s3_config: null,
-        database_config: dbField,
-        qdrant_config: null,
-      },
-    ])
-    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
-    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
-    vi.doMock('~/utils/qdrantClient', () => ({ qdrant: {} }))
-    setupRedisFake()
-
-    const pools: Array<{ end: ReturnType<typeof vi.fn> }> = []
-    vi.doMock('postgres', () => ({
-      default: vi.fn(() => {
-        const pool = { end: vi.fn().mockRejectedValue(new Error('stuck')) }
-        pools.push(pool)
-        return pool
-      }),
-    }))
-    vi.doMock('drizzle-orm/postgres-js', () => ({
-      drizzle: vi.fn(() => ({ kind: 'external' })),
-    }))
-
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
-    try {
-      const { connectionManager, DISPOSE_GRACE_MS } =
-        await import('../connectionManager')
-      await connectionManager.getDocumentsDb('p')
-      vi.setSystemTime(Date.now() + 31 * 60 * 1000)
-      await connectionManager.getDocumentsDb('p')
-
-      vi.advanceTimersByTime(DISPOSE_GRACE_MS + 1)
-      await vi.waitFor(() =>
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining('failed to dispose expired pg pool for p'),
-          expect.any(Error),
-        ),
-      )
-    } finally {
-      vi.useRealTimers()
-      warn.mockRestore()
-    }
   })
 })
 

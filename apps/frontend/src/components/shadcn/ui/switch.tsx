@@ -18,14 +18,14 @@ import { cn } from '@/components/shadcn/lib/utils'
 // data-[state=checked|unchecked]); the custom variants/labels/tooltip are unchanged.
 
 const switchVariants = cva(
-  'peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+  'peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
       variant: {
         default:
-          'border-transparent data-[checked]:bg-primary data-[unchecked]:bg-input dark:data-[unchecked]:bg-white/15',
+          'border-transparent data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-white/15',
         labeled:
-          'data-[checked]:border-[var(--dashboard-button)] data-[checked]:bg-[var(--dashboard-button)] data-[unchecked]:border-[var(--dashboard-background-darker)] data-[unchecked]:bg-[var(--dashboard-background-dark)] dark:data-[unchecked]:border-white/25 dark:data-[unchecked]:bg-white/15',
+          'data-checked:border-(--dashboard-button) data-checked:bg-(--dashboard-button) data-unchecked:border-(--dashboard-background-darker) data-unchecked:bg-(--dashboard-background-dark) dark:data-unchecked:border-white/25 dark:data-unchecked:bg-white/15',
       },
       size: {
         sm: 'h-5 w-10',
@@ -45,10 +45,10 @@ const switchThumbVariants = cva(
   {
     variants: {
       size: {
-        sm: 'h-4 w-4 data-[checked]:translate-x-5 data-[unchecked]:translate-x-0',
+        sm: 'h-4 w-4 data-checked:translate-x-5 data-unchecked:translate-x-0',
         default:
-          'h-5 w-5 data-[checked]:translate-x-6 data-[unchecked]:translate-x-0',
-        lg: 'h-[24px] w-[24px] data-[checked]:translate-x-7 data-[unchecked]:translate-x-0',
+          'h-5 w-5 data-checked:translate-x-6 data-unchecked:translate-x-0',
+        lg: 'h-[24px] w-[24px] data-checked:translate-x-7 data-unchecked:translate-x-0',
       },
     },
     defaultVariants: {
@@ -95,7 +95,7 @@ const switchContainerVariants = cva(
 
 interface SwitchProps
   extends
-    Omit<SwitchPrimitives.Root.Props, 'onCheckedChange'>,
+    Omit<SwitchPrimitives.Root.Props, 'onCheckedChange' | 'defaultChecked'>,
     VariantProps<typeof switchVariants> {
   /** Show ON/OFF labels on track */
   showLabels?: boolean
@@ -112,6 +112,14 @@ interface SwitchProps
   /** Fired with the next checked value */
   onCheckedChange?: (checked: boolean) => void
 }
+
+// Base UI latches controlled-vs-uncontrolled on the first render: a `checked`
+// that starts out `undefined` (form data still loading, for example) leaves the
+// switch uncontrolled for its whole lifetime, so it ignores every later
+// `checked` value and its track stays stuck in the off position while the
+// labels and thumb icon below show the real value. Always hand Base UI a
+// boolean so the switch is controlled from the very first render.
+const toChecked = (checked: boolean | undefined) => checked ?? false
 
 const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
   (
@@ -134,12 +142,13 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
   ) => {
     // Only wrap in container when there's actually a label or tooltip to show
     const hasLabelOrTooltip = !!(label || tooltip)
+    const isChecked = toChecked(checked)
 
     const switchElement = (
       <SwitchPrimitives.Root
         className={cn(switchVariants({ variant, size }), className)}
         disabled={disabled}
-        checked={checked}
+        checked={isChecked}
         onCheckedChange={(value) => onCheckedChange?.(value)}
         onClick={(e) => e.stopPropagation()}
         {...props}
@@ -152,7 +161,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
               className={cn(
                 switchTrackLabelVariants({ size, position: 'on' }),
                 checked
-                  ? 'text-white opacity-100 dark:text-[var(--illinois-blue)]'
+                  ? 'text-white opacity-100 dark:text-(--illinois-blue)'
                   : 'opacity-0',
               )}
             >
@@ -161,7 +170,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
             <span
               className={cn(
                 switchTrackLabelVariants({ size, position: 'off' }),
-                !checked
+                !isChecked
                   ? 'text-gray-400 opacity-100 dark:text-gray-300'
                   : 'opacity-0',
               )}
@@ -173,18 +182,18 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
 
         <SwitchPrimitives.Thumb className={cn(switchThumbVariants({ size }))}>
           {showThumbIcon &&
-            (checked ? (
+            (isChecked ? (
               <IconCheck
                 size={12}
                 className={cn(
-                  'stroke-[3] dark:text-[var(--illinois-blue)]',
+                  'stroke-3 dark:text-(--illinois-blue)',
                   disabled
                     ? 'text-gray-400'
-                    : 'text-[var(--dashboard-button,hsl(var(--primary)))]',
+                    : 'text-(--dashboard-button,hsl(var(--primary)))',
                 )}
               />
             ) : (
-              <IconX size={12} className="stroke-[3] text-gray-400" />
+              <IconX size={12} className="stroke-3 text-gray-400" />
             ))}
         </SwitchPrimitives.Thumb>
       </SwitchPrimitives.Root>
@@ -205,7 +214,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         onClick={(e) => {
           if (disabled) return
           e.preventDefault()
-          onCheckedChange?.(!checked)
+          onCheckedChange?.(!isChecked)
         }}
       >
         {switchElement}
@@ -214,7 +223,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
           <span
             className={cn(
               'ml-3 flex items-center text-sm transition-colors duration-200 ease-in-out',
-              'text-[var(--dashboard-foreground,hsl(var(--foreground)))]',
+              'text-(--dashboard-foreground,hsl(var(--foreground)))',
             )}
           >
             {label}
@@ -237,7 +246,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
                   />
                   <TooltipContent
                     side="bottom"
-                    className="max-w-[220px] bg-[var(--tooltip-background,hsl(var(--popover)))] text-[var(--tooltip,hsl(var(--popover-foreground)))] shadow-lg"
+                    className="max-w-[220px] bg-(--tooltip-background,hsl(var(--popover))) text-(--tooltip,hsl(var(--popover-foreground))) shadow-lg"
                   >
                     <p className="text-sm">{tooltip}</p>
                   </TooltipContent>

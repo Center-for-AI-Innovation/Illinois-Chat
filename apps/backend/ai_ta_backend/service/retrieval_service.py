@@ -489,7 +489,9 @@ class RetrievalService:
         try:
             print("Deleting from vector store (Qdrant or pgvector)")
             vdb = self.conn_manager.get_vector_db(course_name)
-            engine_kind = self.conn_manager.get_vector_engine_kind(course_name)
+            # Derive the kind from the instance we just resolved instead of
+            # re-reading project_external_connections.
+            engine_kind = "pgvector" if vdb._using_pgvector() else "qdrant"
 
             if engine_kind == "qdrant":
                 collection_name = vdb.qdrant_config.get(
@@ -590,11 +592,21 @@ class RetrievalService:
 
         # Dynamic resolution: use ConnectionManager to get the right VectorDatabase
         vdb = self.conn_manager.get_vector_db(course_name)
-        engine_kind = self.conn_manager.get_vector_engine_kind(course_name)
+        # Derive the kind from the instance we just resolved instead of
+        # re-reading project_external_connections.
+        engine_kind = "pgvector" if vdb._using_pgvector() else "qdrant"
 
         if engine_kind == "qdrant":
+            # External Qdrant only (host default is pgvector). Course-name
+            # scoping stays on unless qdrant_config.apply_course_filter is
+            # False (shared corpora like pubmed/patents). conversation_id
+            # / doc_groups still apply either way.
             search_filter = vdb._create_search_filter(
-                course_name, doc_groups, disabled_doc_groups, public_doc_groups
+                course_name,
+                doc_groups,
+                disabled_doc_groups,
+                public_doc_groups,
+                apply_course_filter=vdb._should_apply_course_filter(),
             )
             if conversation_id:
                 chat_filter = vdb._create_conversation_search_filter(conversation_id)
@@ -817,8 +829,13 @@ class RetrievalService:
         return [
             {
                 "text": doc.page_content,
-                "readable_filename": doc.metadata["readable_filename"],
-                "course_name ": doc.metadata["course_name"],
+                "readable_filename": doc.metadata.get(
+                    "readable_filename", "Unknown Document"
+                ),
+                # Shared external corpora (e.g. pubmed) often omit course_name;
+                # fall back so format_for_json does not KeyError after an
+                # unfiltered Qdrant hit.
+                "course_name ": doc.metadata.get("course_name", ""),
                 # OPTIONAL
                 "s3_path": doc.metadata.get("s3_path"),
                 "pagenumber": doc.metadata.get(

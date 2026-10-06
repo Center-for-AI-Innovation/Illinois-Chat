@@ -244,11 +244,11 @@ type S3OverrideConfig = {
 
 type DatabaseOverrideConfig = {
   // postgres:// or postgresql:// only (schema-enforced on /test and upsert).
-  // The frontend opens the pool with `max: 3, idle_timeout: 20,
-  // prepare: false` — transaction-pooler compatible. For Supabase, register
-  // the transaction pooler URI (port 6543); session-mode (5432) and direct
-  // (db.<ref>.supabase.co) URIs are accepted but produce a `warning` in the
-  // /test and upsert responses.
+  // The frontend opens a per-request client with `max: 1,
+  // idle_timeout: 5, prepare: false` — transaction-pooler compatible.
+  // For Supabase, register the transaction pooler URI (port 6543);
+  // session-mode (5432) and direct (db.<ref>.supabase.co) URIs are
+  // accepted but produce a `warning` in the /test and upsert responses.
   connection_uri: string
 }
 
@@ -293,21 +293,32 @@ role on this table.** Treat it as append-only.
 
 ---
 
-## 6. Cache invalidation
+## 6. Connection lifecycle
 
-Every mutating endpoint calls `connectionManager.invalidate(projectName)`
-after a successful write. That drops in-process client caches and the
-Redis config cache on the frontend.
+Nothing is cached. Every request that needs an external connection reads
+the project's row from `project_external_connections`, decrypts the
+fields it needs, and builds the client it uses. There is no invalidation
+step after a write, and no restart is needed for a config change to take
+effect: the next request in every service already sees it.
 
-The **backend's** `ConnectionManager` has its own 5-minute TTL cache
-that is not invalidated cross-service. Two consequences:
+This replaced a TTL cache (5 min for configs, 30 min for live clients,
+plus a Redis tier holding the decrypted config) whose invalidation only
+ever reached the frontend replica that served the write. Other frontend
+replicas, the backend, and the ingest worker kept serving stale
+credentials for up to 30 minutes. Removing the cache also keeps
+decrypted credentials out of Redis entirely.
 
-- During the window, the backend may still serve responses using stale
-  config.
-- A cross-service Redis pub/sub channel is the intended follow-up (see
-  the plan; out of scope for this PR).
+Connection cost is delegated to the external database's own pooler,
+which is why the transaction pooler is the documented choice:
 
-If a faster cutover is needed during ops, restart the backend pod.
+- Frontend: a `postgres()` client per request with `max: 1` and a 5s
+  `idle_timeout`, which closes the connection and lets the client be
+  collected without an explicit `end()`.
+- Backend and worker: `create_engine(..., poolclass=NullPool)`, matching
+  the host engines in `sql.py` and `rmsql.py`.
+- S3, Qdrant, and embedding clients are constructed per call. The Python
+  services build S3 clients from a fresh `boto3.session.Session()`
+  because the default module-level session is not thread-safe.
 
 ---
 

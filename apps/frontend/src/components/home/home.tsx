@@ -419,7 +419,7 @@ const Home = ({
   }
 
   // Update actions for a prompt
-  // Fetch n8nWorkflow instead of OpenAI Compatible tools.
+  // Fetch workflow tools instead of OpenAI-compatible tools.
   const handleUpdateTools = (id: string) => {
     tools.map((tool) =>
       tool.id === id ? { ...tool, checked: !tool.enabled } : tool,
@@ -543,7 +543,7 @@ const Home = ({
       <>
         <MainPageBackground>
           <div
-            className={`flex items-center justify-center font-montserratHeading ${montserrat_heading.variable}`}
+            className={`font-montserratHeading flex items-center justify-center ${montserrat_heading.variable}`}
           >
             <span className="mr-2">Warming up the knowledge engines...</span>
             <LoadingSpinner size="sm" />
