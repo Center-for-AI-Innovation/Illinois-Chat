@@ -1,7 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Card, Text, Button, Tooltip } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import {
   IconCheck,
   IconChevronDown,
@@ -148,7 +153,7 @@ function UploadNotificationContent({
       size: 20,
       stroke: 1.5,
       'aria-hidden': true as const,
-      className: 'flex-shrink-0',
+      className: 'shrink-0',
     }
 
     /* //changed to match the same colors as the upload maters section in largeDropzone
@@ -195,7 +200,7 @@ function UploadNotificationContent({
         return (
           <IconFileTypeTxt
             {...iconProps}
-            className="text-[--foreground-faded]"
+            className="text-(--foreground-faded)"
           />
         )
     }
@@ -250,18 +255,13 @@ function UploadNotificationContent({
   }
 
   return (
-    <Card
-      shadow="sm"
-      padding={0}
-      radius="md"
-      className={`fixed bottom-20 right-4 z-50 w-[320px] overflow-hidden border border-[--modal-border] bg-[--modal] shadow-xl shadow-black/25 md:w-[420px] ${montserrat_paragraph.variable}`}
+    <div
+      className={`fixed right-4 bottom-20 z-50 w-[320px] overflow-hidden rounded-md border border-(--modal-border) bg-(--modal) shadow-xl shadow-black/25 md:w-[420px] ${montserrat_paragraph.variable}`}
     >
-      <div className="flex items-center justify-between border-b border-[--modal-border] bg-[--modal-dark] px-5 py-4 text-[--modal-text]">
+      <div className="flex items-center justify-between border-b border-(--modal-border) bg-(--modal-dark) px-5 py-4 text-(--modal-text)">
         <div className="flex flex-col gap-1">
-          <Text
-            size="sm"
-            weight={600}
-            className={`${montserrat_heading.variable} font-montserratHeading`}
+          <p
+            className={`text-sm font-semibold ${montserrat_heading.variable} font-montserratHeading`}
           >
             {allComplete
               ? `${currentFiles.length} document${
@@ -270,11 +270,9 @@ function UploadNotificationContent({
               : `Processing ${currentFiles.length} document${
                   currentFiles.length > 1 ? 's' : ''
                 }`}
-          </Text>
-          <Text
-            size="xs"
-            className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-            component="pre"
+          </p>
+          <pre
+            className={`m-0 text-xs font-sans ${montserrat_paragraph.variable} font-montserratParagraph`}
           >
             {currentFiles.some((file) => file.status === 'error')
               ? 'If upload failed, please try again and let us know!'
@@ -283,16 +281,16 @@ function UploadNotificationContent({
                 : currentFiles.some((file) => file.status === 'ingesting')
                   ? 'Files are being processed for chat\nYou can leave this page if you want'
                   : 'All files processed\nContinue to chat'}
-          </Text>
+          </pre>
         </div>
         <div className="flex items-center gap-1">
           <Button
-            variant="subtle"
-            color="gray"
-            compact
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={toggleMinimize}
             aria-label={isMinimized ? 'Expand uploads' : 'Minimize uploads'}
-            className="h-8 w-8 rounded-md p-0 text-[--modal-button] hover:bg-[--background-dark] hover:text-[--modal-button-text-hover]"
+            className="text-(--modal-button) hover:bg-(--background-dark) hover:text-(--modal-button-text-hover)"
           >
             {isMinimized ? (
               <IconChevronUp size={18} aria-hidden="true" />
@@ -301,12 +299,12 @@ function UploadNotificationContent({
             )}
           </Button>
           <Button
-            variant="subtle"
-            color="gray"
-            compact
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
             aria-label="Close uploads"
-            className="h-8 w-8 rounded-md p-0 text-[--modal-button] hover:bg-[--background-dark] hover:text-[--modal-button-text-hover]"
+            className="text-(--modal-button) hover:bg-(--background-dark) hover:text-(--modal-button-text-hover)"
           >
             <IconX size={18} aria-hidden="true" />
           </Button>
@@ -326,7 +324,7 @@ function UploadNotificationContent({
                 className="mb-3 last:mb-0"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center text-[--foreground-faded]">
+                  <div className="flex h-8 w-8 items-center justify-center text-(--foreground-faded)">
                     {file.type === 'webscrape' ? (
                       <IconWorld size={18} aria-hidden="true" />
                     ) : file.name ? (
@@ -336,16 +334,14 @@ function UploadNotificationContent({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <Text
-                      size="sm"
-                      className={`truncate font-medium text-[--modal-text] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                    <p
+                      className={`truncate text-sm font-medium text-(--modal-text) ${montserrat_paragraph.variable} font-montserratParagraph`}
                       title={file.name}
                     >
                       {file.name ? truncateText(file.name, 30) : file.name}
-                    </Text>
-                    <Text
-                      size="xs"
-                      className={`truncate text-[--modal-text] ${montserrat_paragraph.variable} font-montserratParagraph`}
+                    </p>
+                    <p
+                      className={`truncate text-xs text-(--modal-text) ${montserrat_paragraph.variable} font-montserratParagraph`}
                       title={
                         file.status === 'error' && file.error
                           ? getDisplayError(file.error) || file.error
@@ -365,51 +361,55 @@ function UploadNotificationContent({
                         file.isBaseUrl,
                         getDisplayError(file.error),
                       )}
-                    </Text>
+                    </p>
                   </div>
                   <div className="ml-2 flex items-center">
                     {(file.status === 'uploading' ||
                       file.status === 'ingesting') && (
-                      <Tooltip
-                        label={
-                          file.status === 'uploading'
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="inline-flex" />}>
+                          <LoadingSpinner size="xs" />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                        >
+                          {file.status === 'uploading'
                             ? 'Uploading to secure storage'
-                            : 'Processing for chat'
-                        }
-                        classNames={{
-                          tooltip: `${montserrat_paragraph.variable} font-montserratParagraph`,
-                        }}
-                      >
-                        <LoadingSpinner size="xs" />
+                            : 'Processing for chat'}
+                        </TooltipContent>
                       </Tooltip>
                     )}
 
                     {file.status === 'complete' && (
-                      <Tooltip
-                        label="Ready for chat"
-                        classNames={{
-                          tooltip: `${montserrat_paragraph.variable} font-montserratParagraph`,
-                        }}
-                      >
-                        <IconCheck
-                          size={18}
-                          aria-hidden="true"
-                          className="text-[--modal-button]"
-                        />
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="inline-flex" />}>
+                          <IconCheck
+                            size={18}
+                            aria-hidden="true"
+                            className="text-(--modal-button)"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                        >
+                          Ready for chat
+                        </TooltipContent>
                       </Tooltip>
                     )}
                     {file.status === 'error' && (
-                      <Tooltip
-                        label={getDisplayError(file.error) || 'Upload failed'}
-                        classNames={{
-                          tooltip: `${montserrat_paragraph.variable} font-montserratParagraph`,
-                        }}
-                      >
-                        <IconX
-                          size={18}
-                          aria-hidden="true"
-                          className="text-[--error]"
-                        />
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="inline-flex" />}>
+                          <IconX
+                            size={18}
+                            aria-hidden="true"
+                            className="text-(--error)"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent
+                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
+                        >
+                          {getDisplayError(file.error) || 'Upload failed'}
+                        </TooltipContent>
                       </Tooltip>
                     )}
                   </div>
@@ -419,7 +419,7 @@ function UploadNotificationContent({
           </AnimatePresence>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 

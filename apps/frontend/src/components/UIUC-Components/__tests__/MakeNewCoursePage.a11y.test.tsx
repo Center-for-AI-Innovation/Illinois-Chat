@@ -187,7 +187,7 @@ describe('MakeNewCoursePage - accessibility', () => {
       )
 
       // heading-order violation is pre-existing in the disabled config view
-      // (Mantine Title renders as h3, skipping h2 after the sr-only h1)
+      // (the title renders as h3, skipping h2 after the sr-only h1)
       const results = await axe(container, {
         rules: { 'heading-order': { enabled: false } },
       })

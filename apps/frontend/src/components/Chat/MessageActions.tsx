@@ -1,5 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react'
-import { Tooltip } from '@mantine/core'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import {
   IconCheck,
   IconCopy,
@@ -25,6 +29,9 @@ interface MessageActionsProps {
   ) => void
   onOpenFeedbackModal: () => void
 }
+
+const tooltipContentClassName = 'bg-(--tooltip-background) text-(--tooltip)'
+const tooltipArrowClassName = 'bg-(--tooltip-background) fill-(--tooltip-background)'
 
 export const MessageActions: React.FC<MessageActionsProps> = ({
   message,
@@ -134,25 +141,16 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
 
   return (
     <div className="flex items-center justify-start gap-2">
-      <Tooltip
-        label={messagedCopied ? 'Copied!' : 'Copy'}
-        position="bottom"
-        withArrow
-        arrowSize={6}
-        transitionProps={{
-          transition: 'fade',
-          duration: 200,
-        }}
-        style={{
-          color: 'var(--tooltip)',
-          backgroundColor: 'var(--tooltip-background)',
-        }}
-      >
-        <button
-          tabIndex={0}
-          className="text-[--foreground-faded] hover:text-[--foreground]"
-          onClick={copyOnClick}
-          aria-label="Copy message"
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              tabIndex={0}
+              className="text-(--foreground-faded) hover:text-(--foreground)"
+              onClick={copyOnClick}
+              aria-label="Copy message"
+            />
+          }
         >
           {messagedCopied ? (
             <IconCheck
@@ -163,29 +161,27 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
           ) : (
             <IconCopy size={20} aria-hidden="true" />
           )}
-        </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className={tooltipContentClassName}
+          arrowClassName={tooltipArrowClassName}
+        >
+          {messagedCopied ? 'Copied!' : 'Copy'}
+        </TooltipContent>
       </Tooltip>
 
-      <Tooltip
-        label={isThumbsUp ? 'Remove Good Response' : 'Good Response'}
-        position="bottom"
-        withArrow
-        arrowSize={6}
-        transitionProps={{
-          transition: 'fade',
-          duration: 200,
-        }}
-        style={{
-          color: 'var(--tooltip)',
-          backgroundColor: 'var(--tooltip-background)',
-        }}
-      >
-        <button
-          tabIndex={0}
-          aria-label={isThumbsUp ? 'Remove Good Response' : 'Good Response'}
-          aria-pressed={isThumbsUp}
-          className="text-[--foreground-faded] hover:text-[--foreground]"
-          onClick={handleThumbsUp}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              tabIndex={0}
+              aria-label={isThumbsUp ? 'Remove Good Response' : 'Good Response'}
+              aria-pressed={isThumbsUp}
+              className="text-(--foreground-faded) hover:text-(--foreground)"
+              onClick={handleThumbsUp}
+            />
+          }
         >
           <div>
             {isThumbsUp ? (
@@ -194,63 +190,66 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
               <IconThumbUp size={20} aria-hidden="true" />
             )}
           </div>
-        </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className={tooltipContentClassName}
+          arrowClassName={tooltipArrowClassName}
+        >
+          {isThumbsUp ? 'Remove Good Response' : 'Good Response'}
+        </TooltipContent>
       </Tooltip>
 
-      <Tooltip
-        label={isThumbsDown ? 'Remove Bad Response' : 'Bad Response'}
-        position="bottom"
-        withArrow
-        arrowSize={6}
-        transitionProps={{
-          transition: 'fade',
-          duration: 200,
-        }}
-        style={{
-          color: 'var(--tooltip)',
-          backgroundColor: 'var(--tooltip-background)',
-        }}
-      >
-        <button
-          tabIndex={0}
-          aria-label={isThumbsDown ? 'Remove Bad Response' : 'Bad Response'}
-          aria-pressed={isThumbsDown}
-          className="text-[--foreground-faded] hover:text-[--foreground]"
-          onClick={handleThumbsDown}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              tabIndex={0}
+              aria-label={isThumbsDown ? 'Remove Bad Response' : 'Bad Response'}
+              aria-pressed={isThumbsDown}
+              className="text-(--foreground-faded) hover:text-(--foreground)"
+              onClick={handleThumbsDown}
+            />
+          }
         >
           {isThumbsDown ? (
             <IconThumbDownFilled size={20} aria-hidden="true" />
           ) : (
             <IconThumbDown size={20} aria-hidden="true" />
           )}
-        </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className={tooltipContentClassName}
+          arrowClassName={tooltipArrowClassName}
+        >
+          {isThumbsDown ? 'Remove Bad Response' : 'Bad Response'}
+        </TooltipContent>
       </Tooltip>
 
-      <Tooltip
-        label="Regenerate Response"
-        position="bottom"
-        withArrow
-        arrowSize={6}
-        transitionProps={{
-          transition: 'fade',
-          duration: 200,
-        }}
-        style={{
-          color: 'var(--tooltip)',
-          backgroundColor: 'var(--tooltip-background)',
-        }}
-      >
-        <button
-          tabIndex={0}
-          aria-label="Regenerate Response"
-          className={`text-[--foreground-faded] hover:text-[--foreground] ${
-            isRegenerating ? 'animate-spin' : ''
-          }`}
-          onClick={handleRegenerate}
-          disabled={isRegenerating}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              tabIndex={0}
+              aria-label="Regenerate Response"
+              className={`text-(--foreground-faded) hover:text-(--foreground) ${
+                isRegenerating ? 'animate-spin' : ''
+              }`}
+              onClick={handleRegenerate}
+              disabled={isRegenerating}
+            />
+          }
         >
           <IconRepeat size={20} aria-hidden="true" />
-        </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className={tooltipContentClassName}
+          arrowClassName={tooltipArrowClassName}
+        >
+          Regenerate Response
+        </TooltipContent>
       </Tooltip>
     </div>
   )

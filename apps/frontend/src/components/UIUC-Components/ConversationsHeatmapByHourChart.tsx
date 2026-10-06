@@ -1,6 +1,5 @@
 // src/components/UIUC-Components/ConversationsHeatmapByHourChart.tsx
 import React, { useMemo } from 'react'
-import { Text } from '@mantine/core'
 import { LoadingSpinner } from './LoadingSpinner'
 import { montserrat_paragraph } from 'fonts'
 
@@ -46,18 +45,19 @@ const ConversationsHeatmapByHourChart: React.FC<ChartProps> = ({
 
   if (isLoading) {
     return (
-      <Text>
-        Loading heatmap <LoadingSpinner size="xs" />
-      </Text>
+      <div className="flex items-center gap-2">
+        <LoadingSpinner size="xs" />
+        <span>Loading heatmap...</span>
+      </div>
     )
   }
 
   if (error) {
-    return <Text color="red">{error}</Text>
+    return <p className="text-(--error)">{error}</p>
   }
 
   if (!data) {
-    return <Text>No data available</Text>
+    return <p>No data available</p>
   }
 
   const getCellColor = (value: number) => {

@@ -5,7 +5,7 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import React, { useEffect, useState } from 'react'
 
-import { Card, Flex, Title } from '@mantine/core'
+import { Card } from '@/components/shadcn/ui/card'
 import { useAuth } from 'react-oidc-context'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
@@ -102,20 +102,15 @@ const CourseMain: NextPage = () => {
   if (user_emails.length == 0) {
     return (
       <MainPageBackground>
-        <Title
-          className={montserrat.className}
-          variant="gradient"
-          gradient={{ from: 'gold', to: 'white', deg: 50 }}
-          order={3}
-          p="xl"
-          style={{ marginTop: '4rem' }}
+        <h3
+          className={`heading-h3 mt-16 bg-[linear-gradient(50deg,gold,white)] bg-clip-text p-8 text-transparent ${montserrat.className}`}
         >
           You&apos;ve encountered a software bug!<br></br>Your account has no
           email address. Please shoot me an email so I can fix it for you:{' '}
           <a className="goldUnderline" href="mailto:rohan13@illinois.edu">
             rohan13@illinois.edu
           </a>
-        </Title>
+        </h3>
       </MainPageBackground>
     )
   }
@@ -159,20 +154,13 @@ const CourseMain: NextPage = () => {
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main min-w-screen flex min-h-screen flex-col items-center"
+        className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
         <h1 className="sr-only">{courseName} Prompt Settings</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
-          <Flex direction="column" align="center" w="100%">
+          <div className="flex w-full flex-col items-center">
             <Card
-              withBorder
-              padding="none"
-              radius="xl"
-              className={`mt-[2%] ${cardWidthClasses}`}
-              style={{
-                backgroundColor: 'var(--background)',
-                borderColor: 'var(--dashboard-border)',
-              }}
+              className={`mt-[2%] gap-0 rounded-2xl border border-(--dashboard-border) bg-(--background) py-0 ${cardWidthClasses}`}
             >
               <PromptEditor
                 project_name={courseName}
@@ -181,7 +169,7 @@ const CourseMain: NextPage = () => {
                 userEmail={user?.profile?.email as string}
               />
             </Card>
-          </Flex>
+          </div>
         </div>
       </main>
 

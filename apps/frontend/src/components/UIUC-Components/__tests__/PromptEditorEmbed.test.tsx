@@ -164,7 +164,7 @@ describe('PromptEditorEmbed', () => {
   describe('showPromptToast', () => {
     it('calls showToast with correct params', async () => {
       const { showPromptToast } = await import('../PromptEditorEmbed')
-      showPromptToast({} as any, 'Title', 'Message')
+      showPromptToast('Title', 'Message')
       expect(mockShowToast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Title',
@@ -176,7 +176,7 @@ describe('PromptEditorEmbed', () => {
 
     it('uses error type when isError=true', async () => {
       const { showPromptToast } = await import('../PromptEditorEmbed')
-      showPromptToast({} as any, 'Error', 'Msg', true)
+      showPromptToast('Error', 'Msg', true)
       expect(mockShowToast).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error' }),
       )
@@ -185,7 +185,7 @@ describe('PromptEditorEmbed', () => {
     it('handles custom icon', async () => {
       const { showPromptToast } = await import('../PromptEditorEmbed')
       const icon = React.createElement('div', null, 'ico')
-      showPromptToast({} as any, 'T', 'M', false, icon)
+      showPromptToast('T', 'M', false, icon)
       expect(mockShowToast).toHaveBeenCalledWith(
         expect.objectContaining({ icon }),
       )
@@ -193,14 +193,14 @@ describe('PromptEditorEmbed', () => {
 
     it('caps duration at 15000ms for long messages', async () => {
       const { showPromptToast } = await import('../PromptEditorEmbed')
-      showPromptToast({} as any, 'T', 'x'.repeat(500))
+      showPromptToast('T', 'x'.repeat(500))
       const call = mockShowToast.mock.calls[0]![0]
       expect(call.autoClose).toBe(15000)
     })
 
     it('uses baseDuration for short messages', async () => {
       const { showPromptToast } = await import('../PromptEditorEmbed')
-      showPromptToast({} as any, 'T', 'hi')
+      showPromptToast('T', 'hi')
       const call = mockShowToast.mock.calls[0]![0]
       expect(call.autoClose).toBe(5000)
     })
@@ -209,7 +209,7 @@ describe('PromptEditorEmbed', () => {
   describe('showToastOnPromptUpdate', () => {
     it('shows success message', async () => {
       const { showToastOnPromptUpdate } = await import('../PromptEditorEmbed')
-      showToastOnPromptUpdate({} as any)
+      showToastOnPromptUpdate()
       expect(mockShowToast).toHaveBeenCalledWith(
         expect.objectContaining({ title: 'Prompt Updated Successfully' }),
       )
@@ -217,7 +217,7 @@ describe('PromptEditorEmbed', () => {
 
     it('shows error message', async () => {
       const { showToastOnPromptUpdate } = await import('../PromptEditorEmbed')
-      showToastOnPromptUpdate({} as any, true)
+      showToastOnPromptUpdate(true)
       expect(mockShowToast).toHaveBeenCalledWith(
         expect.objectContaining({ title: 'Error Updating Prompt' }),
       )
@@ -225,7 +225,7 @@ describe('PromptEditorEmbed', () => {
 
     it('shows reset message', async () => {
       const { showToastOnPromptUpdate } = await import('../PromptEditorEmbed')
-      showToastOnPromptUpdate({} as any, false, true)
+      showToastOnPromptUpdate(false, true)
       expect(mockShowToast).toHaveBeenCalledWith(
         expect.objectContaining({ title: 'Prompt Reset to Default' }),
       )

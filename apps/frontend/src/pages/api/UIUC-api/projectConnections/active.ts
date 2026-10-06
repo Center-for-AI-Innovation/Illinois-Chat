@@ -10,7 +10,6 @@ import { setActiveBodySchema } from '~/utils/projectConnections/validation'
 import {
   extractRequestMeta,
   formatZodError,
-  invalidateForProject,
 } from '~/utils/projectConnections/handlerShared'
 
 // Exported for unit tests — see projectConnections.ts for the same pattern.
@@ -49,7 +48,6 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     }
 
-    await invalidateForProject(project_name)
     await writeAuditEntry({
       actor_email: actorEmail,
       action: 'set_active',

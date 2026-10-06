@@ -16,69 +16,6 @@ vi.mock('~/utils/downloadConversationHistory', () => ({
   downloadConversationHistory: vi.fn(async () => ({ message: 'ok' })),
 }))
 
-vi.mock('@mantine/core', async (importOriginal) => {
-  const actual: any = await importOriginal()
-  return {
-    ...actual,
-    Select: (props: any) => {
-      const themeStub = {
-        colors: { dark: ['#000', '#111'] },
-        radius: { md: '4px' },
-        fontFamily: 'system-ui',
-        white: '#fff',
-      }
-      if (typeof props.styles === 'function') props.styles(themeStub)
-
-      return (
-        <select
-          data-testid={
-            props.data?.length === 5 ? 'date-range-select' : 'view-select'
-          }
-          value={props.value ?? ''}
-          onChange={(e) => props.onChange?.(e.target.value)}
-        >
-          {(props.data ?? []).map((opt: any) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      )
-    },
-  }
-})
-
-vi.mock('@mantine/dates', () => ({
-  DatePickerInput: (props: any) => (
-    <button
-      type="button"
-      onClick={() => {
-        if (typeof props.styles === 'function') {
-          props.styles({
-            colors: {
-              grape: [
-                '#000',
-                '#111',
-                '#222',
-                '#333',
-                '#444',
-                '#555',
-                '#666',
-                '#777',
-                '#888',
-              ],
-            },
-            white: '#fff',
-          })
-        }
-        props.onChange?.([new Date('2024-01-01'), new Date('2024-01-05')])
-      }}
-    >
-      set-date-range
-    </button>
-  ),
-}))
-
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 import MakeQueryAnalysisPage from '../MakeQueryAnalysisPage'
 
@@ -315,7 +252,13 @@ describe('MakeQueryAnalysisPage', () => {
   })
 
   it('supports switching date range + view selects, including custom ranges', async () => {
-    const user = userEvent.setup()
+    // Base UI's Select popup stays mounted (marked `data-closed`) through
+    // its close animation, which never actually completes in jsdom (no real
+    // CSS animation engine) — the stale, `pointer-events: none` positioner
+    // then sits on top of the next popup and trips userEvent's visibility
+    // check on reopen. Disabled here since this test exercises the state
+    // wiring across several rapid reselections, not pointer realism.
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
 
     globalThis.__TEST_ROUTER__ = {
       asPath: '/CS101/analysis',
@@ -369,25 +312,65 @@ describe('MakeQueryAnalysisPage', () => {
       await screen.findByText(/Conversation Visualizations/i),
     ).toBeInTheDocument()
 
-    // Switch view selector to weekday.
-    await user.selectOptions(screen.getByTestId('view-select'), 'weekday')
+    // Selecting an item needs userEvent's full pointer sequence (a bare
+    // `fireEvent.click` isn't enough); the stale-popup visibility check is
+    // already disabled for this whole test via `setup` above.
+    const clickOption = (element: Element) => user.click(element)
+
+    await user.click(screen.getByLabelText('View by hour or day'))
+    await clickOption(await screen.findByText('By Day of Week'))
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText('View by hour or day'),
+      ).toHaveTextContent('By Day of Week'),
+    )
 
     // Switch date ranges to cover multiple cases.
-    await user.selectOptions(
-      screen.getByTestId('date-range-select'),
-      'last_week',
+    await user.click(screen.getByLabelText('Date range filter'))
+    await clickOption(await screen.findByText('Last Week'))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Date range filter')).toHaveTextContent(
+        'Last Week',
+      ),
     )
-    await user.selectOptions(
-      screen.getByTestId('date-range-select'),
-      'last_year',
+
+    await user.click(screen.getByLabelText('Date range filter'))
+    await clickOption(await screen.findByText('Last Year'))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Date range filter')).toHaveTextContent(
+        'Last Year',
+      ),
     )
-    await user.selectOptions(screen.getByTestId('date-range-select'), 'all')
 
-    // Custom range renders date picker; setting it triggers fetch with explicit dates.
-    await user.selectOptions(screen.getByTestId('date-range-select'), 'custom')
-    await user.click(screen.getByRole('button', { name: /set-date-range/i }))
+    await user.click(screen.getByLabelText('Date range filter'))
+    await clickOption(await screen.findByText('All Time'))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Date range filter')).toHaveTextContent(
+        'All Time',
+      ),
+    )
 
-    expect(true).toBe(true)
+    // Custom range renders the date range popover; picking a range triggers
+    // a fetch with explicit dates.
+    await user.click(screen.getByLabelText('Date range filter'))
+    await clickOption(await screen.findByText('Custom Range'))
+    const datePickerTrigger = await screen.findByLabelText(
+      'Custom date range picker',
+    )
+    await user.click(datePickerTrigger)
+    const dayButtons = (
+      await screen.findAllByRole('button')
+    ).filter((button) => button.hasAttribute('data-day'))
+    await user.click(dayButtons[0]!)
+    await user.click(dayButtons[dayButtons.length - 1]!)
+
+    // Both ends picked: the trigger stops showing the placeholder and
+    // renders `formatDateRangeLabel`'s "Mon D – Mon D" range instead.
+    await waitFor(() => {
+      const label = screen.getByLabelText('Custom date range picker')
+      expect(label).not.toHaveTextContent('Pick date range')
+      expect(label.textContent).toMatch(/[A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+/)
+    })
   })
 
   it('shows empty-state when custom range is selected without a full date range', async () => {
@@ -431,7 +414,8 @@ describe('MakeQueryAnalysisPage', () => {
     expect(
       await screen.findByText(/Conversation Visualizations/i),
     ).toBeInTheDocument()
-    await user.selectOptions(screen.getByTestId('date-range-select'), 'custom')
+    await user.click(screen.getByLabelText('Date range filter'))
+    await user.click(await screen.findByText('Custom Range'))
     expect(
       await screen.findByText(
         /No conversation data available for selected time range/i,

@@ -1,7 +1,8 @@
-import { Button, Card } from '@mantine/core'
+import { Button, buttonVariants } from '@/components/shadcn/ui/button'
 import { type NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import React, { useState, useEffect, useMemo } from 'react'
 import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
@@ -236,20 +237,16 @@ const Home: NextPage = () => {
                 </h1>
               </div>
 
-              <div className="mb-8 mt-4 text-sm text-[--foreground-subtle]">
+              <div className="mt-4 mb-8 text-sm text-(--foreground-subtle)">
                 Deep search your documents, build an AI-teaching assistant,
                 accelerate your literature review,{' '}
                 <span className="whitespace-nowrap">and get creative.</span>
               </div>
 
               <Button
+                type="button"
                 tabIndex={0}
-                variant="light"
-                style={{
-                  backgroundColor: 'var(--illinois-orange)',
-                  color: 'var(--illinois-white)',
-                }}
-                radius="sm"
+                className="rounded-sm bg-(--illinois-orange) text-(--illinois-white) hover:bg-(--illinois-orange)/90"
                 onClick={() => {
                   // Use Next.js router to navigate
                   router.push('/chat')
@@ -294,7 +291,7 @@ const Home: NextPage = () => {
               </div>
 
               <div
-                className="mr-8 mt-[2px] hidden text-right text-xs sm:mr-4 sm:mt-[-8px]"
+                className="mt-[2px] mr-8 hidden text-right text-xs sm:mt-[-8px] sm:mr-4"
                 style={{ color: 'var(--illinois-orange)' }}
               >
                 Upload almost anything
@@ -303,7 +300,7 @@ const Home: NextPage = () => {
           </div>
 
           {!useIllinoisChatConfig && (
-            <div className="mt-12 w-[100vw] rounded-lg bg-[--dashboard-background-faded] p-8 pb-14">
+            <div className="mt-12 w-screen rounded-lg bg-(--dashboard-background-faded) p-8 pb-14">
               <div className="mb-0 w-full text-center">
                 <h2
                   className={`text-2xl font-bold sm:pt-2 ${montserrat_heading.variable} font-montserratHeading`}
@@ -319,7 +316,7 @@ const Home: NextPage = () => {
               </div>
 
               <div className="w-full">
-                <div className="ml-auto mr-auto max-w-5xl">
+                <div className="mr-auto ml-auto max-w-5xl">
                   <FlagshipChatbots />
                 </div>
               </div>
@@ -337,11 +334,11 @@ const Home: NextPage = () => {
           >
             {/* Adjusted container with better spacing */}
             <div className="flex w-full flex-col items-center justify-center sm:flex-row">
-              <div className="pr-2 sm:flex-shrink-0 sm:text-right">
+              <div className="pr-2 sm:shrink-0 sm:text-right">
                 Your AI trained on your
               </div>
 
-              <div className="sm:max-w-[300px] sm:flex-grow">
+              <div className="sm:max-w-[300px] sm:grow">
                 <TypingAnimation />
               </div>
             </div>
@@ -598,16 +595,12 @@ const Home: NextPage = () => {
                 free, hosted here at Illinois.
               </div>
 
-              <Button
+              <a
                 tabIndex={0}
-                className="mt-8 bg-none focus:bg-[--dashboard-button]"
-                variant="light"
-                style={{
-                  color: 'var(--illinois-white)',
-                  border: '1px solid var(--illinois-white)',
-                }}
-                radius="sm"
-                component="a"
+                className={buttonVariants({
+                  className:
+                    'mt-8 rounded-sm border border-(--illinois-white) bg-transparent text-(--illinois-white) hover:bg-white/10 focus:bg-(--dashboard-button)',
+                })}
                 href="https://docs.uiuc.chat/api"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -620,7 +613,7 @@ const Home: NextPage = () => {
                   className="ml-1"
                   aria-hidden="true"
                 />
-              </Button>
+              </a>
             </div>
 
             <div className="mt-0 sm:mt-0 sm:w-2/3">
@@ -730,7 +723,7 @@ const Home: NextPage = () => {
             About Us
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-14 sm:grid-cols-3 md:gap-8">
-            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-[--dashboard-background-faded] p-6">
+            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-(--dashboard-background-faded) p-6">
               <h3
                 className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
@@ -750,7 +743,7 @@ const Home: NextPage = () => {
               </div>
               {/* <div className="text-lg">Sponsored by the </div> */}
             </div>
-            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-[--dashboard-background-faded] p-6">
+            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-(--dashboard-background-faded) p-6">
               <h3
                 className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
@@ -769,7 +762,7 @@ const Home: NextPage = () => {
                 .
               </div>
             </div>
-            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-[--dashboard-background-faded] p-6">
+            <div className="flex max-w-xs flex-col gap-4 rounded-xl bg-(--dashboard-background-faded) p-6">
               <h3
                 className={`text-xl font-bold ${montserrat_heading.variable} font-montserratHeading`}
               >
@@ -894,31 +887,28 @@ function FlagshipChatbots() {
   ]
 
   return (
-    <div className="ml-auto mr-auto grid grid-cols-1 gap-6 sm:grid-cols-3">
+    <div className="mr-auto ml-auto grid grid-cols-1 gap-6 sm:grid-cols-3">
       {cards.map((card) => (
-        <Card
+        <Link
           key={card.course_slug}
-          component="a"
           href={`/${card.course_slug}/chat`}
-          // target="_blank"
-          radius="md"
-          className="flex h-56 flex-col"
+          className="flex h-56 flex-col overflow-hidden rounded-md"
           style={{
             color: 'var(--illinois-blue)',
             background: 'var(--illinois-white)',
           }}
         >
-          <Card.Section className="h-12">
+          <div className="h-12">
             <div
               className={`flex items-center px-3 text-sm font-semibold ${montserrat_heading.variable} font-montserratHeading`}
               style={{ height: '100%' }}
             >
               {card.title}
             </div>
-          </Card.Section>
+          </div>
 
           {card.imageSrc && (
-            <Card.Section className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden">
               <div className="h-full w-full">
                 <Image
                   src={card.imageSrc}
@@ -935,16 +925,16 @@ function FlagshipChatbots() {
                   }}
                 />
               </div>
-            </Card.Section>
+            </div>
           )}
 
-          <Card.Section className="h-16 sm:h-20">
+          <div className="h-16 sm:h-20">
             <div className="flex h-full flex-col justify-center px-3 sm:flex-row sm:items-center">
               <div className="line-clamp-2 max-w-full text-xs sm:line-clamp-5">
                 {card.tagline}
               </div>
 
-              <div className="mt-1 flex justify-end sm:ml-auto sm:mt-0">
+              <div className="mt-1 flex justify-end sm:mt-0 sm:ml-auto">
                 <IconArrowNarrowRight
                   size={28}
                   strokeWidth={1.25}
@@ -953,8 +943,8 @@ function FlagshipChatbots() {
                 />
               </div>
             </div>
-          </Card.Section>
-        </Card>
+          </div>
+        </Link>
       ))}
     </div>
   )

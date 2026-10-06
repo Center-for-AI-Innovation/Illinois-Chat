@@ -48,9 +48,14 @@ again, and recreates the database schema on the fresh database —
 `--clean` and `--create-schema` are therefore mutually exclusive.
 
 Note: the `postgres-illinois-chat` service runs the pgvector-enabled
-`pgvector/pgvector:pg17` image (the schema needs the `vector` extension).
-If your volumes were created by the previous stock `postgres` image, the
-data directory is incompatible — run once with `--clean` to recreate them.
+`pgvector/pgvector:pg17` image (the schema needs the `vector` extension),
+mounted at `/var/lib/postgresql/data`. Two kinds of existing volume will not
+start on it: one created by the previous stock `postgres` image (incompatible
+data directory), and one created before the mount moved from
+`/var/lib/postgresql` (it holds only an empty `data/` mount point, which
+Postgres refuses to initialise into). Run once with `--clean` to recreate
+them, or see the upgrade note in the README's Quickstart section for how to
+carry data over from the old anonymous volume.
 
 ### 2. Configure Environment Variables
 
@@ -217,4 +222,7 @@ bash infra/scripts/stop-dev.sh
 
 # Stop infrastructure and remove local volumes/data
 bash infra/scripts/stop-dev.sh --volumes
+
+# Stop infrastructure but leave Sim AI containers running
+bash infra/scripts/stop-dev.sh --no-sim
 ```

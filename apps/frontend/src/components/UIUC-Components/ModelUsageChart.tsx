@@ -8,7 +8,6 @@ import {
   Tooltip,
 } from 'recharts'
 import { LoadingSpinner } from './LoadingSpinner'
-import { Text } from '@mantine/core'
 import { IconAlertCircle } from '@tabler/icons-react'
 
 interface ModelUsage {
@@ -102,7 +101,9 @@ const ModelUsageChart: React.FC<ModelUsageChartProps> = ({
       <div className="rounded-lg bg-red-500/10 p-4" role="alert">
         <div className="flex items-center gap-2">
           <IconAlertCircle className="text-red-400" size={20} />
-          <Text color="red">Error loading model usage data: {error}</Text>
+          <p className="text-(--error)">
+            Error loading model usage data: {error}
+          </p>
         </div>
       </div>
     )
@@ -112,17 +113,17 @@ const ModelUsageChart: React.FC<ModelUsageChartProps> = ({
     return (
       <div className="flex items-center gap-2">
         <LoadingSpinner />
-        <Text>Loading model usage data...</Text>
+        <span>Loading model usage data...</span>
       </div>
     )
   }
 
   if (!data || data.length === 0 || chartData.length === 0) {
     return (
-      <div className="rounded-lg bg-[--dashboard-background-faded] p-4">
-        <Text align="center" style={{ color: 'var(--foreground)' }}>
+      <div className="rounded-lg bg-(--dashboard-background-faded) p-4">
+        <p className="text-center text-(--foreground)">
           No model usage data available
-        </Text>
+        </p>
       </div>
     )
   }

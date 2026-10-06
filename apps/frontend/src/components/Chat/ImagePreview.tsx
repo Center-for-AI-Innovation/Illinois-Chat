@@ -1,24 +1,13 @@
 // ImagePreview.tsx
 import { useState } from 'react'
-import { Modal, createStyles } from '@mantine/core'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
 import { montserrat_heading } from 'fonts'
-
-const useStyles = createStyles((theme) => ({
-  imageLoading: {
-    background:
-      'linear-gradient(90deg, #f0f0f0 0px, rgba(229,229,229,0.8) 40px, #f0f0f0 80px)',
-    backgroundSize: '600px',
-    animation: '$loading 1.2s infinite',
-  },
-  '@keyframes loading': {
-    '0%': {
-      backgroundPosition: '-600px 0',
-    },
-    '100%': {
-      backgroundPosition: '600px 0',
-    },
-  },
-}))
+import { XIcon } from 'lucide-react'
 
 interface ImagePreviewProps {
   src: string
@@ -31,7 +20,6 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   alt,
   className,
 }) => {
-  const { classes, theme } = useStyles()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isImageLoaded, setIsImageLoaded] = useState(false)
   return (
@@ -43,30 +31,30 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
         style={{ cursor: 'pointer' }}
         onLoad={() => setIsImageLoaded(true)}
         className={
-          isImageLoaded ? className : `${className} ${classes.imageLoading}`
+          isImageLoaded
+            ? className
+            : `${className} image-loading-shimmer`
         }
       />
-      <Modal.Root
-        opened={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        size="xl"
-        centered
-      >
-        <Modal.Overlay className="modal-overlay-common" />
-        <Modal.Content className="modal-common">
-          <Modal.Header className="modal-header-common">
-            <Modal.Title
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="modal-common w-full max-w-[calc(100%-2rem)] gap-0 p-0 sm:max-w-[788px]"
+        >
+          <div className="modal-header-common flex items-center justify-between">
+            <DialogTitle
               className={`modal-title-common ${montserrat_heading.variable} font-montserratHeading`}
             >
               {alt || 'Image Preview'}
-            </Modal.Title>
-            <Modal.CloseButton
-              onClick={() => setIsModalOpen(false)}
+            </DialogTitle>
+            <DialogClose
               aria-label="Close image preview"
-              className="modal-close-button-common"
-            />
-          </Modal.Header>
-          <Modal.Body className="modal-body-common">
+              className="modal-close-button-common rounded p-1"
+            >
+              <XIcon className="size-4" aria-hidden="true" />
+            </DialogClose>
+          </div>
+          <div className="modal-body-common">
             <div className="file-preview-container">
               <img
                 src={src}
@@ -80,9 +68,9 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                 }}
               />
             </div>
-          </Modal.Body>
-        </Modal.Content>
-      </Modal.Root>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

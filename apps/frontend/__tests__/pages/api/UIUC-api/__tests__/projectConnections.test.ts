@@ -19,7 +19,6 @@ function makeRes() {
 }
 
 const auditEntries: any[] = []
-const invalidatedProjects: string[] = []
 
 function mockRepoAndManager() {
   vi.doMock('~/db/projectConnectionsRepo', () => ({
@@ -39,18 +38,10 @@ function mockRepoAndManager() {
     }),
     getProjectIdByName_default: undefined,
   }))
-  vi.doMock('~/utils/connectionManager', () => ({
-    connectionManager: {
-      invalidate: vi.fn(async (n: string) => {
-        invalidatedProjects.push(n)
-      }),
-    },
-  }))
 }
 
 beforeEach(() => {
   auditEntries.length = 0
-  invalidatedProjects.length = 0
   vi.resetModules()
   vi.unstubAllEnvs()
   vi.stubEnv('ENCRYPTION_MASTER_KEY', MASTER_KEY)
@@ -58,7 +49,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.doUnmock('~/db/projectConnectionsRepo')
-  vi.doUnmock('~/utils/connectionManager')
 })
 
 describe('projectConnections handler — auth gate', () => {
@@ -139,9 +129,6 @@ describe('projectConnections handler — GET masks secrets', () => {
       setActive: vi.fn(),
       writeAuditEntry: vi.fn(async () => {}),
     }))
-    vi.doMock('~/utils/connectionManager', () => ({
-      connectionManager: { invalidate: vi.fn(async () => {}) },
-    }))
 
     const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const req: any = {
@@ -165,7 +152,7 @@ describe('projectConnections handler — GET masks secrets', () => {
 })
 
 describe('projectConnections handler — POST', () => {
-  it('upserts, invalidates, and writes an audit entry with field NAMES only', async () => {
+  it('upserts and writes an audit entry with field NAMES only', async () => {
     mockRepoAndManager()
     const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const req: any = {
@@ -196,7 +183,6 @@ describe('projectConnections handler — POST', () => {
       project_id: 42,
       kind: 's3',
     })
-    expect(invalidatedProjects).toContain('demo')
     expect(auditEntries).toHaveLength(1)
     const entry = auditEntries[0]
     expect(entry.action).toBe('upsert')
@@ -257,7 +243,7 @@ describe('projectConnections handler — POST', () => {
 })
 
 describe('projectConnections handler — DELETE', () => {
-  it('invalidates and audits on whole-row delete', async () => {
+  it('audits on whole-row delete', async () => {
     mockRepoAndManager()
     const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
     const res = makeRes()
@@ -271,7 +257,6 @@ describe('projectConnections handler — DELETE', () => {
       res,
     )
     expect(res.statusCode).toBe(200)
-    expect(invalidatedProjects).toContain('demo')
     expect(auditEntries[0]).toMatchObject({
       action: 'delete',
       outcome: 'success',

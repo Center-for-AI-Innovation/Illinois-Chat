@@ -1,24 +1,43 @@
 import { useState, useEffect } from 'react'
+import { Button } from '@/components/shadcn/ui/button'
+import { Textarea } from '@/components/shadcn/ui/textarea'
+import { Switch } from '@/components/shadcn/ui/switch'
+import { Separator } from '@/components/shadcn/ui/separator'
+import { Slider } from '@/components/shadcn/ui/slider'
 import {
-  Textarea,
   Select,
-  Button,
-  Title,
-  Switch,
-  Divider,
-  Slider,
-  Tooltip,
-} from '@mantine/core'
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shadcn/ui/select'
 import {
-  IconCheck,
-  IconCopy,
-  IconChevronDown,
-  IconInfoCircle,
-} from '@tabler/icons-react'
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxInputGroup,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/shadcn/ui/combobox'
+import { IconCheck, IconCopy } from '@tabler/icons-react'
 import { useFetchLLMProviders } from '@/hooks/queries/useFetchLLMProviders'
 import { findDefaultModel } from './api-inputs/LLMsApiKeyInputForm'
 import { type AnySupportedModel } from '~/utils/modelProviders/LLMProvider'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
+
+interface ModelOption {
+  value: string
+  label: string
+}
+
+interface ModelOptionGroup {
+  value: string
+  items: ModelOption[]
+}
 
 interface APIRequestBuilderProps {
   course_name: string
@@ -72,19 +91,28 @@ export default function APIRequestBuilder({
     { value: 'node', label: 'Node.js' },
   ]
 
-  const modelOptions = llmProviders
+  const modelOptionGroups: ModelOptionGroup[] = llmProviders
     ? Object.entries(llmProviders).flatMap(([provider, config]) =>
         config.enabled && config.models && provider !== 'WebLLM'
-          ? config.models
-              .filter((model: AnySupportedModel) => model.enabled)
-              .map((model: AnySupportedModel) => ({
-                group: provider,
-                value: model.id,
-                label: model.name,
-              }))
+          ? [
+              {
+                value: provider,
+                items: config.models
+                  .filter((model: AnySupportedModel) => model.enabled)
+                  .map((model: AnySupportedModel) => ({
+                    value: model.id,
+                    label: model.name,
+                  })),
+              },
+            ]
           : [],
       )
     : []
+
+  const selectedModelOption =
+    modelOptionGroups
+      .flatMap((group) => group.items)
+      .find((option) => option.value === selectedModel) ?? null
 
   const handleCopyCodeSnippet = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -99,29 +127,6 @@ export default function APIRequestBuilder({
   /** Escape for JSON, then for single-quoted curl -d payload. */
   const escapeForCurlJson = (s: string) =>
     escapeForSingleQuotedShell(escapeForJson(s))
-
-  // Fix WCAG: Mantine v5 puts aria-label on wrapper div (generic role) instead of
-  // the interactive [role=combobox] / [role=slider] elements. We set labels directly
-  // on the correct elements via a post-render DOM fix.
-  useEffect(() => {
-    const container = document.querySelector('.api-request-builder')
-    if (!container) return
-
-    const comboboxes = container.querySelectorAll('[role="combobox"]')
-    comboboxes[0]?.setAttribute('aria-label', 'Select language')
-    comboboxes[1]?.setAttribute('aria-label', 'Select model')
-
-    container
-      .querySelector('[role="slider"]')
-      ?.setAttribute('aria-label', 'Temperature')
-
-    // Remove stray aria-label from wrapper divs with generic role
-    container
-      .querySelectorAll(
-        '.mantine-Select-root[aria-label], .mantine-Slider-root[aria-label]',
-      )
-      .forEach((el) => el.removeAttribute('aria-label'))
-  }, [selectedLanguage, selectedModel, temperature])
 
   const baseUrl = process.env.VERCEL_URL || window.location.origin
 
@@ -222,154 +227,93 @@ fetch('${baseUrl}/api/chat-api/chat', {
 });`,
   }
 
-  const styles = {
-    container: {
-      backgroundColor: 'var(--illinois-background-darker)',
-      border: '1px solid var(--illinois-storm-dark)',
-    },
-    input: {
-      backgroundColor: 'var(--illinois-background-dark)',
-      color: 'var(--illinois-white)',
-      border: '1px solid var(--illinois-storm-light)',
-    },
-    button: {
-      backgroundColor: 'var(--illinois-industrial)',
-      color: 'var(--illinois-white)',
-      '&:hover': {
-        backgroundColor: 'var(--illinois-blue)',
-      },
-    },
-  }
-
   return (
     <div className="api-request-builder w-full px-4 sm:px-10">
-      <Title
-        order={3}
-        className={`text-left ${montserrat_heading.variable} font-montserratHeading text-[--dashboard-foreground]`}
+      <h3
+        className={`heading-h3 text-left ${montserrat_heading.variable} font-montserratHeading text-(--dashboard-foreground)`}
       >
         Request Builder
-      </Title>
+      </h3>
 
-      <Divider
-        my="lg"
-        size="md"
-        className="-mx-4 border-[--dashboard-background-dark] sm:-mx-10"
-      />
+      <Separator className="-mx-4 my-5 bg-(--dashboard-background-dark) sm:-mx-10" />
 
       <div className="space-y-6">
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
           <Select
-            placeholder="Select language"
-            data={languageOptions}
             value={selectedLanguage}
-            radius={'md'}
-            onChange={(value: 'curl' | 'python' | 'node') =>
-              setSelectedLanguage(value)
+            onValueChange={(value) =>
+              setSelectedLanguage(value as 'curl' | 'python' | 'node')
             }
-            styles={(theme) => ({
-              input: {
-                '&:focus': {
-                  borderColor: 'var(--dashboard-button)',
-                },
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--background)',
-                fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                cursor: 'pointer',
-                minWidth: 0,
-                flex: '1 1 auto',
-              },
-              dropdown: {
-                backgroundColor: 'var(--background)',
-                border: '1px solid var(--background-dark)',
-              },
-              item: {
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--background)',
-                borderRadius: theme.radius.md,
-                margin: '2px',
-                '&[data-selected]': {
-                  '&': {
-                    color: 'var(--foreground)',
-                    backgroundColor: 'transparent',
-                  },
-                  '&:hover': {
-                    color: 'var(--foreground)',
-                    backgroundColor: 'var(--foreground-faded)',
-                  },
-                },
-                '&[data-hovered]': {
-                  color: 'var(--foreground)',
-                  backgroundColor: 'var(--foreground-faded)',
-                },
-              },
-              rightSection: {
-                pointerEvents: 'none',
-                color: theme.colors.gray[5],
-              },
-            })}
-            className={`w-full flex-shrink-0 sm:w-[150px] ${montserrat_paragraph.variable} font-montserratParagraph`}
-            rightSection={<IconChevronDown size={14} aria-hidden="true" />}
-          />
+          >
+            <SelectTrigger
+              aria-label="Select language"
+              className={`w-full shrink-0 cursor-pointer sm:w-[150px] ${montserrat_paragraph.variable} font-montserratParagraph`}
+            >
+              <SelectValue placeholder="Select language">
+                {(value: string | null) =>
+                  languageOptions.find((option) => option.value === value)
+                    ?.label ?? 'Select language'
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {languageOptions.map((option) => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className="rounded-md data-highlighted:bg-(--foreground-faded) data-highlighted:text-(--foreground)"
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex w-full items-center gap-2">
-            <Select
-              placeholder="Select model"
-              data={modelOptions}
-              value={selectedModel}
-              onChange={(value) => setSelectedModel(value || '')}
-              searchable
-              radius={'md'}
-              maxDropdownHeight={400}
-              styles={(theme) => ({
-                input: {
-                  '&:focus': {
-                    borderColor: 'var(--dashboard-button)',
-                  },
-                  color: 'var(--foreground)',
-                  backgroundColor: 'var(--background)',
-                  fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                  cursor: 'pointer',
-                  minWidth: 0,
-                  flex: '1 1 auto',
-                },
-                dropdown: {
-                  backgroundColor: 'var(--background)',
-                  border: '1px solid var(--background-dark)',
-                },
-                item: {
-                  color: 'var(--foreground)',
-                  backgroundColor: 'var(--background)',
-                  borderRadius: theme.radius.md,
-                  margin: '2px',
-                  '&[data-selected]': {
-                    '&': {
-                      backgroundColor: 'transparent',
-                    },
-                    '&:hover': {
-                      color: 'var(--foreground)',
-                      backgroundColor: 'var(--foreground-faded)',
-                    },
-                  },
-                  '&[data-hovered]': {
-                    color: 'var(--foreground)',
-                    backgroundColor: 'var(--foreground-faded)',
-                  },
-                },
-                rightSection: {
-                  pointerEvents: 'none',
-                  color: theme.colors.gray[5],
-                },
-              })}
-              className={`min-w-0 flex-1 ${montserrat_paragraph.variable} font-montserratParagraph`}
-              rightSection={<IconChevronDown size={14} aria-hidden="true" />}
-            />
+            <Combobox
+              items={modelOptionGroups}
+              value={selectedModelOption}
+              onValueChange={(item: ModelOption | null) =>
+                setSelectedModel(item?.value ?? '')
+              }
+            >
+              <ComboboxInputGroup
+                className={`min-w-0 flex-1 ${montserrat_paragraph.variable} font-montserratParagraph`}
+              >
+                <ComboboxInput
+                  aria-label="Select model"
+                  placeholder="Select model"
+                />
+              </ComboboxInputGroup>
+              <ComboboxContent>
+                <ComboboxEmpty>No models found.</ComboboxEmpty>
+                <ComboboxList>
+                  {(group: ModelOptionGroup) => (
+                    <ComboboxGroup key={group.value} items={group.items}>
+                      <ComboboxGroupLabel>{group.value}</ComboboxGroupLabel>
+                      <ComboboxCollection>
+                        {(item: ModelOption) => (
+                          <ComboboxItem
+                            key={item.value}
+                            value={item}
+                            className="rounded-md data-highlighted:bg-(--foreground-faded) data-highlighted:text-(--foreground)"
+                          >
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxCollection>
+                    </ComboboxGroup>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
             <Button
               aria-label="Copy Code Snippet"
               onClick={() =>
                 handleCopyCodeSnippet(codeSnippets[selectedLanguage])
               }
-              variant="subtle"
+              variant="ghost"
               size="xs"
-              className="h-[36px] w-[50px] flex-shrink-0 transform rounded-md bg-[--dashboard-button] text-[--dashboard-button-foreground] hover:bg-[--dashboard-button-hover] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--dashboard-button]"
+              className="h-[36px] w-[50px] shrink-0 transform rounded-md bg-(--dashboard-button) text-(--dashboard-button-foreground) hover:bg-(--dashboard-button-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--dashboard-button)"
             >
               {copiedCodeSnippet ? (
                 <IconCheck aria-hidden="true" />
@@ -381,169 +325,85 @@ fetch('${baseUrl}/api/chat-api/chat', {
         </div>
 
         <div className="space-y-2">
-          <Title
-            order={4}
-            className={`font-medium ${montserrat_paragraph.variable} font-montserratParagraph text-[--dashboard-foreground]`}
+          <h4
+            className={`text-lg leading-[1.45] font-medium ${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground)`}
           >
             System Prompt
-          </Title>
+          </h4>
           <Textarea
             placeholder="System Prompt"
             aria-label="System Prompt"
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.currentTarget.value)}
-            minRows={2}
-            radius={'md'}
+            rows={2}
             className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-            styles={(theme) => ({
-              input: {
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--background)',
-                borderColor: 'var(--foreground-faded)',
-                '&:focus': {
-                  borderColor: 'var(--dashboard-button)',
-                },
-                fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-              },
-            })}
           />
         </div>
 
         <div className="space-y-2">
-          <Title
-            order={4}
-            className={`font-medium ${montserrat_paragraph.variable} font-montserratParagraph text-[--dashboard-foreground]`}
+          <h4
+            className={`text-lg leading-[1.45] font-medium ${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground)`}
           >
             User Query
-          </Title>
+          </h4>
           <Textarea
             placeholder="User Query"
             aria-label="User Query"
             value={userQuery}
             onChange={(e) => setUserQuery(e.currentTarget.value)}
-            minRows={2}
-            radius={'md'}
+            rows={2}
             className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-            styles={(theme) => ({
-              input: {
-                color: 'var(--foreground)',
-                backgroundColor: 'var(--background)',
-                borderColor: 'var(--foreground-faded)',
-                '&:focus': {
-                  borderColor: 'var(--dashboard-button)',
-                },
-                fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-              },
-            })}
           />
         </div>
 
         <div className="space-y-2">
-          <Title
-            order={4}
-            className={`font-medium ${montserrat_paragraph.variable} font-montserratParagraph text-[--dashboard-foreground]`}
+          <h4
+            className={`text-lg leading-[1.45] font-medium ${montserrat_paragraph.variable} font-montserratParagraph text-(--dashboard-foreground)`}
           >
             Temperature
-          </Title>
-          <Slider
-            value={temperature}
-            onChange={setTemperature}
-            min={0}
-            max={1}
-            step={0.1}
-            label={(value) => value.toFixed(1)}
-            styles={(theme) => ({
-              track: {
-                backgroundColor: 'var(--foreground-dark)',
-              },
-              bar: {
-                backgroundColor: 'var(--dashboard-button)',
-              },
-              thumb: {
-                border: '1.5px solid var(--dashboard-background-dark)',
-                backgroundColor: 'var(--dashboard-button)',
-              },
-              label: {
-                color: 'var(--dashboard-button-foreground)',
-                backgroundColor: 'var(--dashboard-button)',
-                fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                fontWeight: 'bold',
-              },
-            })}
-            className="mt-4"
-          />
+          </h4>
+          <div className="mt-4 flex items-center gap-3">
+            <span
+              className={`rounded-md bg-(--dashboard-button) px-2 py-1 text-sm font-bold text-(--dashboard-button-foreground) ${montserrat_paragraph.variable} font-montserratParagraph`}
+            >
+              {temperature.toFixed(1)}
+            </span>
+            <Slider
+              aria-label="Temperature"
+              value={[temperature]}
+              onValueChange={(value) =>
+                setTemperature(
+                  Array.isArray(value) ? (value[0] ?? temperature) : value,
+                )
+              }
+              min={0}
+              max={1}
+              step={0.1}
+              trackClassName="bg-(--foreground-dark)"
+              indicatorClassName="bg-(--dashboard-button)"
+              thumbClassName="border-(--dashboard-background-dark) bg-(--dashboard-button)"
+              className="flex-1"
+            />
+          </div>
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={retrievalOnly}
-              onChange={(event) =>
-                setRetrievalOnly(event.currentTarget.checked)
-              }
-              label="Retrieval Only"
-              size="md"
-              className={`mt-4 ${montserrat_paragraph.variable} font-montserratParagraph`}
-              styles={(theme) => ({
-                track: {
-                  backgroundColor: retrievalOnly
-                    ? 'var(--dashboard-button) !important'
-                    : 'transparent',
-                  borderColor: retrievalOnly
-                    ? 'var(--dashboard-button) !important'
-                    : 'var(--foreground-faded)',
-                },
-                label: {
-                  color: 'var(--dashboard-foreground)',
-                  fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                },
-              })}
-            />
-            <Tooltip
-              label="Retrieval Only bypasses the LLM call, making it free to retrieve relevant documents that match your prompt."
-              position="top"
-              multiline
-              width={220}
-              withArrow
-              styles={(theme) => ({
-                tooltip: {
-                  backgroundColor: 'var(--background)',
-                  color: 'var(--foreground)',
-                  fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                },
-              })}
-            >
-              <IconInfoCircle
-                size={16}
-                aria-hidden="true"
-                className="mt-4 cursor-help text-gray-400"
-              />
-            </Tooltip>
-          </div>
+        <div
+          className={`mt-4 flex gap-4 ${montserrat_paragraph.variable} font-montserratParagraph`}
+        >
+          <Switch
+            checked={retrievalOnly}
+            onCheckedChange={setRetrievalOnly}
+            variant="labeled"
+            label="Retrieval Only"
+            tooltip="Retrieval Only bypasses the LLM call, making it free to retrieve relevant documents that match your prompt."
+          />
 
           {selectedLanguage !== 'node' && (
             <Switch
               checked={streamEnabled}
-              onChange={(event) =>
-                setStreamEnabled(event.currentTarget.checked)
-              }
+              onCheckedChange={setStreamEnabled}
+              variant="labeled"
               label="Stream Response"
-              size="md"
-              className={`mt-4 ${montserrat_paragraph.variable} font-montserratParagraph`}
-              styles={(theme) => ({
-                track: {
-                  backgroundColor: streamEnabled
-                    ? 'var(--dashboard-button) !important'
-                    : 'transparent',
-                  borderColor: streamEnabled
-                    ? 'var(--dashboard-button) !important'
-                    : 'var(--foreground-faded)',
-                },
-                label: {
-                  color: 'var(--dashboard-foreground)',
-                  fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                },
-              })}
             />
           )}
         </div>
@@ -553,7 +413,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
             href="https://docs.uiuc.chat/api/endpoints#image-input-example"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[--foreground] underline hover:text-[--dashboard-button-hover]"
+            className="text-(--foreground) underline hover:text-(--dashboard-button-hover)"
           >
             Using image inputs (docs) →
           </a>
@@ -561,17 +421,10 @@ fetch('${baseUrl}/api/chat-api/chat', {
 
         <Textarea
           value={codeSnippets[selectedLanguage]}
-          autosize
-          variant="unstyled"
-          aria-label="Code snippet"
           readOnly
-          className="relative mt-4 w-full min-w-0 overflow-x-auto rounded-xl bg-[--background] pl-4 text-sm sm:min-w-[20rem] sm:pl-8 sm:text-base"
-          styles={{
-            input: {
-              color: 'var(--foreground)',
-              fontFamily: 'monospace',
-            },
-          }}
+          aria-label="Code snippet"
+          rows={codeSnippets[selectedLanguage].split('\n').length}
+          className="relative mt-4 w-full min-w-0 resize-none overflow-x-auto rounded-xl border-0 bg-(--background) pl-4 font-mono text-sm text-(--foreground) shadow-none focus-visible:ring-0 sm:min-w-80 sm:pl-8 sm:text-base"
         />
       </div>
     </div>

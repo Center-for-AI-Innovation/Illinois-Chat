@@ -1,30 +1,24 @@
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Head from 'next/head'
-// import { DropzoneS3Upload } from '~/components/UIUC-Components/Upload_S3'
+import { Button } from '@/components/shadcn/ui/button'
+import { Calendar } from '@/components/shadcn/ui/calendar'
 import {
-  // Badge,
-  // MantineProvider,
-  Button,
-  Flex,
-  // TextInput,
-  // Tooltip,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/shadcn/ui/popover'
+import {
   Select,
-  Text,
-  // Group,
-  // Stack,
-  // createStyles,
-  // FileInput,
-  // rem,
-  Title,
-  createStyles,
-  // Divider,
-  type MantineTheme,
-} from '@mantine/core'
-import { DatePickerInput } from '@mantine/dates'
-// const rubik_puddles = Rubik_Puddles({ weight: '400', subsets: ['latin'] })
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/shadcn/ui/select'
+import type { DateRange } from 'react-day-picker'
 import {
   IconCalendar,
   IconChartBar,
+  IconCloudDownload,
   IconMessage2,
   IconMessageCircle2,
   IconMinus,
@@ -47,39 +41,26 @@ import ConversationsPerHourChart from './ConversationsPerHourChart'
 import { LoadingSpinner } from './LoadingSpinner'
 import ModelUsageChart from './ModelUsageChart'
 
-const useStyles = createStyles((theme: MantineTheme) => ({
-  downloadButton: {
-    fontFamily: 'var(--font-montserratHeading)',
-    color: 'var(--dashboard-button-foreground)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    borderRadius: theme.radius.xl,
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease-in-out',
-    height: '48px',
-    /* border-1 border-[--dashboard-button] hover:bg-[--dashboard-button-hover] hover:border-[--dashboard-button-hover] */
+const DATE_RANGE_OPTIONS = [
+  { value: 'all', label: 'All Time' },
+  { value: 'last_week', label: 'Last Week' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'last_year', label: 'Last Year' },
+  { value: 'custom', label: 'Custom Range' },
+]
 
-    '&:hover': {
-      color: 'var(--dashboard-button-foreground)',
-    },
-    '@media (max-width: 768px)': {
-      fontSize: theme.fontSizes.xs,
-      padding: '10px',
-      width: '70%',
-    },
-    '@media (min-width: 769px) and (max-width: 1024px)': {
-      fontSize: theme.fontSizes.xs,
-      padding: '12px',
-      width: '90%',
-    },
-    '@media (min-width: 1025px)': {
-      fontSize: theme.fontSizes.sm,
-      padding: '15px',
-      width: '100%',
-    },
-  },
-}))
+const VIEW_OPTIONS = [
+  { value: 'hour', label: 'By Hour' },
+  { value: 'weekday', label: 'By Day of Week' },
+]
+
+const formatDateRangeLabel = (dateRange: [Date | null, Date | null]) => {
+  const [from, to] = dateRange
+  if (!from) return 'Pick date range'
+  const fmt = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return to ? `${fmt(from)} – ${fmt(to)}` : fmt(from)
+}
 
 import { useAuth } from 'react-oidc-context'
 
@@ -123,7 +104,6 @@ const formatPercentageChange = (value: number | null | undefined) => {
 }
 
 const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
-  const { classes, theme } = useStyles()
   const auth = useAuth()
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
@@ -171,6 +151,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
     null,
     null,
   ])
+  const [isDateRangePopoverOpen, setIsDateRangePopoverOpen] = useState(false)
   const [totalCount, setTotalCount] = useState<number>(0)
 
   // Separate state for filtered conversation stats
@@ -413,7 +394,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
     setIsLoading(true)
     try {
       const result = await downloadConversationHistory(courseName)
-      showToastOnUpdate(theme, false, false, result.message)
+      showToastOnUpdate(false, false, result.message)
     } finally {
       setIsLoading(false)
     }
@@ -438,112 +419,80 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="course-page-main min-w-screen flex min-h-screen flex-col items-center"
+          className="course-page-main flex min-h-screen w-full flex-col items-center"
         >
           <h1 className="sr-only">{course_name} Analytics</h1>
           <div className="items-left flex w-full flex-col justify-center py-0">
-            <Flex direction="column" align="center" w="100%">
+            <div className="flex w-full flex-col items-center">
               <div className="pt-5"></div>
-              <div
-                className="w-[96%] rounded-3xl bg-[--background] md:w-full 2xl:w-[95%]"
-                style={{
-                  // width: '98%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  paddingTop: '1rem',
-                }}
-              >
-                <div
-                  style={{
-                    width: '95%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingBottom: '1rem',
-                  }}
-                >
-                  <Title
-                    order={3}
-                    align="left"
-                    className={`px-4 text-[--dashboard-foreground] ${montserrat_heading.variable} font-montserratHeading`}
-                    style={{ flexGrow: 2 }}
+              <div className="flex w-[96%] flex-col items-center rounded-3xl bg-(--background) pt-4 md:w-full 2xl:w-[95%]">
+                <div className="flex w-[95%] items-center justify-between pb-4">
+                  <h3
+                    className={`heading-h3 grow-[2] px-4 text-left text-(--dashboard-foreground) ${montserrat_heading.variable} font-montserratHeading`}
                   >
                     Usage Overview
-                  </Title>
+                  </h3>
                   <Button
-                    className={`${montserrat_paragraph.variable} font-montserratParagraph ${classes.downloadButton} w-full bg-[--dashboard-button] px-2 text-sm hover:bg-[--dashboard-button-hover] sm:w-auto sm:px-4 sm:text-base`}
-                    rightIcon={
-                      isLoading ? (
-                        <LoadingSpinner size="sm" />
-                      ) : (
-                        <IconCloudDownload
-                          className="hidden sm:block"
-                          aria-hidden="true"
-                        />
-                      )
-                    }
+                    type="button"
+                    variant="dashboard"
+                    className={`${montserrat_paragraph.variable} font-montserratParagraph h-12 w-full items-center justify-center gap-2.5 rounded-2xl px-2 text-sm transition-colors sm:w-auto sm:px-4 sm:text-base`}
                     onClick={() => handleDownload(course_name)}
                   >
                     <span className="hidden sm:inline">
                       Download Conversation History
                     </span>
                     <span className="sm:hidden">Download History</span>
+                    {isLoading ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <IconCloudDownload
+                        className="hidden sm:block"
+                        aria-hidden="true"
+                      />
+                    )}
                   </Button>
                 </div>
 
                 {/* Project Analytics Dashboard - Using all-time stats */}
-                <div className="my-6 w-[95%] rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground]">
+                <div className="my-6 w-[95%] rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground)">
                   <div className="mb-6">
-                    <Title
-                      order={4}
-                      className={`${montserrat_heading.variable} font-montserratHeading`}
+                    <h4
+                      className={`heading-h4 ${montserrat_heading.variable} font-montserratHeading`}
                     >
                       Project Analytics
-                    </Title>
-                    <Text
-                      size="sm"
-                      color="var(--dashboard-foreground-faded)"
-                      mt={2}
-                    >
+                    </h4>
+                    <p className="mt-0.5 text-sm text-(--dashboard-foreground-faded)">
                       Overview of project engagement and usage statistics
-                    </Text>
+                    </p>
                   </div>
 
                   {/* Main Stats Grid with Integrated Weekly Trends */}
                   <div className={`grid gap-6 ${statsGridClasses}`}>
                     {/* Conversations Card */}
-                    <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <Text size="sm" weight={500} mb={1}>
+                          <p className="mb-px text-sm font-medium">
                             Total Conversations
-                          </Text>
-                          <Text
-                            size="xs"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          </p>
+                          <p className="text-xs text-(--foreground-faded)">
                             All-time chat sessions
-                          </Text>
+                          </p>
                         </div>
-                        <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                        <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                           <IconMessageCircle2
                             size={24}
-                            className="text-[--dashboard-stat]"
+                            className="text-(--dashboard-stat)"
                             aria-hidden="true"
                           />
                         </div>
                       </div>
                       <div className="mt-4">
                         <div className="flex items-center gap-3">
-                          <Text
-                            size="xl"
-                            weight={700}
-                            className="flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
-                          >
+                          <p className="flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-xl font-bold text-white">
                             {courseStats?.total_conversations?.toLocaleString() ||
                               '0'}
-                          </Text>
+                          </p>
 
                           {(() => {
                             const trend = weeklyTrends.find(
@@ -580,23 +529,21 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                                     aria-hidden="true"
                                   />
                                 )}
-                                <Text
-                                  size="sm"
-                                  weight={500}
-                                  className={
+                                <p
+                                  className={`text-sm font-medium ${
                                     trend.percentage_change > 0
                                       ? 'text-green-400'
                                       : trend.percentage_change < 0
                                         ? 'text-red-400'
                                         : 'text-gray-400'
-                                  }
+                                  }`}
                                 >
                                   {trend.percentage_change > 0 ? '+' : ''}
                                   {formatPercentageChange(
                                     trend.percentage_change,
                                   )}
                                   % vs last week
-                                </Text>
+                                </p>
                               </div>
                             )
                           })()}
@@ -605,36 +552,29 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     </div>
 
                     {/* Users Card */}
-                    <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <Text size="sm" weight={500} mb={1}>
+                          <p className="mb-px text-sm font-medium">
                             Total Users
-                          </Text>
-                          <Text
-                            size="xs"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          </p>
+                          <p className="text-xs text-(--foreground-faded)">
                             All-time unique participants
-                          </Text>
+                          </p>
                         </div>
-                        <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                        <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                           <IconUsers
                             size={24}
-                            className="text-[--dashboard-stat]"
+                            className="text-(--dashboard-stat)"
                             aria-hidden="true"
                           />
                         </div>
                       </div>
                       <div className="mt-4">
                         <div className="flex items-center gap-3">
-                          <Text
-                            size="xl"
-                            weight={700}
-                            className="flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
-                          >
+                          <p className="flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-xl font-bold text-white">
                             {courseStats?.total_users?.toLocaleString() || '0'}
-                          </Text>
+                          </p>
                           {(() => {
                             const trend = weeklyTrends.find(
                               (t) => t.metric_name === 'Unique Users',
@@ -670,23 +610,21 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                                     aria-hidden="true"
                                   />
                                 )}
-                                <Text
-                                  size="sm"
-                                  weight={500}
-                                  className={
+                                <p
+                                  className={`text-sm font-medium ${
                                     trend.percentage_change > 0
                                       ? 'text-green-400'
                                       : trend.percentage_change < 0
                                         ? 'text-red-400'
                                         : 'text-gray-400'
-                                  }
+                                  }`}
                                 >
                                   {trend.percentage_change > 0 ? '+' : ''}
                                   {formatPercentageChange(
                                     trend.percentage_change,
                                   )}
                                   % vs last week
-                                </Text>
+                                </p>
                               </div>
                             )
                           })()}
@@ -695,37 +633,30 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     </div>
 
                     {/* Messages Card */}
-                    <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                    <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <Text size="sm" weight={500} mb={1}>
+                          <p className="mb-px text-sm font-medium">
                             Messages
-                          </Text>
-                          <Text
-                            size="xs"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          </p>
+                          <p className="text-xs text-(--foreground-faded)">
                             Total exchanges
-                          </Text>
+                          </p>
                         </div>
-                        <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                        <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                           <IconMessage2
                             size={24}
-                            className="text-[--dashboard-stat]"
+                            className="text-(--dashboard-stat)"
                             aria-hidden="true"
                           />
                         </div>
                       </div>
                       <div className="mt-4">
                         <div className="flex items-center gap-3">
-                          <Text
-                            size="xl"
-                            weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
-                          >
+                          <p className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-xl font-bold text-white">
                             {courseStats?.total_messages?.toLocaleString() ||
                               '0'}
-                          </Text>
+                          </p>
 
                           {(() => {
                             const trend = weeklyTrends.find(
@@ -762,23 +693,21 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                                     aria-hidden="true"
                                   />
                                 )}
-                                <Text
-                                  size="sm"
-                                  weight={500}
-                                  className={
+                                <p
+                                  className={`text-sm font-medium ${
                                     trend.percentage_change > 0
                                       ? 'text-green-400'
                                       : trend.percentage_change < 0
                                         ? 'text-red-400'
                                         : 'text-gray-400'
-                                  }
+                                  }`}
                                 >
                                   {trend.percentage_change > 0 ? '+' : ''}
                                   {formatPercentageChange(
                                     trend.percentage_change,
                                   )}
                                   % vs last week
-                                </Text>
+                                </p>
                               </div>
                             )
                           })()}
@@ -791,143 +720,107 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   <div className="mt-8">
                     <div className="mb-4 flex items-center">
                       <div className="flex-1">
-                        <Text
-                          size="lg"
-                          weight={600}
-                          className={`${montserrat_heading.variable} font-montserratHeading`}
+                        <p
+                          className={`text-lg font-semibold ${montserrat_heading.variable} font-montserratHeading`}
                         >
                           User Engagement Metrics
-                        </Text>
-                        <Text
-                          size="sm"
-                          color="var(--dashboard-foreground-faded)"
-                          mt={1}
-                        >
+                        </p>
+                        <p className="mt-px text-sm text-(--dashboard-foreground-faded)">
                           Detailed breakdown of user interaction patterns
-                        </Text>
+                        </p>
                       </div>
                     </div>
 
                     <div className={`grid gap-6 ${statsGridClasses}`}>
                       {/* Average Conversations per User */}
-                      <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-3 flex items-center justify-between">
                           <div>
-                            <Text size="sm" weight={500} mb={1}>
+                            <p className="mb-px text-sm font-medium">
                               Conversations per User
-                            </Text>
-                            <Text
-                              size="xs"
-                              style={{ color: 'var(--foreground-faded)' }}
-                            >
+                            </p>
+                            <p className="text-xs text-(--foreground-faded)">
                               Average engagement frequency
-                            </Text>
+                            </p>
                           </div>
-                          <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                          <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                             <IconMessageCircle2
                               size={24}
-                              className="text-[--dashboard-stat]"
+                              className="text-(--dashboard-stat)"
                               aria-hidden="true"
                             />
                           </div>
                         </div>
                         <div className="mt-4 flex items-baseline gap-2">
-                          <Text
-                            size="xl"
-                            weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
-                          >
+                          <p className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-xl font-bold text-white">
                             {courseStats?.avg_conversations_per_user?.toFixed(
                               1,
                             ) || '0'}
-                          </Text>
-                          <Text
-                            size="sm"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          </p>
+                          <p className="text-sm text-(--foreground-faded)">
                             conversations / user
-                          </Text>
+                          </p>
                         </div>
                       </div>
 
                       {/* Average Messages per User */}
-                      <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-3 flex items-center justify-between">
                           <div>
-                            <Text size="sm" weight={500} mb={1}>
+                            <p className="mb-px text-sm font-medium">
                               Messages per User
-                            </Text>
-                            <Text
-                              size="xs"
-                              style={{ color: 'var(--foreground-faded)' }}
-                            >
+                            </p>
+                            <p className="text-xs text-(--foreground-faded)">
                               Average interaction depth
-                            </Text>
+                            </p>
                           </div>
-                          <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                          <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                             <IconMessage2
                               size={24}
-                              className="text-[--dashboard-stat]"
+                              className="text-(--dashboard-stat)"
                               aria-hidden="true"
                             />
                           </div>
                         </div>
                         <div className="mt-4 flex items-baseline gap-2">
-                          <Text
-                            size="xl"
-                            weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
-                          >
+                          <p className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-xl font-bold text-white">
                             {courseStats?.avg_messages_per_user?.toFixed(1) ||
                               '0'}
-                          </Text>
-                          <Text
-                            size="sm"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          </p>
+                          <p className="text-sm text-(--foreground-faded)">
                             messages / user
-                          </Text>
+                          </p>
                         </div>
                       </div>
 
                       {/* Average Messages per Conversation */}
-                      <div className="rounded-lg bg-[--dashboard-background] p-4 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-3 flex items-center justify-between">
                           <div>
-                            <Text size="sm" weight={500} mb={1}>
+                            <p className="mb-px text-sm font-medium">
                               Messages per Conversation
-                            </Text>
-                            <Text
-                              size="xs"
-                              style={{ color: 'var(--foreground-faded)' }}
-                            >
+                            </p>
+                            <p className="text-xs text-(--foreground-faded)">
                               Average conversation length
-                            </Text>
+                            </p>
                           </div>
-                          <div className="rounded-full bg-[--dashboard-background-dark] p-2">
+                          <div className="rounded-full bg-(--dashboard-background-dark) p-2">
                             <IconChartBar
                               size={24}
-                              className="text-[--dashboard-stat]"
+                              className="text-(--dashboard-stat)"
                               aria-hidden="true"
                             />
                           </div>
                         </div>
                         <div className="mt-4 flex items-baseline gap-2">
-                          <Text
-                            size="xl"
-                            weight={700}
-                            className="inline-flex min-h-[3rem] min-w-[3rem] items-center justify-center rounded-full bg-[--dashboard-stat] text-white"
-                          >
+                          <p className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full bg-(--dashboard-stat) text-xl font-bold text-white">
                             {courseStats?.avg_messages_per_conversation?.toFixed(
                               1,
                             ) || '0'}
-                          </Text>
-                          <Text
-                            size="sm"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          </p>
+                          <p className="text-sm text-(--foreground-faded)">
                             messages / conversation
-                          </Text>
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -937,175 +830,124 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                 {/* Charts Section - Using filtered stats */}
                 <div className="grid w-[95%] grid-cols-1 gap-6 pb-10 lg:grid-cols-2">
                   {/* Date Range Selector - Always visible */}
-                  <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200 lg:col-span-2">
+                  <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200 lg:col-span-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <Title order={4}>Conversation Visualizations</Title>
-                        <Text size="sm" mt={1}>
+                        <h4 className="heading-h4">Conversation Visualizations</h4>
+                        <p className="mt-px text-sm">
                           Select a time range to filter the visualizations below
-                        </Text>
+                        </p>
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <Select
-                          size="sm"
-                          w={200}
-                          aria-label="Date range filter"
                           value={dateRangeType}
-                          onChange={(value) => {
+                          onValueChange={(value) => {
                             setDateRangeType(value || 'all')
                             if (value !== 'custom') {
                               setDateRange([null, null])
                             }
                           }}
-                          data={[
-                            { value: 'all', label: 'All Time' },
-                            { value: 'last_week', label: 'Last Week' },
-                            { value: 'last_month', label: 'Last Month' },
-                            { value: 'last_year', label: 'Last Year' },
-                            { value: 'custom', label: 'Custom Range' },
-                          ]}
-                          className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                          styles={(theme) => ({
-                            input: {
-                              '&:focus': {
-                                borderColor: 'var(--dashboard-button)',
-                              },
-                              color: 'var(--foreground)',
-                              backgroundColor: 'var(--background)',
-                              fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                            },
-                            dropdown: {
-                              backgroundColor: 'var(--background)',
-                              border: '1px solid var(--background-dark)',
-                            },
-                            item: {
-                              color: 'var(--foreground)',
-                              backgroundColor: 'var(--background)',
-                              borderRadius: theme.radius.md,
-                              margin: '2px',
-                              '&[data-selected]': {
-                                '&': {
-                                  color: 'var(--foreground)',
-                                  backgroundColor: 'transparent',
-                                },
-                                '&:hover': {
-                                  color: 'var(--foreground)',
-                                  backgroundColor: 'var(--foreground-faded)',
-                                },
-                              },
-                              '&[data-hovered]': {
-                                color: 'var(--foreground)',
-                                backgroundColor: 'var(--foreground-faded)',
-                              },
-                            },
-                          })}
-                        />
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label="Date range filter"
+                            className={`w-[200px] border-(--background-dark) bg-(--background) text-(--foreground) focus-visible:border-(--dashboard-button) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          >
+                            <SelectValue placeholder="Select a range">
+                              {(value: string | null) =>
+                                DATE_RANGE_OPTIONS.find(
+                                  (option) => option.value === value,
+                                )?.label ?? 'Select a range'
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="border-(--background-dark) bg-(--background) text-(--foreground)">
+                            {DATE_RANGE_OPTIONS.map((option) => (
+                              <SelectItem
+                                key={option.value}
+                                value={option.value}
+                                className="data-highlighted:bg-(--foreground-faded)"
+                              >
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         {dateRangeType === 'custom' && (
-                          <DatePickerInput
-                            firstDayOfWeek={0}
-                            icon={
+                          <Popover
+                            open={isDateRangePopoverOpen}
+                            onOpenChange={setIsDateRangePopoverOpen}
+                          >
+                            <PopoverTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  aria-label="Custom date range picker"
+                                  className={`w-[200px] justify-start gap-2 border-(--foreground-faded) bg-(--background) text-sm text-(--foreground) hover:border-(--dashboard-button) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                                />
+                              }
+                            >
                               <IconCalendar
                                 size="1.1rem"
                                 stroke={1.5}
                                 aria-hidden="true"
+                                className="text-(--foreground)"
                               />
-                            }
-                            type="range"
-                            size="sm"
-                            w={200}
-                            aria-label="Custom date range picker"
-                            value={dateRange}
-                            onChange={setDateRange}
-                            // TODO fix me type error complaining placeholder doesn't exist for mantine/date v6
-                            // placeholder="Pick date range"
-                            className="date_picker"
-                            styles={(theme: MantineTheme) => ({
-                              icon: {
-                                color: 'var(--foreground)',
-                              },
-                              input: {
-                                backgroundColor: 'var(--background)',
-                                borderColor: 'var(--foreground-faded)',
-                                color: 'var(--foreground)',
-                                '&:selected': {
-                                  color: 'var(--button-text-color)',
-                                  backgroundColor: 'var(--button)',
-                                  borderColor: 'var(--button)',
-                                },
-                                '&:hover': {
-                                  borderColor: 'var(--dashboard-button)',
-                                },
-                                '&:focus': {
-                                  borderColor: 'var(--button)',
-                                },
-                              },
-                              calendarHeader: {
-                                borderColor: 'var(--button)',
-                                color: theme.white,
-                              },
-                              calendarHeaderControl: {
-                                color: theme.white,
-                                '&:hover': {
-                                  color: theme.white,
-                                },
-                              },
-                              monthPickerControl: {
-                                color: theme.white,
-                                '&:hover': {
-                                  backgroundColor: 'var(--button-hover)',
-                                },
-                              },
-                              yearPickerControl: {
-                                color: theme.white,
-                                '&:hover': {
-                                  backgroundColor: 'var(--button-hover)',
-                                },
-                              },
-                              day: {
-                                color: theme.white,
-                                // '&:hover': {
-                                //   backgroundColor: theme.colors.grape[8],
-                                // },
-                              },
-                            })}
-                          />
+                              {formatDateRangeLabel(dateRange)}
+                            </PopoverTrigger>
+                            <PopoverContent
+                              align="start"
+                              className="w-auto border-(--background-dark) bg-(--background) p-0 text-(--foreground)"
+                            >
+                              <Calendar
+                                mode="range"
+                                selected={{
+                                  from: dateRange[0] ?? undefined,
+                                  to: dateRange[1] ?? undefined,
+                                }}
+                                onSelect={(range: DateRange | undefined) => {
+                                  setDateRange([
+                                    range?.from ?? null,
+                                    range?.to ?? null,
+                                  ])
+                                }}
+                              />
+                            </PopoverContent>
+                          </Popover>
                         )}
                         {totalCount > 0 && (
-                          <Text
-                            size="sm"
-                            style={{ color: 'var(--foreground-faded)' }}
-                          >
+                          <p className="text-sm text-(--foreground-faded)">
                             {totalCount} conversations in selected range
-                          </Text>
+                          </p>
                         )}
                       </div>
                     </div>
                   </div>
 
                   {!hasConversationData ? (
-                    <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
-                      <Title
-                        order={4}
-                        className={`${montserrat_heading.variable} font-montserratHeading`}
+                    <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
+                      <h4
+                        className={`heading-h4 ${montserrat_heading.variable} font-montserratHeading`}
                       >
                         No conversation data available for selected time range
-                      </Title>
-                      <Text size="lg" mt="md">
+                      </h4>
+                      <p className="mt-4 text-lg">
                         Try selecting a different time range to view the
                         visualizations
-                      </Text>
+                      </p>
                     </div>
                   ) : (
                     <>
                       {/* Model Usage Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
-                        <Title order={4} mb="md" align="left">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
+                        <h4 className="heading-h4 mb-4 text-left">
                           Model Usage Distribution
-                        </Title>
-                        <Text size="sm" mb="xl">
+                        </h4>
+                        <p className="mb-8 text-sm">
                           Distribution of AI models used across all
                           conversations
-                        </Text>
+                        </p>
                         <ModelUsageChart
                           data={modelUsageData}
                           isLoading={modelUsageLoading}
@@ -1114,14 +956,14 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Conversations Per Day Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
-                        <Title order={4} mb="md" align="left">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
+                        <h4 className="heading-h4 mb-4 text-left">
                           Conversations Per Day
-                        </Title>
-                        <Text size="sm" mb="xl">
+                        </h4>
+                        <p className="mb-8 text-sm">
                           Shows the total number of conversations that occurred
                           on each calendar day
-                        </Text>
+                        </p>
                         <ConversationsPerDayChart
                           data={filteredConversationStats?.per_day}
                           isLoading={filteredStatsLoading}
@@ -1130,63 +972,46 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Combined Hour/Weekday Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
                         <div className="mb-4 flex items-center justify-between">
                           <div>
-                            <Title order={4}>
+                            <h4 className="heading-h4">
                               Aggregated Conversation Breakdown
-                            </Title>
-                            <Text size="sm" mt={1}>
+                            </h4>
+                            <p className="mt-px text-sm">
                               View conversation patterns by hour of day or day
                               of week
-                            </Text>
+                            </p>
                           </div>
                           <Select
                             value={view}
-                            aria-label="View by hour or day"
-                            onChange={(value) => setView(value || 'hour')}
-                            data={[
-                              { value: 'hour', label: 'By Hour' },
-                              { value: 'weekday', label: 'By Day of Week' },
-                            ]}
-                            className={`${montserrat_paragraph.variable} font-montserratParagraph`}
-                            styles={(theme) => ({
-                              input: {
-                                '&:focus': {
-                                  borderColor: 'var(--dashboard-button)',
-                                },
-                                color: 'var(--foreground)',
-                                backgroundColor: 'var(--background)',
-                                fontFamily: `var(--font-montserratParagraph), ${theme.fontFamily}`,
-                              },
-                              dropdown: {
-                                backgroundColor: 'var(--background)',
-                                border: '1px solid var(--background-dark)',
-                              },
-                              item: {
-                                color: 'var(--foreground)',
-                                backgroundColor: 'var(--background)',
-                                borderRadius: theme.radius.md,
-                                margin: '2px',
-                                '&[data-selected]': {
-                                  '&': {
-                                    color: 'var(--foreground)',
-                                    backgroundColor: 'transparent',
-                                  },
-                                  '&:hover': {
-                                    color: 'var(--foreground)',
-                                    backgroundColor: 'var(--foreground-faded)',
-                                  },
-                                },
-                                '&[data-hovered]': {
-                                  color: 'var(--foreground)',
-                                  backgroundColor: 'var(--foreground-faded)',
-                                },
-                              },
-                            })}
-                            size="xs"
-                            w={150}
-                          />
+                            onValueChange={(value) => setView(value || 'hour')}
+                          >
+                            <SelectTrigger
+                              size="sm"
+                              aria-label="View by hour or day"
+                              className={`w-[150px] border-(--background-dark) bg-(--background) text-xs text-(--foreground) focus-visible:border-(--dashboard-button) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                            >
+                              <SelectValue placeholder="Select a view">
+                                {(value: string | null) =>
+                                  VIEW_OPTIONS.find(
+                                    (option) => option.value === value,
+                                  )?.label ?? 'Select a view'
+                                }
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="border-(--background-dark) bg-(--background) text-(--foreground)">
+                              {VIEW_OPTIONS.map((option) => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                  className="data-highlighted:bg-(--foreground-faded)"
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         {view === 'hour' ? (
                           <ConversationsPerHourChart
@@ -1204,14 +1029,14 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                       </div>
 
                       {/* Heatmap Chart */}
-                      <div className="rounded-xl bg-[--dashboard-background-faded] p-6 text-[--dashboard-foreground] transition-all duration-200">
-                        <Title order={4} mb="md" align="left">
+                      <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200">
+                        <h4 className="heading-h4 mb-4 text-left">
                           Conversations Per Day and Hour
-                        </Title>
-                        <Text size="sm" mb="xl">
+                        </h4>
+                        <p className="mb-8 text-sm">
                           A heatmap showing conversation density across both
                           days and hours
-                        </Text>
+                        </p>
                         <ConversationsHeatmapByHourChart
                           data={filteredConversationStats?.heatmap}
                           isLoading={filteredStatsLoading}
@@ -1222,7 +1047,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   )}
                 </div>
               </div>
-            </Flex>
+            </div>
           </div>
 
           {/*<NomicDocumentMap course_name={course_name as string} />*/}
@@ -1233,8 +1058,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
     </>
   )
 }
-
-import { IconCloudDownload } from '@tabler/icons-react'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { showToast } from '~/utils/toastUtils'
@@ -1277,21 +1100,9 @@ async function fetchCourseMetadata(course_name: string) {
   }
 }
 
-const showToastOnFileDeleted = (theme: MantineTheme, was_error = false) => {
-  return showToast({
-    autoClose: 5000,
-    title: was_error ? 'Error deleting file' : 'Deleting file...',
-    message: was_error
-      ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
-      : 'The file is being deleted in the background.',
-    type: was_error ? 'error' : 'success',
-  })
-}
-
 export default MakeQueryAnalysisPage
 
 export const showToastOnUpdate = (
-  theme: MantineTheme,
   was_error = false,
   isReset = false,
   message: string,

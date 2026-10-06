@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Text, Card, Button, Input, createStyles } from '@mantine/core'
+import { Button } from '@/components/shadcn/ui/button'
+import { Input } from '@/components/shadcn/ui/input'
 import {
   IconBrandGithub,
   IconWorldDownload,
@@ -34,85 +35,6 @@ export default function GitHubIngestForm({
   setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }): JSX.Element {
-  const useStyles = createStyles((theme) => ({
-    // For Logos
-    logos: {
-      // width: '30%',
-      aspectRatio: '3/2',
-      objectFit: 'contain',
-      width: '80px',
-    },
-
-    smallLogos: {
-      // width: '30%',
-      aspectRatio: '1/1',
-      objectFit: 'contain',
-      width: '45px',
-    },
-
-    codeStyledText: {
-      color: 'var(--illinois-white)',
-      backgroundColor: 'var(--illinois-orange)',
-      borderRadius: '5px',
-      padding: '.2rem .5rem',
-      fontFamily: 'monospace',
-      alignItems: 'center',
-      justifyItems: 'center',
-    },
-
-    // For Accordion
-    root: {
-      borderRadius: theme.radius.lg,
-      paddingLeft: 25,
-      width: '400px',
-      // outline: 'none',
-      paddingTop: 20,
-      paddingBottom: 20,
-
-      '&[data-active]': {
-        paddingTop: 20,
-      },
-    },
-    control: {
-      borderRadius: theme.radius.lg,
-      // outline: '0.5px solid ',
-      '&:hover': {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)', // 20% white on hover
-      },
-    },
-    content: {
-      borderRadius: theme.radius.lg,
-    },
-    panel: {
-      borderRadius: theme.radius.lg,
-    },
-    item: {
-      backgroundColor: 'bg-transparent',
-      // border: `${rem(1)} solid transparent`,
-      border: `solid transparent`,
-      borderRadius: theme.radius.lg,
-      position: 'relative',
-      // zIndex: 0,
-      transition: 'transform 150ms ease',
-      outline: 'none',
-
-      '&[data-active]': {
-        transform: 'scale(1.03)',
-        backgroundColor: '#15162b',
-        borderRadius: theme.radius.lg,
-        boxShadow: theme.shadows.xl,
-      },
-      '&:hover': {
-        backgroundColor: 'bg-transparent',
-      },
-    },
-
-    chevron: {
-      '&[data-rotate]': {
-        transform: 'rotate(180deg)',
-      },
-    },
-  }))
   const [isUrlValid, setIsUrlValid] = useState(false)
   const [url, setUrl] = useState('')
   const [maxUrls, setMaxUrls] = useState('50')
@@ -130,12 +52,15 @@ export default function GitHubIngestForm({
     }
   }
   const [icon, setIcon] = useState(
-    <IconWorldDownload size={'50%'} aria-hidden="true" />,
+    <IconWorldDownload
+      size={20}
+      aria-hidden="true"
+      className="text-(--foreground-faded)"
+    />,
   )
   const [scrapeStrategy, setScrapeStrategy] =
     useState<string>('equal-and-below')
   const [open, setOpen] = useState(false)
-  const { classes, theme } = useStyles()
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value
     setUrl(input)
@@ -345,25 +270,22 @@ export default function GitHubIngestForm({
         <DialogTrigger
           tabIndex={0}
           nativeButton={false}
-          className="focus:bg-[--dashboard-background-dark]"
+          className="focus:bg-(--dashboard-background-dark)"
           render={
-            <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[--dashboard-border] bg-transparent px-6 py-4 text-[--dashboard-foreground] transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-              style={{ height: '100%' }}
-            >
-              <div className="-ml-2 mb-2 flex items-center justify-between">
+            <div className="group relative h-full cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
+              <div className="mb-2 -ml-2 flex items-center justify-between">
                 <div className="flex items-center space-x-1">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full">
                     <IconBrandGithub className="h-8 w-8" aria-hidden="true" />
                   </div>
-                  <Text className="text-xl font-semibold">GitHub</Text>
+                  <p className="text-xl font-semibold">GitHub</p>
                 </div>
               </div>
-              <Text className="mb-4 text-sm leading-relaxed text-[--dashboard-foreground-faded]">
+              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
                 Import content from GitHub repositories, including
                 documentation, code, and README files.
-              </Text>
-              <div className="mt-auto flex items-center text-sm font-bold text-[--dashboard-button]">
+              </p>
+              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
                 <span>Configure import</span>
                 <IconArrowRight
                   size={16}
@@ -371,11 +293,11 @@ export default function GitHubIngestForm({
                   className="ml-2 transition-transform group-hover:translate-x-1"
                 />
               </div>
-            </Card>
+            </div>
           }
         />
 
-        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto !rounded-2xl border-0 bg-[--modal] px-4 py-6 text-[--modal-text] sm:px-6">
+        <DialogContent className="mx-auto h-auto max-h-[85vh] w-[95%] max-w-2xl overflow-y-auto rounded-2xl! border-0 bg-(--modal) px-4 py-6 text-(--modal-text) sm:px-6">
           <DialogHeader>
             <DialogTitle className="mb-4 text-left text-xl font-bold">
               Ingest GitHub Website
@@ -384,9 +306,9 @@ export default function GitHubIngestForm({
           <div className="">
             <div className="">
               <div>
-                <div className="break-words text-sm sm:text-base">
+                <div className="text-sm wrap-break-word sm:text-base">
                   <strong>For GitHub</strong>, just enter a URL like{' '}
-                  <code className={classes.codeStyledText}>
+                  <code className="inline-flex items-center rounded-md bg-(--illinois-orange) px-2 py-1 font-mono text-xs text-(--illinois-white) sm:text-sm">
                     github.com/USER/REPO
                   </code>
                   , for example:{' '}
@@ -396,7 +318,7 @@ export default function GitHubIngestForm({
                       rel="noreferrer"
                       href={'https://github.com/langchain-ai/langchain'}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[--dashboard-button]"
+                      className="text-(--dashboard-button)"
                     >
                       https://github.com/langchain-ai/langchain
                     </Link>
@@ -405,35 +327,24 @@ export default function GitHubIngestForm({
                   repository is public.
                 </div>
 
-                <Input
-                  icon={icon}
-                  aria-label="GitHub repository URL"
-                  className="mt-4 w-full rounded-full"
-                  styles={{
-                    input: {
-                      color: 'var(--foreground)',
-                      backgroundColor: 'var(--background-faded)',
-                      borderColor: 'var(--background-dark)',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      '&:focus': {
-                        borderColor: 'var(--illinois-orange)',
-                      },
-                    },
-                    wrapper: {
-                      width: '100%',
-                    },
-                  }}
-                  placeholder="Enter URL..."
-                  radius="md"
-                  type="url"
-                  value={url}
-                  size="lg"
-                  onChange={(e) => {
-                    handleUrlChange(e)
-                  }}
-                />
+                <div className="relative mt-4 w-full">
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+                  >
+                    {icon}
+                  </span>
+                  <Input
+                    aria-label="GitHub repository URL"
+                    className="h-12 w-full truncate rounded-full border-(--background-dark) bg-(--background-faded) pl-11 text-(--foreground) focus-visible:border-(--illinois-orange)"
+                    placeholder="Enter URL..."
+                    type="url"
+                    value={url}
+                    onChange={(e) => {
+                      handleUrlChange(e)
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -441,7 +352,7 @@ export default function GitHubIngestForm({
             <Button
               onClick={handleIngest}
               disabled={!isUrlValid}
-              className="h-11 w-full rounded-xl bg-[--dashboard-button] text-[--dashboard-button-foreground] transition-colors hover:bg-[--dashboard-button-hover] disabled:bg-[--background-faded] disabled:text-[--background-dark]"
+              className="h-11 w-full rounded-xl bg-(--dashboard-button) text-(--dashboard-button-foreground) transition-colors hover:bg-(--dashboard-button-hover) disabled:bg-(--background-faded) disabled:text-(--background-dark)"
             >
               Ingest the Website
             </Button>

@@ -272,7 +272,7 @@ describe('Sidebar – additional coverage', () => {
     const { container } = renderSidebar({ onScroll })
 
     const scrollArea = container.querySelector(
-      '.flex-grow.overflow-auto',
+      '.grow.overflow-auto',
     ) as HTMLElement
     fireEvent.scroll(scrollArea)
 
@@ -318,7 +318,7 @@ describe('Sidebar – additional coverage', () => {
         } as any,
       })
 
-      // Use the Mantine Button with title="Admin Dashboard" (the settings icon)
+      // Use the button with title="Admin Dashboard" (the settings icon)
       const settingsBtn = screen.getAllByTitle('Admin Dashboard')[0]!
       await userEvent.setup().click(settingsBtn)
 
