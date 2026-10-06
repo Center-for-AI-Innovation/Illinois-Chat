@@ -77,7 +77,7 @@ describe('UIUC-api/getMaintainerProfiles', () => {
   it('builds maintainer profiles from owner + admins (excluding the default admin)', async () => {
     hoisted.getCourseMetadata.mockResolvedValueOnce({
       course_owner: 'owner@example.com',
-      course_admins: ['alice@example.com', 'rohan13@illinois.edu'],
+      course_admins: ['alice@example.com'],
     })
     hoisted.find.mockImplementation(async ({ email }: { email: string }) => {
       if (email === 'owner@example.com')
@@ -114,7 +114,7 @@ describe('UIUC-api/getMaintainerProfiles', () => {
     )
     // The default admin email is excluded from the maintainer list.
     expect(
-      payload.profiles.some((p: any) => p.email === 'rohan13@illinois.edu'),
+      payload.profiles.some((p: any) => p.email === 'genaisupport@mx.uillinois.edu'),
     ).toBe(false)
   })
 

@@ -96,7 +96,7 @@ describe('EmailListAccordion', () => {
         metadata={
           {
             course_owner: 'owner@example.com',
-            course_admins: ['admin1@example.com', 'rohan13@illinois.edu'],
+            course_admins: ['admin1@example.com'],
           } as any
         }
         is_private={false}
@@ -114,7 +114,7 @@ describe('EmailListAccordion', () => {
     expect(callSetCourseMetadata).toHaveBeenCalledWith(
       'CS101',
       expect.objectContaining({
-        course_admins: expect.arrayContaining(['rohan13@illinois.edu']),
+        course_admins: expect.arrayContaining(['genaisupport@mx.uillinois.edu']),
       }),
     )
   })

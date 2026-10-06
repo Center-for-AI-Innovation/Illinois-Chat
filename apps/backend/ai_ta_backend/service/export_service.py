@@ -13,6 +13,7 @@ from ai_ta_backend.database.connection_manager import ConnectionManager
 from ai_ta_backend.database.sql import SQLDatabase
 from ai_ta_backend.executors.process_pool_executor import ProcessPoolExecutorAdapter
 from ai_ta_backend.service.sentry_service import SentryService
+from ai_ta_backend.utils.email.constants import SUPPORT_EMAIL
 from ai_ta_backend.utils.email.send_transactional_email import send_email
 from ai_ta_backend.utils.export_utils import (
   _cleanup,
@@ -571,9 +572,9 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
     bcc_emails = []
 
     # Handle specific email cases
-    if 'rohan13@illinois.edu' in admin_emails:
-      admin_emails.remove('rohan13@illinois.edu')
-      bcc_emails.append('rohan13@illinois.edu')
+    if SUPPORT_EMAIL in admin_emails:
+      admin_emails.remove(SUPPORT_EMAIL)
+      bcc_emails.append(SUPPORT_EMAIL)
 
     admin_emails.append(course_metadata['course_owner'])
     admin_emails = list(set(admin_emails))
@@ -674,10 +675,10 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
 
     bcc_emails = []
 
-    # check for dev's email and move to bcc
-    if 'rohan13@illinois.edu' in admin_emails:
-      admin_emails.remove('rohan13@illinois.edu')
-      bcc_emails.append('rohan13@illinois.edu')
+    # check for support email and move to bcc
+    if SUPPORT_EMAIL in admin_emails:
+      admin_emails.remove(SUPPORT_EMAIL)
+      bcc_emails.append(SUPPORT_EMAIL)
 
     # add course owner email to admin_emails
     admin_emails.append(course_metadata['course_owner'])

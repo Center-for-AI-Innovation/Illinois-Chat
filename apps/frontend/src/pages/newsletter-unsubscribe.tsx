@@ -42,7 +42,7 @@ export default function Unsubscribe() {
         showToast({
           title: 'Our database is having a bad day. 😢',
           message:
-            "Seems like we couldn't unsubscribe you. Please try again later. Email help@uiuc.chat for assistance.",
+            "Seems like we couldn't unsubscribe you. Please try again later. Email genaisupport@mx.uillinois.edu for assistance.",
           type: 'error',
           autoClose: 20000,
         })
@@ -65,7 +65,7 @@ export default function Unsubscribe() {
       console.error('There was a problem with the fetch operation:', error)
       showToast({
         title: 'Our database is having a bad day. 😢',
-        message: `Seems like we couldn't unsubscribe you. Please try again later. Email help@uiuc.chat for assistance. Full error: ${error}`,
+        message: `Seems like we couldn't unsubscribe you. Please try again later. Email genaisupport@mx.uillinois.edu for assistance. Full error: ${error}`,
         type: 'error',
         autoClose: 20000,
       })

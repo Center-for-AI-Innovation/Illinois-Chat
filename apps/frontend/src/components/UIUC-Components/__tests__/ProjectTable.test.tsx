@@ -47,7 +47,7 @@ describe('ProjectTable', () => {
       {
         CS101: {
           course_owner: 'owner@example.com',
-          course_admins: ['admin@example.com', 'rohan13@illinois.edu'],
+          course_admins: ['admin@example.com'],
           is_private: true,
           allow_logged_in_users: false,
         },

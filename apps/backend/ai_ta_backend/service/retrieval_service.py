@@ -420,7 +420,7 @@ class RetrievalService:
                         subject=f"LLM Monitor Alert - {', '.join(alert_categories)}",
                         body_text=alert_body,
                         sender="hi@uiuc.chat",
-                        recipients=["hbroome@illinois.edu", SUPPORT_EMAIL],
+                        recipients=[SUPPORT_EMAIL],
                         bcc_recipients=[],
                     )
             else:
