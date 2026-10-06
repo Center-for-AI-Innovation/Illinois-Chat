@@ -201,7 +201,7 @@ The general lesson applies to any tool you build. **When the inputs need checkin
 
 **Author-only searches come back in an odd order.** Results are sorted by relevance. If you want an author's newest papers first, add a **Condition** block that sends author-only requests to a second ArXiv block set to **Get Author Papers**, which sorts by submission date.
 
-**The run fails with "blocked by the server policy".** The workflow uses a block that is switched off on this deployment. The [Sim AI user guide](../sim-user-guide.md#5-which-sim-blocks-you-can-use) lists which blocks are available.
+**The run fails with "blocked by the server policy".** The workflow uses a block that is switched off on this deployment. The [Sim AI user guide](../sim-user-guide.md#which-sim-blocks-you-can-use) lists which blocks are available.
 
 ## Adapting this to your own tool
 

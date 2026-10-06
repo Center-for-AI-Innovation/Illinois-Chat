@@ -1,7 +1,7 @@
-# Sim AI developer guide
+# Sim AI operator guide
 
-How the Sim AI deployment is put together, how Illinois Chat talks to it, and what to know
-before changing or upgrading it.
+How the Sim AI deployment is put together, how Illinois Chat talks to it, how users get
+in, and what to know before changing or upgrading it.
 
 If you build tools in Sim rather than maintain the deployment, read the
 [Sim user guide](sim-user-guide.md) instead.
@@ -107,7 +107,29 @@ Two independent gates:
    revokes live sessions immediately.
 
 The gate lives in the database precisely so we can keep using upstream images unmodified.
-The user guide covers the admin workflow.
+
+### Approving users
+
+A `sim_user_approval` table stores one decision per email (`pending`, `approved`, or
+`blocked`), and database triggers enforce it on Sim's user and session tables. The
+bootstrap platform admin is the address in `SIM_APPROVAL_ADMIN_EMAIL` (required in
+`.env`; the Sim stack refuses to start without it).
+
+Admins have two equivalent ways to act on a request:
+
+- **In Sim's UI**: sign in as a platform admin and open **Settings → Admin**. Pending
+  users appear as banned; use **Unban** to approve them. Banning a user blocks them
+  again. Actions taken here are mirrored into the approval table automatically.
+- **In the database**: update the row directly, e.g.
+  `UPDATE sim_user_approval SET status = 'approved' WHERE email = 'someone@illinois.edu';`
+  Valid statuses are `approved`, `pending`, and `blocked`.
+
+Decisions take effect immediately: approving unlocks the account on the next sign-in,
+and blocking revokes the user's live Sim sessions on the spot. Setting `is_admin = true`
+on a row promotes that user to Sim platform admin.
+
+What users see while they wait, and how they connect a workspace once approved, is in the
+[user guide](sim-user-guide.md#waiting-for-approval).
 
 ## 5. The block whitelist
 
@@ -115,8 +137,8 @@ The user guide covers the admin workflow.
 comes from `ALLOWED_INTEGRATIONS` in `.env`, which is where the list lives and the only
 place it lives; `.env.template` ships the full 67 ids. `infra/docker/docker-compose.sim.yaml`
 passes it through with `:?` and no default, so a missing or blank value stops the Sim stack
-instead of silently unrestricting it. The allowed set is documented for builders in section 5
-of the user guide.
+instead of silently unrestricting it. The allowed set is documented for builders in the
+user guide under [Which Sim blocks you can use](sim-user-guide.md#which-sim-blocks-you-can-use).
 
 **Six properties, all verified against the source at our pinned commit.** Do not assume the
 public documentation applies — it describes a newer release that behaves differently:
@@ -189,7 +211,12 @@ entirely.
 **Every SSO sign-in is refused.** Check `SIM_SSO_DOMAIN` is one domain, not a list.
 
 **The Tools page says a stored key "could not be read".** `ENCRYPTION_MASTER_KEY` changed
-since the key was saved, or a migration is missing. Paste the key again.
+since the key was saved, or a migration is missing. Paste the key again. Project admins
+are told to report this to you if it recurs, so check which of the two happened.
+
+**Saving a Base URL on the Tools page is rejected.** The URL is not sim.ai, a local host,
+the origin of `SIM_API_BASE_URL`, or listed in `SIM_ALLOWED_SIM_ORIGINS` (section 3).
+Project admins cannot extend that set; add the origin to `SIM_ALLOWED_SIM_ORIGINS`.
 
 **A Connect button opens and closes immediately.** That integration needs a deployment-wide
 OAuth client we have not registered. This is expected; see the user guide.

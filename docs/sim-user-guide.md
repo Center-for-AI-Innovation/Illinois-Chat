@@ -2,22 +2,24 @@
 
 Illinois Chat uses [Sim AI](https://sim.ai) as its tool platform: workflows built and
 deployed in a Sim workspace become tools that chatbots can call during a conversation.
-This guide covers how to get access to Sim, how admin approval works, how to wire a Sim
-workspace into an Illinois Chat project, and which blocks you can use.
+This guide covers how to get access to Sim, how to wire a Sim workspace into an Illinois
+Chat project, how to let others build tools with you, and which blocks you can use.
 
 If you maintain the deployment rather than build tools with it, read the
-[Sim developer guide](sim-developer-guide.md) instead.
+[Sim AI operator guide](sim-developer-guide.md) instead. For how tools behave once they are
+connected, see [Tools & Workflows](guides/tools-workflows.md); for a complete worked example,
+see [Build a Tool in Sim](guides/build-a-sim-tool.md).
 
-## 1. Signing in to Sim with your Illinois identity (Keycloak SSO)
+## Signing in to Sim with your Illinois identity (Keycloak SSO)
 
 Sim shares the same Keycloak realm as Illinois Chat, so you sign in to Sim with the same
 account you use for the chat app — there is no separate Sim password.
 
-1. Open the Sim app (`http://localhost:3010` on the local stack, or your deployment's
-   Sim URL).
-2. On the login page, enter your email address and choose the single sign-on option.
-   The single email domain in `SIM_SSO_DOMAIN` (default: `illinois.edu`) is routed
-   to the Keycloak provider; addresses in any other domain are refused.
+1. Open Sim ([sim.chat.illinois.edu](https://sim.chat.illinois.edu/) on the hosted site, or
+   your deployment's Sim URL).
+2. On the login page, enter your email address and choose the single sign-on option. Only
+   addresses in the deployment's SSO domain (`illinois.edu` on the hosted site) are
+   accepted; addresses in any other domain are refused.
 3. You are redirected to Keycloak. Log in with your Illinois Chat credentials.
 4. Keycloak sends you back to Sim, which creates your Sim identity automatically on the
    first sign-in.
@@ -30,37 +32,15 @@ admin approves it. If you see a message that your account is banned or pending, 
 is wrong — an admin simply has not approved you yet. Contact your deployment's Sim
 admin, then sign in again once you have been approved; there is no need to re-register.
 
-## 2. How admin approval works
-
-The approval gate lives in Sim's own database (`infra/docker/sim/approval-setup.sql`): a
-`sim_user_approval` table stores one decision per email (`pending`, `approved`, or
-`blocked`), and database triggers enforce it on Sim's user and session tables. The
-bootstrap platform admin is the address in `SIM_APPROVAL_ADMIN_EMAIL` (required in
-`.env`; the Sim stack refuses to start without it).
-
-Admins have two equivalent ways to act on a request:
-
-- **In Sim's UI**: sign in as a platform admin and open **Settings → Admin**. Pending
-  users appear as banned; use **Unban** to approve them. Banning a user blocks them
-  again. Actions taken here are mirrored into the approval table automatically.
-- **In the database**: update the row directly, e.g.
-  `UPDATE sim_user_approval SET status = 'approved' WHERE email = 'someone@illinois.edu';`
-  Valid statuses are `approved`, `pending`, and `blocked`.
-
-Decisions take effect immediately: approving unlocks the account on the next sign-in,
-and blocking revokes the user's live Sim sessions on the spot. Setting `is_admin = true`
-on a row promotes that user to Sim platform admin.
-
-## 3. Connecting a Sim workspace to an Illinois Chat project
+## Connecting a Sim workspace to an Illinois Chat project
 
 Tools are configured per project by a project owner or admin on the project's **Tools**
 page (`/<project-name>/tools`, "Tools" in the sidebar). You need two values from Sim:
 
 1. **API key** — in Sim, open **Settings → Sim Keys** and create an API key
    (`sk-sim-...`). The key is stored encrypted server-side and only a masked version is
-   ever shown again. If the Tools page reports that the stored key "could not be read",
-   the deployment's `ENCRYPTION_MASTER_KEY` changed since the key was saved (or a database
-   migration is missing); paste the key again to restore tools.
+   ever shown again. If the Tools page later reports that the stored key "could not be
+   read", paste the key again; if that keeps happening, tell your deployment's operator.
 2. **Workspace ID** — in Sim, open the workspace you want to connect; the workspace ID
    is the identifier in the browser URL (`.../workspace/<workspace-id>/...`) and in the
    workspace settings.
@@ -68,10 +48,9 @@ page (`/<project-name>/tools`, "Tools" in the sidebar). You need two values from
 On the Tools page:
 
 1. Paste the **API Key** and **Workspace ID**.
-2. **Base URL** is optional: leave it blank to use the deployment default. Set it only
-   when pointing the project at a different Sim instance — the URL must be sim.ai or an
-   origin the operator has allowlisted (`SIM_API_BASE_URL` / `SIM_ALLOWED_SIM_ORIGINS`),
-   otherwise saving is rejected.
+2. **Base URL** is optional: leave it blank to use the deployment default. Only set it if
+   your operator has told you to point the project at a different Sim instance; other
+   URLs are rejected when you save.
 3. Save. The page lists every **deployed** workflow discovered in the workspace, along
    with the input fields each workflow expects.
 
@@ -83,16 +62,16 @@ the Tools page with a placeholder description.
 The Tools page also shows the project's tool-routing status: **Custom router** (tool
 calls are routed through the project's own OpenAI or OpenAI-compatible provider),
 **Default router** (the Illinois-hosted model does the routing), or **Offline** (no
-router is configured — add an LLM key or ask the operator to configure the hosted
-default).
+router is configured — add an LLM key on the project's **LLMs** page, or ask the operator
+to configure the hosted default).
 
-## 4. Letting others build tools in your workspace
+## Letting others build tools in your workspace
 
 Tool building happens in Sim, so collaboration is managed with Sim's own workspace
 membership:
 
-1. Each collaborator first needs Sim access: they sign in via SSO once (section 1) and a
-   platform admin approves them (section 2).
+1. Each collaborator first needs Sim access: they sign in via SSO once and a platform
+   admin approves them (see [Signing in](#signing-in-to-sim-with-your-illinois-identity-keycloak-sso)).
 2. In Sim, open your workspace and invite them by email from the workspace's member
    management, granting write (edit) permission so they can create and deploy workflows.
 3. Anything they deploy in that workspace automatically appears on the Tools page of
@@ -108,7 +87,7 @@ In chat, users can toggle individual tools on or off per conversation from the s
 panel's Tools tab; enabled tools are offered to the model automatically when a message
 looks like it needs one.
 
-## 5. Which Sim blocks you can use
+## Which Sim blocks you can use
 
 Not every block Sim ships is available on this deployment. When you open the block
 picker you will see the core workflow blocks plus a selected set of tools you can
@@ -184,7 +163,7 @@ are building with it. Adding a tool you authenticate yourself is a small configu
 change. Adding a Connect-button vendor depends on registering an application with that
 vendor first, so it takes longer.
 
-## 6. Learning more about Sim itself
+## Learning more about Sim itself
 
 Everything above is specific to our deployment. For how Sim works in general — writing
 prompts, wiring blocks together, testing a workflow — use Sim's own documentation:
@@ -210,7 +189,7 @@ but two things differ often enough to watch for:
 
 - **A block or feature described there may not exist here yet.** If the block picker does
   not show something the docs mention, it is either newer than our version or not on the
-  allowed list in section 5.
+  allowed list above.
 - **Anything about billing, hosted keys or "Sim Cloud" does not apply.** This is a
   self-hosted instance. Where the docs say Sim supplies a key for you, you supply your own.
 

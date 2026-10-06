@@ -74,4 +74,4 @@ Most tools follow the same shape: a **Start** block that declares the inputs, a 
 3. Enable the tools you want active in your project.
 4. Start chatting — tools are invoked as needed.
 
-See [Connecting a Sim workspace to an Illinois Chat project](../sim-user-guide.md#3-connecting-a-sim-workspace-to-an-illinois-chat-project) for the details, including the optional base URL and what the tool-routing status on the Tools page means.
+See [Connecting a Sim workspace to an Illinois Chat project](../sim-user-guide.md#connecting-a-sim-workspace-to-an-illinois-chat-project) for the details, including the optional base URL and what the tool-routing status on the Tools page means.

@@ -127,6 +127,7 @@ nav:
       - Environment Variables: self-hosting/environment-variables.md
       - Configuration: self-hosting/configuration.md
       - External Connections Setup: external-connections-setup.md
+      - Tools Platform (Sim AI): sim-developer-guide.md
       - System Architecture: self-hosting/architecture.md
   - CropWizard:
       - cropwizard/index.md
@@ -137,5 +138,4 @@ nav:
       - Development Setup: developers/dev-setup.md
       - Cloud Deployment: developers/deployment.md
       - Monorepo Migration: developers/monorepo-migration.md
-      - Sim AI Developer Guide: sim-developer-guide.md
   - Blog: blog/index.md
