@@ -203,6 +203,8 @@ The general lesson applies to any tool you build. **When the inputs need checkin
 
 **The run fails with "blocked by the server policy".** The workflow uses a block that is switched off on this deployment. The [Sim AI user guide](../sim-user-guide.md#which-sim-blocks-you-can-use) lists which blocks are available.
 
+**Still stuck?** See [Getting help](../sim-user-guide.md#getting-help) in the user guide for who to contact.
+
 ## Adapting this to your own tool
 
 The same shape works for most tools:

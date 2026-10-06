@@ -15,7 +15,7 @@ Tools are invoked automatically based on the LLM's judgment; there is no way to 
 
 ## Building tools with Sim AI
 
-Tools are [Sim AI](https://sim.ai) workflows. Sim is a visual workflow builder that ships with the Illinois Chat stack and shares its Keycloak login, so any workflow you build and deploy in a Sim workspace can be exposed to a chatbot as a tool. The hosted site runs Sim at [sim.chat.illinois.edu](https://sim.chat.illinois.edu/); new accounts wait for a platform admin to approve them before they can build anything.
+Tools are [Sim AI](https://sim.ai) workflows. Sim is a visual workflow builder that ships with the Illinois Chat stack and shares its Keycloak login, so any workflow you build and deploy in a Sim workspace can be exposed to a chatbot as a tool. The hosted site runs Sim at [sim.chat.illinois.edu](https://sim.chat.illinois.edu/); new accounts wait for approval before they can build anything (see [Getting help](../sim-user-guide.md#getting-help) for who to contact).
 
 The [Sim AI user guide](../sim-user-guide.md) covers signing in, approval, inviting collaborators, and which Sim blocks are available on this deployment.
 
@@ -70,7 +70,7 @@ Most tools follow the same shape: a **Start** block that declares the inputs, a 
 ## Using tools in your project
 
 1. In Sim, create an API key under **Settings → Sim Keys** and note the ID of the workspace that holds your workflows (it is in the workspace URL).
-2. Open `https://chat.illinois.edu/<your-project>/tools`, paste the API key and workspace ID, and save. The page lists every **deployed** workflow in that workspace; drafts do not appear until you deploy them.
+2. Open your project's **Tools** page in Illinois Chat (`/<your-project>/tools`), paste the API key and workspace ID, and save. The page lists every **deployed** workflow in that workspace; drafts do not appear until you deploy them.
 3. Enable the tools you want active in your project.
 4. Start chatting — tools are invoked as needed.
 

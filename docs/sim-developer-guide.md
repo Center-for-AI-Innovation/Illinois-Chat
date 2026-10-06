@@ -65,7 +65,8 @@ them invalidates sessions and makes previously encrypted data undecryptable.
 
 `SIM_SSO_DOMAIN` takes **a single registrable domain**, not a list. A comma-separated value
 normalises to nothing and denies every sign-in, and `start-dev.sh` refuses to start on one.
-Set it to `illinois.edu` and nothing else.
+Set it to the one domain your users sign in with (the hosted site uses `illinois.edu`) and
+nothing else.
 
 ## 3. How Illinois Chat talks to Sim
 
@@ -121,7 +122,7 @@ Admins have two equivalent ways to act on a request:
   users appear as banned; use **Unban** to approve them. Banning a user blocks them
   again. Actions taken here are mirrored into the approval table automatically.
 - **In the database**: update the row directly, e.g.
-  `UPDATE sim_user_approval SET status = 'approved' WHERE email = 'someone@illinois.edu';`
+  `UPDATE sim_user_approval SET status = 'approved' WHERE email = 'someone@example.edu';`
   Valid statuses are `approved`, `pending`, and `blocked`.
 
 Decisions take effect immediately: approving unlocks the account on the next sign-in,
@@ -185,7 +186,7 @@ variable. To genuinely lift the restriction you must set it to every id you want
 
 Two things this variable **cannot** do: disable MCP tools or custom tools. Those are
 permission-group settings with no environment equivalent. `ALLOWED_MCP_DOMAINS` restricts
-which hosts an MCP server may point at, and we currently set none.
+which hosts an MCP server may point at; the repository ships with none set.
 
 ## 6. Upgrading Sim
 
@@ -227,29 +228,33 @@ Check the container log for `Integration blocked by env allowlist` alongside
 
 ## 8. Sim's own documentation, and how far to trust it
 
-Start here for anything not covered above:
+Start here for anything not covered above. Sim's published docs track their **latest**
+release; this deployment runs the pinned **v0.8.4** (commit `e741923f`). Each row links
+the page as it was for our version (the documentation source at that commit, viewed on
+GitHub) and the current page.
 
-- [Self-hosting overview](https://docs.sim.ai/platform/self-hosting/environment-variables) —
-  the full environment variable reference.
-- [Integrations and OAuth](https://docs.sim.ai/platform/self-hosting/integrations-oauth) —
-  which providers need which `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, and the callback URL
-  shape. Read this before registering any vendor application.
-- [Security and hardening](https://docs.sim.ai/platform/self-hosting/security) — the SSRF
-  boundary, egress allowlists, and where user code runs.
-- [Sandboxes](https://docs.sim.ai/platform/self-hosting/sandboxes) — relevant because we run
-  the **default in-process sandbox**: Function block code executes inside the app container
-  with no network or filesystem separation. Anyone who can author a workflow runs code in
-  that container's security context. Accepted for now given the approval gate.
-- [Authentication](https://docs.sim.ai/platform/self-hosting/authentication) — signup
-  restrictions and SSO options.
-- [Access control](https://docs.sim.ai/platform/enterprise/access-control) — permission
-  groups, and the only documentation of `ALLOWED_INTEGRATIONS`.
+| Topic | Why it matters here | Our version (v0.8.4) | Current docs |
+|---|---|---|---|
+| Environment variables | The full reference for the `SIM_*` values passed through by the compose file. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/environment-variables.mdx) | [current](https://docs.sim.ai/platform/self-hosting/environment-variables) |
+| Integrations and OAuth | Which providers need which `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, and the callback URL shape. Read before registering any vendor application. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/integrations-oauth.mdx) | [current](https://docs.sim.ai/platform/self-hosting/integrations-oauth) |
+| Security and hardening | The SSRF boundary, egress allowlists, and where user code runs. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/security.mdx) | [current](https://docs.sim.ai/platform/self-hosting/security) |
+| Authentication | Signup restrictions and SSO options. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/authentication.mdx) | [current](https://docs.sim.ai/platform/self-hosting/authentication) |
+| Access control | Permission groups, and the only documentation of `ALLOWED_INTEGRATIONS`. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/enterprise/access-control.mdx) | [current](https://docs.sim.ai/platform/enterprise/access-control) |
+| Troubleshooting | Upstream's own list, for anything not in section 7. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/troubleshooting.mdx) | [current](https://docs.sim.ai/platform/self-hosting/troubleshooting) |
 
-**Treat these pages as indicative, not authoritative for this deployment.** They track
-Sim's latest release; we run a pinned, older one. During this work several documented
-behaviours turned out to differ from what our version actually does — including how the
-block allowlist matches ids and which blocks it exempts. When a detail matters, read the
-source at our pinned commit rather than the docs:
+The whole documentation set for our version is browsable at
+[`apps/docs/content/docs/en` at `e741923f`](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en).
+The current docs also have a [Sandboxes](https://docs.sim.ai/platform/self-hosting/sandboxes)
+page that did not exist at our version; it is still relevant because this deployment runs
+the **default in-process sandbox**: Function block code executes inside the app container
+with no network or filesystem separation. Anyone who can author a workflow runs code in
+that container's security context. Accepted for now given the approval gate.
+
+**Treat the current pages as indicative, not authoritative for this deployment.** During
+this work several documented behaviours turned out to differ from what our version
+actually does — including how the block allowlist matches ids and which blocks it exempts.
+When a detail matters, prefer the v0.8.4 column, and when even that is unclear, read the
+source at the pinned commit:
 
 ```
 https://github.com/simstudioai/sim/tree/e741923f

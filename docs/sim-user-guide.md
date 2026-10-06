@@ -29,8 +29,11 @@ account you use for the chat app — there is no separate Sim password.
 New Sim accounts do **not** get access immediately. Every first sign-in lands in a
 `pending` state ("Pending admin approval") and the account is held until a Sim platform
 admin approves it. If you see a message that your account is banned or pending, nothing
-is wrong — an admin simply has not approved you yet. Contact your deployment's Sim
-admin, then sign in again once you have been approved; there is no need to re-register.
+is wrong — an admin simply has not approved you yet. On the hosted site, email
+[genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu) with the address you
+signed in with; on a self-hosted deployment, contact whoever runs it (see
+[Getting help](#getting-help)). Sign in again once you have been approved; there is no
+need to re-register.
 
 ## Connecting a Sim workspace to an Illinois Chat project
 
@@ -40,7 +43,7 @@ page (`/<project-name>/tools`, "Tools" in the sidebar). You need two values from
 1. **API key** — in Sim, open **Settings → Sim Keys** and create an API key
    (`sk-sim-...`). The key is stored encrypted server-side and only a masked version is
    ever shown again. If the Tools page later reports that the stored key "could not be
-   read", paste the key again; if that keeps happening, tell your deployment's operator.
+   read", paste the key again; if that keeps happening, [contact support](#getting-help).
 2. **Workspace ID** — in Sim, open the workspace you want to connect; the workspace ID
    is the identifier in the browser URL (`.../workspace/<workspace-id>/...`) and in the
    workspace settings.
@@ -92,6 +95,11 @@ looks like it needs one.
 Not every block Sim ships is available on this deployment. When you open the block
 picker you will see the core workflow blocks plus a selected set of tools you can
 authenticate yourself. Everything else is hidden on purpose.
+
+!!! note "This list describes the hosted site"
+    The lists below are the configuration of the hosted Illinois Chat deployment. A
+    self-hosted deployment chooses its own list; if you run one, see the
+    [operator guide](sim-developer-guide.md#5-the-block-whitelist).
 
 ### What you can use
 
@@ -158,34 +166,34 @@ because the tool list is built from what is deployed in Sim.
 
 ### Asking for a block to be added
 
-Open an issue on the Illinois Chat repository describing the block you need and what you
-are building with it. Adding a tool you authenticate yourself is a small configuration
-change. Adding a Connect-button vendor depends on registering an application with that
-vendor first, so it takes longer.
+[Contact support](#getting-help) describing the block you need and what you are building
+with it. Adding a tool you authenticate yourself is a small configuration change. Adding a
+Connect-button vendor depends on registering an application with that vendor first, so it
+takes longer.
 
 ## Learning more about Sim itself
 
-Everything above is specific to our deployment. For how Sim works in general — writing
-prompts, wiring blocks together, testing a workflow — use Sim's own documentation:
+Everything above is specific to this deployment. For how Sim works in general — writing
+prompts, wiring blocks together, testing a workflow — use Sim's own documentation.
 
-- [Build your first workflow](https://docs.sim.ai/introduction) — the starting point.
-- [Blocks reference](https://docs.sim.ai/workflows/blocks/agent) — what each core block
-  does. Agent, API, Condition, Function, Router and Response are the ones you will use
-  most, and all are available here.
-- [Connecting blocks](https://docs.sim.ai/workflows/connections) — how data flows from one
-  block into the next.
-- [Variables and secrets](https://docs.sim.ai/platform/credentials) — storing an API key
-  once and referencing it as `{{KEY}}` instead of pasting it into every block.
-- [Triggers](https://docs.sim.ai/workflows/triggers/start) — how a workflow starts. For
-  Illinois Chat tools the start trigger matters most: the inputs you declare on it become
-  the tool's parameters, and a workflow whose inputs have no descriptions is skipped by
-  discovery rather than published with a guessed signature.
-- [Integrations](https://docs.sim.ai/integrations/firecrawl) — one page per tool block,
-  listing its operations and the inputs each needs.
+Sim's published docs at [docs.sim.ai](https://docs.sim.ai) always describe their **latest**
+release, while this deployment runs a pinned, slightly older one (**Sim v0.8.4**). The
+table gives both: the page as it was for our version (the documentation source at that
+release, viewed on GitHub) and the current page.
 
-**One caveat when reading those pages.** Sim's documentation tracks their latest release,
-while this deployment runs a pinned, slightly older version. Most of it applies unchanged,
-but two things differ often enough to watch for:
+| Topic | Why it matters here | Our version (v0.8.4) | Current docs |
+|---|---|---|---|
+| Build your first workflow | The starting point. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/introduction/index.mdx) | [current](https://docs.sim.ai/introduction) |
+| Blocks reference | What each core block does. Agent, API, Condition, Function, Router and Response are the ones you will use most, and all are available here. | [v0.8.4](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en/workflows/blocks) | [current](https://docs.sim.ai/workflows/blocks/agent) |
+| Connecting blocks | How data flows from one block into the next. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/workflows/connections.mdx) | [current](https://docs.sim.ai/workflows/connections) |
+| Variables and secrets | Storing an API key once and referencing it as `{{KEY}}` instead of pasting it into every block. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/credentials.mdx) | [current](https://docs.sim.ai/platform/credentials) |
+| Triggers | How a workflow starts. For Illinois Chat tools the Start trigger matters most: the inputs you declare on it become the tool's parameters, and a workflow whose inputs have no descriptions is skipped by discovery rather than published with a guessed signature. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/workflows/triggers/start.mdx) | [current](https://docs.sim.ai/workflows/triggers/start) |
+| Integrations | One page per tool block, listing its operations and the inputs each needs. | [v0.8.4](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en/integrations) | [current](https://docs.sim.ai/integrations/firecrawl) |
+
+The whole documentation set for our version is browsable at
+[`apps/docs/content/docs/en` at `e741923f`](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en).
+
+**Two caveats when reading the current docs.** Most of them apply unchanged, but:
 
 - **A block or feature described there may not exist here yet.** If the block picker does
   not show something the docs mention, it is either newer than our version or not on the
@@ -193,5 +201,16 @@ but two things differ often enough to watch for:
 - **Anything about billing, hosted keys or "Sim Cloud" does not apply.** This is a
   self-hosted instance. Where the docs say Sim supplies a key for you, you supply your own.
 
-If a page describes something you need and it is not available here, open an issue on the
-Illinois Chat repository rather than working around it.
+If a page describes something you need and it is not available here,
+[contact support](#getting-help) rather than working around it.
+
+## Getting help
+
+For anything about Sim on the hosted Illinois Chat site — account approval, a block you
+need, a tool that stopped working — email
+[genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu). This is the same
+support contact shown in the Illinois Chat app. Include your sign-in address and, for a
+workflow problem, the workflow name and the project it is connected to.
+
+If you use a self-hosted deployment, contact the people who run it; they have the
+[operator guide](sim-developer-guide.md).
