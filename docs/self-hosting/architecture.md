@@ -53,7 +53,7 @@ flowchart TB
 - **Ollama / vLLM** — local LLM serving.
 - **Crawlee** — web crawling.
 - **Nomic Atlas** — semantic maps of documents and conversation history.
-- **N8N** — user-defined tool workflows.
+- **Sim AI** — user-defined tool workflows.
 - **Sentry** — error monitoring; **PostHog** — product analytics.
 
 ## RAG chat: what happens when you hit send?

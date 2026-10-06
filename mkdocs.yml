@@ -108,7 +108,10 @@ nav:
       - Uploading Materials: guides/uploading-materials.md
       - Web Crawling: guides/web-crawling.md
       - Sharing & Access Control: guides/sharing-access.md
-      - Tools & Workflows: guides/tools-workflows.md
+      - Tools & Workflows:
+          - guides/tools-workflows.md
+          - Sim AI User Guide: sim-user-guide.md
+          - Build a Tool in Sim: guides/build-a-sim-tool.md
       - Canvas Integration: guides/canvas-integration.md
       - Analytics: guides/analytics.md
       - Bulk Export: guides/bulk-export.md
@@ -124,6 +127,7 @@ nav:
       - Environment Variables: self-hosting/environment-variables.md
       - Configuration: self-hosting/configuration.md
       - External Connections Setup: external-connections-setup.md
+      - Tools Platform (Sim AI): sim-developer-guide.md
       - System Architecture: self-hosting/architecture.md
   - CropWizard:
       - cropwizard/index.md
