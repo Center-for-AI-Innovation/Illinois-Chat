@@ -266,7 +266,12 @@ html {
   color: var(--ic-text-secondary);
 }
 
-/* ----- Sidebar ----- */
+/* ----- Sidebar -----
+   Three visual levels: the tab title and section labels are small uppercase
+   headings in the secondary colour with no hover/active state; pages are
+   regular-weight links; pages inside a section are indented behind a thin
+   rule so a section reads as a group, not as another page. Material removes
+   the indent for section children on purpose, so it is restored here. */
 
 @media screen and (min-width: 76.25em) {
   .md-nav--primary .md-nav__title,
@@ -274,8 +279,10 @@ html {
     background: transparent;
     box-shadow: none;
     color: var(--ic-text-secondary);
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     line-height: 1;
   }
 }
@@ -292,16 +299,62 @@ html {
   color: var(--illinois-orange);
 }
 
-.md-nav__item--active > .md-nav__link,
+/* Active page only — never a section label (the section item is also
+   "active" whenever one of its pages is). */
+.md-nav__item--active:not(.md-nav__item--section) > .md-nav__link,
 .md-nav__link--active {
   background-color: var(--ic-slate-100);
   color: var(--illinois-orange);
   font-weight: 700;
 }
 
-.md-nav__item--nested > .md-nav__link {
+/* Section labels (navigation.sections) */
+.md-nav--primary .md-nav__item--section {
+  margin-top: 1.25em;
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav__link {
+  color: var(--ic-text-secondary);
+  font-size: 0.6875rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* A section whose first entry is its own index page (navigation.indexes)
+   keeps that index clickable: Material renders it as the label itself. */
+.md-nav--primary .md-nav__item--section > .md-nav__link[href] {
+  pointer-events: auto;
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav__link[href]:hover {
+  color: var(--illinois-orange);
+}
+
+/* Indent section children behind a rule line */
+.md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list {
+  margin-left: 0.4rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--ic-border);
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
+  padding-left: 0;
+}
+
+/* Collapsible groups below section level keep a medium weight so they sit
+   between a section label and a page. */
+.md-nav__item--nested:not(.md-nav__item--section) > .md-nav__link {
+  font-weight: 600;
   color: var(--ic-sidebar-fg);
+}
+
+.md-nav__item--nested:not(.md-nav__item--section) > .md-nav > .md-nav__list {
+  margin-left: 0.4rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--ic-border);
 }
 
 .md-sidebar--primary {

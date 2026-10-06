@@ -41,7 +41,7 @@ Learn more in [Concepts → Retrieval](concepts/retrieval.md).
 - :material-file-document-multiple: **[Guides](guides/uploading-materials.md)** — uploading materials, web crawling, sharing, tools, Canvas, analytics.
 - :material-api: **[API Reference](api/index.md)** — integrate Illinois Chat into your own applications.
 - :material-server: **[Self-Hosting](self-hosting/index.md)** — run the full stack yourself with Docker Compose.
-- :material-sprout: **[CropWizard](cropwizard/index.md)** — the flagship agricultural assistant built on Illinois Chat.
+- :material-sprout: **[CropWizard](use-cases/cropwizard/index.md)** — the flagship agricultural assistant built on Illinois Chat.
 - :material-post: **[Blog](blog/index.md)** — release notes and announcements.
 
 </div>

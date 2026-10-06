@@ -18,7 +18,7 @@ Welcome to the new home of the Illinois Chat documentation — built with Materi
 - **[Guides](../../guides/uploading-materials.md)** — uploading materials, web crawling, sharing, custom tools, Canvas, analytics, and bulk export.
 - **[API Reference](../../api/index.md)** — chat, retrieval, ingest, and export endpoints with runnable examples.
 - **[Self-Hosting](../../self-hosting/index.md)** — the full Docker Compose stack, environment variables, and system architecture.
-- **[CropWizard](../../cropwizard/index.md)** — the flagship agricultural assistant built on the platform.
+- **[CropWizard](../../use-cases/cropwizard/index.md)** — the flagship agricultural assistant built on the platform.
 
 ## Release notes live here too
 

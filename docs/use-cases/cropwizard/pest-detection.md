@@ -21,6 +21,6 @@ Use it to quickly diagnose pest problems, track infestations, and get informed t
 
 ## How it fits the tools framework
 
-Pest detection is a standard Illinois Chat [tool](../guides/tools-workflows.md): image in, annotated image + labels out, automatically selected by the LLM when your question and images make it relevant. See [Tool questions](index.md#tool-questions) for the steps CropWizard displays during a tool invocation.
+Pest detection is a standard Illinois Chat [tool](../../guides/tools-workflows.md): image in, annotated image + labels out, automatically selected by the LLM when your question and images make it relevant. See [Tool questions](index.md#tool-questions) for the steps CropWizard displays during a tool invocation.
 
 LeAF was developed within the **AIFARMS** institute.
