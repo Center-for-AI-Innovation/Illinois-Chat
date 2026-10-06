@@ -15,7 +15,7 @@ Tools are invoked automatically based on the LLM's judgment; there is no way to 
 
 ## Building tools with Sim AI
 
-Tools are [Sim AI](https://sim.ai) workflows. Sim is a visual workflow builder that ships with the Illinois Chat stack and shares its Keycloak login, so any workflow you build and deploy in a Sim workspace can be exposed to a chatbot as a tool. The hosted site runs Sim at [sim.chat.illinois.edu](https://sim.chat.illinois.edu/); new accounts wait for approval before they can build anything (see [Getting help](../sim-user-guide.md#getting-help) for who to contact).
+Tools are [Sim AI](https://sim.ai) workflows. Sim is a visual workflow builder that ships with the Illinois Chat stack and shares its Keycloak login, so any workflow you build and deploy in a Sim workspace can be exposed to a chatbot as a tool. The hosted site runs Sim at [sim.chat.illinois.edu](https://sim.chat.illinois.edu/); new accounts wait for approval before they can build anything (contact support using the address in the page footer).
 
 The [Sim AI user guide](../sim-user-guide.md) covers signing in, approval, inviting collaborators, and which Sim blocks are available on this deployment.
 

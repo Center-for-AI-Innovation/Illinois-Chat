@@ -10,6 +10,9 @@ If you maintain the deployment rather than build tools with it, read the
 connected, see [Tools & Workflows](guides/tools-workflows.md); for a complete worked example,
 see [Build a Tool in Sim](guides/build-a-sim-tool.md).
 
+Wherever this guide says to contact support, use the support address in the footer of this
+page. If you use a self-hosted deployment, contact the people who run it instead.
+
 ## Signing in to Sim with your Illinois identity (Keycloak SSO)
 
 Sim shares the same Keycloak realm as Illinois Chat, so you sign in to Sim with the same
@@ -29,11 +32,9 @@ account you use for the chat app — there is no separate Sim password.
 New Sim accounts do **not** get access immediately. Every first sign-in lands in a
 `pending` state ("Pending admin approval") and the account is held until a Sim platform
 admin approves it. If you see a message that your account is banned or pending, nothing
-is wrong — an admin simply has not approved you yet. On the hosted site, email
-[genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu) with the address you
-signed in with; on a self-hosted deployment, contact whoever runs it (see
-[Getting help](#getting-help)). Sign in again once you have been approved; there is no
-need to re-register.
+is wrong — an admin simply has not approved you yet. Contact support with the address you
+signed in with, then sign in again once you have been approved; there is no need to
+re-register.
 
 ## Connecting a Sim workspace to an Illinois Chat project
 
@@ -43,7 +44,7 @@ page (`/<project-name>/tools`, "Tools" in the sidebar). You need two values from
 1. **API key** — in Sim, open **Settings → Sim Keys** and create an API key
    (`sk-sim-...`). The key is stored encrypted server-side and only a masked version is
    ever shown again. If the Tools page later reports that the stored key "could not be
-   read", paste the key again; if that keeps happening, [contact support](#getting-help).
+   read", paste the key again.
 2. **Workspace ID** — in Sim, open the workspace you want to connect; the workspace ID
    is the identifier in the browser URL (`.../workspace/<workspace-id>/...`) and in the
    workspace settings.
@@ -159,8 +160,8 @@ because the tool list is built from what is deployed in Sim.
 
 ### Asking for a block to be added
 
-[Contact support](#getting-help) with the block you need and what you are building with
-it. Requests like these help decide which blocks are added next.
+Contact support with the block you need and what you are building with it. Requests like
+these help decide which blocks are added next.
 
 ## Learning more about Sim itself
 
@@ -191,17 +192,3 @@ The whole documentation set for our version is browsable at
   allowed list above.
 - **Anything about billing, hosted keys or "Sim Cloud" does not apply.** This is a
   self-hosted instance. Where the docs say Sim supplies a key for you, you supply your own.
-
-If a page describes something you need and it is not available here,
-[contact support](#getting-help) rather than working around it.
-
-## Getting help
-
-For anything about Sim on the hosted Illinois Chat site — account approval, a block you
-need, a tool that stopped working — email
-[genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu). This is the same
-support contact shown in the Illinois Chat app. Include your sign-in address and, for a
-workflow problem, the workflow name and the project it is connected to.
-
-If you use a self-hosted deployment, contact the people who run it; they have the
-[operator guide](sim-developer-guide.md).
