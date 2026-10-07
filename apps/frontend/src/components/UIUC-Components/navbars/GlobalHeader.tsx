@@ -264,7 +264,7 @@ export function LandingPageHeader({
               </Link>
               <Link
                 tabIndex={0}
-                href="https://docs.uiuc.chat/"
+                href="https://docs.chat.illinois.edu/"
                 className={orangeOutlineBtn}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -328,7 +328,7 @@ export function LandingPageHeader({
               {showDocsInNav && (
                 <Link
                   tabIndex={0}
-                  href="https://docs.uiuc.chat/"
+                  href="https://docs.chat.illinois.edu/"
                   className={orangeOutlineBtn}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -490,7 +490,7 @@ export function LandingPageHeader({
                   {!showDocsInNav && (
                     <Link
                       tabIndex={0}
-                      href="https://docs.uiuc.chat/"
+                      href="https://docs.chat.illinois.edu/"
                       className="menu-item rounded transition-colors duration-200 hover:bg-orange-100"
                       target="_blank"
                       rel="noopener noreferrer"

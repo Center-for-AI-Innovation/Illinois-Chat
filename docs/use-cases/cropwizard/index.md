@@ -12,18 +12,14 @@ CropWizard is built on the Illinois Chat platform and is its flagship example of
 
 Enter a text question in the chat bar at the bottom of the Chat page and you'll receive a response within a few seconds. You can also upload one or more images and ask about them, or ask questions that trigger registered computational tools — tools are invoked automatically when relevant.
 
-The tools functionality can also analyze your own data, including spreadsheets (CSV) and databases (SQL); this is preliminary — contact the team at [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu) if you're interested.
+The tools functionality can also analyze your own data, including spreadsheets (CSV) and databases (SQL); this is preliminary — contact support using the address in the page footer if you're interested.
 
 ## Customizing user settings
 
-1. **Account** *(optional)* — click **Login** at the top right to sign in or create an account.
-2. **New Chat** — start a fresh conversation. Chat history from the current conversation (questions, images, answers) is included with every question posed to the LLM.
-3. **Settings** — customize:
-    - **LLM** — which model answers your questions.
-    - **Temperature** — `0` for precise, `1` for creative. The recommended default is `0.1`, since the goal is reliable technical question-answering.
-    - **Document Groups** — enable or disable categories of documents in the knowledge base (grouped by university for Extension documents, by publisher for research publications). "All Documents" is enabled by default.
-    - **Tools** — enable or disable individual computational tools.
-4. **Conversation history** — previous questions are listed in the left pane; click one to re-enter it. You can clear the history or export it as JSON.
+The chat screen works like every Illinois Chat chatbot — model picker, **Settings** (Model, Document Groups, Tools), conversation history, **Export history** and **Clear conversations** — see [Using a chatbot](../../getting-started/using-a-chatbot.md). Two CropWizard specifics:
+
+- **Document Groups** are organised by university for Extension documents and by publisher for research publications; "All Documents" is enabled by default.
+- **Export history** downloads your conversations as a zip of Markdown files.
 
 ## Text questions and references
 
@@ -48,7 +44,7 @@ Upload images with the photo icon at the left of the chat bar and ask about them
 
 ## Tool questions
 
-Upload pest images and ask a question, or share a link to a list of field trials and ask about the growing season; the AI automatically invokes the relevant tools, such as the [Pest Detection tool](pest-detection.md) and the [Seasonal Characterization tool](seasonal-characterization.md). Tool inputs and outputs (text and images) are displayed as steps and folded into the final answer. See [Tools & Workflows](../../guides/tools-workflows.md) for how tools work platform-wide.
+Upload pest images and ask a question, or share a link to a list of field trials and ask about the growing season; the AI automatically invokes the relevant tools, such as the [Pest Detection tool](pest-detection.md) and the [Seasonal Characterization tool](seasonal-characterization.md). Tool inputs and outputs (text and images) are displayed as steps and folded into the final answer. See [Tools & Workflows](../../building/tools/index.md) for how tools work platform-wide.
 
 ## Example questions
 

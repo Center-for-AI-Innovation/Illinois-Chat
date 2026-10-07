@@ -1,42 +1,29 @@
 # Export API
 
-Bulk-export conversation history and documents from a project. These endpoints are served by the Flask backend; the same exports are available in the UI — see [Bulk Export](../guides/bulk-export.md).
+Bulk-export conversation history and documents from a chatbot. The same exports are available in the UI — see [Analysis & exports](../building/analysis-exports.md).
 
-All export endpoints are `GET` requests sharing the same query parameters:
+Exports are produced by the Flask backend. There is no API-key form of the export endpoints, and the web app's own download routes need a signed-in browser session, so they are not part of this API. If you run the stack yourself and have exposed the backend, you can call its endpoints directly.
 
-| Parameter | Type | Required | Description |
+Every export shares the same behaviour:
+
+- **Up to 500 items** — a `.zip` is returned directly as a download.
+- **More than 500 items** — the export runs in the background and the response says so immediately. When it finishes, the zip is uploaded to object storage and a download link (valid 48 hours) is emailed to the recipients listed per endpoint — **only if the backend has the SMTP variables** from the [Configuration reference](../self-hosting/configuration.md). Without them the export still reaches object storage and nothing is sent.
+- **No data** — HTTP `204 No Content`.
+
+## Backend endpoints
+
+The Flask backend serves three `GET` endpoints. They have no authentication, are not published outside the Docker Compose stack, and the hosted site does not expose them; see the note on the [API Reference](index.md) page. `from_date` and `to_date` take ISO 8601 dates; `to_date` is extended to the end of that day. Over 500 items the response is `{"response": "Download from S3", "s3_path": "..."}`; a missing `course_name` is `400`.
+
+| Endpoint | Parameters | Zip contents | Background email to |
 | --- | --- | --- | --- |
-| `course_name` | string | yes | Project name. |
-| `from_date` | string | no | Start of the date range (ISO 8601). |
-| `to_date` | string | no | End of the date range (ISO 8601). |
-
-And the same response behavior:
-
-- **Small exports** — the file (a `.zip`) is returned directly as a download.
-- **Large exports** — the export is staged in object storage and the response contains a link: `{"response": "Download from S3", "s3_path": "…"}`.
-- **No data in range** — HTTP `204 No Content`.
-
-## `GET /export-convo-history`
-
-Export all conversations in the project as JSON Lines. See [Bulk Export](../guides/bulk-export.md#data-format) for the row format.
+| `/export-convo-history` | `course_name` (required), `from_date`, `to_date` | `markdown export/`, `media_files/`, `.xlsx`, `.jsonl`, `error.log` | Owner and administrators |
+| `/export-convo-history-user` | `user_email`, `project_name` (both required; note the parameter names) | Markdown files plus media | `user_email` |
+| `/exportDocuments` | `course_name` (required), `from_date`, `to_date` | One `.jsonl` of post-processed text and embeddings | Owner and administrators |
 
 ```bash
-curl -o convos.zip "https://backend.chat.illinois.edu/export-convo-history?course_name=your-project-name&from_date=2026-01-01&to_date=2026-06-30"
-```
-
-Variants:
-
-- `GET /export-convo-history-csv` — CSV-oriented export of the conversation history.
-- `GET /export-convo-history-user` — export a single user's conversations.
-- `GET /export-conversations-custom` — custom-filtered conversation export.
-
-## `GET /exportDocuments`
-
-Export the post-processed text and vector embeddings of all documents as JSON Lines.
-
-```bash
-curl -o documents.zip "https://backend.chat.illinois.edu/exportDocuments?course_name=your-project-name"
+curl -o convos.zip "https://<your-backend-host>/export-convo-history?course_name=ece-385&from_date=2026-01-01&to_date=2026-06-30"
+curl -o documents.zip "https://<your-backend-host>/exportDocuments?course_name=ece-385"
 ```
 
 !!! note "Original files"
-    To minimize data-transfer costs, exporting original files (PDFs, etc.) is only available for individual documents through the Materials page.
+    Original files (PDFs, etc.) are downloaded per document from the Dashboard's Project Files table, not through these endpoints.

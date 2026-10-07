@@ -287,11 +287,16 @@ html {
   }
 }
 
+/* Every nav entry (sidebar and table of contents) is a padded pill so the
+   hover/active background has breathing room around the text. Section labels
+   share the horizontal padding, which keeps labels and pages left-aligned. */
 .md-nav__link {
   font-size: 0.8125rem;
   font-weight: 500;
   border-radius: var(--ic-radius-md);
   color: var(--ic-sidebar-fg);
+  padding: 0.3rem 0.6rem;
+  margin-top: 0.15rem;
 }
 
 .md-nav__link:hover {
@@ -324,13 +329,57 @@ html {
 }
 
 /* A section whose first entry is its own index page (navigation.indexes)
-   keeps that index clickable: Material renders it as the label itself. */
-.md-nav--primary .md-nav__item--section > .md-nav__link[href] {
+   keeps that index clickable. Material renders it as a container
+   (div.md-nav__link.md-nav__container) holding the real link and the
+   expand toggle, so the block above would otherwise swallow the click:
+   pointer-events is inherited. Re-enable it on the container and the link,
+   keep it off the toggle, and let the container act as the hover pill. */
+.md-nav--primary .md-nav__item--section > .md-nav__container {
   pointer-events: auto;
 }
 
-.md-nav--primary .md-nav__item--section > .md-nav__link[href]:hover {
+.md-nav--primary .md-nav__item--section > .md-nav__container > label {
+  pointer-events: none;
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav__container:hover {
+  background-color: var(--ic-slate-100);
   color: var(--illinois-orange);
+}
+
+/* Under a tab, Material also marks every group that has children as a
+   section (Dashboard, Tools, CropWizard). Those sit beside ordinary pages in
+   the same list, so they take the page-link size and colour, semibold to
+   show they open a group; only the tab title at the top of the sidebar keeps
+   the small uppercase treatment. */
+.md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section {
+  margin-top: 0.15rem;
+}
+
+.md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section > .md-nav__link {
+  color: var(--ic-sidebar-fg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* When the section's own index page is the current page, the container is
+   the active pill, exactly like a selected page at the same level. */
+.md-nav--primary .md-nav__item--section > .md-nav__link.md-nav__container:has(> .md-nav__link.md-nav__link--active) {
+  background-color: var(--ic-slate-100);
+  color: var(--illinois-orange);
+  font-weight: 700;
+}
+
+/* Inside any container the inner link inherits the container's padding and
+   colour instead of adding its own pill. */
+.md-nav__container > .md-nav__link {
+  padding: 0;
+  margin-top: 0;
+  color: inherit;
+  font-weight: inherit;
+  background: transparent;
 }
 
 /* Indent section children behind a rule line */

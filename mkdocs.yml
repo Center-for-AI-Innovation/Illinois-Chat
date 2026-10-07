@@ -3,15 +3,15 @@ site_description: >-
   Illinois Chat is a self-hostable AI chat platform for building course,
   research, and organization-specific assistants over curated documents and
   web content.
-site_url: https://center-for-ai-innovation.github.io/Illinois-Chat/
+site_url: https://docs.chat.illinois.edu/
 repo_url: https://github.com/Center-for-AI-Innovation/Illinois-Chat
 repo_name: Center-for-AI-Innovation/Illinois-Chat
-edit_uri: edit/main/docs/
-copyright: Apache 2.0
 
 theme:
   name: material
   custom_dir: overrides
+  # Material's own Google Fonts loading is off; overrides/main.html loads
+  # Montserrat and Source Sans 3, which stylesheets/extra.css applies.
   font: false
   logo: assets/logo_illinois.png
   favicon: assets/favicon.ico
@@ -40,7 +40,9 @@ theme:
     - search.highlight
     - content.code.copy
     - content.tabs.link
-    - content.action.edit
+
+validation:
+  anchors: warn
 
 extra_css:
   - stylesheets/extra.css
@@ -53,7 +55,8 @@ plugins:
   - blog:
       blog_dir: blog
       blog_toc: true
-      post_url_format: "{slug}"
+      post_url_format: "{date}/{slug}"
+      draft_if_future_date: true
       categories_allowed:
         - Releases
         - Announcements
@@ -83,7 +86,6 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 extra:
-  generator: false
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/Center-for-AI-Innovation/Illinois-Chat
@@ -93,29 +95,35 @@ extra:
       link: mailto:genaisupport@mx.uillinois.edu
 
 nav:
-  - Home: index.md
+  - Introduction: index.md
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
+      - Using a chatbot: getting-started/using-a-chatbot.md
+      - Finding chatbots: getting-started/finding-chatbots.md
       - FAQs: getting-started/faqs.md
       - Video Walkthroughs: getting-started/video-walkthroughs.md
-      - Migrating from uiuc.chat: migration.md
-  - Concepts:
-      - Projects: concepts/projects.md
-      - Documents: concepts/documents.md
-      - Retrieval: concepts/retrieval.md
-      - LLM Providers: concepts/llm-providers.md
-  - Guides:
-      - Uploading Materials: guides/uploading-materials.md
-      - Web Crawling: guides/web-crawling.md
-      - Sharing & Access Control: guides/sharing-access.md
-      - Tools & Workflows:
-          - guides/tools-workflows.md
-          - Sim AI User Guide: sim-user-guide.md
-          - Build a Tool in Sim: guides/build-a-sim-tool.md
-      - Canvas Integration: guides/canvas-integration.md
-      - Analytics: guides/analytics.md
-      - Bulk Export: guides/bulk-export.md
-      - External Connections: guides/external-connections.md
+  - Building a Chatbot:
+      - building/index.md
+      - Dashboard:
+          - Uploading files: building/dashboard/uploading-files.md
+          - Web crawling: building/dashboard/web-crawling.md
+          - Importing: building/dashboard/importing.md
+          - Document groups & deleting: building/dashboard/document-groups.md
+          - Sharing & access: building/dashboard/sharing-access.md
+      - LLMs: building/llms.md
+      - Prompting: building/prompting.md
+      - Tools:
+          - building/tools/index.md
+          - Sim AI User Guide: building/tools/sim-user-guide.md
+          - Build a Tool in Sim: building/tools/build-a-tool.md
+      - Analysis & exports: building/analysis-exports.md
+      - External connections: building/external-connections.md
+  - How It Works:
+      - how-it-works/index.md
+      - Documents & ingest: how-it-works/documents-ingest.md
+      - Retrieval: how-it-works/retrieval.md
+      - Tool routing: how-it-works/tool-routing.md
+      - Glossary: how-it-works/glossary.md
   - API Reference:
       - api/index.md
       - Authentication: api/authentication.md
@@ -125,11 +133,15 @@ nav:
       - Export: api/export.md
   - Self-Hosting:
       - self-hosting/index.md
-      - Environment Variables: self-hosting/environment-variables.md
-      - Configuration: self-hosting/configuration.md
-      - External Connections Setup: external-connections-setup.md
-      - Tools Platform (Sim AI): sim-developer-guide.md
-      - System Architecture: self-hosting/architecture.md
+      - Configuration reference: self-hosting/configuration.md
+      - Services, ports & architecture: self-hosting/architecture.md
+      - Tools Platform (Sim AI): self-hosting/sim.md
+      - External connections (operators): self-hosting/external-connections.md
+      - External connections config reference: self-hosting/external-connections-config.md
+      - Cloud deployment (ECS): self-hosting/cloud-deployment.md
+      - Upgrading: self-hosting/upgrading.md
+      - Backup & restore: self-hosting/backup-restore.md
+      - Troubleshooting: self-hosting/troubleshooting.md
   - Use Cases:
       - use-cases/index.md
       - CropWizard:
@@ -138,9 +150,10 @@ nav:
           - Pest Detection Tool: use-cases/cropwizard/pest-detection.md
           - Seasonal Characterization Tool: use-cases/cropwizard/seasonal-characterization.md
           - Document Licenses: use-cases/cropwizard/licenses.md
-  - Developers:
-      - Development Setup: developers/dev-setup.md
-      - Cloud Deployment: developers/deployment.md
-      - Monorepo Migration: developers/monorepo-migration.md
-      - Lightweight Ingest Bridge: developers/ingest-bridge.md
+  - Contributing:
+      - Development setup: contributing/dev-setup.md
+      - Repository layout: contributing/repository-layout.md
+      - Testing & CI: contributing/testing-ci.md
+      - Writing docs: contributing/writing-docs.md
+      - Lightweight ingest bridge: contributing/ingest-bridge.md
   - Blog: blog/index.md
