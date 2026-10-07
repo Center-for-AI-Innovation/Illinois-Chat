@@ -1,42 +1,21 @@
-# UIUC.chat ingest and retrieval
+# Illinois Chat backend
 
-A Flask application hosting endpoints for UIUC.chat. 
+The Flask backend (`ai_ta_backend/main.py`) and the RabbitMQ ingest worker (`ai_ta_backend/rabbitmq/`) of [Illinois Chat](https://github.com/Center-for-AI-Innovation/Illinois-Chat). The backend serves ingest, exports and Qdrant-backed retrieval for the web app; the worker turns queued ingest jobs into chunks and embeddings.
 
-# [Start with the docs here](https://docs.chat.illinois.edu/)
+- Documentation: https://docs.chat.illinois.edu/
+- Running it locally: https://docs.chat.illinois.edu/contributing/dev-setup/
+- Endpoints the web app calls: https://docs.chat.illinois.edu/api/
 
-## 👉 [Developer quickstart here](https://docs.chat.illinois.edu/contributing/dev-setup/)
+## Run from this directory
 
-### 🛠️ Technical Architecture
+With the dev infrastructure started by `infra/scripts/start-dev.sh` and the virtualenv active:
 
-Hosted (mostly for free) on [Railway](https://railway.app/).
-Architecture diagram of Flask + Next.js & React hosted on Vercel.
-![Architecture diagram](https://github.com/UIUC-Chatbot/ai-ta-backend/assets/13607221/bda7b4d6-79ce-4d12-bf8f-cff9207c37af)
+```bash
+pip install -r requirements.txt
+pip install -r ai_ta_backend/rabbitmq/requirements.txt
 
-## Documentation
-
-* **Extensive usage docs at [docs.chat.illinois.edu](https://docs.chat.illinois.edu/)**
-
-## 🏎️ Quickstart 
-
-1. Rename `.env.template` to `.env` and fill in the required variables
-2. Install Python requirements `pip install -r requirements.txt`
-3. Start the server for development (with live reloads) `cd ai_ta_backend` then `flask --app ai_ta_backend.main:app --debug run --port 8000`
-
-## 📣 Development
-Install the Trunk "superlinter" so your commits are formatted. Just one step:
-
-Mac: brew install trunk-io
-Linux: curl https://get.trunk.io -fsSL | bash
-
-### Course metadata structure
-
-```text
-'text': doc.page_content,
-'readable_filename': doc.metadata['readable_filename'],
-'course_name ': doc.metadata['course_name'],
-'s3_path': doc.metadata['s3_path'],
-'pagenumber': doc.metadata['pagenumber_or_timestamp'], # this is the recent breaking change!!
-# OPTIONAL properties
-'url': doc.metadata.get('url'), # wouldn't this error out?
-'base_url': doc.metadata.get('base_url'),
+flask --app ai_ta_backend.main:app --debug run --port 8000   # backend
+python ai_ta_backend/rabbitmq/worker.py                      # ingest worker, in another terminal
 ```
+
+Both read `apps/backend/.env`, which `start-dev.sh` writes. The containers for the full stack are built from `Self-Hosted-Dockerfile` (backend) and `ai_ta_backend/rabbitmq/Dockerfile` (worker).
