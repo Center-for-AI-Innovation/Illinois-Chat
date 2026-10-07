@@ -329,13 +329,31 @@ html {
 }
 
 /* A section whose first entry is its own index page (navigation.indexes)
-   keeps that index clickable: Material renders it as the label itself. */
-.md-nav--primary .md-nav__item--section > .md-nav__link[href] {
+   keeps that index clickable. Material renders it as a container
+   (div.md-nav__link.md-nav__container) holding the real link and the
+   expand toggle, so the block above would otherwise swallow the click:
+   pointer-events is inherited. Re-enable it on the container and the link,
+   keep it off the toggle, and let the container act as the hover pill. */
+.md-nav--primary .md-nav__item--section > .md-nav__container {
   pointer-events: auto;
 }
 
-.md-nav--primary .md-nav__item--section > .md-nav__link[href]:hover {
+.md-nav--primary .md-nav__item--section > .md-nav__container > label {
+  pointer-events: none;
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav__container:hover {
+  background-color: var(--ic-slate-100);
   color: var(--illinois-orange);
+}
+
+/* Inside any container the inner link inherits the container's padding and
+   colour instead of adding its own pill. */
+.md-nav__container > .md-nav__link {
+  padding: 0;
+  margin-top: 0;
+  color: inherit;
+  background: transparent;
 }
 
 /* Indent section children behind a rule line */
