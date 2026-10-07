@@ -10,6 +10,8 @@ repo_name: Center-for-AI-Innovation/Illinois-Chat
 theme:
   name: material
   custom_dir: overrides
+  # Material's own Google Fonts loading is off; overrides/main.html loads
+  # Montserrat and Source Sans 3, which stylesheets/extra.css applies.
   font: false
   logo: assets/logo_illinois.png
   favicon: assets/favicon.ico
@@ -53,7 +55,7 @@ plugins:
   - blog:
       blog_dir: blog
       blog_toc: true
-      post_url_format: "{slug}"
+      post_url_format: "{date}/{slug}"
       draft_if_future_date: true
       categories_allowed:
         - Releases

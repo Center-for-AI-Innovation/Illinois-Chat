@@ -26,7 +26,7 @@ This blog is where we'll publish release announcements going forward. Subscribe 
 
 ## Contributing
 
-Spotted something wrong or missing? Every page has an **edit** button that takes you straight to the source file on GitHub — pull requests are very welcome. Docs changes merged to `main` deploy automatically via GitHub Actions and GitHub Pages.
+Spotted something wrong or missing? The source lives in `docs/` in the [repository](https://github.com/Center-for-AI-Innovation/Illinois-Chat); open a pull request, or contact support using the address in the page footer.
 
 ### How to write a release post
 
@@ -35,13 +35,12 @@ Add a file under `docs/blog/posts/` named `YYYY-MM-DD-short-slug.md`:
 ```markdown
 ---
 date: 2026-08-15
+title: "vX.Y.Z: one-line summary"
 categories:
   - Releases
 authors:
   - caii
 ---
-
-# vX.Y.Z — one-line summary
 
 A paragraph summarizing the release.
 
