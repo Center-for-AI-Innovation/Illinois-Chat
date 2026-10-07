@@ -15,9 +15,9 @@ This guide covers operator setup:
 4. [Keeping existing external stores up to date](#keeping-existing-external-stores-up-to-date)
 5. [Verifying and troubleshooting](#verifying-and-troubleshooting)
 
-Deeper reference material lives with the apps:
+Related pages:
 
-- Feature overview: [`apps/backend/docs/features/external-connections.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/features/external-connections.md)
+- Feature overview for chatbot owners: [External connections](../building/external-connections.md)
 - Full config reference (all fields, multi-collection search, post-processors):
   [`apps/backend/docs/developers/external-connections-config.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/developers/external-connections-config.md)
 - Frontend architecture (ConnectionManager, connection lifecycle, SSRF-guarded probes):

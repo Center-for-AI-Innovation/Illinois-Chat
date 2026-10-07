@@ -139,6 +139,9 @@ nav:
       - Tools Platform (Sim AI): self-hosting/sim.md
       - External connections (operators): self-hosting/external-connections.md
       - Cloud deployment (ECS): self-hosting/cloud-deployment.md
+      - Upgrading: self-hosting/upgrading.md
+      - Backup & restore: self-hosting/backup-restore.md
+      - Troubleshooting: self-hosting/troubleshooting.md
   - Use Cases:
       - use-cases/index.md
       - CropWizard:
