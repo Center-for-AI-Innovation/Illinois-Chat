@@ -18,7 +18,7 @@ The platform is free to use. If you want to use commercial models such as OpenAI
 
 ## Is there a community or support available?
 
-Yes. For questions and support, contact support using the address in the page footer.
+Yes. For questions and support, email [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu). The platform is developed in the open at [github.com/Center-for-AI-Innovation/Illinois-Chat](https://github.com/Center-for-AI-Innovation/Illinois-Chat), where you can follow releases and report bugs.
 
 ## Is it secure?
 
