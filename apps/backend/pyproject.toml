@@ -1,0 +1,87 @@
+[project]
+name = "ai-ta-backend"
+version = "0.0.0"
+description = "Illinois Chat Flask API and RabbitMQ ingest worker"
+requires-python = ">=3.11"
+dependencies = [
+  # Shared by the API process (which imports rabbitmq.rmqueue / ingest_canvas) and the worker.
+  "python-dotenv==1.0.1",
+  "Flask==3.1.0",
+  "Flask-SQLAlchemy==3.0.0",
+  "SQLAlchemy==2.0.38",
+  "psycopg2-binary==2.9.13",
+  "pika==1.3.2",
+  "cryptography==44.0.1",
+  "boto3==1.36.20",
+  "qdrant-client==1.13.2",
+  "openai==1.63.0",
+  "tiktoken==0.9.0",
+  "aiohttp==3.11.12",
+  "requests",
+  "langchain==0.3.18",
+  "langchain-community==0.3.16",
+  "langchain-openai==0.3.5",
+  "pydantic==2.10.6",
+  "posthog==3.13.0",
+  "sentry-sdk==2.21.0",
+  "canvasapi==3.2.0",
+  "yt-dlp==2024.7.16",
+  "beautifulsoup4==4.12.2",
+  # File parsing used by retrieval_service (chat uploads) and ingest.py.
+  "PyMuPDF==1.23.6",
+  "pdfplumber==0.11.0",
+  "pytesseract==0.3.10",
+  "Pillow==10.0.0",
+  "python-docx==0.8.11",
+  "python-pptx==0.6.23",  # not via unstructured[pptx]: that extra requires >=1.0.1
+  "openpyxl==3.1.2",
+  "pysrt==1.1.2",
+  "pandas>=2.2,<3",
+  "retry==0.9.2",
+]
+
+[project.optional-dependencies]
+# Flask API only (Self-Hosted-Dockerfile installs --extra api).
+api = [
+  "gunicorn==23.0.0",
+  "flask-cors==5.0.0",
+  "Flask-Injector==0.15.0",
+  "injector",
+  "flask-executor==1.0.0",
+  "langgraph==0.2.69",
+  "langchain-neo4j==0.4.0",
+  "nomic==3.4.1",
+  "ollama==0.4.7",
+  "supabase==2.13.0",
+  "minio==7.2.15",
+  "redis[hiredis]==5.2.1",
+  "XlsxWriter==3.2.2",
+  "numpy",
+  "tenacity",
+  "pytz",
+  "python-dateutil",
+  "typing_extensions",
+]
+# Ingest worker only (ai_ta_backend/rabbitmq/Dockerfile installs --extra worker).
+worker = [
+  "unstructured[xlsx]==0.18.9",
+  "networkx==3.2.1",
+  "xlrd>=2.0.1",
+  "msoffcrypto-tool==5.2.0",
+  "nltk",
+  "docx2txt==0.8",
+  "pydub==0.25.1",
+  "GitPython==3.1.40",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+# Nothing imports ai_ta_backend as an installed distribution; the Flask CLI, gunicorn,
+# the worker script path and pytest's pythonpath all resolve it from the working directory.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
