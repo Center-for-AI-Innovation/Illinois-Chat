@@ -50,7 +50,7 @@ export const AuthMenu = ({ size = 34 }: AuthMenuProps) => {
           className="rounded-xl border border-(--border) bg-(--background) p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.2)]"
         >
           <DropdownMenuItem
-            className="my-0.5 cursor-pointer rounded-lg px-4 py-2.5 text-sm font-medium text-(--foreground) focus:bg-(--muted)"
+            className="my-0.5 cursor-pointer rounded-lg px-4 py-2.5 text-sm font-medium text-(--foreground) focus:bg-(--background-faded) focus:text-(--foreground)"
             onClick={() => {
               // Fixed URL construction to avoid realm duplication
               window.open(
@@ -62,7 +62,7 @@ export const AuthMenu = ({ size = 34 }: AuthMenuProps) => {
             Manage Account
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="my-0.5 cursor-pointer rounded-lg px-4 py-2.5 text-sm font-medium text-(--foreground) focus:bg-(--muted)"
+            className="my-0.5 cursor-pointer rounded-lg px-4 py-2.5 text-sm font-medium text-(--foreground) focus:bg-(--background-faded) focus:text-(--foreground)"
             onClick={() => auth.signoutRedirect()}
           >
             Sign Out
