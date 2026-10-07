@@ -19,7 +19,7 @@ Related pages:
 
 - Feature overview for chatbot owners: [External connections](../building/external-connections.md)
 - Full config reference (all fields, multi-collection search, post-processors):
-  [`apps/backend/docs/developers/external-connections-config.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/developers/external-connections-config.md)
+  [External connections config reference](external-connections-config.md)
 - Frontend architecture (ConnectionManager, connection lifecycle, SSRF-guarded probes):
   [`apps/frontend/docs/EXTERNAL_CONNECTIONS.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/frontend/docs/EXTERNAL_CONNECTIONS.md)
 

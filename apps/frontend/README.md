@@ -6,7 +6,7 @@
 
 <div align="center">
   <a href="https://www.uiuc.chat/" target="_blank"><img src="https://img.shields.io/badge/Visit-UIUC.chat-blue?style=for-the-badge" alt="Visit UIUC.chat"></a>
-  <a href="https://docs.uiuc.chat/" target="_blank"><img src="https://img.shields.io/badge/Read-Documentation-green?style=for-the-badge" alt="Documentation"></a>
+  <a href="https://docs.chat.illinois.edu/" target="_blank"><img src="https://img.shields.io/badge/Read-Documentation-green?style=for-the-badge" alt="Documentation"></a>
   <a href="https://status.uiuc.chat/" target="_blank">
     <img src="https://status.uiuc.chat/api/badge/1/uptime/24?label=Uptime%2024%20hours" alt="Service Uptime Badge" width="110" height="50">
   </a>
@@ -29,7 +29,7 @@ We follow the [T3 Stack](https://create.t3.gg/) architecture for robust and scal
 
 ## 👩‍💻 For Developers
 
-Read our [developer quickstart guide here](https://docs.uiuc.chat/developers/developer-quickstart).
+Read our [developer quickstart guide here](https://docs.chat.illinois.edu/contributing/dev-setup/).
 
 ## 🤝 Join Our Mission
 

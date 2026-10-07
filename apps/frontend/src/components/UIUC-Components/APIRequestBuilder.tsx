@@ -410,7 +410,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
 
         <div className="text-sm">
           <a
-            href="https://docs.uiuc.chat/api/endpoints#image-input-example"
+            href="https://docs.chat.illinois.edu/api/chat/#image-input"
             target="_blank"
             rel="noopener noreferrer"
             className="text-(--foreground) underline hover:text-(--dashboard-button-hover)"

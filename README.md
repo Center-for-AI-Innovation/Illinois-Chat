@@ -148,7 +148,7 @@ bash infra/scripts/start-all.sh --rebuild=frontend,backend
 
 ## Documentation
 
-See `DEV_SETUP.md` for local development details. Published docs are available at https://docs.uiuc.chat.
+See `DEV_SETUP.md` for local development details. Published docs are available at https://docs.chat.illinois.edu/.
 
 Projects can bring their own S3, PostgreSQL/pgvector, Qdrant, and embedding
 provider — see [`docs/self-hosting/external-connections.md`](docs/self-hosting/external-connections.md)

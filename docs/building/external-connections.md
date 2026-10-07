@@ -65,5 +65,5 @@ There is no environment switch for this; the project's connection record alone d
 ## Further reading
 
 - [External Connections Setup](../self-hosting/external-connections.md) — provisioning an external Postgres, applying migrations, registering connections with the CLI.
-- [Configuration reference](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/developers/external-connections-config.md) — field-by-field schemas, post-processors, embedding providers.
+- [Configuration reference](../self-hosting/external-connections-config.md) — field-by-field schemas, post-processors, embedding providers.
 - [Lightweight Ingest Bridge](../contributing/ingest-bridge.md) — bulk-ingesting into a project whose storage lives behind an external connection.

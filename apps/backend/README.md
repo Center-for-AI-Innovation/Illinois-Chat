@@ -2,9 +2,9 @@
 
 A Flask application hosting endpoints for UIUC.chat. 
 
-# [Start with the docs here](https://docs.uiuc.chat)
+# [Start with the docs here](https://docs.chat.illinois.edu/)
 
-## 👉 [Developer quickstart here](https://docs.uiuc.chat/developers/developer-quickstart)
+## 👉 [Developer quickstart here](https://docs.chat.illinois.edu/contributing/dev-setup/)
 
 ### 🛠️ Technical Architecture
 
@@ -14,7 +14,7 @@ Architecture diagram of Flask + Next.js & React hosted on Vercel.
 
 ## Documentation
 
-* **Extensive usage docs on [UIUC.chat](docs.uiuc.chat/)**
+* **Extensive usage docs at [docs.chat.illinois.edu](https://docs.chat.illinois.edu/)**
 
 ## 🏎️ Quickstart 
 
