@@ -18,7 +18,7 @@ This repository contains the full monorepo needed to run Illinois Chat locally o
 ## Prerequisites
 
 - Docker and Docker Compose
-- Python 3.10 or 3.11 for local backend development
+- [uv](https://docs.astral.sh/uv/) for local backend development (`brew install uv` on macOS, `curl -LsSf https://astral.sh/uv/install.sh | sh` elsewhere); it installs the pinned Python for you
 - Node.js 20.19+ or 22.12+ for local frontend development
 
 ## Quickstart
@@ -71,16 +71,20 @@ This starts `infra/docker/docker-compose.dev.yaml` and non-destructively creates
 - `apps/frontend/.env`
 - `apps/crawlee/.env`
 
-Run the backend, ingest worker, and frontend in separate terminals:
+Install the backend environment once, then run the backend, ingest worker, and frontend in separate terminals:
 
 ```bash
-cd apps/backend
-flask --app ai_ta_backend.main:app --debug run --port 8000
+cd apps/backend && uv sync --all-extras
 ```
 
 ```bash
 cd apps/backend
-python ai_ta_backend/rabbitmq/worker.py
+uv run flask --app ai_ta_backend.main:app --debug run --port 8000
+```
+
+```bash
+cd apps/backend
+uv run python ai_ta_backend/rabbitmq/worker.py
 ```
 
 ```bash
