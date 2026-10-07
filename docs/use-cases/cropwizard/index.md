@@ -48,7 +48,7 @@ Upload images with the photo icon at the left of the chat bar and ask about them
 
 ## Tool questions
 
-Upload pest images and ask a question, or share a link to a list of field trials and ask about the growing season; the AI automatically invokes the relevant tools, such as the [Pest Detection tool](pest-detection.md) and the [Seasonal Characterization tool](seasonal-characterization.md). Tool inputs and outputs (text and images) are displayed as steps and folded into the final answer. See [Tools & Workflows](../../guides/tools-workflows.md) for how tools work platform-wide.
+Upload pest images and ask a question, or share a link to a list of field trials and ask about the growing season; the AI automatically invokes the relevant tools, such as the [Pest Detection tool](pest-detection.md) and the [Seasonal Characterization tool](seasonal-characterization.md). Tool inputs and outputs (text and images) are displayed as steps and folded into the final answer. See [Tools & Workflows](../../building/tools/index.md) for how tools work platform-wide.
 
 ## Example questions
 

@@ -17,7 +17,7 @@ Fast, single-query vector retrieval.
 | `course_name` | string | yes | Project name. |
 | `token_limit` | integer | no | Token budget for the returned contexts. |
 | `top_n` | integer | no | Maximum number of contexts to return. |
-| `doc_groups` | array | no | Restrict retrieval to specific [document groups](../guides/uploading-materials.md#organizing-with-document-groups). |
+| `doc_groups` | array | no | Restrict retrieval to specific [document groups](../building/dashboard/document-groups.md#organizing-with-document-groups). |
 
 ### Example
 
@@ -47,7 +47,7 @@ curl -X POST https://backend.chat.illinois.edu/getTopContexts \
 
 ## `GET /getTopContextsWithMQR`
 
-Multi-query retrieval with LLM filtering — higher precision at higher latency. See [Concepts → Retrieval](../concepts/retrieval.md#3-multi-query-retrieval-with-filtering).
+Multi-query retrieval with LLM filtering — higher precision at higher latency. See [Concepts → Retrieval](../how-it-works/retrieval.md#3-multi-query-retrieval-with-filtering).
 
 ### Query parameters
 

@@ -10,7 +10,7 @@ Upload your docs — PDFs, PowerPoints, Word files, or even videos — or connec
 
 ## What happened to uiuc.chat?
 
-The community instance at uiuc.chat is migrating to the official campus-supported instance at [chat.illinois.edu](https://chat.illinois.edu). Chatbot creation on uiuc.chat has been disabled. If you have an existing chatbot there, see [Migrating from uiuc.chat](../migration.md).
+The community instance at uiuc.chat is migrating to the official campus-supported instance at [chat.illinois.edu](https://chat.illinois.edu). Chatbot creation on uiuc.chat has been disabled. If you have an existing chatbot there, see [Migrating from uiuc.chat](migration.md).
 
 ## Are there any costs associated with using it?
 

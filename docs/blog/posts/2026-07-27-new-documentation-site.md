@@ -14,8 +14,8 @@ Welcome to the new home of the Illinois Chat documentation — built with Materi
 ## What's here
 
 - **[Quickstart](../../getting-started/quickstart.md)** — from sign-in to a working, cited assistant in minutes.
-- **[Concepts](../../concepts/projects.md)** — projects, documents, retrieval methods, and LLM providers.
-- **[Guides](../../guides/uploading-materials.md)** — uploading materials, web crawling, sharing, custom tools, Canvas, analytics, and bulk export.
+- **[Building a Chatbot](../../building/index.md)** — projects, documents, retrieval methods, and LLM providers.
+- **[Uploading files](../../building/dashboard/uploading-files.md)** — uploading materials, web crawling, sharing, Sim tools, Canvas, analytics, and bulk export.
 - **[API Reference](../../api/index.md)** — chat, retrieval, ingest, and export endpoints with runnable examples.
 - **[Self-Hosting](../../self-hosting/index.md)** — the full Docker Compose stack, environment variables, and system architecture.
 - **[CropWizard](../../use-cases/cropwizard/index.md)** — the flagship agricultural assistant built on the platform.

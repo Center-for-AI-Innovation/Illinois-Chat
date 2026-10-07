@@ -102,7 +102,7 @@ bash infra/scripts/stop-dev.sh --no-sim
 
 ### Sim AI Local Stack
 
-Two guides cover Sim. For the user-facing side — signing in via Keycloak SSO, the admin approval flow, connecting a Sim workspace to a project's tools, and which blocks are available — see [`docs/sim-user-guide.md`](docs/sim-user-guide.md). For how the stack fits together, how Illinois Chat talks to Sim, the block whitelist and upgrade procedure — see [`docs/sim-developer-guide.md`](docs/sim-developer-guide.md).
+Two guides cover Sim. For the user-facing side — signing in via Keycloak SSO, the admin approval flow, connecting a Sim workspace to a project's tools, and which blocks are available — see [`docs/building/tools/sim-user-guide.md`](docs/building/tools/sim-user-guide.md). For how the stack fits together, how Illinois Chat talks to Sim, the block whitelist and upgrade procedure — see [`docs/self-hosting/sim.md`](docs/self-hosting/sim.md).
 
 The full and dev Docker stacks also start Sim AI against the same local Keycloak realm for SSO testing while keeping Sim's pgvector database isolated. No separate Sim checkout is required; the stack uses the upstream Sim container images.
 
@@ -151,7 +151,7 @@ bash infra/scripts/start-all.sh --rebuild=frontend,backend
 See `DEV_SETUP.md` for local development details. Published docs are available at https://docs.uiuc.chat.
 
 Projects can bring their own S3, PostgreSQL/pgvector, Qdrant, and embedding
-provider — see [`docs/external-connections-setup.md`](docs/external-connections-setup.md)
+provider — see [`docs/self-hosting/external-connections.md`](docs/self-hosting/external-connections.md)
 for provisioning an external database and registering per-project connections.
 
 ## License

@@ -56,38 +56,6 @@ flowchart TB
 - **Sim AI** — user-defined tool workflows.
 - **Sentry** — error monitoring; **PostHog** — product analytics.
 
-## RAG chat: what happens when you hit send?
-
-1. The user submits a prompt.
-    1. Determine whether tools should be invoked; if so, execute them and store the outputs.
-2. Embed the user prompt with the embedding model.
-3. Retrieve the most related documents from the vector database.
-4. Prompt engineering to:
-    1. pack as many documents as possible into the context window,
-    2. retain as much conversation history as possible,
-    3. include tool outputs and images,
-    4. include user-configurable features (tutor mode, document references).
-5. Send the final prompt to the LLM and stream the result.
-    1. During streaming, a state machine replaces LLM citations with proper links — e.g. `[doc 1, page 3]` becomes a link to the document at the right page.
-
-## Document ingest: how does it work?
-
-![Document ingest pipeline for uploaded files; web crawling is very similar](../assets/ingest-pipeline.png)
-
-1. The user uploads a document via the file-upload dropzone.
-    1. Client-side check for supported filetypes.
-    2. A presigned S3 URL is generated for a direct client → S3 upload (bypassing the app servers to save bandwidth).
-    3. After the upload completes, an ingest job is posted to the queue.
-2. The ingest worker picks up the job:
-    1. The filetype is detected and the request forwarded to the matching ingest function (PDF, Word, Excel, ...). Each function shares the same interface: extract text plus per-page metadata, then call `split_and_upload()`.
-    2. [Duplicates are detected](../concepts/documents.md#duplicate-handling) and skipped or replaced.
-    3. Text is chunked, embedded, and uploaded to Qdrant and SQL. On failure, the job retries up to 9 times with exponential backoff.
-3. Meanwhile, the frontend polls the database to show success/failure indicators in the UI.
-
-### Ingest during web crawling
-
-Crawled sources always link back to the original site, like a search engine. Compatible files (PDF, Word, PPT, Excel) are backed up to S3, but citations link to the original source, falling back to the local copy if the original 404s. HTML pages are not uploaded to S3 — their text is stored directly in SQL. See [Web Crawling](../guides/web-crawling.md).
-
 ## Where the code lives
 
 | Path | Contents |

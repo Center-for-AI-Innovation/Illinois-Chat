@@ -30,7 +30,7 @@ flowchart LR
 
 The worker runs each document in a time-boxed subprocess (default 300 s, `INGEST_SUBPROCESS_TIMEOUT`), so a hung or segfaulting PDF/OCR job kills only that document's child process — the queue keeps draining.
 
-Per-project infrastructure (S3 bucket, vector store, embeddings, documents DB) is resolved by the worker at job time from the project's [external connections](../guides/external-connections.md), with the host defaults used for projects that have none.
+Per-project infrastructure (S3 bucket, vector store, embeddings, documents DB) is resolved by the worker at job time from the project's [external connections](../building/external-connections.md), with the host defaults used for projects that have none.
 
 ## Running the bridge
 

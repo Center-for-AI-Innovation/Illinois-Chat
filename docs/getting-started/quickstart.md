@@ -7,21 +7,21 @@ Get from zero to a working, document-grounded assistant in about five minutes.
 
 ## 1. Sign in and create a project
 
-Go to [chat.illinois.edu](https://chat.illinois.edu) and sign in. Create a new **project** — a project is an assistant scoped to a topic, course, or team, with its own documents, settings, and access controls. See [Concepts → Projects](../concepts/projects.md).
+Go to [chat.illinois.edu](https://chat.illinois.edu) and sign in. Create a new **project** — a project is an assistant scoped to a topic, course, or team, with its own documents, settings, and access controls. See [Concepts → Projects](../building/index.md).
 
 ## 2. Upload documents
 
 Open the **Materials** page of your project and add content:
 
 - **Drag and drop files** — PDF, Word, PowerPoint, Excel, CSV, text, HTML, code files, and even videos (transcribed automatically).
-- **Crawl a website** — enter a starting URL and the built-in crawler ingests linked pages. See [Web Crawling](../guides/web-crawling.md).
-- **Connect Canvas** — import course files, pages, and modules directly. See [Canvas Integration](../guides/canvas-integration.md).
+- **Crawl a website** — enter a starting URL and the built-in crawler ingests linked pages. See [Web Crawling](../building/dashboard/web-crawling.md).
+- **Connect Canvas** — import course files, pages, and modules directly. See [Canvas Integration](../building/dashboard/importing.md).
 
-Documents are automatically chunked, embedded, and indexed. See [Uploading Materials](../guides/uploading-materials.md) for supported formats and details.
+Documents are automatically chunked, embedded, and indexed. See [Uploading Materials](../building/dashboard/uploading-files.md) for supported formats and details.
 
 ## 3. Configure an LLM provider
 
-For the best experience, bring your own API key (OpenAI, Anthropic, Azure OpenAI, and others are supported) in your project's settings. Free NCSA-hosted open models are also available with no key required. See [Concepts → LLM Providers](../concepts/llm-providers.md).
+For the best experience, bring your own API key (OpenAI, Anthropic, Azure OpenAI, and others are supported) in your project's settings. Free NCSA-hosted open models are also available with no key required. See [Concepts → LLM Providers](../building/llms.md).
 
 !!! info "Your keys are yours"
     Provider keys are used only to serve your project's requests. Your data is never used to train models.
@@ -36,7 +36,7 @@ Tailor your assistant's behavior on the **Prompting** page — for example, enab
 
 ## 6. Share it
 
-Every project has a permanent URL you can share. Control who gets access — private with an approved email list, or public to anyone with the link. See [Sharing & Access Control](../guides/sharing-access.md).
+Every project has a permanent URL you can share. Control who gets access — private with an approved email list, or public to anyone with the link. See [Sharing & Access Control](../building/dashboard/sharing-access.md).
 
 ## 7. Integrate via API (optional)
 

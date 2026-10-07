@@ -19,13 +19,13 @@ The finished tool takes three inputs:
 You can give it a topic, an author, or both. A topic alone finds papers on that subject. An author alone lists that author's papers. Both together finds that author's papers on the topic. Sim's ArXiv block cannot do that last case out of the box, and solving it shows a pattern you will reuse in most tools.
 
 !!! info "Before you start"
-    You need a Sim account and a Sim workspace connected to your Illinois Chat project. The [Sim AI user guide](../sim-user-guide.md) covers signing in, admin approval, and connecting a workspace on your project's **Tools** page. For how tools work once connected, see [Tools & Workflows](tools-workflows.md).
+    You need a Sim account and a Sim workspace connected to your Illinois Chat project. The [Sim AI user guide](sim-user-guide.md) covers signing in, admin approval, and connecting a workspace on your project's **Tools** page. For how tools work once connected, see [Tools & Workflows](index.md).
 
 ## Shortcut: import the finished tool
 
 If you would rather start from a working copy and read along:
 
-1. Download [arxiv-paper-search-workflow.json](../assets/arxiv-paper-search-workflow.json).
+1. Download [arxiv-paper-search-workflow.json](../../assets/arxiv-paper-search-workflow.json).
 2. In Sim, open the **⋯** menu next to **Workflows** in the sidebar and choose **Import workflow**.
 3. Pick the downloaded file. The workflow opens with all three blocks wired up.
 4. Skip to [Step 5: Test it in Sim](#step-5-test-it-in-sim).
@@ -201,7 +201,7 @@ The general lesson applies to any tool you build. **When the inputs need checkin
 
 **Author-only searches come back in an odd order.** Results are sorted by relevance. If you want an author's newest papers first, add a **Condition** block that sends author-only requests to a second ArXiv block set to **Get Author Papers**, which sorts by submission date.
 
-**The run fails with "blocked by the server policy".** The workflow uses a block that is switched off on this deployment. The [Sim AI user guide](../sim-user-guide.md#which-sim-blocks-you-can-use) lists which blocks are available.
+**The run fails with "blocked by the server policy".** The workflow uses a block that is switched off on this deployment. The [Sim AI user guide](sim-user-guide.md#which-sim-blocks-you-can-use) lists which blocks are available.
 
 **Still stuck?** Contact support using the address in the page footer.
 
@@ -214,4 +214,4 @@ The same shape works for most tools:
 3. **Main block.** Call the service, whether that is a Sim integration block or an **API** block pointing at an endpoint you host.
 4. **Deploy and describe.** Write a workflow description that says what the tool returns, what it needs, and when to use it.
 
-For how tools work once they are connected, including passing images in and out, see [Tools & Workflows](tools-workflows.md).
+For how tools work once they are connected, including passing images in and out, see [Tools & Workflows](index.md).

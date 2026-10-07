@@ -39,4 +39,4 @@ Maintain a list of addresses allowed to use the project. You can approve:
 
 ## Analytics on shared projects
 
-Once shared, the **Analysis** page shows how users interact with your assistant — see [Analytics](analytics.md).
+Once shared, the **Analysis** page shows how users interact with your assistant — see [Analytics](../analysis-exports.md).

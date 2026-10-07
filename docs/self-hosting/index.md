@@ -6,7 +6,7 @@ Illinois Chat is fully open source (Apache 2.0) and ships with a Docker Compose 
 
 - Docker v24+ and Docker Compose v2
 - Git
-- Python 3.10/3.11 and Node.js 20.19+/22.12+ only if you plan to [develop locally](../developers/dev-setup.md)
+- Python 3.10/3.11 and Node.js 20.19+/22.12+ only if you plan to [develop locally](../contributing/dev-setup.md)
 
 ## Quickstart
 
@@ -24,7 +24,7 @@ The script creates a repository-root `.env` from `.env.template` if needed, star
 Open **http://localhost:3000** and create your first project.
 
 !!! tip "No OpenAI key required"
-    OpenAI is not required for local self-hosting. Configure `EMBEDDING_MODEL` and `EMBEDDING_API_BASE` for any OpenAI-compatible embedding endpoint (the default expects Qwen3-Embedding-8B, 4096-dimensional vectors), and point chat at Ollama, vLLM, or another provider. See [Environment Variables](environment-variables.md).
+    OpenAI is not required for local self-hosting. Configure `EMBEDDING_MODEL` and `EMBEDDING_API_BASE` for any OpenAI-compatible embedding endpoint (the default expects Qwen3-Embedding-8B, 4096-dimensional vectors), and point chat at Ollama, vLLM, or another provider. See [Environment Variables](configuration.md).
 
 ## What's running
 
@@ -66,7 +66,7 @@ bash infra/scripts/stop-all.sh --volumes
 
 The full Docker stack reads the repository-root `.env`. Inside Docker, services address each other by Compose service name (`backend`, `minio`, `qdrant`, `postgres-illinois-chat`); browser-facing URLs use `localhost`. See:
 
-- [Environment Variables](environment-variables.md) — the complete reference.
+- [Environment Variables](configuration.md) — the complete reference.
 - [Configuration](configuration.md) — authentication (Keycloak) and model setup.
 - [System Architecture](architecture.md) — how the services fit together.
 
@@ -82,4 +82,4 @@ The full Docker stack reads the repository-root `.env`. Inside Docker, services 
 - [ ] Back up the Docker volumes (Postgres, MinIO, Qdrant) on a schedule.
 - [ ] Ensure `QDRANT_API_KEY` in `.env` matches `qdrant_config.yaml`.
 
-For cloud deployment on AWS ECS Fargate, see [Cloud Deployment](../developers/deployment.md).
+For cloud deployment on AWS ECS Fargate, see [Cloud Deployment](cloud-deployment.md).

@@ -12,7 +12,7 @@ Add documents to a project programmatically. Ingest is asynchronous: requests ar
 | `s3_paths` | array | one of* | S3 keys of files already uploaded to object storage. |
 | `url` | string | one of* | A URL to ingest. |
 | `readable_filename` | string | no | Human-readable name shown in the Materials page and citations. |
-| `groups` | array | no | [Document groups](../guides/uploading-materials.md#organizing-with-document-groups) to assign. |
+| `groups` | array | no | [Document groups](../building/dashboard/document-groups.md#organizing-with-document-groups) to assign. |
 
 *At least one of `s3_paths` or `url` must be provided.
 
@@ -50,7 +50,7 @@ curl -X POST https://backend.chat.illinois.edu/ingest \
 POST /canvas_ingest
 ```
 
-Bulk-import a Canvas course. Requires the platform's Canvas bot to have TA access to the course — see [Canvas Integration](../guides/canvas-integration.md).
+Bulk-import a Canvas course. Requires the platform's Canvas bot to have TA access to the course — see [Canvas Integration](../building/dashboard/importing.md).
 
 ### Request body
 

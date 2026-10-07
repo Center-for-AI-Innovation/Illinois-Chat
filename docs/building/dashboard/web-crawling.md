@@ -21,11 +21,7 @@ The built-in crawler discovers and ingests linked pages starting from a URL you 
 
 ## How crawled content is stored
 
-![Document ingest during web crawling](../assets/web-crawl-ingest.png)
+![Document ingest during web crawling](../../assets/web-crawl-ingest.png)
 
 - **HTML pages** — visible text is extracted and stored directly in the database (not object storage), with the source URL preserved for citations.
 - **Files found during the crawl** (PDF, Word, PowerPoint, Excel) — uploaded to object storage as a backup, but citations still link to the original source; the local copy is used as a fallback if the original goes missing (404).
-
-## Under the hood
-
-Crawling is powered by [Crawlee](https://crawlee.dev/) with Playwright, running as its own service (`apps/crawlee` in the monorepo). It is fast — crawls have been observed at 10 Gbps using six cores of parallel JavaScript — and cheap to host.

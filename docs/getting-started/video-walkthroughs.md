@@ -19,7 +19,7 @@ A short and sweet introduction:
 <iframe width="560" height="315" src="https://www.youtube.com/embed/OOy0JD0Gf9g" title="Connecting Canvas" frameborder="0" allowfullscreen></iframe>
 
 !!! warning "Canvas bot invitation"
-    You must invite the platform bot to your Canvas course as a TA. See [Canvas Integration](../guides/canvas-integration.md) for details.
+    You must invite the platform bot to your Canvas course as a TA. See [Canvas Integration](../building/dashboard/importing.md) for details.
 
 ## Set up an LLM API key
 
@@ -33,6 +33,6 @@ This walkthrough covers system prompts and the different ways you can customize 
 
 ## Tools demo
 
-See [Tools & Workflows](../guides/tools-workflows.md) for the concepts behind custom tools:
+See [Tools & Workflows](../building/tools/index.md) for the concepts behind custom tools:
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/sSai_F1cbEI" title="Tools demo" frameborder="0" allowfullscreen></iframe>

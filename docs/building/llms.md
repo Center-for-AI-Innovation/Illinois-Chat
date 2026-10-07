@@ -38,8 +38,4 @@ For commercial providers you supply your own API key in the project settings. Ke
 ## Vision and tools
 
 - **Image input** is supported on vision-capable models (e.g. GPT-4o, Claude).
-- **Tool selection** always uses a strong commercial model regardless of your default, for reliable tool-argument generation. See [Tools & Workflows](../guides/tools-workflows.md).
-
-## Embeddings
-
-Retrieval quality also depends on the embedding model. The platform default is **Qwen3-Embedding-8B** (4096-dimensional vectors) served from any OpenAI-compatible endpoint — configurable in self-hosted deployments via `EMBEDDING_MODEL` and `EMBEDDING_API_BASE`. See [Environment Variables](../self-hosting/environment-variables.md).
+- **Tool selection** always uses a strong commercial model regardless of your default, for reliable tool-argument generation. See [Tools & Workflows](tools/index.md).

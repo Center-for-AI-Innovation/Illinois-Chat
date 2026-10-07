@@ -75,7 +75,7 @@ The tool checks your file before running and, if something is off, tells you exa
 - **Partial results:** if one trial fails or times out, you still get results for the rest, with an explanation of what went wrong.
 - **Downloads:** links to the charts and the CSV outputs are valid for 7 days.
 
-For how tools work on Illinois Chat in general, see [Tools & Workflows](../../guides/tools-workflows.md).
+For how tools work on Illinois Chat in general, see [Tools & Workflows](../../building/tools/index.md).
 
 ## Credits
 

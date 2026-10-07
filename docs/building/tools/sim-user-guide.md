@@ -6,9 +6,9 @@ This guide covers how to get access to Sim, how to wire a Sim workspace into an 
 Chat project, how to let others build tools with you, and which blocks you can use.
 
 If you maintain the deployment rather than build tools with it, read the
-[Sim AI operator guide](sim-developer-guide.md) instead. For how tools behave once they are
-connected, see [Tools & Workflows](guides/tools-workflows.md); for a complete worked example,
-see [Build a Tool in Sim](guides/build-a-sim-tool.md).
+[Sim AI operator guide](../../self-hosting/sim.md) instead. For how tools behave once they are
+connected, see [Tools & Workflows](index.md); for a complete worked example,
+see [Build a Tool in Sim](build-a-tool.md).
 
 Wherever this guide says to contact support, use the support address in the footer of this
 page. If you use a self-hosted deployment, contact the people who run it instead.
@@ -100,7 +100,7 @@ authenticate yourself. Everything else is hidden on purpose.
 !!! note "This list describes the hosted site"
     The lists below are the configuration of the hosted Illinois Chat deployment. A
     self-hosted deployment chooses its own list; if you run one, see the
-    [operator guide](sim-developer-guide.md#5-the-block-whitelist).
+    [operator guide](../../self-hosting/sim.md#5-the-block-whitelist).
 
 ### What you can use
 

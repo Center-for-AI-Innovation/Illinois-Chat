@@ -2,7 +2,7 @@
 
 Tools let your assistant take real actions during a conversation: search the literature, query databases, post notifications, create tickets, call APIs, or run computations. The LLM decides when a tool is relevant, generates its input parameters, invokes it, and folds the result into its answer.
 
-![The concept of tool use: the LLM parses user input, decides whether a tool is relevant, generates the parameters, the platform invokes the tool, and the output is returned to the LLM for the final answer](../assets/tool-use-concept.png)
+![The concept of tool use: the LLM parses user input, decides whether a tool is relevant, generates the parameters, the platform invokes the tool, and the output is returned to the LLM for the final answer](../../assets/tool-use-concept.png)
 
 ## How tool selection works
 
@@ -17,10 +17,10 @@ Tools are invoked automatically based on the LLM's judgment; there is no way to 
 
 Tools are [Sim AI](https://sim.ai) workflows. Sim is a visual workflow builder that ships with the Illinois Chat stack and shares its Keycloak login, so any workflow you build and deploy in a Sim workspace can be exposed to a chatbot as a tool. The hosted site runs Sim at [sim.chat.illinois.edu](https://sim.chat.illinois.edu/); new accounts wait for approval before they can build anything (contact support using the address in the page footer).
 
-The [Sim AI user guide](../sim-user-guide.md) covers signing in, approval, inviting collaborators, and which Sim blocks are available on this deployment.
+The [Sim AI user guide](sim-user-guide.md) covers signing in, approval, inviting collaborators, and which Sim blocks are available on this deployment.
 
 !!! tip "Worked example"
-    [Build a Tool in Sim: arXiv Example](build-a-sim-tool.md) walks through a complete tool, from an empty workflow to a chatbot that calls it, and explains the rules below as they come up.
+    [Build a Tool in Sim: arXiv Example](build-a-tool.md) walks through a complete tool, from an empty workflow to a chatbot that calls it, and explains the rules below as they come up.
 
 A tool is a Sim workflow with three parts:
 
@@ -65,7 +65,7 @@ Images are passed as an array of `image_urls` in a JSON object — URLs only, no
 
 ## Recommended pattern
 
-Most tools follow the same shape: a **Start** block that declares the inputs, a **Function** block that checks and combines them, and a main block that does the work — either one of Sim's integration blocks or an **API** block calling a small HTTP endpoint you host. Putting the logic in a Function block or in code you control keeps the workflow short and stops bad inputs from reaching the service silently; the [worked example](build-a-sim-tool.md#why-the-function-block-matters) shows what goes wrong without it.
+Most tools follow the same shape: a **Start** block that declares the inputs, a **Function** block that checks and combines them, and a main block that does the work — either one of Sim's integration blocks or an **API** block calling a small HTTP endpoint you host. Putting the logic in a Function block or in code you control keeps the workflow short and stops bad inputs from reaching the service silently; the [worked example](build-a-tool.md#why-the-function-block-matters) shows what goes wrong without it.
 
 ## Using tools in your project
 
@@ -74,4 +74,4 @@ Most tools follow the same shape: a **Start** block that declares the inputs, a 
 3. Enable the tools you want active in your project.
 4. Start chatting — tools are invoked as needed.
 
-See [Connecting a Sim workspace to an Illinois Chat project](../sim-user-guide.md#connecting-a-sim-workspace-to-an-illinois-chat-project) for the details, including the optional base URL and what the tool-routing status on the Tools page means.
+See [Connecting a Sim workspace to an Illinois Chat project](sim-user-guide.md#connecting-a-sim-workspace-to-an-illinois-chat-project) for the details, including the optional base URL and what the tool-routing status on the Tools page means.

@@ -6,8 +6,8 @@ Each project bundles together:
 
 - **A knowledge base** — the documents and crawled web pages the assistant can draw on. Documents in one project are completely isolated from every other project; retrieval never crosses project boundaries.
 - **Settings** — the default LLM, temperature, and system prompt used for conversations.
-- **Access controls** — owners, admins, an approved user list, and a public/private toggle. See [Sharing & Access Control](../guides/sharing-access.md).
-- **Tools** — optional custom tools the LLM can invoke during conversations. See [Tools & Workflows](../guides/tools-workflows.md).
+- **Access controls** — owners, admins, an approved user list, and a public/private toggle. See [Sharing & Access Control](dashboard/sharing-access.md).
+- **Tools** — optional custom tools the LLM can invoke during conversations. See [Tools & Workflows](tools/index.md).
 - **An API key** — for programmatic access. See the [API Reference](../api/index.md).
 
 ## Project URL
@@ -42,5 +42,5 @@ Project names must be unique across the instance and become part of the URL, so 
 
 ## Next steps
 
-- [Documents](documents.md) — what happens to materials you add.
-- [Retrieval](retrieval.md) — how answers get grounded in your documents.
+- [Documents](../how-it-works/documents-ingest.md) — what happens to materials you add.
+- [Retrieval](../how-it-works/retrieval.md) — how answers get grounded in your documents.

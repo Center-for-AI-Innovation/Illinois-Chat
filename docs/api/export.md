@@ -1,6 +1,6 @@
 # Export API
 
-Bulk-export conversation history and documents from a project. These endpoints are served by the Flask backend; the same exports are available in the UI — see [Bulk Export](../guides/bulk-export.md).
+Bulk-export conversation history and documents from a project. These endpoints are served by the Flask backend; the same exports are available in the UI — see [Bulk Export](../building/analysis-exports.md).
 
 All export endpoints are `GET` requests sharing the same query parameters:
 
@@ -18,7 +18,7 @@ And the same response behavior:
 
 ## `GET /export-convo-history`
 
-Export all conversations in the project as JSON Lines. See [Bulk Export](../guides/bulk-export.md#data-format) for the row format.
+Export all conversations in the project as JSON Lines. See [Bulk Export](../building/analysis-exports.md#data-format) for the row format.
 
 ```bash
 curl -o convos.zip "https://backend.chat.illinois.edu/export-convo-history?course_name=your-project-name&from_date=2026-01-01&to_date=2026-06-30"

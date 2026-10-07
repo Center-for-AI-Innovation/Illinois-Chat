@@ -13,7 +13,7 @@ External connections let a project use **your own infrastructure** — a private
     Projects without an external connection need nothing. They automatically use the shared platform infrastructure: the default object-storage bucket, the platform Postgres (with pgvector for embeddings), and the default embedding model.
 
 !!! note "Who sets this up"
-    External connections are created and managed by platform super admins, not from the project pages. On the hosted site, contact support using the address in the page footer to request one for your project. Operators running their own deployment: see [External Connections Setup](../external-connections-setup.md) for provisioning and the registration CLI.
+    External connections are created and managed by platform super admins, not from the project pages. On the hosted site, contact support using the address in the page footer to request one for your project. Operators running their own deployment: see [External Connections Setup](../self-hosting/external-connections.md) for provisioning and the registration CLI.
 
 This is useful when you need:
 
@@ -33,7 +33,7 @@ Controls where uploaded documents and exported files are stored. Configure this 
 Controls where **document metadata and embeddings** are stored: the `documents`, `documents_in_progress`, `documents_failed`, `doc_groups`, `documents_doc_groups` and `embeddings` tables. Configure this when you want a project's document inventory and its vectors to live in your own Postgres.
 
 !!! info "Embeddings follow the documents database"
-    When a database connection is set and no Qdrant connection is, the same external Postgres holds both documents and embeddings, using pgvector. The external database must have the `pgvector` extension installed and the platform's migrations applied before the connection is activated; the [setup guide](../external-connections-setup.md) covers this.
+    When a database connection is set and no Qdrant connection is, the same external Postgres holds both documents and embeddings, using pgvector. The external database must have the `pgvector` extension installed and the platform's migrations applied before the connection is activated; the [setup guide](../self-hosting/external-connections.md) covers this.
 
 !!! info "The external database is document-scoped"
     Conversations, messages, project metadata, analytics, API keys and tool state always remain on the platform's main database. They are never written to a project's external Postgres, even when a database connection is set.
@@ -64,6 +64,6 @@ There is no environment switch for this; the project's connection record alone d
 
 ## Further reading
 
-- [External Connections Setup](../external-connections-setup.md) — provisioning an external Postgres, applying migrations, registering connections with the CLI.
+- [External Connections Setup](../self-hosting/external-connections.md) — provisioning an external Postgres, applying migrations, registering connections with the CLI.
 - [Configuration reference](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/developers/external-connections-config.md) — field-by-field schemas, post-processors, embedding providers.
-- [Lightweight Ingest Bridge](../developers/ingest-bridge.md) — bulk-ingesting into a project whose storage lives behind an external connection.
+- [Lightweight Ingest Bridge](../contributing/ingest-bridge.md) — bulk-ingesting into a project whose storage lives behind an external connection.

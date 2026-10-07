@@ -10,7 +10,7 @@ POST https://chat.illinois.edu/api/chat-api/chat
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `model` | string | yes | Model to use, e.g. `gpt-4o-mini`, or a free NCSA-hosted model like `llama3.1:70b`. See [LLM Providers](../concepts/llm-providers.md). |
+| `model` | string | yes | Model to use, e.g. `gpt-4o-mini`, or a free NCSA-hosted model like `llama3.1:70b`. See [LLM Providers](../building/llms.md). |
 | `messages` | array | yes | OpenAI-style message list (`role`: `system` \| `user` \| `assistant`; `content`: string or content-part array for images). |
 | `course_name` | string | yes | Your project name (the slug in your project URL). |
 | `api_key` | string | yes | Project API key. See [Authentication](authentication.md). |
@@ -172,4 +172,4 @@ data = {
 
 ### Tool use
 
-Tools enabled in your project are invoked automatically based on the LLM's judgment — there is no way to force invocation, but you can encourage it via prompting. A strong commercial model is always used for tool selection. See [Tools & Workflows](../guides/tools-workflows.md).
+Tools enabled in your project are invoked automatically based on the LLM's judgment — there is no way to force invocation, but you can encourage it via prompting. A strong commercial model is always used for tool selection. See [Tools & Workflows](../building/tools/index.md).

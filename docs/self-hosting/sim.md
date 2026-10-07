@@ -4,7 +4,7 @@ How the Sim AI deployment is put together, how Illinois Chat talks to it, how us
 in, and what to know before changing or upgrading it.
 
 If you build tools in Sim rather than maintain the deployment, read the
-[Sim user guide](sim-user-guide.md) instead.
+[Sim user guide](../building/tools/sim-user-guide.md) instead.
 
 ## 1. What runs
 
@@ -130,7 +130,7 @@ and blocking revokes the user's live Sim sessions on the spot. Setting `is_admin
 on a row promotes that user to Sim platform admin.
 
 What users see while they wait, and how they connect a workspace once approved, is in the
-[user guide](sim-user-guide.md#waiting-for-approval).
+[user guide](../building/tools/sim-user-guide.md#waiting-for-approval).
 
 ## 5. The block whitelist
 
@@ -139,7 +139,7 @@ comes from `ALLOWED_INTEGRATIONS` in `.env`, which is where the list lives and t
 place it lives; `.env.template` ships the full 67 ids. `infra/docker/docker-compose.sim.yaml`
 passes it through with `:?` and no default, so a missing or blank value stops the Sim stack
 instead of silently unrestricting it. The allowed set is documented for builders in the
-user guide under [Which Sim blocks you can use](sim-user-guide.md#which-sim-blocks-you-can-use).
+user guide under [Which Sim blocks you can use](../building/tools/sim-user-guide.md#which-sim-blocks-you-can-use).
 
 **Six properties, all verified against the source at our pinned commit.** Do not assume the
 public documentation applies — it describes a newer release that behaves differently:

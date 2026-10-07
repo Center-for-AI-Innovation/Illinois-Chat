@@ -15,20 +15,9 @@ The campus-supported instance is available at [chat.illinois.edu](https://chat.i
 - **Robust platform features.** Authentication, sharing and access control, analytics, and support for many different language models.
 - **User analytics.** When you share your assistant as a learning tool, Illinois Chat provides analytics on how users interact with it, helping you tailor your content.
 
-## How it works
-
-Illinois Chat uses **retrieval-augmented generation (RAG)**:
-
-1. **Ingest** — documents are split into overlapping chunks and converted into embeddings.
-2. **Index** — embeddings are stored in a per-project vector index, isolated from other projects.
-3. **Retrieve** — each question is embedded and matched against the index to find the most relevant passages.
-4. **Generate** — the retrieved passages are passed to a large language model, which produces a cited answer.
-
-Learn more in [Concepts → Retrieval](concepts/retrieval.md).
-
 ## Top use cases
 
-1. **AI teaching assistant** — create a virtual assistant for your courses that provides expert answers, cites sources, and encourages students to explore primary documents. It even [integrates with Canvas](guides/canvas-integration.md).
+1. **AI teaching assistant** — create a virtual assistant for your courses that provides expert answers, cites sources, and encourages students to explore primary documents. It even [integrates with Canvas](building/dashboard/importing.md).
 2. **Literature review** — upload academic PDFs or research papers and let the assistant help you find relevant information and citations.
 3. **Project onboarding companion** — integrate resources like GitHub repos and PDFs to efficiently onboard team members.
 4. **Advanced search tool** — use Illinois Chat over your curated content for fast, reliable information retrieval.
@@ -38,7 +27,7 @@ Learn more in [Concepts → Retrieval](concepts/retrieval.md).
 <div class="grid cards" markdown>
 
 - :material-rocket-launch: **[Quickstart](getting-started/quickstart.md)** — create your first project and start chatting in minutes.
-- :material-file-document-multiple: **[Guides](guides/uploading-materials.md)** — uploading materials, web crawling, sharing, tools, Canvas, analytics.
+- :material-file-document-multiple: **[Guides](building/dashboard/uploading-files.md)** — uploading materials, web crawling, sharing, tools, Canvas, analytics.
 - :material-api: **[API Reference](api/index.md)** — integrate Illinois Chat into your own applications.
 - :material-server: **[Self-Hosting](self-hosting/index.md)** — run the full stack yourself with Docker Compose.
 - :material-sprout: **[CropWizard](use-cases/cropwizard/index.md)** — the flagship agricultural assistant built on Illinois Chat.

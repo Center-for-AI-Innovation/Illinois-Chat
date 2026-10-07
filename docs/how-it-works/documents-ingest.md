@@ -33,15 +33,29 @@ There are two pathways for new documents — direct file upload and web crawl �
     - **Contents match** → the incoming document is a duplicate and is *not* ingested.
     - **Contents differ** → it is treated as an updated version; the old document is removed and the new one ingested.
 
-## Document groups
+## Document ingest: how does it work?
 
-Documents can be organized into **groups** (for example "Lectures", "Homework", "Extension articles"). Users can enable or disable groups in chat settings to scope retrieval to a subset of the knowledge base.
+![Document ingest pipeline for uploaded files; web crawling is very similar](../assets/ingest-pipeline.png)
 
-## Deleting documents
+1. The user uploads a document via the file-upload dropzone.
+    1. Client-side check for supported filetypes.
+    2. A presigned S3 URL is generated for a direct client → S3 upload (bypassing the app servers to save bandwidth).
+    3. After the upload completes, an ingest job is posted to the queue.
+2. The ingest worker picks up the job:
+    1. The filetype is detected and the request forwarded to the matching ingest function (PDF, Word, Excel, ...). Each function shares the same interface: extract text plus per-page metadata, then call `split_and_upload()`.
+    2. [Duplicates are detected](documents-ingest.md#duplicate-handling) and skipped or replaced.
+    3. Text is chunked, embedded, and uploaded to Qdrant and SQL. On failure, the job retries up to 9 times with exponential backoff.
+3. Meanwhile, the frontend polls the database to show success/failure indicators in the UI.
 
-Deleting a document removes it from retrieval for future conversations. Citations in past conversations remain visible.
+### Ingest during web crawling
+
+Crawled sources always link back to the original site, like a search engine. Compatible files (PDF, Word, PPT, Excel) are backed up to S3, but citations link to the original source, falling back to the local copy if the original 404s. HTML pages are not uploaded to S3 — their text is stored directly in SQL. See [Web Crawling](../building/dashboard/web-crawling.md).
+
+## Under the hood
+
+Crawling is powered by [Crawlee](https://crawlee.dev/) with Playwright, running as its own service (`apps/crawlee` in the monorepo). It is fast — crawls have been observed at 10 Gbps using six cores of parallel JavaScript — and cheap to host.
 
 ## Next steps
 
-- [Uploading Materials](../guides/uploading-materials.md) — supported formats and upload methods.
+- [Uploading Materials](../building/dashboard/uploading-files.md) — supported formats and upload methods.
 - [Retrieval](retrieval.md) — how documents are found at question time.
