@@ -85,12 +85,4 @@ Internal only on the full stack: `backend`, `worker`, `redis`, `rabbitmq`, `mini
 
 ## Where the code lives
 
-| Path | Contents |
-| --- | --- |
-| `apps/frontend` | Next.js web application |
-| `apps/backend` | Flask API and ingest worker (`ai_ta_backend/rabbitmq`) |
-| `apps/crawlee` | Crawlee web-crawling service |
-| `infra/docker` | Docker Compose files, Sim setup SQL |
-| `infra/db` | Postgres schema (`init-schema.sql`) and external-store migrations |
-| `infra/keycloak` | Keycloak realm and theme |
-| `infra/scripts` | `start-all.sh`, `stop-all.sh`, `start-dev.sh`, `stop-dev.sh` |
+The repository tree is described on [Repository layout](../contributing/repository-layout.md).

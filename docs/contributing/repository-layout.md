@@ -1,89 +1,27 @@
 # Repository layout
 
-!!! note "Historical record"
-    This page records the May 2026 migration of three repositories into this monorepo. The commands below were run once and are kept for reference; the layout they produced is what the rest of the documentation describes.
+Illinois Chat is one repository: [Center-for-AI-Innovation/Illinois-Chat](https://github.com/Center-for-AI-Innovation/Illinois-Chat). All development happens here, on branches off `main`; pull requests target `main`. The frontend, backend and crawler were merged into it from separate repositories in May 2026 with their history preserved, and those earlier repositories are no longer updated.
 
-This document records the key `git subtree` commands and layout changes used to migrate to the `self-hostable-uiuc-chat` monorepo.
+## Top level
 
-## Service imports
+| Path | Contents |
+| --- | --- |
+| `apps/frontend` | The Next.js web application: pages, API routes, the Drizzle schema and migrations. Most product logic lives here. |
+| `apps/backend` | The Flask backend (`ai_ta_backend/main.py`) and the RabbitMQ ingest worker (`ai_ta_backend/rabbitmq`). |
+| `apps/crawlee` | The Crawlee web-crawling service. |
+| `infra/docker` | Docker Compose files: `docker-compose.yaml` (full stack), `docker-compose.dev.yaml` (infrastructure for local development), `docker-compose.sim.yaml` (Sim AI), `docker-compose.models.yaml` (Ollama); `sim/` holds the Sim setup SQL. |
+| `infra/db` | `init-schema.sql`, the Postgres schema applied on an empty database, and the external-store migrations. |
+| `infra/keycloak` | The Keycloak realm exports (`realms/`) and login theme (`theme/`). |
+| `infra/scripts` | `start-all.sh` / `stop-all.sh` for the full stack, `start-dev.sh` / `stop-dev.sh` for development, and the external-connection provisioning script. |
+| `docs/`, `mkdocs.yml`, `overrides/` | This documentation site. See [Writing docs](writing-docs.md). |
+| `.github/workflows` | CI: `pr-checks.yml`, `illinois-chat-dev.yml`, `release-images.yml`, `docs.yml`. See [Testing & CI](testing-ci.md). |
+| `.trunk` | Linter configuration shared by CI and the local `trunk` CLI. |
+| `.env.template` | The root environment template the start scripts copy to `.env`. See the [Configuration reference](../self-hosting/configuration.md). |
 
-All commands were run from the monorepo root on branch `monorepo`.
+## Inside the apps
 
-### Submodule removal
+- **Frontend** (`apps/frontend/src`): `pages/` holds the routes and the `pages/api` handlers, `components/` the UI, `db/` the Drizzle schema (`schema.ts`) and `migrations/`, `utils/` and `server/` the server-side logic such as retrieval and authorization, `__tests__/` the Vitest suites.
+- **Backend** (`apps/backend/ai_ta_backend`): `main.py` registers the routes, `service/` and `database/` implement them, `rabbitmq/` is the ingest worker with its own `requirements.txt` and `Dockerfile`, `utils/` holds exports and email.
+- **Crawler** (`apps/crawlee/src`): the crawl API and the per-page ingest calls to the backend.
 
-```bash
-git submodule deinit -f uiuc-chat-frontend uiuc-chat-backend ic_crawlee
-git rm -f uiuc-chat-frontend uiuc-chat-backend ic_crawlee
-rm -f .gitmodules
-git commit -m "Remove frontend/backend/crawlee submodules for monorepo layout"
-```
-
-### Subtree adds
-
-#### Frontend (uiuc-chat-frontend, branch illinois-chat)
-
-```bash
-git remote add uiuc-frontend git@github.com:Center-for-AI-Innovation/uiuc-chat-frontend.git
-git fetch uiuc-frontend
-git subtree add --prefix=apps/frontend uiuc-frontend illinois-chat
-```
-
-#### Backend (ai-ta-backend, branch illinois-chat)
-
-```bash
-git remote add uiuc-backend git@github.com:Center-for-AI-Innovation/ai-ta-backend.git
-git fetch uiuc-backend
-git subtree add --prefix=apps/backend uiuc-backend illinois-chat
-```
-
-#### Crawlee (crawlee, branch main)
-
-```bash
-git remote add uiuc-crawlee git@github.com:Center-for-AI-Innovation/crawlee.git
-git fetch uiuc-crawlee
-git subtree add --prefix=apps/crawlee uiuc-crawlee main
-```
-
-## Ongoing syncs
-
-To pull new changes from the legacy repos into `monorepo`:
-
-```bash
-# Frontend (illinois-chat)
-git checkout monorepo
-git fetch uiuc-frontend
-git subtree pull --prefix=apps/frontend uiuc-frontend illinois-chat
-
-# Backend (illinois-chat)
-git fetch uiuc-backend
-git subtree pull --prefix=apps/backend uiuc-backend illinois-chat
-
-# Crawlee (main)
-git fetch uiuc-crawlee
-git subtree pull --prefix=apps/crawlee uiuc-crawlee main
-```
-
-## Infra layout changes
-
-Infra-related files were moved into `infra/*`:
-
-- Database schema and init:
-  - `db/` → `infra/db/`
-- Keycloak realms and theme:
-  - `keycloak/` → `infra/keycloak/realms/`
-  - `keycloak-theme/` → `infra/keycloak/theme/`
-- Docker Compose:
-  - `docker-compose.yaml` → `infra/docker/docker-compose.yaml`
-  - `docker-compose.dev.yaml` → `infra/docker/docker-compose.dev.yaml`
-  - `docker-compose.models.yaml` → `infra/docker/docker-compose.models.yaml`
-- Scripts:
-  - `init-dev.sh`, `init.sh`, `initialize.sh`, `run-dev.sh`, `run.sh`, `init-scripts/` → `infra/scripts/`
-
-All documentation and scripts were updated to reference:
-
-- `apps/frontend`, `apps/backend`, `apps/crawlee` for service code.
-- `infra/docker/docker-compose*.yaml` for compose.
-- `infra/db/init-schema.sql` for DB bootstrap.
-- `infra/keycloak/realms` and `infra/keycloak/theme` for Keycloak realm and theme mounts.
-
-The current top-level layout is described on [Services, ports & architecture](../self-hosting/architecture.md).
+Each app has its own `README.md`, `Dockerfile` and lockfile; the root `README.md` is the entry point for the whole repository.
