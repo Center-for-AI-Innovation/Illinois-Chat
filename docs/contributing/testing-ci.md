@@ -32,4 +32,4 @@ Runs on pushes to `main` that touch `apps/**`, `infra/**` or `.github/workflows/
 
 ## Docs (`docs.yml`)
 
-Runs on pushes to `main` that touch `docs/**`, `mkdocs.yml` or the workflow itself, and on manual dispatch: `pip install -r docs/requirements.txt`, `mkdocs build --strict`, then a GitHub Pages deploy. There is no PR-time docs build, so run the strict build locally before opening a PR — see [Writing docs](writing-docs.md).
+Runs when `docs/**`, `overrides/**`, `mkdocs.yml` or the workflow itself change: on pull requests it runs `pip install -r docs/requirements.txt` and `mkdocs build --strict` as a check; on pushes to `main` (and manual dispatch) it also deploys the built site to GitHub Pages. A broken link or anchor therefore fails the PR check, the same way it fails the local build described on [Writing docs](writing-docs.md).

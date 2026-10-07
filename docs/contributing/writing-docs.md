@@ -14,7 +14,7 @@ uv tool run --with-requirements docs/requirements.txt mkdocs serve   # http://12
 uv tool run --with-requirements docs/requirements.txt mkdocs build --strict
 ```
 
-The strict build must finish with zero warnings. It fails on broken links, broken `#anchors`, missing images and pages absent from `nav`. Blog posts dated in the future are drafts: `serve` renders them, `build` omits them and does not check their links.
+The strict build must finish with zero warnings; pull requests that touch the docs run the same build as a check. It fails on broken links, broken `#anchors`, missing images and pages absent from `nav`. Blog posts dated in the future are drafts: `serve` renders them, `build` omits them and does not check their links.
 
 ## Structure
 

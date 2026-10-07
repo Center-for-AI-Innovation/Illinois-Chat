@@ -6,7 +6,6 @@ site_description: >-
 site_url: https://docs.chat.illinois.edu/
 repo_url: https://github.com/Center-for-AI-Innovation/Illinois-Chat
 repo_name: Center-for-AI-Innovation/Illinois-Chat
-edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -39,7 +38,6 @@ theme:
     - search.highlight
     - content.code.copy
     - content.tabs.link
-    - content.action.edit
 
 validation:
   anchors: warn
