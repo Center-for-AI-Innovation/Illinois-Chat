@@ -21,7 +21,6 @@ This repository includes a complete CI/CD pipeline for deploying the AI TA Backe
 
 - `.github/workflows/deploy-to-ecs.yml` - GitHub Actions workflow
 - `ai-ta-backend-task-definition.json` - ECS task definition
-- `Dockerfile.ecs` - Optimized Docker file for ECS
 - `scripts/setup-ecs-deployment.sh` - Automated setup script
 - `docs/deployment/aws-ecs-setup.md` - Detailed setup guide
 - `.env.ecs.example` - Production environment variables template
