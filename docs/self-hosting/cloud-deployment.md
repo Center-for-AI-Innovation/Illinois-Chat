@@ -23,7 +23,7 @@ Four workflows live in `.github/workflows/`:
 | --- | --- | --- |
 | `illinois-chat-dev.yml` | push to `main` touching `apps/**`, `infra/**` or `.github/workflows/**` | Runs Trunk on the pushed commits, then builds and pushes `uiuc-chat-backend` (from `Self-Hosted-Dockerfile`), `uiuc-chat-worker` (from `ai_ta_backend/rabbitmq/`), `uiuc-chat-frontend` and `uiuc-chat-crawlee`, each tagged with the commit SHA, `latest` and `main`, then runs `aws ecs update-service --force-new-deployment` on the four services. |
 | `release-images.yml` | a GitHub release is published | Builds and pushes the same four images tagged with the release tag. Trunk runs on the full tree but cannot fail the build. No ECS update. |
-| `pr-checks.yml` | pull requests to `main` | Lint and frontend tests. |
+| `pr-checks.yml` | pull requests to `main` | Lint and frontend tests; see [Testing & CI](../contributing/testing-ci.md). |
 | `docs.yml` | push to `main` touching `docs/**`, `mkdocs.yml` or the workflow; or manual run | Strict MkDocs build and GitHub Pages deploy of this site. |
 
 The frontend build fails on purpose when `NEXT_PUBLIC_KEYCLOAK_URL` is empty or lacks a trailing slash, because `NEXT_PUBLIC_*` values are inlined at build time and cannot be corrected by runtime environment variables.

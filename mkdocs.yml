@@ -153,5 +153,7 @@ nav:
   - Contributing:
       - Development setup: contributing/dev-setup.md
       - Repository layout: contributing/repository-layout.md
+      - Testing & CI: contributing/testing-ci.md
+      - Writing docs: contributing/writing-docs.md
       - Lightweight ingest bridge: contributing/ingest-bridge.md
   - Blog: blog/index.md
