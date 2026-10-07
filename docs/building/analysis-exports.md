@@ -1,45 +1,32 @@
-# Analytics
+# Analysis & Exports
 
-When you share your assistant as a learning tool, Illinois Chat shows you how people use it — helping you understand your audience's needs and improve your content.
+When you share your chatbot as a learning tool, Illinois Chat shows you how people use it — helping you understand your audience's needs and improve your content. Only the owner and administrators can see the Analysis page and run exports.
 
 ## The Analysis page
 
-Open **Analysis** in your project to see:
+Open **Analysis** in your chatbot to see statistics and charts:
 
 - **Usage over time** — conversation and message volume, including weekly trends.
 - **Model usage** — which LLMs are being used and how often.
-- **Conversation history** — browse what users are asking (owners and admins only).
 
-Use it to spot gaps: questions that come up repeatedly with weak answers usually mean a document is missing from your knowledge base.
-
-## Exporting conversations
-
-The full conversation history — every user, every conversation — can be exported for offline analysis from the Analysis page. Only owners and admins can export. See [Bulk Export](analysis-exports.md) for the data format.
-
-## Semantic maps
-
-Projects can generate **Nomic Atlas** semantic maps of documents and conversation history: an interactive 2-D visualization where similar items cluster together. This makes it easy to see, at a glance, the topics your users care about and how well your documents cover them. (Requires a Nomic API key on self-hosted deployments — see [Environment Variables](../self-hosting/configuration.md).)
-
-## Privacy notes
-
-- If a user is authenticated when chatting, their email is included in conversation logs; otherwise it is `null`.
-- Only project owners and admins can access conversation history and exports.
-
-Your data is yours. Export it for detailed analysis of user conversations, or to move to another service.
+Use it to spot gaps: questions that come up repeatedly with weak answers usually mean a document is missing from your knowledge base. To read what users actually asked, export the conversations.
 
 ## Export all conversations
 
-![To export all conversations, open Analysis and click Download](../assets/export-conversations.png)
+On the **Analysis** page, **Download Conversation History** downloads *all* conversations anyone has had with your chatbot as a zip containing:
 
-From the **Analysis** page, download *all* conversations anyone has had in your project. Only the project owner and admins can access these sensitive details.
+- `markdown export/` — one readable Markdown file per conversation,
+- `media_files/` — images attached to messages,
+- an `.xlsx` spreadsheet and a `.jsonl` file of the same conversations,
+- `error.log` for anything that could not be exported.
 
 ### Data format
 
-Exports are JSON Lines (`.jsonl`), one conversation per row:
+The `.jsonl` file is JSON Lines, one conversation per row:
 
 - If a user was authenticated when chatting, their email address is included; otherwise `null`.
 - Messages mirror [OpenAI's chat format](https://platform.openai.com/docs/api-reference/chat/create) (`role`/`content` pairs).
-- Each `assistant` message additionally includes the `contexts` that were (potentially) used to answer — up to 80 contexts per response, each with `text`, `readable_filename`, `s3_path`, `url`, and `pagenumber` metadata.
+- Each `assistant` message additionally includes the `contexts` that were (potentially) used to answer — up to 100 contexts per response, each with `text`, `readable_filename`, `s3_path`, `url`, and `pagenumber` metadata.
 
 ### Reading the export
 
@@ -77,10 +64,21 @@ Each row looks like:
 
 ## Export all documents
 
-![Export all documents from the bottom of the Materials page](../assets/export-documents.png)
+**Export** in the **Project Files** table on the Dashboard downloads a zip with one `.jsonl` file of the post-processed text and vector embeddings used by the LLM. To minimize data-transfer costs, exporting *original* files (PDFs, etc.) is only available per-document.
 
-From the bottom of the **Materials** page, download the post-processed text and vector embeddings used by the LLM, also as JSON Lines. To minimize data-transfer costs, exporting *original* files (PDFs, etc.) is only available per-document.
+## Large exports
+
+When an export covers more than 500 conversations or documents it runs as a background job. A download link is emailed to the chatbot's owner and administrators when the deployment has the backend's email settings (see the [Configuration reference](../self-hosting/configuration.md)); otherwise the export is written to object storage and nothing is sent.
+
+## A user's own history
+
+Each user can download their own conversations with the chatbot: **Export history** in the chat sidebar produces a zip of Markdown files plus media. See [Using a chatbot](../getting-started/using-a-chatbot.md).
+
+## Privacy notes
+
+- If a user is authenticated when chatting, their email is included in conversation logs; otherwise it is `null`.
+- Only the owner and administrators can access conversation history and exports.
 
 ## Programmatic export
 
-Exports are also available via the API — see [Export API](../api/export.md).
+Exports are also available via the API — see the [Export API](../api/export.md).

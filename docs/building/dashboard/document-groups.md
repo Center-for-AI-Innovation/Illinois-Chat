@@ -1,17 +1,11 @@
 # Document Groups & Deleting
 
-## Organizing with document groups
-
-Group related documents (e.g. "Lectures", "Homework solutions", "Research papers"). Users can toggle groups on and off in chat settings to scope retrieval, and the [Retrieval API](../../api/retrieval.md) accepts a `doc_groups` filter.
-
 ## Document groups
 
-Documents can be organized into **groups** (for example "Lectures", "Homework", "Extension articles"). Users can enable or disable groups in chat settings to scope retrieval to a subset of the knowledge base.
+Documents can be organized into **groups** (for example "Lectures", "Homework solutions", "Research papers") from the Project Files table on the **Dashboard**. Every document also belongs to the built-in **All Documents** group.
+
+Users can switch groups on and off in the chat **Settings › Document Groups** tab to scope retrieval to a subset of the knowledge base, and the [Retrieval API](../../api/retrieval.md) and [Chat API](../../api/chat.md) accept a `doc_groups` filter.
 
 ## Deleting documents
 
-Deleting a document removes it from future retrieval. Citations that already appeared in past conversations remain visible.
-
-## Deleting documents
-
-Deleting a document removes it from retrieval for future conversations. Citations in past conversations remain visible.
+Delete a document from the Project Files table. Deleting removes it from future retrieval and updates the group counts; citations that already appeared in past conversations remain visible.

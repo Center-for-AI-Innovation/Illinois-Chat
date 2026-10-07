@@ -1,41 +1,33 @@
-# LLM Providers
+# LLMs
 
-Illinois Chat is model-agnostic: each project chooses which large language models power it, and users can override the model per conversation.
+Illinois Chat is model-agnostic: each chatbot chooses which large language models power it, and users can switch models per conversation. Everything on this page is set on the chatbot's **LLMs** screen ("Configure LLM Providers for your Chatbot").
 
 ## Supported providers
 
-| Provider | Notes |
-| --- | --- |
-| **OpenAI** | GPT-4o family and newer; strong instruction-following and citation quality. |
-| **Azure OpenAI** | OpenAI models via your Azure enterprise agreement. |
-| **Anthropic** | Claude models. |
-| **Google** | Gemini models. |
-| **AWS Bedrock** | Models available through your AWS account. |
-| **SambaNova** | Hosted open models. |
-| **NCSA-hosted models** | Free open models (e.g. Llama family and Qwen) served on NCSA infrastructure — no API key required. |
-| **Ollama** | Locally hosted open models, ideal for self-hosted deployments. |
-| **WebLLM** | Runs entirely in the user's browser. |
-| **OpenAI-compatible** | Any custom endpoint that speaks the OpenAI API (vLLM, etc.). |
+The page groups providers in two sets:
 
-!!! tip "Which model should I use?"
-    Free NCSA-hosted models are a great zero-cost starting point. For the best instruction-following, response quality, and source citation, we recommend bringing your own key for a frontier commercial model.
+| Group | Providers |
+| --- | --- |
+| **Closed models (bring your own key)** | Anthropic, OpenAI, OpenAI Compatible (any endpoint that speaks the OpenAI API, such as vLLM — base URL including `/v1`), Azure OpenAI, Amazon Bedrock, Google Gemini, SambaNova |
+| **Open models (no key needed)** | NCSA Hosted LLMs, NCSA Hosted VLMs, Ollama, WebLLM (runs entirely in the user's browser) |
+
+Free NCSA-hosted models are a zero-cost starting point; commercial providers generally give better instruction-following and citation quality, and you pay the provider directly for usage.
 
 ## Bring your own key
 
-For commercial providers you supply your own API key in the project settings. Keys are used only to serve your project's requests:
+For commercial providers you paste your own API key on the LLMs page. Keys are stored encrypted per chatbot and used to serve the chatbot's requests from both the chat interface and the [Chat API](../api/chat.md). Your data is never used to train models — provider interactions are contractually protected.
 
-- Your data is **never used to train models** — provider interactions are contractually protected.
-- For API access, provider keys are passed per-request and **never stored**. See [API Authentication](../api/authentication.md).
+## Enabling models
 
-## Configuring models
+- Each provider card has a switch; inside it, each model has its own switch. Users and the API can only use models that are enabled.
+- **Default Model** picks the model new conversations start with. Users can choose a different enabled model from the model picker in chat; API callers pass `model`.
+- Models hosted in countries of concern show a warning before you enable them or set them as default (**Enable anyway** / **Set as default anyway**).
 
-- **Project default** — set the default model in your project's settings.
-- **Per-conversation** — users can pick a different model from the model selector in the chat interface.
-- **Via API** — pass the `model` parameter to the [Chat API](../api/chat.md).
-
-**Temperature** controls creativity, from `0.0` (precise, deterministic) to `1.0` (creative). For technical question-answering the recommended default is `0.1`.
+**Temperature** is not set on this page: users choose it per conversation in the chat **Settings › Model** tab, and it defaults to `0.1`.
 
 ## Vision and tools
 
-- **Image input** is supported on vision-capable models (e.g. GPT-4o, Claude).
-- **Tool selection** always uses a strong commercial model regardless of your default, for reliable tool-argument generation. See [Tools & Workflows](tools/index.md).
+- **Image input** is supported on vision-capable models (for example GPT-4o or Claude).
+- **Tool selection** does not use the chat model you pick here; see [Tool routing](../how-it-works/tool-routing.md).
+
+The embedding model used for retrieval is set by the operator, not per chatbot — see the [Configuration reference](../self-hosting/configuration.md).

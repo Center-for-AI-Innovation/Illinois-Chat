@@ -1,49 +1,39 @@
-# Canvas Integration
+# Importing
 
-Turn a Canvas course into an assistant in one step: Illinois Chat can bulk-import your course content directly from Canvas.
+The import cards on your chatbot's **Dashboard** pull content in from other systems. Each card has a **Configure import** button; everything imported goes through the standard [ingest pipeline](../../how-it-works/documents-ingest.md) and becomes citable content.
 
-## What gets imported
+## Canvas
 
-- Files
-- Pages
-- Modules
-- Syllabus
-- Assignments
-- Discussions
+Turn a Canvas course into a chatbot in one step: Illinois Chat bulk-imports your course content directly from Canvas.
 
-Everything imported goes through the standard [ingest pipeline](../../how-it-works/documents-ingest.md#the-ingest-pipeline) and becomes citable content.
+What gets imported — pick any of: Files, Pages, Modules, Syllabus, Assignments, Discussions.
 
-## Setting it up
-
-1. Open your project's **Materials** page and choose **Connect Canvas**.
-2. Invite the platform bot to your Canvas course **as a TA** so it can read the course content.
+1. On the **Canvas** card choose **Configure import**.
+2. Invite the account shown in the dialog to your Canvas course so it can read the course content.
 
     !!! warning "Bot invitation required"
-        The import cannot see your course until the bot account has TA access. On the legacy uiuc.chat instance the bot address was `uiuc.chat@ad.illinois.edu`; the current instance shows the address to invite during the connect flow.
+        The import cannot see your course until that account has been added to it. The dialog shows the address to invite and the role to give it.
 
 3. Enter your Canvas course URL and select which content types to import.
-4. Start the import. Content is queued and ingested asynchronously — watch progress on the Materials page.
+4. Click **Ingest Canvas Content**. Content is queued and ingested asynchronously — watch progress in Project Files.
 
 [Watch the Canvas walkthrough :material-open-in-new:](../../getting-started/video-walkthroughs.md#connect-canvas){ .md-button }
 
-## Programmatic imports
+Canvas ingestion is also available via the API — see the [Ingest API](../../api/ingest.md).
 
-Canvas ingestion is also available via the API — see [Ingest API](../../api/ingest.md#canvas-ingest).
+!!! tip "Tips for teaching assistants"
+    - Combine the Canvas import with [Guided Learning](../prompting.md) so the chatbot guides students rather than giving away solutions.
+    - Use [document groups](document-groups.md) to separate lecture materials from assignments.
+    - Check the [Analysis](../analysis-exports.md) page to see what students actually ask.
 
-## Tips for teaching assistants
+## Website
 
-- Combine the Canvas import with [tutor mode](../../getting-started/video-walkthroughs.md#set-up-tutor-mode) so the assistant guides students rather than giving away solutions.
-- Use [document groups](document-groups.md#organizing-with-document-groups) to separate lecture materials from assignments.
-- Check the [Analytics](../analysis-exports.md) page to see what students actually ask.
-
-## Web crawl
-
-Enter a starting URL and let the crawler discover and ingest linked pages. See the dedicated [Web Crawling](web-crawling.md) guide.
-
-## PubMed
-
-Import articles by PubMed ID or search query — handy for literature-review projects.
+Enter a starting URL and let the crawler discover and ingest linked pages. See [Web crawling](web-crawling.md).
 
 ## GitHub
 
-Provide a public repository URL to ingest its contents — great for project-onboarding assistants.
+Provide a public repository URL and click **Ingest GitHub Website** to ingest its contents — great for project-onboarding chatbots.
+
+## Not yet available
+
+The **MIT Course** and **Coursera** cards are shown as *Coming soon* and cannot be configured yet.

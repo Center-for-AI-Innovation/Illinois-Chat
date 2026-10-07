@@ -7,11 +7,11 @@ Tools let your assistant take real actions during a conversation: search the lit
 ## How tool selection works
 
 1. The user sends a message.
-2. The LLM compares the message against the names and descriptions of the tools enabled in the project.
+2. The LLM compares the message against the names and descriptions of the chatbot's tools.
 3. If a tool matches, the LLM generates the input parameters and the platform invokes it (multiple tools can run in parallel).
 4. The tool output — text and/or images — is passed back to the LLM to generate the final response.
 
-Tools are invoked automatically based on the LLM's judgment; there is no way to force invocation, but you can encourage it through prompting. Tool selection does not use the project's default chat model. It is routed through the project's own OpenAI or OpenAI-compatible provider when one is configured on the **LLMs** page, and otherwise through the Illinois-hosted default router. The Tools page shows which of these is in effect (**Custom router**, **Default router**, or **Offline** when neither is available). Users can toggle individual tools on or off per conversation from the **Tools** tab of the settings panel on the chat page.
+Tools are invoked automatically based on the LLM's judgment; there is no way to force invocation, but you can encourage it through prompting. Tool selection does not use the chatbot's default chat model — see [Tool routing](../../how-it-works/tool-routing.md) for which model is used and what the **Custom router** / **Default router** / **Offline** badge on the Tools page means. Users can toggle individual tools on or off per conversation from the **Tools** tab of the settings panel on the chat page.
 
 ## Building tools with Sim AI
 
@@ -67,11 +67,10 @@ Images are passed as an array of `image_urls` in a JSON object — URLs only, no
 
 Most tools follow the same shape: a **Start** block that declares the inputs, a **Function** block that checks and combines them, and a main block that does the work — either one of Sim's integration blocks or an **API** block calling a small HTTP endpoint you host. Putting the logic in a Function block or in code you control keeps the workflow short and stops bad inputs from reaching the service silently; the [worked example](build-a-tool.md#why-the-function-block-matters) shows what goes wrong without it.
 
-## Using tools in your project
+## Using tools in your chatbot
 
 1. In Sim, create an API key under **Settings → Sim Keys** and note the ID of the workspace that holds your workflows (it is in the workspace URL).
-2. Open your project's **Tools** page in Illinois Chat (`/<your-project>/tools`), paste the API key and workspace ID, and save. The page lists every **deployed** workflow in that workspace; drafts do not appear until you deploy them.
-3. Enable the tools you want active in your project.
-4. Start chatting — tools are invoked as needed.
+2. Open your chatbot's **Tools** page in Illinois Chat (`/<your-chatbot>/tools`), paste the API key and workspace ID, and save. The page lists every **deployed** workflow in that workspace, read-only; drafts do not appear until you deploy them, and every deployed workflow is available as a tool.
+3. Start chatting — tools are invoked as needed. Users can switch individual tools off for a conversation in the chat **Settings › Tools** tab.
 
 See [Connecting a Sim workspace to an Illinois Chat project](sim-user-guide.md#connecting-a-sim-workspace-to-an-illinois-chat-project) for the details, including the optional base URL and what the tool-routing status on the Tools page means.

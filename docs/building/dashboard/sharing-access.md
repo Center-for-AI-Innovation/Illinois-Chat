@@ -1,42 +1,33 @@
-# Sharing & Access Control
+# Sharing & Access
 
-Share your assistant like a document: every project has a permanent URL, and you decide who can use it.
+Share your chatbot like a document: every chatbot has a permanent URL, and you decide who can use it.
 
 ```
-https://chat.illinois.edu/<project-name>
+https://chat.illinois.edu/<chatbot-name>
 ```
 
-## Roles
+Open **Sharing and Access** on the **Dashboard** to change these settings.
 
-| Role | Capabilities |
+## Access level
+
+| Option in the dialog | Who can chat |
 | --- | --- |
-| **Owner** | Full control, including deleting the project. |
-| **Admin** | Manage documents, settings, exports, and API keys — everything except deletion. |
-| **Regular user** | Chat with the assistant. |
+| **Private (only invited members)** *(default)* | Only the owner, administrators and the members you list. |
+| **All logged-in users** | Anyone signed in to the site. |
+| **Public (anyone with the link)** | Anyone with the URL, no login required. |
 
-Owners and admins are also the only ones who can access sensitive data such as conversation-history exports and API keys.
+!!! warning "Public chatbots expose your documents indirectly"
+    A public chatbot will answer questions using your uploaded materials and cite passages from them. Don't make a chatbot public if its documents shouldn't be visible to the world.
 
-## Granting access
+## Members and administrators
 
-### Email invitations
+The dialog has two lists of email addresses:
 
-Invite individual users by email address and assign them a role.
+- **Members** can chat when the access level is *Private*. The list is ignored for the other two levels.
+- **Administrators** can edit every builder screen; see the [roles table](../index.md#roles).
 
-### Approved email list
+Both lists are allow-lists of full email addresses matched exactly — there is no domain wildcard, and adding an address does not send an invitation. Tell people the chatbot's URL yourself.
 
-Maintain a list of addresses allowed to use the project. You can approve:
+## Analytics on shared chatbots
 
-- **Individual addresses** — `student@illinois.edu`
-- **Entire domains** — `@illinois.edu` admits anyone with an Illinois email
-
-### Public vs. private
-
-- **Private** *(default)* — only approved users can access the project.
-- **Public** — anyone with the URL can chat, no login required.
-
-!!! warning "Public projects expose your documents indirectly"
-    A public assistant will answer questions using your uploaded materials and cite passages from them. Don't make a project public if its documents shouldn't be visible to the world.
-
-## Analytics on shared projects
-
-Once shared, the **Analysis** page shows how users interact with your assistant — see [Analytics](../analysis-exports.md).
+Once shared, the **Analysis** page shows how users interact with your chatbot — see [Analysis & exports](../analysis-exports.md).

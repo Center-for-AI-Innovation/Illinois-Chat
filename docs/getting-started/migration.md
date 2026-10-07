@@ -18,4 +18,4 @@ If you have a chatbot on uiuc.chat and would like help moving its files to the n
 
 ## Questions?
 
-Contact the support team at [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu). Thank you, and happy chatting!
+Contact support using the address in the page footer. Thank you, and happy chatting!

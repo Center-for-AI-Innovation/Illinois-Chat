@@ -170,10 +170,10 @@ prompts, wiring blocks together, testing a workflow — use Sim's own documentat
 
 Sim's published docs at [docs.sim.ai](https://docs.sim.ai) always describe their **latest**
 release, while this deployment runs a pinned, slightly older one (**Sim v0.8.4**). The
-table gives both: the page as it was for our version (the documentation source at that
+table gives both: the page as it was for the pinned version (the documentation source at that
 release, viewed on GitHub) and the current page.
 
-| Topic | Why it matters here | Our version (v0.8.4) | Current docs |
+| Topic | Why it matters here | Pinned version (v0.8.4) | Current docs |
 |---|---|---|---|
 | Build your first workflow | The starting point. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/introduction/index.mdx) | [current](https://docs.sim.ai/introduction) |
 | Blocks reference | What each core block does. Agent, API, Condition, Function, Router and Response are the ones you will use most, and all are available here. | [v0.8.4](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en/workflows/blocks) | [current](https://docs.sim.ai/workflows/blocks/agent) |
@@ -182,13 +182,13 @@ release, viewed on GitHub) and the current page.
 | Triggers | How a workflow starts. For Illinois Chat tools the Start trigger matters most: the inputs you declare on it become the tool's parameters, and a workflow whose inputs have no descriptions is skipped by discovery rather than published with a guessed signature. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/workflows/triggers/start.mdx) | [current](https://docs.sim.ai/workflows/triggers/start) |
 | Integrations | One page per tool block, listing its operations and the inputs each needs. | [v0.8.4](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en/integrations) | [current](https://docs.sim.ai/integrations/firecrawl) |
 
-The whole documentation set for our version is browsable at
+The whole documentation set for the pinned version is browsable at
 [`apps/docs/content/docs/en` at `e741923f`](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en).
 
 **Two caveats when reading the current docs.** Most of them apply unchanged, but:
 
 - **A block or feature described there may not exist here yet.** If the block picker does
-  not show something the docs mention, it is either newer than our version or not on the
+  not show something the docs mention, it is either newer than the pinned version or not on the
   allowed list above.
 - **Anything about billing, hosted keys or "Sim Cloud" does not apply.** This is a
   self-hosted instance. Where the docs say Sim supplies a key for you, you supply your own.

@@ -4,10 +4,10 @@ The built-in crawler discovers and ingests linked pages starting from a URL you 
 
 ## Starting a crawl
 
-1. Open your project's **Materials** page.
+1. On your chatbot's **Dashboard**, choose **Configure import** on the **Website** card.
 2. Enter the starting URL.
-3. Choose a crawl scope (see below).
-4. Click **Start Crawl**. Crawling runs asynchronously; pages appear in your materials as they are ingested.
+3. Choose a crawl scope (see below) and the maximum number of pages (1–500, default 50).
+4. Click **Ingest the Website**. Crawling runs asynchronously; pages appear in Project Files as they are ingested.
 
 ## Crawl scopes
 
@@ -21,7 +21,7 @@ The built-in crawler discovers and ingests linked pages starting from a URL you 
 
 ## How crawled content is stored
 
-![Document ingest during web crawling](../../assets/web-crawl-ingest.png)
-
 - **HTML pages** — visible text is extracted and stored directly in the database (not object storage), with the source URL preserved for citations.
 - **Files found during the crawl** (PDF, Word, PowerPoint, Excel) — uploaded to object storage as a backup, but citations still link to the original source; the local copy is used as a fallback if the original goes missing (404).
+
+How the crawler itself works is described in [Documents & ingest](../../how-it-works/documents-ingest.md).

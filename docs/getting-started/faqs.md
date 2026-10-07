@@ -2,15 +2,15 @@
 
 ## What is Illinois Chat?
 
-Illinois Chat is a friendly course-assistant platform. Professors (and anyone else, really) can upload documents like syllabi, PDFs, videos, and more; students can then ask questions about the coursework and get fast, cited answers. It's open source, easy to use, and backed by the Center for AI Innovation (CAII) at NCSA, University of Illinois Urbana-Champaign.
+Illinois Chat is a friendly course-assistant platform. Professors (and anyone else, really) can upload documents like syllabi, PDFs, slides, and more; students can then ask questions about the coursework and get fast, cited answers. It's open source, easy to use, and backed by the Center for AI Innovation (CAII) at NCSA, University of Illinois Urbana-Champaign.
 
 ## How do I get started?
 
-Upload your docs — PDFs, PowerPoints, Word files, or even videos — or connect a website crawl or Canvas course, and you're ready to go. See the [Quickstart](quickstart.md) and the [video walkthroughs](video-walkthroughs.md).
+Upload your docs — PDFs, PowerPoints, Word files, and most text formats — or connect a website crawl or Canvas course, and you're ready to go. See the [Quickstart](quickstart.md) and the [video walkthroughs](video-walkthroughs.md).
 
 ## What happened to uiuc.chat?
 
-The community instance at uiuc.chat is migrating to the official campus-supported instance at [chat.illinois.edu](https://chat.illinois.edu). Chatbot creation on uiuc.chat has been disabled. If you have an existing chatbot there, see [Migrating from uiuc.chat](migration.md).
+Chatbot creation on uiuc.chat has been disabled while it migrates to [chat.illinois.edu](https://chat.illinois.edu); see [Migrating from uiuc.chat](migration.md).
 
 ## Are there any costs associated with using it?
 
@@ -18,7 +18,7 @@ The platform is free to use. If you want to use commercial models such as OpenAI
 
 ## Is there a community or support available?
 
-Yes. For questions and support, contact the team at [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu). Bug reports and feature requests are welcome on [GitHub](https://github.com/Center-for-AI-Innovation/Illinois-Chat/issues).
+Yes. For questions and support, contact support using the address in the page footer.
 
 ## Is it secure?
 

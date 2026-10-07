@@ -1,26 +1,17 @@
-# Uploading Materials
+# Uploading Files
 
-Add documents to your project from the **Materials** page. Everything you add is chunked, embedded, and indexed automatically — see [Concepts → Documents](../../how-it-works/documents-ingest.md) for what happens under the hood.
+Add documents to your chatbot from the **Dashboard**. Everything you add is chunked, embedded, and indexed automatically — see [Documents & ingest](../../how-it-works/documents-ingest.md) for what happens under the hood.
 
 ## Supported formats
 
-| Category | Formats |
-| --- | --- |
-| Documents | PDF, DOCX, PPTX, XLSX, CSV, TXT, HTML |
-| Code | Python, JSON, and other text-based source files |
-| Media | MP4 (and other video), PNG, JPG/JPEG, SRT |
+The **Upload materials** dropzone shows icons for PDF, Word, PowerPoint, Excel, images, code and text files; most text formats (Markdown, HTML, CSV, XML, SRT and VTT subtitles, source code) are accepted as well. Audio and video files are rejected.
 
-The per-file size limit is **500 MB**.
+## Uploading
 
-!!! info "Videos are transcribed"
-    Videos are transcribed automatically with Whisper. Expect roughly 5–10 minutes of processing for an hour-long lecture; the transcript becomes searchable, citable content.
-
-## Upload methods
-
-### Drag and drop
-
-Drag files onto the Materials page (or click **Upload**). Files are uploaded directly from your browser to object storage via presigned URLs, then queued for ingest.
+Drag files onto **Upload materials** (or click it to pick files). Files are uploaded directly from your browser to object storage via presigned URLs, then queued for ingest.
 
 ## Monitoring ingest
 
-Each document on the Materials page shows its ingest status. Large files and crawls process asynchronously; failures are retried automatically with exponential backoff. Duplicate documents are detected by content and skipped — see [duplicate handling](../../how-it-works/documents-ingest.md#duplicate-handling).
+Each document in **Project Files** shows its ingest status. Large files and crawls process asynchronously; failed jobs are retried automatically. Duplicate documents are detected by content and skipped — see [duplicate handling](../../how-it-works/documents-ingest.md#duplicate-handling).
+
+Other ways to add content: [Web crawling](web-crawling.md) and [Importing](importing.md) from Canvas or GitHub.

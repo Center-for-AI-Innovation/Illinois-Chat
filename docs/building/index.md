@@ -1,46 +1,46 @@
-# Projects
+# Building a Chatbot
 
-A **project** is the basic unit of organization in Illinois Chat: an assistant scoped to a topic, course, research group, or team.
+A **chatbot** is the basic unit of organization in Illinois Chat: an assistant scoped to a topic, course, research group, or team. Documents in one chatbot are completely isolated from every other chatbot; retrieval never crosses chatbot boundaries.
 
-Each project bundles together:
+!!! note "Chatbot, project, course"
+    The app's routes, settings and API call a chatbot a **project** (`course_name` in API payloads), and older material says **course**. These docs say *chatbot*; technical identifiers stay as they are in the product.
 
-- **A knowledge base** — the documents and crawled web pages the assistant can draw on. Documents in one project are completely isolated from every other project; retrieval never crosses project boundaries.
-- **Settings** — the default LLM, temperature, and system prompt used for conversations.
-- **Access controls** — owners, admins, an approved user list, and a public/private toggle. See [Sharing & Access Control](dashboard/sharing-access.md).
-- **Tools** — optional custom tools the LLM can invoke during conversations. See [Tools & Workflows](tools/index.md).
-- **An API key** — for programmatic access. See the [API Reference](../api/index.md).
+## Chatbot URL
 
-## Project URL
-
-Every project gets a permanent, shareable URL based on its name:
+Every chatbot gets a permanent, shareable URL based on its name:
 
 ```
-https://chat.illinois.edu/<project-name>
+https://chat.illinois.edu/<chatbot-name>
 ```
 
-Project names must be unique across the instance and become part of the URL, so pick something short and recognizable (for example `ece-408` or `soil-science-lab`).
+Names must be unique across the instance and become part of the URL, so pick something short and recognizable (for example `ece-408` or `soil-science-lab`). New chatbots start out private.
 
-## Key pages within a project
+## The builder screens
 
-| Page | Purpose |
+The sidebar of a chatbot you can edit has one entry per screen:
+
+| Screen | What you do there |
 | --- | --- |
-| **Chat** | The conversation interface your users see. |
-| **Materials** | Upload documents, start web crawls, organize document groups, export documents. |
-| **Prompting** | Customize the system prompt (e.g. tutor mode). |
-| **Tools** | Enable or disable custom tools. |
-| **Analysis** | Usage analytics and conversation-history export. |
-| **API** | Generate and rotate the project API key. |
-| **Settings** | Default model, access control, and project administration. |
+| **Dashboard** | Upload files, import from Canvas, a website or GitHub, manage Project Files, open **Sharing and Access**, set Branding (greeting, example questions, logo) and Tags. See [Uploading files](dashboard/uploading-files.md), [Web crawling](dashboard/web-crawling.md), [Importing](dashboard/importing.md), [Document groups & deleting](dashboard/document-groups.md), [Sharing & access](dashboard/sharing-access.md). |
+| **LLMs** | Add provider keys, enable models, pick the default model. See [LLMs](llms.md). |
+| **Analysis** | Usage statistics and conversation exports. See [Analysis & exports](analysis-exports.md). |
+| **Prompting** | The system prompt and behaviour switches such as Guided Learning. See [Prompting](prompting.md). |
+| **Tools** | Connect a Sim AI workspace so deployed workflows become tools. See [Tools](tools/index.md). |
+| **API** | Generate and rotate your API key. See the [API Reference](../api/index.md). |
+
+Users see only the **Chat** screen, described in [Using a chatbot](../getting-started/using-a-chatbot.md).
 
 ## Roles
 
-| Role | Capabilities |
-| --- | --- |
-| **Owner** | Full control, including deleting the project. |
-| **Admin** | Manage documents, settings, exports, and API keys — everything except deletion. |
-| **Regular user** | Chat with the assistant. |
+| Role | Stored as | Capabilities |
+| --- | --- | --- |
+| **Owner** | `course_owner` | The person who created the chatbot. Everything administrators can do. |
+| **Administrators** | `course_admins` | Edit every builder screen: documents, LLMs, prompt, tools, sharing, analytics and exports. |
+| **Members** | `approved_emails_list` | Chat with the chatbot when it is private. |
+
+Owners and administrators are set in the Sharing and Access dialog; see [Sharing & access](dashboard/sharing-access.md). API keys belong to a **user**, not to a chatbot, and work on every chatbot that user can edit — see [API authentication](../api/authentication.md).
 
 ## Next steps
 
-- [Documents](../how-it-works/documents-ingest.md) — what happens to materials you add.
-- [Retrieval](../how-it-works/retrieval.md) — how answers get grounded in your documents.
+- [Quickstart](../getting-started/quickstart.md) — the whole flow in five minutes.
+- [How It Works](../how-it-works/index.md) — what happens to the documents you add and to each question.

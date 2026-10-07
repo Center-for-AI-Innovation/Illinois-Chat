@@ -98,6 +98,8 @@ nav:
   - Introduction: index.md
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
+      - Using a chatbot: getting-started/using-a-chatbot.md
+      - Finding chatbots: getting-started/finding-chatbots.md
       - FAQs: getting-started/faqs.md
       - Video Walkthroughs: getting-started/video-walkthroughs.md
       - Migrating from uiuc.chat: getting-started/migration.md
@@ -110,6 +112,7 @@ nav:
           - Document groups & deleting: building/dashboard/document-groups.md
           - Sharing & access: building/dashboard/sharing-access.md
       - LLMs: building/llms.md
+      - Prompting: building/prompting.md
       - Tools:
           - building/tools/index.md
           - Sim AI User Guide: building/tools/sim-user-guide.md
@@ -120,6 +123,8 @@ nav:
       - how-it-works/index.md
       - Documents & ingest: how-it-works/documents-ingest.md
       - Retrieval: how-it-works/retrieval.md
+      - Tool routing: how-it-works/tool-routing.md
+      - Glossary: how-it-works/glossary.md
   - API Reference:
       - api/index.md
       - Authentication: api/authentication.md

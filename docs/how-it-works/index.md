@@ -1,26 +1,39 @@
 # How It Works
 
-## How it works
+Illinois Chat uses **retrieval-augmented generation (RAG)**: instead of relying on what a language model memorised, every answer is built from passages retrieved from the documents a chatbot's builder added.
 
-Illinois Chat uses **retrieval-augmented generation (RAG)**:
+```mermaid
+flowchart LR
+    subgraph Ingest
+        A[Upload / crawl / import] --> B[Ingest queue] --> C[Worker: extract, chunk, embed]
+        C --> D[(Vector index + SQL + object storage)]
+    end
+    subgraph Chat
+        Q[User question] --> T{Tools?}
+        T --> R[Embed question, retrieve top passages]
+        D --> R
+        R --> P[Assemble prompt] --> L[LLM] --> S[Streamed, cited answer]
+    end
+```
 
-1. **Ingest** — documents are split into overlapping chunks and converted into embeddings.
-2. **Index** — embeddings are stored in a per-project vector index, isolated from other projects.
-3. **Retrieve** — each question is embedded and matched against the index to find the most relevant passages.
-4. **Generate** — the retrieved passages are passed to a large language model, which produces a cited answer.
+## Two pipelines
 
-Learn more in [Concepts → Retrieval](retrieval.md).
+1. **Ingest** — when a builder adds a document, the frontend (or the crawler) posts a job to the backend's `/ingest` endpoint, which queues it. A worker extracts the text, checks for duplicates, splits it into overlapping chunks, converts each chunk into an embedding and stores vectors, text and metadata. Details: [Documents & ingest](documents-ingest.md).
+2. **Chat** — when a user asks a question, the question is embedded, matched against the chatbot's index, and the best passages are handed to a large language model together with the conversation, which answers with citations. Details: [Retrieval](retrieval.md).
 
-## RAG chat: what happens when you hit send?
+Each chatbot's index is isolated; retrieval never crosses chatbot boundaries.
 
-1. The user submits a prompt.
-    1. Determine whether tools should be invoked; if so, execute them and store the outputs.
-2. Embed the user prompt with the embedding model.
-3. Retrieve the most related documents from the vector database.
-4. Prompt engineering to:
-    1. pack as many documents as possible into the context window,
-    2. retain as much conversation history as possible,
-    3. include tool outputs and images,
-    4. include user-configurable features (tutor mode, document references).
-5. Send the final prompt to the LLM and stream the result.
-    1. During streaming, a state machine replaces LLM citations with proper links — e.g. `[doc 1, page 3]` becomes a link to the document at the right page.
+## What happens when you hit send
+
+1. The question is sent to the frontend.
+2. If the chatbot has tools, a routing model decides whether any apply and runs them; the outputs are kept for the prompt. Which model does this is described in [Tool routing](tool-routing.md).
+3. The question (optimised by Smart Document Search when enabled) is embedded with the deployment's embedding model and the most relevant chunks are retrieved from the vector index, limited to the document groups the user has switched on.
+4. The prompt is assembled: as many retrieved passages as fit in the context window, as much conversation history as possible, tool outputs and images, plus the behaviour switches from the [Prompting](../building/prompting.md) page (Guided Learning, document-based references only, and so on).
+5. The prompt goes to the model the user selected and the answer streams back. While it streams, a state machine turns the model's citation markers (such as `[doc 1, page 3]`) into links to the right document and page.
+
+## Read on
+
+- [Documents & ingest](documents-ingest.md) — formats, duplicate handling, retries, where things are stored.
+- [Retrieval](retrieval.md) — how passages are found, and ideas that are not in the product.
+- [Tool routing](tool-routing.md) — which model picks tools and how operators enable the default router.
+- [Glossary](glossary.md) — the terms used across these docs.
