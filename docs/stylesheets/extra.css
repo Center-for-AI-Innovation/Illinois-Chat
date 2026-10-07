@@ -287,11 +287,16 @@ html {
   }
 }
 
+/* Every nav entry (sidebar and table of contents) is a padded pill so the
+   hover/active background has breathing room around the text. Section labels
+   share the horizontal padding, which keeps labels and pages left-aligned. */
 .md-nav__link {
   font-size: 0.8125rem;
   font-weight: 500;
   border-radius: var(--ic-radius-md);
   color: var(--ic-sidebar-fg);
+  padding: 0.3rem 0.6rem;
+  margin-top: 0.15rem;
 }
 
 .md-nav__link:hover {
