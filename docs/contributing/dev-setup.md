@@ -6,14 +6,59 @@ For the all-Docker experience instead, see [Self-Hosting](../self-hosting/index.
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Python 3.10 or 3.11 (backend and ingest worker)
-- Node.js 20.19+ or 22.12+ (frontend). `apps/frontend/.nvmrc` pins v22.12.0; CI runs Node 20.
-- For the Sim AI tool stack (started by default): set `SIM_APPROVAL_ADMIN_EMAIL` in the repository-root `.env`, or pass `--no-sim`.
+- Git, Docker and Docker Compose
+- Python 3.10 or 3.11 for the backend and ingest worker (the images use 3.10)
+- Node.js 20.19+ or 22.12+ for the frontend. `apps/frontend/.nvmrc` pins v22.12.0 (`nvm use` picks it up); CI runs Node 20.
+- An OpenAI-compatible embedding endpoint, for example [Ollama](https://ollama.com/) serving `Qwen/Qwen3-Embedding-8B`; ingest and retrieval need one, chat models do not have to be configured up front.
 
 ## Quick start
 
-### 1. Start infrastructure services
+### 1. Clone the repository and configure the environment
+
+```bash
+git clone https://github.com/Center-for-AI-Innovation/Illinois-Chat.git
+cd Illinois-Chat
+cp .env.template .env
+```
+
+Edit `.env` before anything starts:
+
+- `SIM_APPROVAL_ADMIN_EMAIL` — your email. It names the account that becomes the Sim platform admin, and the start script refuses to run while it is empty. Leave it empty only if you will start with `--no-sim`.
+- `EMBEDDING_MODEL` / `EMBEDDING_API_BASE` — the template points at Ollama on the host (`http://host.docker.internal:11434/v1`); change the URL for any other OpenAI-compatible endpoint. The default vector collection expects 4096-dimensional Qwen3-Embedding-8B vectors.
+- Everything else can stay as shipped for local work. `ENCRYPTION_MASTER_KEY` and the `SIM_*` secrets are generated for you on the first run. OpenAI is **not** required.
+
+The full variable list is in the [Configuration reference](../self-hosting/configuration.md).
+
+### 2. Install packages
+
+=== "Backend and ingest worker"
+
+    ```bash
+    cd apps/backend
+    python3.11 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    pip install -r ai_ta_backend/rabbitmq/requirements.txt
+    ```
+
+=== "Frontend"
+
+    ```bash
+    cd apps/frontend
+    nvm use        # or any Node 20.19+ / 22.12+
+    npm ci
+    ```
+
+=== "Crawler (optional)"
+
+    The dev stack does not run Crawlee in Docker. Install it only if you will test web crawling:
+
+    ```bash
+    cd apps/crawlee
+    npm install    # also installs the Playwright browsers
+    ```
+
+### 3. Start the infrastructure
 
 On the first run (or whenever the database volume is empty), pass `--create-schema`:
 
@@ -25,9 +70,9 @@ Without the flag, an empty database stops the script with `Database is empty. Re
 
 This script:
 
-- creates a repository-root `.env` from `.env.template` if needed, and generates `ENCRYPTION_MASTER_KEY` and the `SIM_*` secrets when they are missing;
-- creates or updates app-local env files (`apps/backend/.env`, `apps/frontend/.env`, `apps/crawlee/.env`) without overwriting existing values;
-- starts shared dev infrastructure from `infra/docker/docker-compose.dev.yaml`, plus the Sim stack from `infra/docker/docker-compose.sim.yaml` unless `--no-sim` is given;
+- generates `ENCRYPTION_MASTER_KEY` and the `SIM_*` secrets into `.env` when they are missing;
+- creates or updates the app-local env files (`apps/backend/.env`, `apps/frontend/.env`, `apps/crawlee/.env`) without overwriting existing values;
+- starts the shared dev infrastructure from `infra/docker/docker-compose.dev.yaml`, plus the Sim stack from `infra/docker/docker-compose.sim.yaml` unless `--no-sim` is given;
 - with `--create-schema`, applies the Postgres schema from `infra/db/init-schema.sql`; on every run it replays Drizzle migrations 0016 and 0017 (both are no-ops once applied);
 - ensures the configured Qdrant collection exists with 4096-dimensional cosine vectors;
 - creates the object-storage `uiuc-chat` bucket.
@@ -39,17 +84,15 @@ This script:
 | `--no-sim` | Start without the Sim AI tool stack. |
 | `-h`, `--help` | Show usage. |
 
-### 2. Configure environment variables
+### 4. Check the app env files
 
-In development mode the compose file only runs infrastructure; each app reads its own env file:
+In development the compose file only runs infrastructure; each app reads its own env file, which the script has just written:
 
 - `apps/backend/.env` — Flask backend and ingest worker
 - `apps/frontend/.env` — Next.js frontend (`npm run local`)
-- `apps/crawlee/.env` — Crawlee, if run outside Docker
+- `apps/crawlee/.env` — Crawlee, if you run it
 
-`start-dev.sh` writes these files itself: connection values for Postgres (app and Keycloak databases), Redis, RabbitMQ, Qdrant and object storage, the Keycloak realm and client, `ENCRYPTION_MASTER_KEY`, `ALLOWED_EMBEDDING_PROVIDERS`, and empty placeholders for model endpoints and API keys (`EMBEDDING_MODEL`, `EMBEDDING_API_BASE`, `NCSA_HOSTED_*`, `OLLAMA_SERVER_URL`, `OPENAI_API_KEY`, `NEXT_PUBLIC_SIGNING_KEY`, …). The `apps/backend/.env.template` and `apps/frontend/.env.template` files are dev reference files that no script reads. The full variable list is in the [Configuration reference](../self-hosting/configuration.md).
-
-OpenAI is **not** required. Configure `EMBEDDING_MODEL` and `EMBEDDING_API_BASE` for an OpenAI-compatible embedding endpoint; the default collection expects Qwen3-Embedding-8B vectors (dimension 4096).
+They already hold the connection values for Postgres (app and Keycloak databases), Redis, RabbitMQ, Qdrant and object storage, the Keycloak realm and client, `ENCRYPTION_MASTER_KEY`, `ALLOWED_EMBEDDING_PROVIDERS`, and empty placeholders for model endpoints and API keys (`EMBEDDING_MODEL`, `EMBEDDING_API_BASE`, `NCSA_HOSTED_*`, `OLLAMA_SERVER_URL`, `OPENAI_API_KEY`, `NEXT_PUBLIC_SIGNING_KEY`, …). Fill in the model values you need; re-running the script later only appends keys that are missing. The `apps/backend/.env.template` and `apps/frontend/.env.template` files are dev reference files that no script reads.
 
 For uploads and ingest, always use the object-storage **API** port, not the console port (the dev stack runs [Silo](https://github.com/pgsty/silo), a MinIO-compatible server, as the compose service `minio`):
 
@@ -67,9 +110,9 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:10000
 
 `http://localhost:9001` is the object-storage console and must not be used for S3 uploads.
 
-### 3. Start the app processes
+### 5. Run the apps
 
-Run each in its own terminal:
+Run each in its own terminal, with the backend virtualenv active for the first two:
 
 ```bash
 # Flask backend
@@ -89,32 +132,13 @@ cd apps/frontend
 npm run local
 ```
 
-## Manual setup (alternative)
+```bash
+# crawler, only if you installed it
+cd apps/crawlee
+npm start
+```
 
-=== "Backend"
-
-    ```bash
-    cd apps/backend
-
-    python3.11 -m venv venv
-    source venv/bin/activate
-
-    pip install -r requirements.txt
-    pip install -r ai_ta_backend/rabbitmq/requirements.txt
-
-    flask --app ai_ta_backend.main:app --debug run --port 8000
-    # in another terminal:
-    python ai_ta_backend/rabbitmq/worker.py
-    ```
-
-=== "Frontend"
-
-    ```bash
-    cd apps/frontend
-
-    npm install
-    npm run local
-    ```
+Open `http://localhost:3000` and sign in. The local Keycloak realm (`illinois_chat_realm`, admin console at `http://localhost:8080`) ships with no users and allows self-registration, so register an account on the sign-in page, then create your first chatbot.
 
 ## Services overview
 
@@ -182,8 +206,8 @@ Linting is enforced with [Trunk](https://trunk.io) (`npm exec trunk check` in th
 
 **Missing dependencies**
 
-- Backend: activate the virtualenv and `pip install -r requirements.txt`.
-- Frontend: `npm install` in `apps/frontend`.
+- Backend: activate the virtualenv and repeat the two `pip install` commands from step 2.
+- Frontend: `npm ci` in `apps/frontend`.
 
 **Environment variables**
 
