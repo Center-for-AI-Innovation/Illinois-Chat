@@ -12,20 +12,17 @@ Every export shares the same behaviour:
 
 ## Backend endpoints
 
-The Flask backend serves five `GET` endpoints. They have no authentication, are not published outside the Docker Compose stack, and the hosted site does not expose them; see the note on the [API Reference](index.md) page. `from_date` and `to_date` take ISO 8601 dates; `to_date` is extended to the end of that day. Over 500 items the response is `{"response": "Download from S3", "s3_path": "..."}`; a missing `course_name` is `400`.
+The Flask backend serves three `GET` endpoints. They have no authentication, are not published outside the Docker Compose stack, and the hosted site does not expose them; see the note on the [API Reference](index.md) page. `from_date` and `to_date` take ISO 8601 dates; `to_date` is extended to the end of that day. Over 500 items the response is `{"response": "Download from S3", "s3_path": "..."}`; a missing `course_name` is `400`.
 
 | Endpoint | Parameters | Zip contents | Background email to |
 | --- | --- | --- | --- |
 | `/export-convo-history` | `course_name` (required), `from_date`, `to_date` | `markdown export/`, `media_files/`, `.xlsx`, `.jsonl`, `error.log` | Owner and administrators |
-| `/export-convo-history-csv` | `course_name` (required), `from_date`, `to_date` | One `.jsonl` (one conversation per line), despite the name | Owner and administrators |
-| `/export-conversations-custom` | `course_name` (required), `from_date`, `to_date`, `destination_emails_list` (repeatable) | One `.jsonl`, as `-csv` | The addresses in `destination_emails_list` |
 | `/export-convo-history-user` | `user_email`, `project_name` (both required; note the parameter names) | Markdown files plus media | `user_email` |
 | `/exportDocuments` | `course_name` (required), `from_date`, `to_date` | One `.jsonl` of post-processed text and embeddings | Owner and administrators |
 
 ```bash
 curl -o convos.zip "https://<your-backend-host>/export-convo-history?course_name=ece-385&from_date=2026-01-01&to_date=2026-06-30"
 curl -o documents.zip "https://<your-backend-host>/exportDocuments?course_name=ece-385"
-curl "https://<your-backend-host>/export-conversations-custom?course_name=ece-385&destination_emails_list=a@example.edu&destination_emails_list=b@example.edu"
 ```
 
 !!! note "Original files"
