@@ -2,7 +2,7 @@
 
 Fetch the most relevant document contexts for a query without generating an answer.
 
-Retrieval runs inside the web app. Each chatbot's vector store decides the engine: by default the app searches **pgvector** in its own Postgres database; a chatbot that has an [external Qdrant connection](../building/external-connections.md) is searched through the Flask backend instead, which the app calls for you. Either way you talk to the app, not to the backend. How ranking works is described on the [Retrieval](../how-it-works/retrieval.md) page.
+Retrieval runs inside the web app: by default it searches **pgvector** in the chatbot's Postgres database. How ranking works is described on the [Retrieval](../how-it-works/retrieval.md) page.
 
 There are two ways in:
 
@@ -104,6 +104,19 @@ The response is the bare array of context objects (the same objects the Chat API
 | `url`, `base_url` | Source URL of a crawled page and the crawl's starting URL; empty for uploads. |
 | `doc_groups` | Groups the chunk's document belongs to. |
 
-## The backend route
+## Chatbots with an external Qdrant connection
 
-The Flask backend's `POST /getTopContexts` serves only Qdrant-backed chatbots and is called by the app internally. It has no authentication, is not published outside the Docker Compose stack and is not a public endpoint; see the note on the [API Reference](index.md) page. Its sibling `/getTopContextsWithMQR` is not implemented and returns an error for every request.
+A chatbot that has an [external Qdrant connection](../building/external-connections.md) is searched by the Flask backend, and the app forwards both routes above to it, so nothing changes for callers. If you run the stack yourself and have exposed the backend, you can also call it directly. The body takes `search_query`, `course_name`, and optionally `doc_groups`, `top_n` (default `100`) and `conversation_id`:
+
+```bash
+curl -X POST https://<your-backend-host>/getTopContexts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "search_query": "What is a finite state machine?",
+    "course_name": "ece-385",
+    "doc_groups": ["lectures"],
+    "top_n": 5
+  }'
+```
+
+The response is the bare array of context objects, with the chatbot name under the `"course_name "` key only.
