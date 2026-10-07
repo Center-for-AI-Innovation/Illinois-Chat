@@ -364,12 +364,21 @@ html {
   text-transform: none;
 }
 
+/* When the section's own index page is the current page, the container is
+   the active pill, exactly like a selected page at the same level. */
+.md-nav--primary .md-nav__item--section > .md-nav__link.md-nav__container:has(> .md-nav__link.md-nav__link--active) {
+  background-color: var(--ic-slate-100);
+  color: var(--illinois-orange);
+  font-weight: 700;
+}
+
 /* Inside any container the inner link inherits the container's padding and
    colour instead of adding its own pill. */
 .md-nav__container > .md-nav__link {
   padding: 0;
   margin-top: 0;
   color: inherit;
+  font-weight: inherit;
   background: transparent;
 }
 
