@@ -4,14 +4,7 @@ Fetch the most relevant document contexts for a query without generating an answ
 
 Retrieval runs inside the web app: by default it searches **pgvector** in the chatbot's Postgres database. How ranking works is described on the [Retrieval](../how-it-works/retrieval.md) page.
 
-There are two ways in:
-
-| Route | Who can call it | Use it for |
-| --- | --- | --- |
-| [Chat API](chat.md) with `retrieval_only: true` | Anyone with an [API key](authentication.md) | Scripts, notebooks, other servers |
-| `POST /api/getContexts` | A signed-in browser session | Code running in the web app, or a logged-in browser |
-
-## With an API key: `retrieval_only`
+## `retrieval_only` on the Chat API
 
 Send a normal [Chat request](chat.md) with `"retrieval_only": true`. The app embeds the last user message, searches the chatbot's documents and returns the contexts instead of an answer. `model` is still required and must be enabled on the chatbot; if nothing matches, the request falls through to the LLM and returns a normal `{"message": ..., "contexts": []}` answer.
 
@@ -61,36 +54,6 @@ curl -X POST https://chat.illinois.edu/api/chat-api/chat \
 
 Status codes are the Chat API's; see its [status table](chat.md#status-codes).
 
-## From a signed-in session: `POST /api/getContexts`
-
-The route the chat interface itself uses. It needs the Keycloak session cookie (`access_token`) that the browser holds after sign-in, and the signed-in user must have access to the chatbot; there is no API-key form. Calls without a valid session get `401`.
-
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `course_name` | string | yes | Chatbot name. |
-| `search_query` | string | yes | The query to match against the chatbot's documents. |
-| `doc_groups` | array | no | Restrict retrieval to specific document groups. Default: all documents. |
-| `top_n` | integer | no | Maximum number of contexts to return. Default `100`. |
-| `conversation_id` | string | no | Conversation UUID, recorded with the retrieval. |
-| `token_limit` | integer | no | Default `4000`; applied only to Qdrant-backed chatbots. |
-
-From a page served by the app:
-
-```javascript
-const contexts = await fetch("/api/getContexts", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    course_name: "ece-385",
-    search_query: "What is a finite state machine?",
-    doc_groups: ["lectures"],
-    top_n: 5,
-  }),
-}).then((r) => r.json());
-```
-
-The response is the bare array of context objects (the same objects the Chat API wraps in `contexts`).
-
 ## The context object
 
 | Key | Meaning |
@@ -106,7 +69,7 @@ The response is the bare array of context objects (the same objects the Chat API
 
 ## Chatbots with an external Qdrant connection
 
-A chatbot that has an [external Qdrant connection](../building/external-connections.md) is searched by the Flask backend, and the app forwards both routes above to it, so nothing changes for callers. If you run the stack yourself and have exposed the backend, you can also call it directly. The body takes `search_query`, `course_name`, and optionally `doc_groups`, `top_n` (default `100`) and `conversation_id`:
+A chatbot that has an [external Qdrant connection](../building/external-connections.md) is searched by the Flask backend, and the app forwards retrieval to it, so nothing changes for callers. If you run the stack yourself and have exposed the backend, you can also call it directly. The body takes `search_query`, `course_name`, and optionally `doc_groups`, `top_n` (default `100`) and `conversation_id`:
 
 ```bash
 curl -X POST https://<your-backend-host>/getTopContexts \

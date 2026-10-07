@@ -2,36 +2,13 @@
 
 Bulk-export conversation history and documents from a chatbot. The same exports are available in the UI — see [Analysis & exports](../building/analysis-exports.md).
 
-Exports are produced by the Flask backend. The web app exposes three of them behind a signed-in session; these are the routes the UI itself calls. There is no API-key form of the export routes. If you run the stack yourself and have exposed the backend, you can call its endpoints directly (below).
+Exports are produced by the Flask backend. There is no API-key form of the export endpoints, and the web app's own download routes need a signed-in browser session, so they are not part of this API. If you run the stack yourself and have exposed the backend, you can call its endpoints directly.
 
 Every export shares the same behaviour:
 
 - **Up to 500 items** — a `.zip` is returned directly as a download.
 - **More than 500 items** — the export runs in the background and the response says so immediately. When it finishes, the zip is uploaded to object storage and a download link (valid 48 hours) is emailed to the recipients listed per endpoint — **only if the backend has the SMTP variables** from the [Configuration reference](../self-hosting/configuration.md). Without them the export still reaches object storage and nothing is sent.
 - **No data** — HTTP `204 No Content`.
-
-## From a signed-in session
-
-All three are `GET` requests that need the Keycloak session cookie (`access_token`) the browser holds after sign-in; calls without one get `401`.
-
-| Route | Who can call it | What you get |
-| --- | --- | --- |
-| `/api/UIUC-api/downloadConvoHistory?course_name=<chatbot>` | Owner or administrator | Every conversation in the chatbot as `<first 10 characters>-convos.zip`: `markdown export/` (one file per conversation), `media_files/`, an `.xlsx`, a `.jsonl` (see [Data format](../building/analysis-exports.md#data-format)) and `error.log`. Over 500 conversations: `{"message": "..."}` and the email path. |
-| `/api/UIUC-api/exportAllDocuments?course_name=<chatbot>` | Owner or administrator | The post-processed text and embeddings of every document as `<chatbot>_documents.zip` holding one `.jsonl`. Over 500 documents: `{"message": "...", "s3_path": "..."}` and the email path. |
-| `/api/UIUC-api/downloadConvoHistoryUser?projectName=<chatbot>` | Any user with access to the chatbot | The signed-in user's own conversations (the address comes from the session) as a zip of Markdown files plus media. Over 500 conversations: the email path, to that user. The route waits up to five minutes and returns `504` after that. |
-
-None of the three takes a date range. From a page served by the app:
-
-```javascript
-const response = await fetch(
-  "/api/UIUC-api/downloadConvoHistory?course_name=ece-385",
-);
-if (response.headers.get("content-type") === "application/zip") {
-  const blob = await response.blob(); // save it
-} else {
-  console.log(await response.json()); // background export started
-}
-```
 
 ## Backend endpoints
 

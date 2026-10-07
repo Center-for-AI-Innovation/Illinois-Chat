@@ -17,11 +17,11 @@ The **Ingest** endpoints, and the backend form of the **Export** endpoints, are 
 | Category | What it does | Docs |
 | --- | --- | --- |
 | **Chat** | RAG-grounded, multi-turn conversations with streaming and image support | [Chat](chat.md) |
-| **Retrieval** | Fetch relevant document contexts without an LLM answer, with an API key or from a signed-in session | [Retrieval](retrieval.md) |
+| **Retrieval** | Fetch relevant document contexts without an LLM answer | [Retrieval](retrieval.md) |
 | **Ingest** | Add files, URLs, or Canvas courses to a chatbot programmatically | [Ingest](ingest.md) |
-| **Export** | Bulk-export documents and conversation history, from a signed-in session or on a self-hosted backend | [Export](export.md) |
+| **Export** | Bulk-export documents and conversation history on a self-hosted backend | [Export](export.md) |
 
-The backend has further routes (Nomic maps, statistics, email, graph lookups, `/createProject`, …) that the web app calls internally; they are not documented here and may change without notice. Every other frontend route under `/api/*` (for example `/api/UIUC-api/*` including the Sim tool routes, `/api/projectConnections*` and `/api/chat-api/keys/*`) needs a browser session cookie and is not part of the public API; the session-only routes documented here are `/api/getContexts` on the [Retrieval](retrieval.md) page and the three download routes on the [Export](export.md) page.
+The backend has further routes (Nomic maps, statistics, email, graph lookups, `/createProject`, …) that the web app calls internally; they are not documented here and may change without notice. Every other frontend route under `/api/*` (for example `/api/getContexts`, the `/api/UIUC-api/*` download, upload, ingest and Sim tool routes, `/api/projectConnections*` and `/api/chat-api/keys/*`) needs a browser session cookie and is not part of the public API.md) page and the three download routes on the [Export](export.md) page.
 
 ## Authentication
 
