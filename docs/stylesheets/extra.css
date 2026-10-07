@@ -347,6 +347,23 @@ html {
   color: var(--illinois-orange);
 }
 
+/* Under a tab, Material also marks every group that has children as a
+   section (Dashboard, Tools, CropWizard). Those sit beside ordinary pages in
+   the same list, so they take the page-link size and colour, semibold to
+   show they open a group; only the tab title at the top of the sidebar keeps
+   the small uppercase treatment. */
+.md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section {
+  margin-top: 0.15rem;
+}
+
+.md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section > .md-nav__link {
+  color: var(--ic-sidebar-fg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 /* Inside any container the inner link inherits the container's padding and
    colour instead of adding its own pill. */
 .md-nav__container > .md-nav__link {
