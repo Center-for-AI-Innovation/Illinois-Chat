@@ -102,7 +102,6 @@ nav:
       - Finding chatbots: getting-started/finding-chatbots.md
       - FAQs: getting-started/faqs.md
       - Video Walkthroughs: getting-started/video-walkthroughs.md
-      - Migrating from uiuc.chat: getting-started/migration.md
   - Building a Chatbot:
       - building/index.md
       - Dashboard:

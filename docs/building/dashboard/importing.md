@@ -9,10 +9,10 @@ Turn a Canvas course into a chatbot in one step: Illinois Chat bulk-imports your
 What gets imported — pick any of: Files, Pages, Modules, Syllabus, Assignments, Discussions.
 
 1. On the **Canvas** card choose **Configure import**.
-2. Invite the account shown in the dialog to your Canvas course **as a TA** so it can read the course content.
+2. Invite the account shown in the dialog to your Canvas course **as a student** so it can read the course content.
 
     !!! warning "Bot invitation required"
-        The import cannot see your course until that account has been added to it. The dialog shows the address to invite and the role to give it.
+        The import cannot see your course until that account has been added to it. The dialog shows the address to invite.
 
 3. Enter your Canvas course URL and select which content types to import.
 4. Click **Ingest Canvas Content**. Content is queued and ingested asynchronously — watch progress in Project Files.
