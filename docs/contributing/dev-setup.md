@@ -21,13 +21,11 @@ cd Illinois-Chat
 cp .env.template .env
 ```
 
-Edit `.env` before anything starts:
+One value in `.env` must be set before anything starts:
 
 - `SIM_APPROVAL_ADMIN_EMAIL` — your email. It names the account that becomes the Sim platform admin, and the start script refuses to run while it is empty. Leave it empty only if you will start with `--no-sim`.
-- `EMBEDDING_MODEL` / `EMBEDDING_API_BASE` — the template points at Ollama on the host (`http://host.docker.internal:11434/v1`); change the URL for any other OpenAI-compatible endpoint. The default vector collection expects 4096-dimensional Qwen3-Embedding-8B vectors.
-- Everything else can stay as shipped for local work. `ENCRYPTION_MASTER_KEY` and the `SIM_*` secrets are generated for you on the first run. OpenAI is **not** required.
 
-The full variable list is in the [Configuration reference](../self-hosting/configuration.md).
+Everything else in the root `.env` can stay as shipped for local work: the start script falls back to the dev defaults (`postgres`/`password`, `minioadmin`, `admin`) for anything unset, and generates `ENCRYPTION_MASTER_KEY` and the `SIM_*` secrets on the first run. The model and embedding values are set in step 4, in the app env files, not here. The full variable list is in the [Configuration reference](../self-hosting/configuration.md).
 
 ### 2. Install packages
 
@@ -84,7 +82,7 @@ This script:
 | `--no-sim` | Start without the Sim AI tool stack. |
 | `-h`, `--help` | Show usage. |
 
-### 4. Check the app env files
+### 4. Set the model values in the app env files
 
 In development the compose file only runs infrastructure; each app reads its own env file, which the script has just written:
 
@@ -92,7 +90,17 @@ In development the compose file only runs infrastructure; each app reads its own
 - `apps/frontend/.env` — Next.js frontend (`npm run local`)
 - `apps/crawlee/.env` — Crawlee, if you run it
 
-They already hold the connection values for Postgres (app and Keycloak databases), Redis, RabbitMQ, Qdrant and object storage, the Keycloak realm and client, `ENCRYPTION_MASTER_KEY`, `ALLOWED_EMBEDDING_PROVIDERS`, and empty placeholders for model endpoints and API keys (`EMBEDDING_MODEL`, `EMBEDDING_API_BASE`, `NCSA_HOSTED_*`, `OLLAMA_SERVER_URL`, `OPENAI_API_KEY`, `NEXT_PUBLIC_SIGNING_KEY`, …). Fill in the model values you need; re-running the script later only appends keys that are missing. The `apps/backend/.env.template` and `apps/frontend/.env.template` files are dev reference files that no script reads.
+They already hold the connection values for Postgres (app and Keycloak databases), Redis, RabbitMQ, Qdrant and object storage, the Keycloak realm and client, `ENCRYPTION_MASTER_KEY` and `ALLOWED_EMBEDDING_PROVIDERS`. The model keys are written **empty**, and the script does not copy the root `.env` values into them, so set these in **both** `apps/backend/.env` and `apps/frontend/.env`, with the same values:
+
+| Key | Set it to |
+| --- | --- |
+| `EMBEDDING_MODEL` | `Qwen/Qwen3-Embedding-8B`, or another model that produces 4096-dimensional vectors (the `embeddings` column is `vector(4096)`). |
+| `EMBEDDING_API_BASE` | The OpenAI-compatible endpoint serving it, e.g. `http://localhost:11434/v1` for Ollama on the host. |
+| `NCSA_HOSTED_API_KEY` or `OPENAI_API_KEY` | Only if that endpoint needs a bearer token; either is sent. |
+
+Left empty, both apps fall back to OpenAI's `text-embedding-ada-002` at `https://api.openai.com/v1`, whose 1536-dimensional vectors do not fit the column, so every ingest fails. Re-running the script later only appends keys that are missing, so your values survive.
+
+Optional but worth setting now: `NEXT_PUBLIC_SIGNING_KEY` in `apps/frontend/.env` (provider keys that chatbot owners paste on the LLMs page are stored in plaintext without it) and `SUPER_ADMIN_EMAILS` (your email, to see every chatbot). Chat models themselves are configured per chatbot on its LLMs page; `OLLAMA_SERVER_URL` and `NCSA_HOSTED_API_KEY` only make the Ollama and NCSA providers available there. The `apps/backend/.env.template` and `apps/frontend/.env.template` files are dev reference files that no script reads.
 
 For uploads and ingest, always use the object-storage **API** port, not the console port (the dev stack runs [Silo](https://github.com/pgsty/silo), a MinIO-compatible server, as the compose service `minio`):
 

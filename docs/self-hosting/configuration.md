@@ -95,8 +95,8 @@ The frontend authenticates users via OIDC against this realm. User records live 
 
 | Variable | Read by | Required or default | In template |
 | --- | --- | --- | --- |
-| `EMBEDDING_MODEL` | full, dev | `Qwen/Qwen3-Embedding-8B` | root, worker |
-| `EMBEDDING_API_BASE` | full, dev | frontend/worker: `http://host.docker.internal:11434/v1`; backend: no default | root, worker |
+| `EMBEDDING_MODEL` | full, dev | template `Qwen/Qwen3-Embedding-8B`; when empty the code falls back to `text-embedding-ada-002` (1536 dimensions, which do not fit the 4096-dimension `embeddings` column) | root, worker |
+| `EMBEDDING_API_BASE` | full, dev | template `http://host.docker.internal:11434/v1`; when empty the code falls back to `https://api.openai.com/v1` | root, worker |
 | `ALLOWED_EMBEDDING_PROVIDERS` | full, dev | `openai,ollama`; providers an external connection may use | worker |
 | `NCSA_HOSTED_API_KEY` | full, dev | empty | root, worker |
 | `NCSA_HOSTED_VLM_BASE_URL` | full, dev | empty; enables the hosted default tier of [tool routing](../how-it-works/tool-routing.md) | root |
@@ -118,6 +118,8 @@ EMBEDDING_API_BASE=http://host.docker.internal:11434/v1
 ```
 
 If you switch to a model with a different dimension, set `QDRANT_VECTOR_SIZE` to match before the first start; the start scripts recreate a Qdrant collection whose size does not match.
+
+On the dev stack, `start-dev.sh` writes both keys **empty** into `apps/backend/.env` and `apps/frontend/.env` and does not copy the root `.env` values; set them in those files (see [Development setup](../contributing/dev-setup.md)).
 
 ## Ingest worker
 
