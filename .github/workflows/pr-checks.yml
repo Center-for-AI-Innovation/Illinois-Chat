@@ -42,10 +42,20 @@ jobs:
         with:
           check-mode: pull_request
 
-      # Backend tests placeholder
+      # --frozen fails the job if pyproject.toml changed without re-locking.
+      # --all-extras: the worker tests import ai_ta_backend.rabbitmq modules.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          cache-dependency-glob: apps/backend/uv.lock
+
+      - name: Install backend dependencies
+        working-directory: apps/backend
+        run: uv sync --frozen --all-extras
+
       - name: Backend tests
-        run: |
-          echo "TODO: add backend tests (e.g., pytest) here"
+        working-directory: apps/backend
+        run: uv run --frozen pytest
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -74,3 +84,13 @@ jobs:
       - name: Frontend tests
         working-directory: apps/frontend
         run: npm run test:coverage:check
+
+      # Build (no push) both backend images so a broken Dockerfile fails the PR
+      # instead of the push-to-main deploy. Same contexts as illinois-chat-dev.yml.
+      - name: Build backend image
+        working-directory: apps/backend
+        run: docker build -f Self-Hosted-Dockerfile -t ic-backend:pr .
+
+      - name: Build worker image
+        working-directory: apps/backend
+        run: docker build -f ai_ta_backend/rabbitmq/Dockerfile -t ic-worker:pr .
