@@ -37,7 +37,7 @@ flowchart TB
 
 **Frontend: React + Next.js** — the full-stack web application; most API routes, including the public [Chat API](../api/index.md), live here.
 
-**Backend: Python Flask** — retrieval (`/getTopContexts`), the ingest entry point (`/ingest`, which queues a job), exports and Nomic maps. It listens on port 8001 inside the Compose network and is not published to the host.
+**Backend: Python Flask** — retrieval for Qdrant-backed chatbots (`/getTopContexts`; pgvector retrieval runs in the frontend), the ingest entry point (`/ingest`, which queues a job), exports and Nomic maps. It listens on port 8001 inside the Compose network and is not published to the host.
 
 **Ingest worker** — consumes the RabbitMQ queue, extracts text, embeds and stores it.
 
