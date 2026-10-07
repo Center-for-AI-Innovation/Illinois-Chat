@@ -1,0 +1,13 @@
+# Root project: holds only the documentation toolchain. The backend has its own
+# project in apps/backend. Build the site with `uv run --only-group docs mkdocs serve`.
+[project]
+name = "illinois-chat"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+docs = ["mkdocs-material==9.7.7"]
+
+[tool.uv]
+package = false

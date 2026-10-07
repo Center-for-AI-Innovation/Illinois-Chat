@@ -10,8 +10,8 @@ The documentation is a [Material for MkDocs](https://squidfunk.github.io/mkdocs-
 No local install is needed beyond [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool run --with-requirements docs/requirements.txt mkdocs serve   # http://127.0.0.1:8000/
-uv tool run --with-requirements docs/requirements.txt mkdocs build --strict
+uv run --only-group docs mkdocs serve           # http://127.0.0.1:8000/
+uv run --only-group docs mkdocs build --strict
 ```
 
 The strict build must finish with zero warnings; pull requests that touch the docs run the same build as a check. It fails on broken links, broken `#anchors`, missing images and pages absent from `nav`. Blog posts dated in the future are drafts: `serve` renders them, `build` omits them and does not check their links.
@@ -36,4 +36,4 @@ The strict build must finish with zero warnings; pull requests that touch the do
 
 ## Dependencies
 
-`docs/requirements.txt` pins the whole toolchain. To upgrade, bump `mkdocs-material`, install into a clean environment, confirm `mkdocs build --strict` passes, and regenerate the file with `pip freeze`.
+The toolchain is the `docs` dependency group in the root `pyproject.toml`, locked in the root `uv.lock`. To upgrade, bump `mkdocs-material` there, run `uv lock`, confirm `uv run --only-group docs mkdocs build --strict` passes, and commit both files.

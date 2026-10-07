@@ -21,7 +21,7 @@ Illinois Chat is one repository: [Center-for-AI-Innovation/Illinois-Chat](https:
 ## Inside the apps
 
 - **Frontend** (`apps/frontend/src`): `pages/` holds the routes and the `pages/api` handlers, `components/` the UI, `db/` the Drizzle schema (`schema.ts`) and `migrations/`, `utils/` and `server/` the server-side logic such as retrieval and authorization, `__tests__/` the Vitest suites.
-- **Backend** (`apps/backend/ai_ta_backend`): `main.py` registers the routes, `service/` and `database/` implement them, `rabbitmq/` is the ingest worker with its own `requirements.txt` and `Dockerfile`, `utils/` holds exports and email.
+- **Backend** (`apps/backend/ai_ta_backend`): `main.py` registers the routes, `service/` and `database/` implement them, `rabbitmq/` is the ingest worker with its own `Dockerfile` (dependencies for both live in `apps/backend/pyproject.toml` and `uv.lock`), `utils/` holds exports and email.
 - **Crawler** (`apps/crawlee/src`): the crawl API and the per-page ingest calls to the backend.
 
 Each app has its own `README.md`, `Dockerfile` and lockfile; the root `README.md` is the entry point for the whole repository.

@@ -7,7 +7,7 @@ For the all-Docker experience instead, see [Self-Hosting](../self-hosting/index.
 ## Prerequisites
 
 - Git, Docker and Docker Compose
-- Python 3.10 or 3.11 for the backend and ingest worker (the images use 3.10)
+- [uv](https://docs.astral.sh/uv/) for the backend and ingest worker: `brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`. It installs the Python version pinned in `apps/backend/.python-version`, so no separate Python install is needed.
 - Node.js 20.19+ or 22.12+ for the frontend. `apps/frontend/.nvmrc` pins v22.12.0 (`nvm use` picks it up); CI runs Node 20.
 - An OpenAI-compatible embedding endpoint, for example [Ollama](https://ollama.com/) serving `Qwen/Qwen3-Embedding-8B`; ingest and retrieval need one, chat models do not have to be configured up front.
 
@@ -33,11 +33,10 @@ Everything else in the root `.env` can stay as shipped for local work: the start
 
     ```bash
     cd apps/backend
-    python3.11 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    pip install -r ai_ta_backend/rabbitmq/requirements.txt
+    uv sync --all-extras
     ```
+
+    This creates `apps/backend/.venv` with the pinned Python and every dependency from `uv.lock`. Re-run it after pulling a changed `uv.lock`. Commands run through `uv run`, so nothing needs activating.
 
 === "Frontend"
 
@@ -120,18 +119,18 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:10000
 
 ### 5. Run the apps
 
-Run each in its own terminal, with the backend virtualenv active for the first two:
+Run each in its own terminal:
 
 ```bash
 # Flask backend
 cd apps/backend
-flask --app ai_ta_backend.main:app --debug run --port 8000
+uv run flask --app ai_ta_backend.main:app --debug run --port 8000
 ```
 
 ```bash
 # ingest worker
 cd apps/backend
-python ai_ta_backend/rabbitmq/worker.py
+uv run python ai_ta_backend/rabbitmq/worker.py
 ```
 
 ```bash
@@ -214,7 +213,7 @@ Linting is enforced with [Trunk](https://trunk.io) (`npm exec trunk check` in th
 
 **Missing dependencies**
 
-- Backend: activate the virtualenv and repeat the two `pip install` commands from step 2.
+- Backend: run `uv sync --all-extras` in `apps/backend` again.
 - Frontend: `npm ci` in `apps/frontend`.
 
 **Environment variables**

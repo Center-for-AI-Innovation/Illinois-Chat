@@ -93,9 +93,11 @@ One-time setup:
 
 ```bash
 cd infra/scripts/add_external_project_script
-pip install -r requirements.txt
 cp .external.env.template .external.env   # gitignored — never commit it
 ```
+
+The script declares its own dependency inline, so there is nothing to install:
+[uv](https://docs.astral.sh/uv/) fetches it into a cached environment on first run.
 
 Fill in `.external.env`:
 
@@ -110,24 +112,24 @@ Then:
 
 ```bash
 # Probe a config without persisting anything (recommended first step):
-python3 external_connections_cli.py test database
+uv run external_connections_cli.py test database
 
 # Register the external documents/pgvector database for the project:
-python3 external_connections_cli.py upsert database
+uv run external_connections_cli.py upsert database
 
 # Other kinds work the same way (config built from .external.env):
-python3 external_connections_cli.py upsert s3
-python3 external_connections_cli.py upsert qdrant
-python3 external_connections_cli.py upsert embedding
+uv run external_connections_cli.py upsert s3
+uv run external_connections_cli.py upsert qdrant
+uv run external_connections_cli.py upsert embedding
 
 # Inspect what is stored (secrets come back masked):
-python3 external_connections_cli.py get
+uv run external_connections_cli.py get
 
 # Disable / re-enable a project's overrides without deleting them:
-python3 external_connections_cli.py set-active --active false
+uv run external_connections_cli.py set-active --active false
 
 # Remove one kind (or the whole row when --kind is omitted):
-python3 external_connections_cli.py delete --kind qdrant
+uv run external_connections_cli.py delete --kind qdrant
 ```
 
 Every command also accepts an explicit project name, a literal JSON config,
@@ -137,7 +139,7 @@ You can also probe the config **already stored** for a project (decrypted
 server-side, never echoed back):
 
 ```bash
-python3 external_connections_cli.py test database --stored
+uv run external_connections_cli.py test database --stored
 ```
 
 ### Supabase / pooled Postgres
