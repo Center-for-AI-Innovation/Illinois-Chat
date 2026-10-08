@@ -6,7 +6,11 @@ import {
   DEFAULT_NAVBAR_LOGO_SRC,
   parseLogoDataUrl,
 } from '~/utils/platformSettings.schema'
-import { readNavbarLogo } from '~/utils/platformSettings.server'
+import {
+  logoVersionOf,
+  NAVBAR_LOGO_ENDPOINT,
+  readNavbarLogo,
+} from '~/utils/platformSettings.server'
 
 export default async function handler(
   req: NextApiRequest,
@@ -28,6 +32,17 @@ export default async function handler(
     return res.redirect(307, DEFAULT_NAVBAR_LOGO_SRC)
   }
 
+  // Only the current hash may be cached as immutable; a stale or made-up `v`
+  // would otherwise pin these bytes under the wrong URL for a year.
+  const current = logoVersionOf(read.value)
+  if (req.query.v !== current) {
+    res.setHeader('Cache-Control', 'no-store')
+    return res.redirect(
+      307,
+      `${NAVBAR_LOGO_ENDPOINT}?v=${encodeURIComponent(current)}`,
+    )
+  }
+
   res.setHeader('Content-Type', parsed.contentType)
   res.setHeader('X-Content-Type-Options', 'nosniff')
   // SVG is an active format: opened directly, it would run script on this
@@ -36,12 +51,6 @@ export default async function handler(
     'Content-Security-Policy',
     "default-src 'none'; style-src 'unsafe-inline'; sandbox",
   )
-  // The navbar links a content-hashed `v`, so a new upload is a new URL.
-  res.setHeader(
-    'Cache-Control',
-    typeof req.query.v === 'string'
-      ? 'public, max-age=31536000, immutable'
-      : 'public, max-age=60',
-  )
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
   return res.status(200).send(Buffer.from(parsed.base64, 'base64'))
 }

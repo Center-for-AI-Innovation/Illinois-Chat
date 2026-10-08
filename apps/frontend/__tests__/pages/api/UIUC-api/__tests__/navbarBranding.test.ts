@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import brandingHandler from '~/pages/api/UIUC-api/navbarBranding'
 import logoHandler from '~/pages/api/UIUC-api/navbarLogo'
+import { logoVersionOf } from '~/utils/platformSettings.server'
 import { ensureRedisConnected } from '~/utils/redisClient'
 
 vi.mock('~/utils/redisClient', () => ({
@@ -85,11 +86,16 @@ describe('GET /api/UIUC-api/navbarBranding', () => {
 })
 
 describe('GET /api/UIUC-api/navbarLogo', () => {
+  const SVG_LOGO = 'data:image/svg+xml;base64,PHN2Zy8+'
+
   it('streams the stored image with its content type and a sandbox CSP', async () => {
-    storeFields({ navbar_logo: 'data:image/svg+xml;base64,PHN2Zy8+' })
+    storeFields({ navbar_logo: SVG_LOGO })
 
     const res = createRes()
-    await logoHandler({ method: 'GET', query: { v: 'abc' } } as any, res)
+    await logoHandler(
+      { method: 'GET', query: { v: logoVersionOf(SVG_LOGO) } } as any,
+      res,
+    )
 
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/svg+xml')
     expect(res.setHeader).toHaveBeenCalledWith(
@@ -103,6 +109,26 @@ describe('GET /api/UIUC-api/navbarLogo', () => {
     expect(res.status).toHaveBeenCalledWith(200)
     expect(String(res.send.mock.calls[0][0])).toBe('<svg/>')
   })
+
+  it.each([
+    ['a stale version', { v: 'stale' }],
+    ['no version', {}],
+  ])(
+    'redirects %s to the current hash without caching',
+    async (_label, query) => {
+      storeFields({ navbar_logo: SVG_LOGO })
+
+      const res = createRes()
+      await logoHandler({ method: 'GET', query } as any, res)
+
+      expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
+      expect(res.redirect).toHaveBeenCalledWith(
+        307,
+        `/api/UIUC-api/navbarLogo?v=${logoVersionOf(SVG_LOGO)}`,
+      )
+      expect(res.send).not.toHaveBeenCalled()
+    },
+  )
 
   it('redirects to the built-in logo when none is uploaded', async () => {
     storeFields({ navbar_logo: '' })
