@@ -181,7 +181,7 @@ const Home: NextPage<HomeProps> = () => {
               max-width: 100vw;
             }
             body, html {
-              overflow-x: hidden;
+              overflow-x: clip;
               width: 100%;
               margin: 0;
               padding: 0;
