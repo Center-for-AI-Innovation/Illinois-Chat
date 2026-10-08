@@ -23,7 +23,7 @@ export function ChatbotsGlobalNav({
 
   return (
     <header
-      className={`fixed top-0 right-0 left-0 z-50 bg-white/95 backdrop-blur-xs dark:bg-[#13294b] ${
+      className={`fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-white/95 backdrop-blur-xs dark:bg-[#13294b] ${
         hideBorder ? '' : 'border-border border-b dark:border-[#32517a]'
       }`}
     >
