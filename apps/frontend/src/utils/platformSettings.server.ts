@@ -179,7 +179,7 @@ export function toPublicNavbarBranding(
   }
 }
 
-function logoVersionOf(logoDataUrl: string): string {
+export function logoVersionOf(logoDataUrl: string): string {
   if (logoDataUrl === '') return ''
   return createHash('sha256').update(logoDataUrl).digest('hex').slice(0, 16)
 }
@@ -383,9 +383,9 @@ export class PlatformSettingsConflictError extends Error {
 }
 
 // Lua keeps the version check and writes atomic without WATCH state on the
-// shared Redis connection. Omitted sections remain untouched. Navbar branding
-// and its logo are one section: the logo bytes are stored only when branding
-// is part of this save, including a `''` logo that restores the built-in mark.
+// shared Redis connection. Omitted sections remain untouched. The logo bytes
+// are written only when the save includes a logo (`''` restores the built-in
+// mark); otherwise the stored bytes stay and their `logoVersion` carries over.
 const SAVE_SETTINGS_SCRIPT = `
 for i, key in ipairs(KEYS) do
   local kind = redis.call('TYPE', key).ok
@@ -405,7 +405,20 @@ if ARGV[4] ~= '' then
   redis.call('SET', KEYS[4], ARGV[6])
 end
 if ARGV[9] ~= '' then
-  redis.call('HSET', KEYS[1], 'navbar_branding', ARGV[9], 'navbar_logo', ARGV[10])
+  if ARGV[11] == '1' then
+    redis.call('HSET', KEYS[1], 'navbar_branding', ARGV[9], 'navbar_logo', ARGV[10])
+  else
+    local branding = cjson.decode(ARGV[9])
+    branding.logoVersion = ''
+    local stored = redis.call('HGET', KEYS[1], 'navbar_branding')
+    if stored then
+      local ok, previous = pcall(cjson.decode, stored)
+      if ok and type(previous) == 'table' and type(previous.logoVersion) == 'string' then
+        branding.logoVersion = previous.logoVersion
+      end
+    end
+    redis.call('HSET', KEYS[1], 'navbar_branding', cjson.encode(branding))
+  end
 end
 redis.call('HSET', KEYS[1], 'version', ARGV[2], 'updated_at', ARGV[7], 'updated_by', ARGV[8])
 return 1
@@ -433,12 +446,15 @@ export async function writePlatformSettings(
   const updatedAt = new Date().toISOString()
   const version = randomUUID()
 
+  const logoDataUrl = settings.navbarBranding?.logoDataUrl
   const storedBranding: StoredNavbarBranding | undefined =
     settings.navbarBranding
       ? {
           primaryWord: settings.navbarBranding.primaryWord,
           secondaryWord: settings.navbarBranding.secondaryWord,
-          logoVersion: logoVersionOf(settings.navbarBranding.logoDataUrl),
+          // The script substitutes the stored version when the logo is kept.
+          logoVersion:
+            logoDataUrl === undefined ? '' : logoVersionOf(logoDataUrl),
           updatedAt,
           updatedBy,
         }
@@ -472,7 +488,8 @@ export async function writePlatformSettings(
       updatedAt,
       updatedBy,
       storedBranding ? JSON.stringify(storedBranding) : '',
-      settings.navbarBranding?.logoDataUrl ?? '',
+      logoDataUrl ?? '',
+      logoDataUrl === undefined ? '0' : '1',
     ],
   })
   if (saved === 0) throw new PlatformSettingsConflictError()

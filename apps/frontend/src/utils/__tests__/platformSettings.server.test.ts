@@ -435,6 +435,29 @@ describe('writePlatformSettings', () => {
     const args = client.eval.mock.calls[0]![1].arguments
     expect(JSON.parse(args[8]!).logoVersion).toBe('')
     expect(args[9]).toBe('')
+    expect(args[10]).toBe('1')
+  })
+
+  it('keeps the stored logo when a branding save leaves the logo out', async () => {
+    const { client } = redisReturning()
+
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    await writePlatformSettings(
+      {
+        version: '0',
+        navbarBranding: { primaryWord: 'OSC', secondaryWord: 'Chat' },
+      },
+      'admin@example.com',
+    )
+
+    const args = client.eval.mock.calls[0]![1].arguments
+    expect(JSON.parse(args[8]!)).toMatchObject({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+    })
+    expect(args[9]).toBe('')
+    expect(args[10]).toBe('0')
   })
 
   it('leaves the legacy banner and navbar untouched when saving only maintenance', async () => {

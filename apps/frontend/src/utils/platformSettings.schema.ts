@@ -253,9 +253,17 @@ export const platformSettingsSchema = z.object({
 })
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>
 
+/** Omitting `logoDataUrl` keeps the stored logo, so word edits never resend it. */
+export const navbarBrandingUpdateSchema = navbarBrandingSchema.extend({
+  logoDataUrl: navbarBrandingSchema.shape.logoDataUrl.optional(),
+})
+
 export const platformSettingsUpdateSchema = platformSettingsSchema
   .partial()
-  .extend({ version: z.string().min(1) })
+  .extend({
+    version: z.string().min(1),
+    navbarBranding: navbarBrandingUpdateSchema.optional(),
+  })
   .strict()
   .refine(
     (settings) =>

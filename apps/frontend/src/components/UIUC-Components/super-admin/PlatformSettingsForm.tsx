@@ -104,8 +104,13 @@ export function PlatformSettingsForm({
       changes.announcementBanner = values.announcementBanner
     if (form.formState.dirtyFields.maintenance)
       changes.maintenance = values.maintenance
-    if (form.formState.dirtyFields.navbarBranding)
-      changes.navbarBranding = values.navbarBranding
+    const brandingDirty = form.formState.dirtyFields.navbarBranding
+    if (brandingDirty) {
+      const { logoDataUrl, ...words } = values.navbarBranding
+      changes.navbarBranding = brandingDirty.logoDataUrl
+        ? { ...words, logoDataUrl }
+        : words
+    }
     try {
       const result = await updateSettings.mutateAsync(changes)
       setLoadedVersion(result.version)
