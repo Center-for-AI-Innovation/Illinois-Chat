@@ -191,7 +191,11 @@ export const conversations = pgTable('conversations', {
   updated_at: timestamp('updated_at', { withTimezone: true })
     .defaultNow()
     .notNull(),
-  folder_id: uuid('folder_id'),
+  // ON DELETE SET NULL: deleting a folder must return its conversations to the
+  // main sidebar list, not strand them behind a dead folder id.
+  folder_id: uuid('folder_id').references(() => folders.id, {
+    onDelete: 'set null',
+  }),
 })
 
 // Documents table
@@ -426,6 +430,13 @@ export const folders = pgTable('folders', {
     .notNull(),
   type: text('type'),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  // Scopes the folder to a project. Nullable only for pre-0018 rows that held
+  // no conversations to backfill from; those are treated as belonging to no
+  // course. New folders always carry a project.
+  project_id: bigint('project_id', { mode: 'number' }).references(
+    () => projects.id,
+    { onDelete: 'cascade' },
+  ),
 })
 
 // Define enum for LLM Provider from schema.sql
@@ -633,6 +644,7 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 export const projectsRelations = relations(projects, ({ many, one }) => ({
   apiKeys: many(apiKeys),
   conversations: many(conversations),
+  folders: many(folders),
   stats: one(projectStats, {
     fields: [projects.id],
     references: [projectStats.project_id],
@@ -676,7 +688,11 @@ export const documentsDocGroupsRelations = relations(
   }),
 )
 
-export const foldersRelations = relations(folders, ({ many }) => ({
+export const foldersRelations = relations(folders, ({ many, one }) => ({
+  project: one(projects, {
+    fields: [folders.project_id],
+    references: [projects.id],
+  }),
   conversations: many(conversations),
 }))
 

@@ -27,8 +27,11 @@ export function useUpdateConversation(
       const previousConversationHistory = queryClient.getQueryData<
         InfiniteData<ConversationPage>
       >(conversationHistoryKey)
-      const previousFolders =
-        queryClient.getQueryData<FolderWithConversation[]>(foldersKey)
+      // The folders query key also carries the search term, so match by
+      // prefix; an exact ['folders', course_name] key never exists.
+      const previousFolders = queryClient.getQueriesData<
+        FolderWithConversation[]
+      >({ queryKey: foldersKey })
 
       await queryClient.cancelQueries({ queryKey: conversationHistoryKey })
       if (updatedConversation.folderId) {
@@ -52,8 +55,8 @@ export function useUpdateConversation(
       )
 
       if (updatedConversation.folderId) {
-        queryClient.setQueryData(
-          foldersKey,
+        queryClient.setQueriesData(
+          { queryKey: foldersKey },
           (oldData: FolderWithConversation[] | undefined) => {
             if (!Array.isArray(oldData)) return oldData
             return oldData.map((f) => {
@@ -69,7 +72,17 @@ export function useUpdateConversation(
         )
       }
 
-      return { previousConversationHistory, previousFolders }
+      // Whether this conversation is, or was, inside a cached folder. Only then
+      // do the folders need a refetch once the save settles.
+      const touchesFolders =
+        !!updatedConversation.folderId ||
+        previousFolders.some(([, folders]) =>
+          folders?.some((f) =>
+            f.conversations?.some((c) => c.id === updatedConversation.id),
+          ),
+        )
+
+      return { previousConversationHistory, previousFolders, touchesFolders }
     },
     onError: (error, _variables, context) => {
       // An error happened!
@@ -78,12 +91,9 @@ export function useUpdateConversation(
         ['conversationHistory', course_name, ''],
         context?.previousConversationHistory,
       )
-      if (context?.previousFolders) {
-        queryClient.setQueryData(
-          ['folders', course_name],
-          context.previousFolders,
-        )
-      }
+      context?.previousFolders?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data)
+      })
       console.error(
         'Error saving updated conversation to server:',
         error,
@@ -97,13 +107,13 @@ export function useUpdateConversation(
       // No need to do anything here because the conversationHistory query will be invalidated
     },
     onSettled: (_data, _error, _variables, context) => {
-      // The mutation is done!
-      // Do something here, like closing a modal
       queryClient.invalidateQueries({
         queryKey: ['conversationHistory', course_name, ''],
       })
 
-      if (context?.previousFolders) {
+      // Skipped for conversations outside folders so a model reply does not
+      // refetch every folder.
+      if (context?.touchesFolders) {
         queryClient.invalidateQueries({
           queryKey: ['folders', course_name],
         })

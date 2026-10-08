@@ -293,7 +293,7 @@ const Sidebar = <T,>({
             >
               {itemComponent}
             </div>
-          ) : (
+          ) : folders?.length > 0 ? null : (
             <div className="mt-8 text-center text-(--foreground) opacity-50 select-none">
               <IconMistOff className="mx-auto mb-3" aria-hidden="true" />
               <span className="text-[14px] leading-normal">

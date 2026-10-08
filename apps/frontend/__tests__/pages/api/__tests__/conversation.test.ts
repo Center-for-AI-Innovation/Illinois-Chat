@@ -33,8 +33,14 @@ const hoisted = vi.hoisted(() => {
     folder_id: { name: 'folder_id' },
   }
 
+  const folders = {
+    id: { name: 'id' },
+    user_email: { name: 'user_email' },
+  }
+
   return {
     db: { insert, select, delete: del, execute },
+    folders,
     messages,
     conversations,
     insert,
@@ -53,6 +59,7 @@ vi.mock('~/server/authorization', () => ({
 
 vi.mock('~/db/dbClient', () => ({
   db: hoisted.db,
+  folders: hoisted.folders,
   messages: hoisted.messages,
   conversations: hoisted.conversations,
 }))
@@ -607,6 +614,9 @@ describe('conversation API', () => {
 
   it('POST (legacy) saves conversation + messages and deletes subsequent messages when edited', async () => {
     const editedId = uuidv4()
+    const folderId = uuidv4()
+    // First select resolves the conversation's folder, second loads messages.
+    hoisted.selectWhere.mockResolvedValueOnce([{ id: folderId }])
     hoisted.selectWhere.mockResolvedValueOnce([
       {
         id: editedId,
@@ -631,7 +641,7 @@ describe('conversation API', () => {
             model: { id: 'gpt-4o' },
             prompt: '',
             temperature: 0.1,
-            folderId: uuidv4(),
+            folderId,
             projectName: 'CS101',
             messages: [
               { id: editedId, role: 'user', content: 'new' },
