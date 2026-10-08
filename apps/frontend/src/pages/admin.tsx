@@ -148,7 +148,7 @@ export default function AdminPage() {
 
               {/* Sticky so the tab bar stays reachable while scrolling a long
                   connections table. */}
-              <div className="sticky top-20 z-20 -mx-4 mb-6 border-b border-[#e5e7eb] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#32517a] dark:bg-[#081735]/95">
+              <div className="sticky top-[calc(5rem+var(--announcement-banner-height))] z-20 -mx-4 mb-6 border-b border-[#e5e7eb] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#32517a] dark:bg-[#081735]/95">
                 <TabsList
                   className={`h-10! w-full sm:w-fit ${adminTabsListClass}`}
                 >
