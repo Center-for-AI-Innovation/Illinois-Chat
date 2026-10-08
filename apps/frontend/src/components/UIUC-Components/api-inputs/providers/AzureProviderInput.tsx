@@ -34,7 +34,7 @@ export default function AzureProviderInput({
       </form.Field>
       <form.Field name={`providers.${ProviderNames.Azure}.AzureEndpoint`}>
         {(field: any) => (
-          <div className="mb-3">
+          <div className="mb-3 mt-4">
             <Label
               htmlFor="azure-endpoint"
               className="text-(--dashboard-foreground-faded)"
