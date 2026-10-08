@@ -1,11 +1,10 @@
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
-import { fetchPresignedUrl } from '~/utils/apiUtils'
 import GlobalFooter from './GlobalFooter'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -25,40 +24,10 @@ const MakeOldCoursePage = ({
   current_email: string
   isSuperAdmin?: boolean
 }) => {
-  const [bannerUrl, setBannerUrl] = useState<string>('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState,
   )
   const router = useRouter()
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (metadata == null) {
-          console.error('No metadata found for course')
-          return
-        }
-        // fetch banner image url
-        if (metadata?.banner_image_s3 && metadata.banner_image_s3 !== '') {
-          console.log('Getting banner image: ', metadata.banner_image_s3)
-          try {
-            const url = await fetchPresignedUrl(
-              metadata.banner_image_s3,
-              course_name,
-            )
-            setBannerUrl(url as string)
-            console.log('Got banner image: ', url)
-          } catch (error) {
-            console.error('Error fetching banner image: ', error)
-          }
-        }
-      } catch (error) {
-        console.error(error)
-        // alert('An error occurred while fetching course metadata. Please try again later.')
-      }
-    }
-
-    fetchData()
-  }, [metadata])
 
   if (
     metadata &&
@@ -74,7 +43,6 @@ const MakeOldCoursePage = ({
   return (
     <SettingsLayout
       course_name={course_name}
-      bannerUrl={bannerUrl}
       sidebarCollapsed={sidebarCollapsed}
       setSidebarCollapsed={setSidebarCollapsed}
     >

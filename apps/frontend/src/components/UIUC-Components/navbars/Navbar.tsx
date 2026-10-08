@@ -8,7 +8,6 @@ import {
 } from '@tabler/icons-react'
 import { cva } from 'class-variance-authority'
 import { montserrat_heading } from 'fonts'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { usePostHog } from 'posthog-js/react'
@@ -23,17 +22,10 @@ import {
 } from '~/components/shadcn/ui/dropdown-menu'
 import { Skeleton } from '~/components/shadcn/ui/skeleton'
 import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
-import { useFetchNavbarBranding } from '~/hooks/queries/useFetchNavbarBranding'
-import {
-  DEFAULT_NAVBAR_BRANDING,
-  DEFAULT_NAVBAR_LOGO_SRC,
-} from '~/utils/platformSettings.schema'
 import { AuthMenu } from './AuthMenu'
-import { NavbarBrand, NavbarBrandSkeleton } from './NavbarBrand'
+import { NavbarBrandLink } from './NavbarBrand'
 
 interface NavbarProps {
-  course_name?: string
-  bannerUrl?: string
   isPlain?: boolean
 }
 
@@ -79,48 +71,7 @@ function externalLinkProps(item: NavItem) {
     : undefined
 }
 
-function Brand() {
-  const { data, isError } = useFetchNavbarBranding()
-  const branding = data ?? (isError ? DEFAULT_NAVBAR_BRANDING : undefined)
-
-  if (!branding) return <NavbarBrandSkeleton />
-
-  return (
-    <Link
-      href="/"
-      aria-label={`${branding.primaryWord} ${branding.secondaryWord} home`}
-      className="flex min-w-0 items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-(--illinois-orange)"
-    >
-      <NavbarBrand
-        primaryWord={branding.primaryWord}
-        secondaryWord={branding.secondaryWord}
-        logoSrc={branding.logoUrl ?? DEFAULT_NAVBAR_LOGO_SRC}
-      />
-    </Link>
-  )
-}
-
-function BannerImage({ url, courseName }: { url: string; courseName: string }) {
-  const altText = courseName ? `${courseName} logo` : 'Course chatbot logo'
-  return (
-    <div className="flex h-full min-w-0 flex-1 items-center overflow-hidden px-4 sm:px-6">
-      <Image
-        src={url}
-        className="h-full w-auto object-contain object-left"
-        width={2000}
-        height={2000}
-        alt={altText}
-        onError={(e) => (e.currentTarget.style.display = 'none')}
-      />
-    </div>
-  )
-}
-
-export default function Navbar({
-  course_name = '',
-  bannerUrl = '',
-  isPlain = false,
-}: NavbarProps) {
+export default function Navbar({ isPlain = false }: NavbarProps) {
   const router = useRouter()
   const auth = useAuth()
   const posthog = usePostHog()
@@ -146,13 +97,9 @@ export default function Navbar({
   return (
     <div className="fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-(--navbar-background)">
       <header className="flex h-20 w-full items-center gap-2 border-b border-(--navbar-border) bg-(--navbar-background) px-4 sm:px-6">
-        <Brand />
+        <NavbarBrandLink />
 
-        {bannerUrl ? (
-          <BannerImage url={bannerUrl} courseName={course_name} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {!isPlain && (
           <nav aria-label="Main navigation" className="hidden lg:block">

@@ -3,6 +3,7 @@ import { montserrat_heading } from 'fonts'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { AuthMenu } from '~/components/UIUC-Components/navbars/AuthMenu'
+import { NavbarBrandLink } from '~/components/UIUC-Components/navbars/NavbarBrand'
 
 const navItems = [
   { label: 'Chatbots Hub', icon: IconHome, link: '/chatbots' },
@@ -28,22 +29,7 @@ export function ChatbotsGlobalNav({
       }`}
     >
       <div className="mx-auto flex h-[72px] w-full max-w-[1680px] items-center justify-between px-4 sm:px-8">
-        <Link
-          href="/"
-          className={`relative flex items-center gap-0 font-bold ${montserrat_heading.variable} font-montserratHeading`}
-        >
-          <div style={{ width: '2.5rem', height: '2.5rem' }}>
-            <img
-              alt="Illinois Logo"
-              src="/media/logo_illinois.png"
-              className="h-full w-auto"
-            ></img>
-          </div>
-
-          <div className="text-2xl font-extrabold tracking-tight text-(--illinois-orange-branding) sm:ml-2 sm:text-[1.8rem]">
-            Illinois <span className="text-(--foreground)">Chat</span>
-          </div>
-        </Link>
+        <NavbarBrandLink />
 
         <div className="flex items-center gap-1 sm:gap-2">
           {navItems.map((item) => {
