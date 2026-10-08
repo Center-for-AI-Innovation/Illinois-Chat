@@ -28,7 +28,7 @@ def is_valid_project_name(project_name: str) -> bool:
 
 
 def get_default_course_admins() -> list:
-    """Parse DEFAULT_COURSE_ADMINS (comma-separated emails) into a deduped list."""
+    """Deprecated parser; project creation no longer uses DEFAULT_COURSE_ADMINS."""
     raw = os.getenv('DEFAULT_COURSE_ADMINS', '')
     admins = []
     for part in raw.split(','):
@@ -43,18 +43,18 @@ class ProjectAlreadyExistsError(Exception):
 
 
 class ProjectService:
-    """
+  """
       This class contains all methods related to project management.
       """
 
-    @inject
-    def __init__(self, sql_db: SQLDatabase, posthog_service: PosthogService, sentry_service: SentryService):
-        self.sqlDb = sql_db
-        self.posthog = posthog_service
-        self.sentry = sentry_service
+  @inject
+  def __init__(self, sql_db: SQLDatabase, posthog_service: PosthogService, sentry_service: SentryService):
+    self.sqlDb = sql_db
+    self.posthog = posthog_service
+    self.sentry = sentry_service
 
-        print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
-        self.redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
+    print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
+    self.redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
 
     def generate_json_schema(self, project_name: str, project_description: str | None) -> None:
         """
@@ -99,7 +99,13 @@ class ProjectService:
             value = {
                 "is_private": is_private,
                 "course_owner": project_owner_email,
-                "course_admins": get_default_course_admins(),
+                # Starts empty. Seeding from DEFAULT_COURSE_ADMINS (or a
+                # hardcoded allowlist) would bake those emails into every new
+                # project's admin list — access that could not then be revoked,
+                # since the array is a stored snapshot. The frontend grants
+                # super admins project access with a live check instead (see
+                # apps/frontend/src/server/authorization.ts).
+                "course_admins": [],
                 "approved_emails_list": None,
                 "example_questions": None,
                 "banner_image_s3": None,

@@ -15,10 +15,13 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 import { initiateSignIn } from '~/utils/authHelpers'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 const ApiPage: NextPage = () => {
   const router = useRouter()
   const auth = useAuth()
+  const { data: isPlatformSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
@@ -33,8 +36,8 @@ const ApiPage: NextPage = () => {
     return typeof raw === 'string'
       ? raw
       : Array.isArray(raw)
-        ? raw[0]
-        : undefined
+      ? raw[0]
+      : undefined
   }
   const courseName = getCurrentPageName() as string
 
@@ -68,7 +71,14 @@ const ApiPage: NextPage = () => {
 
   // Second useEffect to handle permissions and other dependent data
   useEffect(() => {
-    if (auth.isLoading || !auth.isAuthenticated || courseName == null) {
+    if (
+      auth.isLoading ||
+      !auth.isAuthenticated ||
+      courseName == null ||
+      // This branch redirects to /not_authorized, so it must not run before
+      // the super-admin answer arrives.
+      isSuperAdminLoading
+    ) {
       // Do not proceed if we are still loading or if the user data is not loaded yet.
       return
     }
@@ -79,7 +89,11 @@ const ApiPage: NextPage = () => {
           return
         }
 
-        const permission_str = get_user_permission(courseMetadata, auth)
+        const permission_str = get_user_permission(
+          courseMetadata,
+          auth,
+          isPlatformSuperAdmin === true,
+        )
 
         if (permission_str !== 'edit') {
           console.debug(
@@ -94,7 +108,12 @@ const ApiPage: NextPage = () => {
       }
     }
     handlePermissionsAndData()
-  }, [courseMetadata, auth.isAuthenticated])
+  }, [
+    courseMetadata,
+    auth.isAuthenticated,
+    isPlatformSuperAdmin,
+    isSuperAdminLoading,
+  ])
 
   if (isLoading || courseName == null) {
     return <LoadingPlaceholderForAdminPages />

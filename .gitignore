@@ -183,3 +183,6 @@ pip-selfcheck.json
 
 # Node dependencies anywhere in the repo
 node_modules/
+
+# Local start-dev.sh --apps process tracking
+.illinois-chat-dev-apps.pid
