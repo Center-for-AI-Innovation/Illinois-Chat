@@ -37,7 +37,7 @@ describe('ToolsItem', () => {
       value: expect.arrayContaining([
         expect.objectContaining({
           id: 't2',
-          checked: true,
+          enabled: true,
         }),
       ]),
     })
