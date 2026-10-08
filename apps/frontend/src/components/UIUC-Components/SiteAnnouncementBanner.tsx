@@ -15,6 +15,8 @@ const HEIGHT_VARIABLE = '--announcement-banner-height'
 interface SiteAnnouncementBannerProps {
   /** The page's statically generated banner, when it has one (home only). */
   initialBanner?: AnnouncementBannerValue | null
+  /** Epoch ms at which `initialBanner` was read from Redis. */
+  initialBannerReadAt?: number
 }
 
 /**
@@ -25,12 +27,17 @@ interface SiteAnnouncementBannerProps {
  */
 export function SiteAnnouncementBanner({
   initialBanner,
+  initialBannerReadAt,
 }: SiteAnnouncementBannerProps) {
   const router = useRouter()
   const isExempt = BANNER_EXEMPT_PREFIXES.some((prefix) =>
     router.pathname.startsWith(prefix),
   )
-  const { data: banner } = useFetchAnnouncementBanner(initialBanner)
+  const { data: banner } = useFetchAnnouncementBanner({
+    initialBanner,
+    initialBannerReadAt,
+    enabled: !isExempt,
+  })
   const containerRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {

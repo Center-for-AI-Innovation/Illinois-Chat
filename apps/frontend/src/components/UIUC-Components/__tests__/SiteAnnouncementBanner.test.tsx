@@ -5,10 +5,14 @@ import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
 
 const query = vi.hoisted(() => ({
   data: undefined as AnnouncementBanner | null | undefined,
+  options: undefined as { enabled?: boolean } | undefined,
 }))
 
 vi.mock('~/hooks/queries/useFetchAnnouncementBanner', () => ({
-  useFetchAnnouncementBanner: () => ({ data: query.data }),
+  useFetchAnnouncementBanner: (options: { enabled?: boolean }) => {
+    query.options = options
+    return { data: query.data }
+  },
 }))
 
 const ENABLED: AnnouncementBanner = {
@@ -34,6 +38,7 @@ function bannerHeightVariable() {
 
 beforeEach(() => {
   query.data = undefined
+  query.options = undefined
   // Without Illinois Chat config the legacy chain renders the rebrand notice,
   // which makes "did the fallback fire" observable.
   delete process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG
@@ -71,6 +76,18 @@ describe('SiteAnnouncementBanner', () => {
     renderAt('/silent-renew')
 
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
+  })
+
+  it.each(['/admin', '/silent-renew'])('does not poll on %s', (pathname) => {
+    renderAt(pathname)
+
+    expect(query.options?.enabled).toBe(false)
+  })
+
+  it('polls on regular pages', () => {
+    renderAt('/chatbots')
+
+    expect(query.options?.enabled).toBe(true)
   })
 
   it('keeps the legacy fallback on the home page only', () => {

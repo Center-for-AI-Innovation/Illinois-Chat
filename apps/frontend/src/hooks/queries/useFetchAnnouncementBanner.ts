@@ -18,15 +18,24 @@ async function fetchAnnouncementBanner(): Promise<AnnouncementBanner | null> {
  * Polled so an open tab follows admin changes; a failed poll keeps the last
  * good value. Pass the statically generated banner when the page has one so
  * the bar is in the first paint; `undefined` means the page has none and the
- * bar appears once the first fetch lands.
+ * bar appears once the first fetch lands. `initialBannerReadAt` is when that
+ * banner was read, so an ISR page older than `staleTime` refetches on mount.
  */
-export function useFetchAnnouncementBanner(
-  initialBanner?: AnnouncementBanner | null,
-) {
+export function useFetchAnnouncementBanner({
+  initialBanner,
+  initialBannerReadAt,
+  enabled = true,
+}: {
+  initialBanner?: AnnouncementBanner | null
+  initialBannerReadAt?: number
+  enabled?: boolean
+} = {}) {
   return useQuery<AnnouncementBanner | null>({
     queryKey: ANNOUNCEMENT_BANNER_QUERY_KEY,
     queryFn: fetchAnnouncementBanner,
     initialData: initialBanner,
+    initialDataUpdatedAt: initialBannerReadAt,
+    enabled,
     retry: 1,
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,

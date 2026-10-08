@@ -95,6 +95,7 @@ if (typeof window !== 'undefined') {
 /** Set only by pages whose getStaticProps reads the banner (the home page). */
 interface SiteBannerPageProps {
   announcementBanner?: AnnouncementBanner | null
+  announcementBannerReadAt?: number
 }
 
 const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
@@ -163,6 +164,9 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
                 <SiteAnnouncementBanner
                   initialBanner={
                     (pageProps as SiteBannerPageProps).announcementBanner
+                  }
+                  initialBannerReadAt={
+                    (pageProps as SiteBannerPageProps).announcementBannerReadAt
                   }
                 />
                 <Component {...pageProps} />
