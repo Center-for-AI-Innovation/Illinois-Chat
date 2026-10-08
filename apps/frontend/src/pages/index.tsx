@@ -1,5 +1,6 @@
 import { Button, buttonVariants } from '@/components/shadcn/ui/button'
 import { type GetStaticProps, type NextPage } from 'next'
+import { PHASE_PRODUCTION_BUILD } from 'next/constants'
 import Head from 'next/head'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -141,6 +142,8 @@ interface HomeProps {
    * `SiteAnnouncementBanner` so the bar is in the first paint on this page.
    */
   announcementBanner?: AnnouncementBannerValue | null
+  /** Epoch ms of the Redis read, so the client knows how stale it is. */
+  announcementBannerReadAt?: number
 }
 
 const Home: NextPage<HomeProps> = () => {
@@ -775,8 +778,9 @@ const Home: NextPage<HomeProps> = () => {
  *
  * `readAnnouncementBanner()` is deliberately non-throwing: Next also runs this
  * during `next build` inside Docker, where Redis is unreachable. A throw there
- * fails the image build, so an unreachable store has to degrade to the legacy
- * banner and let the first live request fill in the real value.
+ * fails the image build, so at build time an unreachable store degrades to the
+ * legacy banner. At runtime it throws instead, so Next keeps serving the last
+ * good page rather than regenerating one with the wrong banner.
  *
  * `revalidate: 30` bounds how stale a fresh page load can be. `res.revalidate('/')`
  * from the settings PUT only regenerates the replica that served that request;
@@ -785,10 +789,17 @@ const Home: NextPage<HomeProps> = () => {
  */
 export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const read = await readAnnouncementBanner()
+  if (
+    read.state === 'unavailable' &&
+    process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD
+  ) {
+    throw new Error('Redis unavailable; keeping the previous home page')
+  }
 
   return {
     props: {
       announcementBanner: toPublicAnnouncementBanner(read),
+      announcementBannerReadAt: Date.now(),
     },
     revalidate: 30,
   }
