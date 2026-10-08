@@ -101,7 +101,7 @@ const Folder = ({
     <>
       <div className="relative flex items-center">
         {isRenaming ? (
-          <div className="flex w-full items-center gap-3 bg-[#343541]/90 p-3">
+          <div className="flex w-full items-center gap-3 rounded-lg bg-(--background-faded) p-3 text-(--foreground)">
             {isOpen ? (
               <IconCaretDown size={18} aria-hidden="true" />
             ) : (
@@ -109,7 +109,7 @@ const Folder = ({
             )}
             <input
               aria-label="Rename Folder Input"
-              className="mr-12 flex-1 overflow-hidden border-neutral-400 bg-transparent text-left text-[12.5px] leading-3 text-ellipsis text-white focus:border-neutral-100"
+              className="mr-12 flex-1 overflow-hidden border-neutral-400 bg-transparent text-left text-[12.5px] leading-3 text-ellipsis text-(--foreground) focus:border-(--foreground)"
               type="text"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
@@ -168,7 +168,7 @@ const Folder = ({
               <IconCheck
                 size={18}
                 aria-hidden="true"
-                className="text-(--foreground-faded) hover:text-(--dashboard-button-foreground)"
+                className="text-(--foreground) hover:text-(--dashboard-button)"
               />
             </SidebarActionButton>
             <SidebarActionButton
@@ -182,7 +182,7 @@ const Folder = ({
               <IconX
                 size={18}
                 aria-hidden="true"
-                className="text-(--foreground-faded) hover:text-(--dashboard-button-foreground)"
+                className="text-(--foreground) hover:text-(--dashboard-button)"
               />
             </SidebarActionButton>
           </div>

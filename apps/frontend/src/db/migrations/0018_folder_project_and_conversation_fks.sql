@@ -50,8 +50,8 @@ CREATE INDEX IF NOT EXISTS "folders_user_email_project_id_idx"
 -- Backfill from the conversations already inside each folder. A folder can
 -- currently hold conversations from several courses (that is the bug this
 -- migration closes), so pick the course contributing the most conversations and
--- break ties on the oldest conversation. Conversations left behind in another
--- course keep their folder_id and simply stop being listed there.
+-- break ties on the oldest conversation. Conversations from the other courses
+-- are taken out of the folder right after this backfill.
 WITH folder_project AS (
   SELECT DISTINCT ON (c.folder_id)
     c.folder_id,
@@ -72,6 +72,19 @@ SET project_id = fp.project_id
 FROM folder_project fp
 WHERE f.id = fp.folder_id
   AND f.project_id IS NULL;--> statement-breakpoint
+
+-- Conversations left behind in another course would be listed nowhere: the
+-- folder is now scoped to a different project, and the main list only returns
+-- rows with folder_id IS NULL. Take them out of the folder so they reappear in
+-- their own course's list. Folders with no project (legacy empty ones) hold no
+-- conversations, so the IS NULL branch is a safeguard only.
+UPDATE conversations c
+SET folder_id = NULL
+FROM folders f
+WHERE c.folder_id = f.id
+  AND (f.project_id IS NULL
+       OR c.project_name IS DISTINCT FROM
+          (SELECT pr.course_name FROM projects pr WHERE pr.id = f.project_id));--> statement-breakpoint
 
 -- ---------------------------------------------------------------------------
 -- 2. Stop folder deletion from orphaning conversations.

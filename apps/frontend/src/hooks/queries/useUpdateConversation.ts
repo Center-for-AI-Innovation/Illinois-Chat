@@ -72,7 +72,17 @@ export function useUpdateConversation(
         )
       }
 
-      return { previousConversationHistory, previousFolders }
+      // Whether this conversation is, or was, inside a cached folder. Only then
+      // do the folders need a refetch once the save settles.
+      const touchesFolders =
+        !!updatedConversation.folderId ||
+        previousFolders.some(([, folders]) =>
+          folders?.some((f) =>
+            f.conversations?.some((c) => c.id === updatedConversation.id),
+          ),
+        )
+
+      return { previousConversationHistory, previousFolders, touchesFolders }
     },
     onError: (error, _variables, context) => {
       // An error happened!
@@ -97,15 +107,17 @@ export function useUpdateConversation(
       // No need to do anything here because the conversationHistory query will be invalidated
     },
     onSettled: (_data, _error, _variables, context) => {
-      // The mutation is done!
-      // Do something here, like closing a modal
       queryClient.invalidateQueries({
         queryKey: ['conversationHistory', course_name, ''],
       })
 
-      queryClient.invalidateQueries({
-        queryKey: ['folders', course_name],
-      })
+      // Skipped for conversations outside folders so a model reply does not
+      // refetch every folder.
+      if (context?.touchesFolders) {
+        queryClient.invalidateQueries({
+          queryKey: ['folders', course_name],
+        })
+      }
     },
   })
 }
