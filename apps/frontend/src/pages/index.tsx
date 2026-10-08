@@ -151,6 +151,7 @@ interface HomeProps {
   announcementBannerReadAt?: number
   /** Seeds the navbar brand into `_app`'s query cache for the first paint. */
   navbarBranding?: NavbarBranding
+  navbarBrandingReadAt?: number
 }
 
 const Home: NextPage<HomeProps> = () => {
@@ -800,17 +801,25 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
     readNavbarBranding(),
   ])
   if (
-    banner.state === 'unavailable' &&
+    (banner.state === 'unavailable' || branding.state === 'unavailable') &&
     process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD
   ) {
     throw new Error('Redis unavailable; keeping the previous home page')
   }
 
+  const readAt = Date.now()
   return {
     props: {
       announcementBanner: toPublicAnnouncementBanner(banner),
-      announcementBannerReadAt: Date.now(),
-      navbarBranding: toPublicNavbarBranding(branding),
+      announcementBannerReadAt: readAt,
+      // A build without Redis must not bake in the default brand; without
+      // the prop the navbar fetches the real one like every other page.
+      ...(branding.state === 'unavailable'
+        ? {}
+        : {
+            navbarBranding: toPublicNavbarBranding(branding),
+            navbarBrandingReadAt: readAt,
+          }),
     },
     revalidate: 30,
   }

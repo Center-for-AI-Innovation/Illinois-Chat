@@ -101,6 +101,7 @@ interface SiteBannerPageProps {
   announcementBanner?: AnnouncementBanner | null
   announcementBannerReadAt?: number
   navbarBranding?: NavbarBranding
+  navbarBrandingReadAt?: number
 }
 
 const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
@@ -111,10 +112,14 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
   const [queryClient] = useState(() => {
     const client = new QueryClient()
     // Seeded once so a statically generated page paints its navbar brand
-    // without waiting on a fetch; later navigations reuse the cache.
-    const initialBranding = (pageProps as SiteBannerPageProps).navbarBranding
-    if (initialBranding) {
-      client.setQueryData(NAVBAR_BRANDING_QUERY_KEY, initialBranding)
+    // without waiting on a fetch; later navigations reuse the cache. Stamped
+    // with the read time so an old ISR page is refetched, not trusted.
+    const { navbarBranding, navbarBrandingReadAt } =
+      pageProps as SiteBannerPageProps
+    if (navbarBranding) {
+      client.setQueryData(NAVBAR_BRANDING_QUERY_KEY, navbarBranding, {
+        updatedAt: navbarBrandingReadAt ?? 0,
+      })
     }
     return client
   })
