@@ -273,6 +273,21 @@ describe('writePlatformSettings', () => {
     ])
   })
 
+  it('leaves maintenance untouched when saving only the banner', async () => {
+    const { client } = redisReturning()
+    const { writePlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    await writePlatformSettings(
+      { version: '0', announcementBanner: input.announcementBanner },
+      'admin@example.com',
+    )
+    const args = client.eval.mock.calls[0]![1].arguments
+    expect(JSON.parse(args[2]!)).toMatchObject({
+      message: input.announcementBanner.message,
+    })
+    expect(args.slice(3, 6)).toEqual(['', '', ''])
+  })
+
   it('reports a version conflict without reporting a successful save', async () => {
     redisReturning({ eval: vi.fn(async () => 0) })
     const { writePlatformSettings, PlatformSettingsConflictError } =

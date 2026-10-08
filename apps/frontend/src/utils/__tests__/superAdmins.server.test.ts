@@ -159,3 +159,23 @@ describe('readSuperAdminRoster', () => {
     ])
   })
 })
+
+describe('removeSuperAdminGrant', () => {
+  it('protects the last grant only when no env admin remains', async () => {
+    hoisted.removeSuperAdminGrant.mockResolvedValue(true)
+    const empty = await load()
+    await empty.removeSuperAdminGrant('granted@example.com')
+    expect(hoisted.removeSuperAdminGrant).toHaveBeenCalledWith(
+      'granted@example.com',
+      true,
+    )
+
+    hoisted.removeSuperAdminGrant.mockClear()
+    const withEnv = await load('env@example.com')
+    await withEnv.removeSuperAdminGrant('granted@example.com')
+    expect(hoisted.removeSuperAdminGrant).toHaveBeenCalledWith(
+      'granted@example.com',
+      false,
+    )
+  })
+})
