@@ -27,6 +27,8 @@ import { NavbarBrandLink } from './NavbarBrand'
 
 interface NavbarProps {
   isPlain?: boolean
+  /** Lets a sticky sub-bar directly below own the divider instead. */
+  hideBorder?: boolean
 }
 
 interface NavItem {
@@ -37,12 +39,24 @@ interface NavItem {
 }
 
 const navLinkVariants = cva(
-  `flex items-center gap-[0.4rem] rounded-md text-[13px] font-bold whitespace-nowrap text-(--navbar-foreground) no-underline transition-colors hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) data-[active=true]:bg-(--navbar-background) data-[active=true]:text-(--navbar-active) ${montserrat_heading.variable} font-montserratHeading`,
+  `flex items-center gap-2 rounded-md font-bold whitespace-nowrap no-underline transition-colors hover:bg-(--navbar-hover-background) hover:text-(--navbar-hover) data-[active=true]:text-(--navbar-active) ${montserrat_heading.variable} font-montserratHeading`,
   {
     variants: {
       placement: {
-        bar: 'justify-center px-3 py-2.5',
-        menu: 'w-full justify-start px-3 py-3 focus:bg-(--navbar-hover-background) focus:text-(--navbar-hover)',
+        bar: 'justify-center px-4 py-2.5 text-sm text-(--illinois-blue) dark:text-white',
+        menu: 'w-full justify-start px-3 py-3 text-[13px] text-(--navbar-foreground) focus:bg-(--navbar-hover-background) focus:text-(--navbar-hover)',
+      },
+    },
+  },
+)
+
+const navbarVariants = cva(
+  'fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-white/95 backdrop-blur-xs dark:bg-[#13294b]',
+  {
+    variants: {
+      bordered: {
+        true: 'border-b border-border dark:border-[#32517a]',
+        false: '',
       },
     },
   },
@@ -71,7 +85,10 @@ function externalLinkProps(item: NavItem) {
     : undefined
 }
 
-export default function Navbar({ isPlain = false }: NavbarProps) {
+export default function Navbar({
+  isPlain = false,
+  hideBorder = false,
+}: NavbarProps) {
   const router = useRouter()
   const auth = useAuth()
   const posthog = usePostHog()
@@ -95,15 +112,15 @@ export default function Navbar({ isPlain = false }: NavbarProps) {
   const activePath = router.asPath?.split('?')[0]
 
   return (
-    <div className="fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-(--navbar-background)">
-      <header className="flex h-20 w-full items-center gap-2 border-b border-(--navbar-border) bg-(--navbar-background) px-4 sm:px-6">
+    <div className={navbarVariants({ bordered: !hideBorder })}>
+      <header className="mx-auto flex h-(--navbar-height) w-full max-w-[1680px] items-center gap-2 px-4 sm:px-8 lg:gap-4">
         <NavbarBrandLink />
 
         <div className="flex-1" />
 
         {!isPlain && (
           <nav aria-label="Main navigation" className="hidden lg:block">
-            <ul className="m-0 flex list-none items-center gap-1 p-0">
+            <ul className="m-0 flex list-none items-center gap-2 p-0">
               {navItems.map((item) => (
                 <li key={item.href}>
                   <Link
@@ -123,9 +140,9 @@ export default function Navbar({ isPlain = false }: NavbarProps) {
 
         <div className="flex shrink-0 items-center gap-2">
           {auth.isLoading ? (
-            <Skeleton className="size-[34px] rounded-full" aria-hidden="true" />
+            <Skeleton className="size-8 rounded-full" aria-hidden="true" />
           ) : (
-            <AuthMenu />
+            <AuthMenu size={32} />
           )}
 
           {!isPlain && (

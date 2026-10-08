@@ -104,7 +104,7 @@ export default function AdminPage() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-h-screen bg-white pt-20 dark:bg-[#081735] [&_[role=switch]:not([data-disabled])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer"
+        className="min-h-screen bg-white pt-(--navbar-height) dark:bg-[#081735] [&_[role=switch]:not([data-disabled])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer"
       >
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {isAuthPending ? (
@@ -148,7 +148,7 @@ export default function AdminPage() {
 
               {/* Sticky so the tab bar stays reachable while scrolling a long
                   connections table. */}
-              <div className="sticky top-[calc(5rem+var(--announcement-banner-height))] z-20 -mx-4 mb-6 border-b border-[#e5e7eb] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#32517a] dark:bg-[#081735]/95">
+              <div className="sticky top-[calc(var(--navbar-height)+var(--announcement-banner-height))] z-20 -mx-4 mb-6 border-b border-[#e5e7eb] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#32517a] dark:bg-[#081735]/95">
                 <TabsList
                   className={`h-10! w-full sm:w-fit ${adminTabsListClass}`}
                 >

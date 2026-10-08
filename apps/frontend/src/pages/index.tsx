@@ -195,7 +195,7 @@ const Home: NextPage<HomeProps> = () => {
       <main
         id="main-content"
         tabIndex={-1}
-        className={`illinois-blue-gradient-bg flex min-h-screen flex-col items-center justify-center overflow-hidden pt-20 ${montserrat_paragraph.variable} font-montserratParagraph`}
+        className={`illinois-blue-gradient-bg flex min-h-screen flex-col items-center justify-center overflow-hidden pt-(--navbar-height) ${montserrat_paragraph.variable} font-montserratParagraph`}
       >
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 px-4 py-8 sm:px-8 sm:py-20">
           <div className="flex w-full max-w-3xl flex-col items-start justify-center gap-8 sm:flex-row">

@@ -15,7 +15,7 @@ import {
 import { showToast } from '~/utils/toastUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type ChatbotProjectType, type ChatbotTag } from '~/types/chatbotTags'
-import { ChatbotsGlobalNav } from './chatbots-hub/ChatbotsGlobalNav'
+import Navbar from './navbars/Navbar'
 import UploadNotification, { type FileUpload } from './UploadNotification'
 
 import StepCreate from './MakeNewCoursePageSteps/StepCreate'
@@ -367,7 +367,7 @@ const MakeNewCoursePage = ({
 
   return (
     <>
-      <ChatbotsGlobalNav />
+      <Navbar />
       <Head>
         <title>{project_name || 'New Project'} — Illinois Chat</title>
         <meta name="description" content="Create a new project on UIUC.chat." />
@@ -376,7 +376,7 @@ const MakeNewCoursePage = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main flex min-h-screen w-full flex-col items-center px-4 pt-20 pb-28 sm:px-6"
+        className="course-page-main flex min-h-screen w-full flex-col items-center px-4 pt-(--navbar-height) pb-28 sm:px-6"
       >
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">

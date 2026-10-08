@@ -75,7 +75,7 @@ export default function SettingsLayout({
   }
 
   return (
-    <div className="min-h-screen bg-(--background) pt-20">
+    <div className="min-h-screen bg-(--background) pt-(--navbar-height)">
       {/* Main Navbar */}
       <Navbar isPlain={false} />
 
