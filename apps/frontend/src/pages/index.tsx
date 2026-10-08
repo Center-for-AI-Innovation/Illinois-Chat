@@ -9,14 +9,19 @@ import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
-import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
+import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import router from 'next/router'
-import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
+import type {
+  AnnouncementBanner as AnnouncementBannerValue,
+  NavbarBranding,
+} from '~/utils/platformSettings.schema'
 // Server-only (imports `redis`). Referenced solely from getStaticProps below,
 // so Next's SSG transform drops it from the client bundle.
 import {
   readAnnouncementBanner,
+  readNavbarBranding,
   toPublicAnnouncementBanner,
+  toPublicNavbarBranding,
 } from '~/utils/platformSettings.server'
 
 // Typing animation component
@@ -144,6 +149,9 @@ interface HomeProps {
   announcementBanner?: AnnouncementBannerValue | null
   /** Epoch ms of the Redis read, so the client knows how stale it is. */
   announcementBannerReadAt?: number
+  /** Seeds the navbar brand into `_app`'s query cache for the first paint. */
+  navbarBranding?: NavbarBranding
+  navbarBrandingReadAt?: number
 }
 
 const Home: NextPage<HomeProps> = () => {
@@ -173,7 +181,7 @@ const Home: NextPage<HomeProps> = () => {
               max-width: 100vw;
             }
             body, html {
-              overflow-x: hidden;
+              overflow-x: clip;
               width: 100%;
               margin: 0;
               padding: 0;
@@ -182,12 +190,12 @@ const Home: NextPage<HomeProps> = () => {
         </style>
       </Head>
 
-      <LandingPageHeader />
+      <Navbar />
 
       <main
         id="main-content"
         tabIndex={-1}
-        className={`illinois-blue-gradient-bg flex min-h-screen flex-col items-center justify-center overflow-hidden ${montserrat_paragraph.variable} font-montserratParagraph`}
+        className={`illinois-blue-gradient-bg flex min-h-(--viewport-height) flex-col items-center justify-center overflow-hidden pt-(--navbar-height) ${montserrat_paragraph.variable} font-montserratParagraph`}
       >
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 px-4 py-8 sm:px-8 sm:py-20">
           <div className="flex w-full max-w-3xl flex-col items-start justify-center gap-8 sm:flex-row">
@@ -788,18 +796,30 @@ const Home: NextPage<HomeProps> = () => {
  * changes through `SiteAnnouncementBanner`, which polls.
  */
 export const getStaticProps: GetStaticProps<HomeProps> = async () => {
-  const read = await readAnnouncementBanner()
+  const [banner, branding] = await Promise.all([
+    readAnnouncementBanner(),
+    readNavbarBranding(),
+  ])
   if (
-    read.state === 'unavailable' &&
+    (banner.state === 'unavailable' || branding.state === 'unavailable') &&
     process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD
   ) {
     throw new Error('Redis unavailable; keeping the previous home page')
   }
 
+  const readAt = Date.now()
   return {
     props: {
-      announcementBanner: toPublicAnnouncementBanner(read),
-      announcementBannerReadAt: Date.now(),
+      announcementBanner: toPublicAnnouncementBanner(banner),
+      announcementBannerReadAt: readAt,
+      // A build without Redis must not bake in the default brand; without
+      // the prop the navbar fetches the real one like every other page.
+      ...(branding.state === 'unavailable'
+        ? {}
+        : {
+            navbarBranding: toPublicNavbarBranding(branding),
+            navbarBrandingReadAt: readAt,
+          }),
     },
     revalidate: 30,
   }

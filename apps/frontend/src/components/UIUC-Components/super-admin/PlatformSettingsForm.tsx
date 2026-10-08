@@ -1,5 +1,5 @@
-// One form for banner and maintenance settings. Saves include only edited
-// sections and the version of the snapshot loaded into the form.
+// One form over the banner, maintenance, and navbar cards. Saves include only
+// edited sections and the version of the snapshot loaded into the form.
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { cva } from 'class-variance-authority'
@@ -13,6 +13,7 @@ import {
   useUpdatePlatformSettings,
 } from '~/hooks/queries/useUpdatePlatformSettings'
 import {
+  DEFAULT_NAVBAR_BRANDING_SETTINGS,
   platformSettingsSchema,
   type PlatformSettings,
   type PlatformSettingsUpdate,
@@ -26,6 +27,7 @@ import {
 } from './AdminCard'
 import { AnnouncementBannerCard } from './AnnouncementBannerCard'
 import { MaintenanceModeCard } from './MaintenanceModeCard'
+import { NavbarBrandingCard } from './NavbarBrandingCard'
 
 // Floats only while there is something to save, so on small screens it does
 // not permanently cover a slice of the form.
@@ -70,6 +72,7 @@ export function PlatformSettingsForm({
         linkUrl: '',
       },
       maintenance: { enabled: false, titleText: '', bodyText: '' },
+      navbarBranding: DEFAULT_NAVBAR_BRANDING_SETTINGS,
     },
   })
 
@@ -101,6 +104,13 @@ export function PlatformSettingsForm({
       changes.announcementBanner = values.announcementBanner
     if (form.formState.dirtyFields.maintenance)
       changes.maintenance = values.maintenance
+    const brandingDirty = form.formState.dirtyFields.navbarBranding
+    if (brandingDirty) {
+      const { logoDataUrl, ...words } = values.navbarBranding
+      changes.navbarBranding = brandingDirty.logoDataUrl
+        ? { ...words, logoDataUrl }
+        : words
+    }
     try {
       const result = await updateSettings.mutateAsync(changes)
       setLoadedVersion(result.version)
@@ -206,6 +216,9 @@ export function PlatformSettingsForm({
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <AnnouncementBannerCard />
           <MaintenanceModeCard />
+          <div className="lg:col-span-2">
+            <NavbarBrandingCard />
+          </div>
         </div>
 
         <div

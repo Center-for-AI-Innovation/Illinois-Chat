@@ -232,7 +232,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="course-page-main flex min-h-screen w-full flex-col items-center">
+      <main className="course-page-main flex min-h-(--viewport-height) w-full flex-col items-center">
         <div className="items-left flex w-full flex-col justify-center py-0">
           <div className="flex w-full flex-col items-center">
             {/* Config card */}
