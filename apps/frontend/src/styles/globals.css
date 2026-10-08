@@ -156,6 +156,10 @@
      layouts subtract it; 0px whenever no bar is showing. */
   --announcement-banner-height: 0px;
 
+  /* The viewport below the announcement bar. Full-height layouts use this
+     instead of 100vh so the bar doesn't make them scroll. */
+  --viewport-height: calc(100vh - var(--announcement-banner-height));
+
   /* Height of the fixed site navbar. Pages pad and sticky chrome offsets by it. */
   --navbar-height: 80px;
 
@@ -652,6 +656,15 @@ html {
   background: var(--illinois-white);
   /* Replaces DaisyUI's global mobile tap-highlight suppression. */
   -webkit-tap-highlight-color: transparent;
+}
+
+/* The banner is sticky and the navbar is fixed, so trackpad rubber-banding
+   moves them apart and opens a gap between them. Touch devices keep their
+   bounce and pull-to-refresh. */
+@media (hover: hover) and (pointer: fine) {
+  html {
+    overscroll-behavior-y: none;
+  }
 }
 
 html.dark {

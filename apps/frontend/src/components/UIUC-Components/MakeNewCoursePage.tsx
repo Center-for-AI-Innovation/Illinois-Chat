@@ -376,7 +376,7 @@ const MakeNewCoursePage = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main flex min-h-screen w-full flex-col items-center px-4 pt-(--navbar-height) pb-28 sm:px-6"
+        className="course-page-main flex min-h-(--viewport-height) w-full flex-col items-center px-4 pt-(--navbar-height) pb-28 sm:px-6"
       >
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">

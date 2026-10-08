@@ -18,7 +18,7 @@ export const MainPageBackground: React.FC<MainPageBackgroundProps> = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="items-left justify-left course-page-main flex min-h-screen flex-col"
+        className="items-left justify-left course-page-main flex min-h-(--viewport-height) flex-col"
       >
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-5 pt-20">
           <Link href="/">
@@ -67,7 +67,7 @@ export const LoadingPlaceholderForAdminPages = ({}) => {
       <main
         id="main-content"
         tabIndex={-1}
-        className="items-left justify-left course-page-main flex min-h-screen flex-col"
+        className="items-left justify-left course-page-main flex min-h-(--viewport-height) flex-col"
       >
         <h1 className="sr-only">
           {courseName ? `Loading ${courseName}` : 'Loading'}

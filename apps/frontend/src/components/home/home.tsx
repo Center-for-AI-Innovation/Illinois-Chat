@@ -586,7 +586,7 @@ const Home = ({
         </Head>
         {selectedConversation && (
           <div
-            className={`flex h-[calc(100vh-var(--announcement-banner-height))] w-screen flex-col pt-(--navbar-height) text-sm text-white dark:text-white`}
+            className={`flex h-(--viewport-height) w-screen flex-col pt-(--navbar-height) text-sm text-white dark:text-white`}
           >
             <Navbar isPlain={false} />
 

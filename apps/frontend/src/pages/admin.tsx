@@ -104,7 +104,7 @@ export default function AdminPage() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-h-screen bg-white pt-(--navbar-height) dark:bg-[#081735] [&_[role=switch]:not([data-disabled])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer"
+        className="min-h-(--viewport-height) bg-white pt-(--navbar-height) dark:bg-[#081735] [&_[role=switch]:not([data-disabled])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer"
       >
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {isAuthPending ? (

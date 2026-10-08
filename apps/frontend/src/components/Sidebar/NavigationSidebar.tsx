@@ -245,7 +245,7 @@ export default function NavigationSidebar({
       {/* Sidebar */}
       <aside
         aria-label="Settings navigation"
-        className={`fixed top-[calc(var(--navbar-height)+var(--announcement-banner-height))] bottom-0 left-0 z-30 h-auto min-h-[calc(100vh-var(--navbar-height)-var(--announcement-banner-height))] w-[280px] border-r border-(--dashboard-border) bg-(--sidebar-background) transition-all duration-300 ease-in-out md:bottom-auto md:h-[calc(100vh-var(--navbar-height)-var(--announcement-banner-height))] md:translate-x-0 ${
+        className={`fixed top-[calc(var(--navbar-height)+var(--announcement-banner-height))] bottom-0 left-0 z-30 h-auto min-h-[calc(var(--viewport-height)-var(--navbar-height))] w-[280px] border-r border-(--dashboard-border) bg-(--sidebar-background) transition-all duration-300 ease-in-out md:bottom-auto md:h-[calc(var(--viewport-height)-var(--navbar-height))] md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isCollapsed ? 'md:w-[80px]' : ''}`}
       >

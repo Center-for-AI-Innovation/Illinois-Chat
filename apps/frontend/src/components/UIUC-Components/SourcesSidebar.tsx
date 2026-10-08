@@ -278,7 +278,7 @@ const SourcesSidebar = ({
         aria-label="Sources sidebar"
         className="fixed top-[calc(var(--navbar-height)+var(--announcement-banner-height))] right-0 bottom-0 z-1000 flex w-[260px] flex-col bg-(--sources-background) text-(--sources-foreground) shadow-lg"
         style={{
-          height: 'calc(100vh - var(--navbar-height) - var(--announcement-banner-height))',
+          height: 'calc(var(--viewport-height) - var(--navbar-height))',
         }}
       >
         <div className="flex-1 overflow-y-auto">{renderContent()}</div>

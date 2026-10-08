@@ -285,7 +285,7 @@ const ChatbotsHubPage = () => {
     !isSearchActive && (isCoursesLoading || isFeaturedLoading)
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#081735]">
+    <main className="min-h-(--viewport-height) bg-white dark:bg-[#081735]">
       <Navbar hideBorder />
       <div className="mx-auto w-full pt-(--navbar-height)">
         {/* Search & Filter Bar — sticky just below the global nav */}
