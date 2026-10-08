@@ -14,6 +14,7 @@ import {
   navbarBrandingSchema,
   parseLogoDataUrl,
   platformSettingsSchema,
+  platformSettingsUpdateSchema,
   storedAnnouncementBannerSchema,
   superAdminEmailSchema,
 } from '~/utils/platformSettings.schema'
@@ -202,6 +203,16 @@ describe('platformSettingsSchema', () => {
       navbarBranding: VALID_BRANDING,
     })
     expect(issuePaths(result)).toContain('announcementBanner.linkUrl')
+  })
+})
+
+describe('platformSettingsUpdateSchema', () => {
+  it('accepts a navbar-only update', () => {
+    const result = platformSettingsUpdateSchema.safeParse({
+      version: '0',
+      navbarBranding: VALID_BRANDING,
+    })
+    expect(result.success).toBe(true)
   })
 })
 

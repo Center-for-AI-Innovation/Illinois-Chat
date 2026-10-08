@@ -270,7 +270,26 @@ describe('readPlatformSettings', () => {
     })
   })
 
-  it('keeps the words but drops the logo when the logo cannot be read', async () => {
+  it('keeps the words and drops the logo when no logo version is stored', async () => {
+    redisReturning({
+      hGet: hGetByField({
+        navbar_branding: JSON.stringify({ ...VALID_BRANDING, logoVersion: '' }),
+        navbar_logo: LOGO_DATA_URL,
+      }),
+    })
+
+    const { readPlatformSettings } =
+      await import('~/utils/platformSettings.server')
+    const snapshot = await readPlatformSettings()
+
+    expect(snapshot.settings.navbarBranding).toEqual({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoDataUrl: '',
+    })
+  })
+
+  it('does not keep partial branding when the snapshot read fails', async () => {
     redisReturning({
       hGet: vi.fn(async (_key: string, field: string) => {
         if (field === 'navbar_logo') throw new Error('ECONNRESET')
@@ -284,11 +303,14 @@ describe('readPlatformSettings', () => {
       await import('~/utils/platformSettings.server')
     const snapshot = await readPlatformSettings()
 
+    // Banner, branding, logo, and version are one transaction. A failure
+    // cannot return the words as if that read had succeeded.
     expect(snapshot.settings.navbarBranding).toEqual({
-      primaryWord: 'OSC',
+      primaryWord: 'Illinois',
       secondaryWord: 'Chat',
       logoDataUrl: '',
     })
+    expect(snapshot.warning).toContain('Navbar branding could not be read')
     expect(snapshot.warning).toContain('Navbar logo could not be read')
   })
 
