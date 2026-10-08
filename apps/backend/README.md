@@ -8,7 +8,6 @@ A Flask application hosting endpoints for UIUC.chat.
 
 ### 🛠️ Technical Architecture
 
-Hosted (mostly for free) on [Railway](https://railway.app/).
 Architecture diagram of Flask + Next.js & React hosted on Vercel.
 ![Architecture diagram](https://github.com/UIUC-Chatbot/ai-ta-backend/assets/13607221/bda7b4d6-79ce-4d12-bf8f-cff9207c37af)
 
@@ -19,8 +18,9 @@ Architecture diagram of Flask + Next.js & React hosted on Vercel.
 ## 🏎️ Quickstart 
 
 1. Rename `.env.template` to `.env` and fill in the required variables
-2. Install Python requirements `pip install -r requirements.txt`
-3. Start the server for development (with live reloads) `cd ai_ta_backend` then `flask --app ai_ta_backend.main:app --debug run --port 8000`
+2. Install the environment with [uv](https://docs.astral.sh/uv/): `uv sync --all-extras` (from this directory)
+3. Start the server for development (with live reloads): `uv run flask --app ai_ta_backend.main:app --debug run --port 8000` (from this directory)
+4. Start the ingest worker in another terminal: `uv run python ai_ta_backend/rabbitmq/worker.py`
 
 ## 📣 Development
 Install the Trunk "superlinter" so your commits are formatted. Just one step:

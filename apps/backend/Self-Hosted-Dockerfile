@@ -1,38 +1,23 @@
-# Use an official Python runtime as a parent image
-FROM --platform=linux/amd64 python:3.10-slim as build
+FROM python:3.12-slim-bookworm
+COPY --from=ghcr.io/astral-sh/uv:0.12.8 /uv /uvx /bin/
 
-# Set the working directory in the container
 WORKDIR /usr/src/app
 
-# Install ffmpeg, git, and curl
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    git \
-    curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# ffmpeg: yt_dlp remux in ingest_canvas (run in-process by main.py). curl: ECS task-definition health check.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# Fail loudly if the base image's interpreter does not satisfy .python-version instead of downloading one.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 
-RUN pip install uv
+# Dependency layer: only invalidated when the manifest or lock changes.
+COPY pyproject.toml uv.lock .python-version ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --extra api
 
-# Copy the requirements file first to leverage Docker cache
-COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
-RUN uv pip install -r requirements.txt --system
-
-# Mkdir for sqlite db
-RUN mkdir -p /usr/src/app/db
-
-# Copy the rest of the local directory contents into the container
 COPY . .
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
 
-# Set the Python path to include the ai_ta_backend directory
-ENV PYTHONPATH="${PYTHONPATH}:/usr/src/app/ai_ta_backend"
-
-# Make port 8001 available to the world outside this container
 EXPOSE 8001
 
-# Run the application using Gunicorn with specified configuration
 CMD ["gunicorn", "--workers=2", "--threads=3", "--worker-class=gthread", "ai_ta_backend.main:app", "--timeout=1800", "--bind=0.0.0.0:8001"]

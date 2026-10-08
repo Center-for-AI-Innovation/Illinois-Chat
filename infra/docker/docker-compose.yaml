@@ -285,7 +285,6 @@ services:
         condition: service_completed_successfully
 
   backend:
-    platform: linux/arm64/v8
     build:
       context: ./apps/backend
       dockerfile: Self-Hosted-Dockerfile
@@ -336,8 +335,8 @@ services:
 
   worker:
     build:
-      context: ./apps/backend/ai_ta_backend/rabbitmq
-      dockerfile: Dockerfile
+      context: ./apps/backend
+      dockerfile: ai_ta_backend/rabbitmq/Dockerfile
     restart: unless-stopped
     #    ports:
     #      - "8001:8001"

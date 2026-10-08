@@ -194,26 +194,24 @@ Finally, attempt cloning the repo again.
 
 ### (1/2) Install dev dependencies
 
-Use a python virtual environment, here I'll use `conda`.
+Dependencies are managed with [uv](https://docs.astral.sh/uv/), which also installs the Python version pinned in `apps/backend/.python-version`.
 
-* [Fast and easy conda install](https://www.anaconda.com/docs/getting-started/anaconda/install#macos-linux-installation) (via CLI is easiest), if you don't have it yet.
+* Install uv if you don't have it yet: `brew install uv` on macOS, or `curl -LsSf https://astral.sh/uv/install.sh | sh`.
 
-Use <mark style="color:yellow;">python 3.10</mark>.
-
-1. Create and activate Conda env
+1. Install the environment
 
 ```bash
-conda create --name ai-ta-backend python=3.10 -y && conda activate ai-ta-backend
+# navigate to the backend
+cd apps/backend
+
+# install the pinned Python and every dependency into .venv
+uv sync --all-extras
 ```
 
-2. Install dependencies
+2. Run commands through `uv run` (nothing to activate):
 
 ```bash
-# navigate to the root of the github
-cd ai-ta-backend
-
-# install dependencies
-pip install -r requirements.txt
+uv run flask --app ai_ta_backend.main:app --debug run --port 8000
 ```
 
 ### (2/2) Set up secrets
