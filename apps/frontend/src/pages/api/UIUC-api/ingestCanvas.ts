@@ -2,6 +2,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { NOTIFICATIONS_SENDER } from '~/utils/app/const'
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   try {
@@ -26,7 +27,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 
     console.log('About to send transactional email')
 
-    // Send email to kastan alerting that he needs to approve a canvas course
+    // Alert the maintainers that a canvas course needs approval
     const sendEmailResponse = await fetch(
       `${getBackendUrl()}/send-transactional-email`,
       {
@@ -37,7 +38,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
         body: JSON.stringify({
           to_recipients_list: ['rohan13@illinois.edu'],
           bcc_recipients_list: [],
-          sender: 'rohan13@illinois.edu',
+          sender: NOTIFICATIONS_SENDER,
           subject: 'New Canvas Course Ingestion Request',
           body_text: `New Canvas course ingestion request received:
 Course Name: ${courseName}
