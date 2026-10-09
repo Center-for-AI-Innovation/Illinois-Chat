@@ -15,7 +15,7 @@
  * `course_metadatas` stay in sync.
  *
  * Usage:
- *   pnpm tsx scripts/seedChatbots.ts                     # owner=alpacaking77@gmail.com (default)
+ *   pnpm tsx scripts/seedChatbots.ts                     # owner=genaisupport@mx.uillinois.edu (default)
  *   pnpm tsx scripts/seedChatbots.ts --email you@x.com   # custom owner email
  *   pnpm tsx scripts/seedChatbots.ts --dry-run           # print plan, no writes
  */
@@ -24,7 +24,7 @@ import { writeCourseMetadata } from '../src/utils/courseMetadataStore'
 import type { CourseMetadata } from '../src/types/courseMetadata'
 import type { ChatbotTag } from '../src/types/chatbotTags'
 
-const DEFAULT_EMAIL = 'bingjiguo@icloud.com'
+const DEFAULT_EMAIL = 'genaisupport@mx.uillinois.edu'
 const OTHER_OWNER = 'someone-else@example.com'
 const OTHER_ADMIN = 'colleague@example.com'
 // Distinct third-party owners used for the "discovery" bots — the current

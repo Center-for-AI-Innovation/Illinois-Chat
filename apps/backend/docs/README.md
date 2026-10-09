@@ -49,7 +49,7 @@ Short and sweet introduction to UIUC.chat
 Connect canvas on the materials page&#x20;
 
 {% hint style="warning" %}
-You must invite our bot for your course as a TA. The email address is `uiuc.chat@ad.illinois.edu`
+You must invite our bot for your course as a TA. The email address is `uiuc.chat@ad.uillinois.edu`
 {% endhint %}
 
 {% embed url="https://youtu.be/OOy0JD0Gf9g" %}

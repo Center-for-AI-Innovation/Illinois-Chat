@@ -64,6 +64,7 @@ import { DocGroupMultiSelect } from './DocGroupMultiSelect'
 import { LoadingSpinner } from './LoadingSpinner'
 import { showToastOnUpdate } from './MakeQueryAnalysisPage'
 import { TablePaginationFooter } from './TablePaginationFooter'
+import { SUPPORT_EMAIL } from '~/utils/app/const'
 
 const PAGE_SIZE = 100
 
@@ -550,7 +551,7 @@ export function ProjectFilesTable({
       autoClose: 5000,
       title: was_error ? 'Error deleting file' : 'Deleting file...',
       message: was_error
-        ? "An error occurred while deleting the file. Please try again and I'd be so grateful if you email rohan13@illinois.edu to report this bug."
+        ? `An error occurred while deleting the file. Please try again and we'd be so grateful if you email ${SUPPORT_EMAIL} to report this bug.`
         : 'The file is being deleted in the background.',
       type: was_error ? 'error' : 'success',
     })

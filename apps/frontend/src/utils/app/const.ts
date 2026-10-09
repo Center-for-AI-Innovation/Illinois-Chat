@@ -60,3 +60,7 @@ export const OPENAI_API_VERSION =
 export const OPENAI_ORGANIZATION = process.env.OPENAI_ORGANIZATION || ''
 
 export const AZURE_DEPLOYMENT_ID = process.env.AZURE_DEPLOYMENT_ID || ''
+
+export const SUPPORT_EMAIL = 'genaisupport@mx.uillinois.edu'
+export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`
+export const NOTIFICATIONS_SENDER = 'illinoischat@lists.illinois.edu'

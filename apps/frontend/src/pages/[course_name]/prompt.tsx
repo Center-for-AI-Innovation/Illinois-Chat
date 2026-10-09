@@ -24,6 +24,7 @@ import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
 import GlobalFooter from '../../components/UIUC-Components/GlobalFooter'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
 
 const montserrat = Montserrat({
   weight: '700',
@@ -106,9 +107,9 @@ const CourseMain: NextPage = () => {
           className={`heading-h3 mt-16 bg-[linear-gradient(50deg,gold,white)] bg-clip-text p-8 text-transparent ${montserrat.className}`}
         >
           You&apos;ve encountered a software bug!<br></br>Your account has no
-          email address. Please shoot me an email so I can fix it for you:{' '}
-          <a className="goldUnderline" href="mailto:rohan13@illinois.edu">
-            rohan13@illinois.edu
+          email address. Please send us an email so we can fix it for you:{' '}
+          <a className="goldUnderline" href={SUPPORT_MAILTO}>
+            {SUPPORT_EMAIL}
           </a>
         </h3>
       </MainPageBackground>

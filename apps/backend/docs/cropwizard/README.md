@@ -18,7 +18,7 @@ Alternatively, you can upload one or more images and type in a question about th
 
 You can also get answers to questions that require predefined computational tools. These tools have been registered with CropWizard and are invoked automatically when relevant. See "_Tool Questions_" below for more information about tools.
 
-The tools functionality can be used to analyze your data, including spreadsheets (CSV) and databases (SQL). This functionality is preliminary — contact us if you are interested in that.
+The tools functionality can be used to analyze your data, including spreadsheets (CSV) and databases (SQL). This functionality is preliminary — [contact us](mailto:genaisupport@mx.uillinois.edu) if you are interested in that.
 
 ### **Customizing User Settings**
 
