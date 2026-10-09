@@ -1,7 +1,7 @@
-# Sim AI developer guide
+# Sim AI operator guide
 
-How the Sim AI deployment is put together, how Illinois Chat talks to it, and what to know
-before changing or upgrading it.
+How the Sim AI deployment is put together, how Illinois Chat talks to it, how users get
+in, and what to know before changing or upgrading it.
 
 If you build tools in Sim rather than maintain the deployment, read the
 [Sim user guide](sim-user-guide.md) instead.
@@ -65,7 +65,8 @@ them invalidates sessions and makes previously encrypted data undecryptable.
 
 `SIM_SSO_DOMAIN` takes **a single registrable domain**, not a list. A comma-separated value
 normalises to nothing and denies every sign-in, and `start-dev.sh` refuses to start on one.
-Set it to `illinois.edu` and nothing else.
+Set it to the one domain your users sign in with (the hosted site uses `illinois.edu`) and
+nothing else.
 
 ## 3. How Illinois Chat talks to Sim
 
@@ -107,7 +108,29 @@ Two independent gates:
    revokes live sessions immediately.
 
 The gate lives in the database precisely so we can keep using upstream images unmodified.
-The user guide covers the admin workflow.
+
+### Approving users
+
+A `sim_user_approval` table stores one decision per email (`pending`, `approved`, or
+`blocked`), and database triggers enforce it on Sim's user and session tables. The
+bootstrap platform admin is the address in `SIM_APPROVAL_ADMIN_EMAIL` (required in
+`.env`; the Sim stack refuses to start without it).
+
+Admins have two equivalent ways to act on a request:
+
+- **In Sim's UI**: sign in as a platform admin and open **Settings → Admin**. Pending
+  users appear as banned; use **Unban** to approve them. Banning a user blocks them
+  again. Actions taken here are mirrored into the approval table automatically.
+- **In the database**: update the row directly, e.g.
+  `UPDATE sim_user_approval SET status = 'approved' WHERE email = 'someone@example.edu';`
+  Valid statuses are `approved`, `pending`, and `blocked`.
+
+Decisions take effect immediately: approving unlocks the account on the next sign-in,
+and blocking revokes the user's live Sim sessions on the spot. Setting `is_admin = true`
+on a row promotes that user to Sim platform admin.
+
+What users see while they wait, and how they connect a workspace once approved, is in the
+[user guide](sim-user-guide.md#waiting-for-approval).
 
 ## 5. The block whitelist
 
@@ -115,8 +138,8 @@ The user guide covers the admin workflow.
 comes from `ALLOWED_INTEGRATIONS` in `.env`, which is where the list lives and the only
 place it lives; `.env.template` ships the full 67 ids. `infra/docker/docker-compose.sim.yaml`
 passes it through with `:?` and no default, so a missing or blank value stops the Sim stack
-instead of silently unrestricting it. The allowed set is documented for builders in section 5
-of the user guide.
+instead of silently unrestricting it. The allowed set is documented for builders in the
+user guide under [Which Sim blocks you can use](sim-user-guide.md#which-sim-blocks-you-can-use).
 
 **Six properties, all verified against the source at our pinned commit.** Do not assume the
 public documentation applies — it describes a newer release that behaves differently:
@@ -163,7 +186,7 @@ variable. To genuinely lift the restriction you must set it to every id you want
 
 Two things this variable **cannot** do: disable MCP tools or custom tools. Those are
 permission-group settings with no environment equivalent. `ALLOWED_MCP_DOMAINS` restricts
-which hosts an MCP server may point at, and we currently set none.
+which hosts an MCP server may point at; the repository ships with none set.
 
 ## 6. Upgrading Sim
 
@@ -189,7 +212,12 @@ entirely.
 **Every SSO sign-in is refused.** Check `SIM_SSO_DOMAIN` is one domain, not a list.
 
 **The Tools page says a stored key "could not be read".** `ENCRYPTION_MASTER_KEY` changed
-since the key was saved, or a migration is missing. Paste the key again.
+since the key was saved, or a migration is missing. Paste the key again. Project admins
+are told to report this to you if it recurs, so check which of the two happened.
+
+**Saving a Base URL on the Tools page is rejected.** The URL is not sim.ai, a local host,
+the origin of `SIM_API_BASE_URL`, or listed in `SIM_ALLOWED_SIM_ORIGINS` (section 3).
+Project admins cannot extend that set; add the origin to `SIM_ALLOWED_SIM_ORIGINS`.
 
 **A Connect button opens and closes immediately.** That integration needs a deployment-wide
 OAuth client we have not registered. This is expected; see the user guide.
@@ -200,29 +228,33 @@ Check the container log for `Integration blocked by env allowlist` alongside
 
 ## 8. Sim's own documentation, and how far to trust it
 
-Start here for anything not covered above:
+Start here for anything not covered above. Sim's published docs track their **latest**
+release; this deployment runs the pinned **v0.8.4** (commit `e741923f`). Each row links
+the page as it was for our version (the documentation source at that commit, viewed on
+GitHub) and the current page.
 
-- [Self-hosting overview](https://docs.sim.ai/platform/self-hosting/environment-variables) —
-  the full environment variable reference.
-- [Integrations and OAuth](https://docs.sim.ai/platform/self-hosting/integrations-oauth) —
-  which providers need which `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, and the callback URL
-  shape. Read this before registering any vendor application.
-- [Security and hardening](https://docs.sim.ai/platform/self-hosting/security) — the SSRF
-  boundary, egress allowlists, and where user code runs.
-- [Sandboxes](https://docs.sim.ai/platform/self-hosting/sandboxes) — relevant because we run
-  the **default in-process sandbox**: Function block code executes inside the app container
-  with no network or filesystem separation. Anyone who can author a workflow runs code in
-  that container's security context. Accepted for now given the approval gate.
-- [Authentication](https://docs.sim.ai/platform/self-hosting/authentication) — signup
-  restrictions and SSO options.
-- [Access control](https://docs.sim.ai/platform/enterprise/access-control) — permission
-  groups, and the only documentation of `ALLOWED_INTEGRATIONS`.
+| Topic | Why it matters here | Our version (v0.8.4) | Current docs |
+|---|---|---|---|
+| Environment variables | The full reference for the `SIM_*` values passed through by the compose file. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/environment-variables.mdx) | [current](https://docs.sim.ai/platform/self-hosting/environment-variables) |
+| Integrations and OAuth | Which providers need which `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, and the callback URL shape. Read before registering any vendor application. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/integrations-oauth.mdx) | [current](https://docs.sim.ai/platform/self-hosting/integrations-oauth) |
+| Security and hardening | The SSRF boundary, egress allowlists, and where user code runs. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/security.mdx) | [current](https://docs.sim.ai/platform/self-hosting/security) |
+| Authentication | Signup restrictions and SSO options. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/authentication.mdx) | [current](https://docs.sim.ai/platform/self-hosting/authentication) |
+| Access control | Permission groups, and the only documentation of `ALLOWED_INTEGRATIONS`. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/enterprise/access-control.mdx) | [current](https://docs.sim.ai/platform/enterprise/access-control) |
+| Troubleshooting | Upstream's own list, for anything not in section 7. | [v0.8.4](https://github.com/simstudioai/sim/blob/e741923f/apps/docs/content/docs/en/platform/self-hosting/troubleshooting.mdx) | [current](https://docs.sim.ai/platform/self-hosting/troubleshooting) |
 
-**Treat these pages as indicative, not authoritative for this deployment.** They track
-Sim's latest release; we run a pinned, older one. During this work several documented
-behaviours turned out to differ from what our version actually does — including how the
-block allowlist matches ids and which blocks it exempts. When a detail matters, read the
-source at our pinned commit rather than the docs:
+The whole documentation set for our version is browsable at
+[`apps/docs/content/docs/en` at `e741923f`](https://github.com/simstudioai/sim/tree/e741923f/apps/docs/content/docs/en).
+The current docs also have a [Sandboxes](https://docs.sim.ai/platform/self-hosting/sandboxes)
+page that did not exist at our version; it is still relevant because this deployment runs
+the **default in-process sandbox**: Function block code executes inside the app container
+with no network or filesystem separation. Anyone who can author a workflow runs code in
+that container's security context. Accepted for now given the approval gate.
+
+**Treat the current pages as indicative, not authoritative for this deployment.** During
+this work several documented behaviours turned out to differ from what our version
+actually does — including how the block allowlist matches ids and which blocks it exempts.
+When a detail matters, prefer the v0.8.4 column, and when even that is unclear, read the
+source at the pinned commit:
 
 ```
 https://github.com/simstudioai/sim/tree/e741923f

@@ -17,11 +17,11 @@ This guide covers operator setup:
 
 Deeper reference material lives with the apps:
 
-- Feature overview: [`apps/backend/docs/features/external-connections.md`](../apps/backend/docs/features/external-connections.md)
+- Feature overview: [`apps/backend/docs/features/external-connections.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/features/external-connections.md)
 - Full config reference (all fields, multi-collection search, post-processors):
-  [`apps/backend/docs/developers/external-connections-config.md`](../apps/backend/docs/developers/external-connections-config.md)
+  [`apps/backend/docs/developers/external-connections-config.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/backend/docs/developers/external-connections-config.md)
 - Frontend architecture (ConnectionManager, connection lifecycle, SSRF-guarded probes):
-  [`apps/frontend/docs/EXTERNAL_CONNECTIONS.md`](../apps/frontend/docs/EXTERNAL_CONNECTIONS.md)
+  [`apps/frontend/docs/EXTERNAL_CONNECTIONS.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/apps/frontend/docs/EXTERNAL_CONNECTIONS.md)
 
 ## Prerequisites
 
@@ -207,7 +207,7 @@ in sync and already includes every change.
 
 Contributors: the convention for adding to that directory — and the rule that
 `provision_external_pgvector_store.sql` moves with it — is documented in
-[`infra/db/external-migrations/README.md`](../infra/db/external-migrations/README.md).
+[`infra/db/external-migrations/README.md`](https://github.com/Center-for-AI-Innovation/Illinois-Chat/blob/main/infra/db/external-migrations/README.md).
 
 ## Verifying and troubleshooting
 
