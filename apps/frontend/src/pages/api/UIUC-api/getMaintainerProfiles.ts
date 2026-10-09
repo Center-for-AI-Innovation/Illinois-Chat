@@ -4,7 +4,6 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getCourseMetadata } from './getCourseMetadata'
 import { getKeycloakBaseUrl } from '~/utils/authHelpers'
 import { initializeKeycloakAdmin } from '~/utils/keycloakClient'
-import { isSuperAdmin } from '~/utils/superAdmins'
 import type { MaintainerProfile } from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
 
 export default withCourseAccessFromRequest('any')(handler)
@@ -30,9 +29,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   const { course_owner = '', course_admins = [] } = course_metadata
-  const maintainers = new Set(
-    course_admins.filter((admin: string) => !isSuperAdmin(admin)),
-  )
+  const maintainers = new Set(course_admins)
+  maintainers.delete('rohan13@illinois.edu') // Exclude the default admin email
   maintainers.add(course_owner)
 
   try {
