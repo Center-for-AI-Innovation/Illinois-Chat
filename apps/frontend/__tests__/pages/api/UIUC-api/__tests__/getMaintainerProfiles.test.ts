@@ -24,6 +24,10 @@ vi.mock('~/utils/keycloakClient', () => ({
   initializeKeycloakAdmin: hoisted.initializeKeycloakAdmin,
 }))
 
+vi.mock('~/utils/superAdmins', () => ({
+  isSuperAdmin: (email?: string | null) => email === 'superadmin@example.com',
+}))
+
 import handler from '~/pages/api/UIUC-api/getMaintainerProfiles'
 
 describe('UIUC-api/getMaintainerProfiles', () => {
@@ -74,10 +78,10 @@ describe('UIUC-api/getMaintainerProfiles', () => {
     expect(res.status).toHaveBeenCalledWith(404)
   })
 
-  it('builds maintainer profiles from owner + admins (excluding the default admin)', async () => {
+  it('builds maintainer profiles from owner + admins (excluding super admins)', async () => {
     hoisted.getCourseMetadata.mockResolvedValueOnce({
       course_owner: 'owner@example.com',
-      course_admins: ['alice@example.com'],
+      course_admins: ['alice@example.com', 'superadmin@example.com'],
     })
     hoisted.find.mockImplementation(async ({ email }: { email: string }) => {
       if (email === 'owner@example.com')
@@ -112,10 +116,12 @@ describe('UIUC-api/getMaintainerProfiles', () => {
         },
       ]),
     )
-    // The default admin email is excluded from the maintainer list.
     expect(
-      payload.profiles.some((p: any) => p.email === 'genaisupport@mx.uillinois.edu'),
+      payload.profiles.some((p: any) => p.email === 'superadmin@example.com'),
     ).toBe(false)
+    expect(hoisted.find).not.toHaveBeenCalledWith({
+      email: 'superadmin@example.com',
+    })
   })
 
   it('falls back to bare-email profile when keycloak lookup throws or returns nothing', async () => {

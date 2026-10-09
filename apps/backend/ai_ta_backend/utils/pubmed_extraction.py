@@ -489,7 +489,7 @@ def getArticleIDs(metadata: list, error_file: str):
   start_time = time.monotonic()
 
   base_url = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
-  app_details = "?tool=ncsa_uiuc&email=genaisupport@mx.uillinois.edu&format=json"
+  app_details = "?tool=ncsa_uiuc&email=caiincsa@gmail.com&format=json"
 
   batch_size = 200  # maximum number of articles API can process in one request
 

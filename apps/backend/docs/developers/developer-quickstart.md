@@ -15,7 +15,6 @@ description: Thanks for contributing to UIUC.chat ❤️
 
 <summary>Background info on Key accounts</summary>
 
-* Google: `caiincsa@gmail.com`
 * Managed services: Vercel, Railway, Beam, Supabase, S3, Posthog, Sentry.
 * Self-hosted: pgvector (Postgres), Ollama.
 * Task management via [our Github Projects board](https://github.com/orgs/Center-for-AI-Innovation/projects?query=is:open).

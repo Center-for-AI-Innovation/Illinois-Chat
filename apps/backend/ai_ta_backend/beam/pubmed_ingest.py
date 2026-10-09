@@ -450,7 +450,7 @@ def pubmed_id_converter(id: str):
     """
     pmcid_list = []
     base_url = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
-    app_details = "?tool=ncsa_uiuc&email=genaisupport@mx.uillinois.edu"
+    app_details = "?tool=ncsa_uiuc&email=caiincsa@gmail.com"
     url = base_url + app_details + "&ids=" + id
     
     response = requests.get(url)
