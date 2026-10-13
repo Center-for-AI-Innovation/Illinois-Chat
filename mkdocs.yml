@@ -129,8 +129,6 @@ nav:
       - Authentication: api/authentication.md
       - Chat: api/chat.md
       - Retrieval: api/retrieval.md
-      - Ingest: api/ingest.md
-      - Export: api/export.md
   - Self-Hosting:
       - self-hosting/index.md
       - Configuration reference: self-hosting/configuration.md

@@ -4,13 +4,11 @@ Illinois Chat exposes a REST API so you can integrate your chatbots into your ow
 
 ## Base URL
 
-The **Chat** endpoint is served by the Next.js frontend, at the same host as the web app. The examples use the hosted site:
+The **Chat** and **Retrieval** endpoints are served by the Next.js frontend, at the same host as the web app. The examples use the hosted site:
 
 ```
 https://chat.illinois.edu
 ```
-
-The **Ingest** endpoints, and the backend form of the **Export** endpoints, are served by the Flask backend. The examples write its host as `https://<your-backend-host>`: on the Docker Compose stack the backend is internal-only (container port `8001`, no authentication), and `:8000` is the development server started by `start-dev.sh`. Expose it deliberately, behind your own authentication, before using these endpoints from outside the stack.
 
 ## Endpoint categories
 
@@ -18,10 +16,8 @@ The **Ingest** endpoints, and the backend form of the **Export** endpoints, are 
 | --- | --- | --- |
 | **Chat** | RAG-grounded, multi-turn conversations with streaming and image support | [Chat](chat.md) |
 | **Retrieval** | Fetch relevant document contexts without an LLM answer | [Retrieval](retrieval.md) |
-| **Ingest** | Add files, URLs, or Canvas courses to a chatbot programmatically | [Ingest](ingest.md) |
-| **Export** | Bulk-export documents and conversation history on a self-hosted backend | [Export](export.md) |
 
-The backend has further routes (Nomic maps, statistics, email, graph lookups, `/createProject`, …) that the web app calls internally; they are not documented here and may change without notice. Every other frontend route under `/api/*` (for example `/api/getContexts`, the `/api/UIUC-api/*` download, upload, ingest and Sim tool routes, `/api/projectConnections*` and `/api/chat-api/keys/*`) needs a browser session cookie and is not part of the public API.md) page and the three download routes on the [Export](export.md) page.
+The Flask backend has further routes (ingest, exports, Nomic maps, statistics, email, graph lookups, `/createProject`, …) that the web app calls internally; they have no authentication of their own, are not documented here and may change without notice. Every other frontend route under `/api/*` (for example the `/api/UIUC-api/*` download, upload, ingest and Sim tool routes, `/api/projectConnections*` and `/api/chat-api/keys/*`) needs a browser session cookie and is not part of the public API; the one session-only route documented here is `/api/getContexts` on the [Retrieval](retrieval.md) page.
 
 ## Authentication
 

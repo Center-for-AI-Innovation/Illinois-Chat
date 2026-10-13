@@ -19,8 +19,6 @@ What gets imported — pick any of: Files, Pages, Modules, Syllabus, Assignments
 
 [Watch the Canvas walkthrough :material-open-in-new:](../../getting-started/video-walkthroughs.md#connect-canvas){ .md-button }
 
-Canvas ingestion is also available via the API — see the [Ingest API](../../api/ingest.md).
-
 !!! tip "Tips for teaching assistants"
     - Combine the Canvas import with [Guided Learning](../prompting.md) so the chatbot guides students rather than giving away solutions.
     - Use [document groups](document-groups.md) to separate lecture materials from assignments.

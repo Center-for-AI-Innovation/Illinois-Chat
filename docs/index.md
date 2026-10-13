@@ -28,7 +28,7 @@ The campus-supported instance is available at [chat.illinois.edu](https://chat.i
 
 - :material-chat: **[Use a chatbot](getting-started/using-a-chatbot.md)** — someone shared a chatbot with you: picking a model, settings, sources and citations, exporting your history.
 - :material-hammer-wrench: **[Build a chatbot](building/index.md)** — create one, upload or crawl content, choose LLMs, write the prompt, add tools, share it, and read the analytics. New here? Take the [Quickstart](getting-started/quickstart.md).
-- :material-api: **[Integrate](api/index.md)** — call a chatbot from your own application through the chat, retrieval, ingest and export APIs.
+- :material-api: **[Integrate](api/index.md)** — call a chatbot from your own application through the chat and retrieval APIs.
 - :material-server: **[Run it yourself](self-hosting/index.md)** — the full Docker Compose stack, configuration reference, upgrades and troubleshooting.
 - :material-source-branch: **[Contribute](contributing/dev-setup.md)** — development setup, repository layout, tests and CI, writing these docs.
 

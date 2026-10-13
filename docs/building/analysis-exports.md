@@ -78,7 +78,3 @@ Each user can download their own conversations with the chatbot: **Export histor
 
 - If a user is authenticated when chatting, their email is included in conversation logs; otherwise it is `null`.
 - Only the owner and administrators can access conversation history and exports.
-
-## Programmatic export
-
-Exports are also available via the API — see the [Export API](../api/export.md).
