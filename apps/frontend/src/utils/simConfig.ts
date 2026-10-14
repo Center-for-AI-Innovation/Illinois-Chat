@@ -3,6 +3,11 @@ import { db } from '~/db/dbClient'
 import { projects } from '~/db/schema'
 import { type SimApiKeyField, type SimProjectConfig } from '~/types/sim'
 import { decryptProjectConfig, encryptProjectConfig } from '~/utils/crypto'
+import {
+  discoverSimWorkflows,
+  SimListError,
+  type SimDiscoveryResult,
+} from '~/utils/simDiscovery'
 
 /** Resolved credentials. `api_key` is guaranteed present on the success path. */
 export interface SimCredentials {
@@ -244,7 +249,13 @@ export function simConfigErrorResponse(reason: SimConfigError): {
   }
 }
 
-const ALLOWED_SIM_HOSTS = new Set(['www.sim.ai', 'sim.ai', 'api.sim.ai', 'sim.chat.illinois.edu'])
+const ALLOWED_SIM_HOSTS = new Set([
+  'www.sim.ai',
+  'sim.ai',
+  'api.sim.ai',
+  'sim.chat.illinois.edu',
+  'sim-dev.ilchat.mss.illinois.edu',
+])
 
 /**
  * Origins the deployment operator has declared as trusted Sim instances:
@@ -306,5 +317,57 @@ export function validateSimBaseUrl(url: string): string | null {
     return `${parsed.protocol}//${parsed.host}`
   } catch {
     return null
+  }
+}
+
+/** Why discovery with a set of credentials produced no workflow list. */
+export type SimDiscoveryFailure =
+  | { reason: 'missing_workspace_id' }
+  | { reason: 'invalid_base_url' }
+  | { reason: 'list_failed'; status: number }
+  | { reason: 'timeout' }
+  | { reason: 'request_failed'; error: unknown; simBaseUrl: string }
+
+/**
+ * Discover a workspace's workflows with the given credentials. Every caller
+ * goes through here, so base-URL defaulting and validation, and how a failure
+ * is classified, cannot drift between them; each caller turns a failure into
+ * its own response.
+ */
+export async function discoverWithCredentials(
+  creds: {
+    api_key: string
+    workspace_id: string | null
+    base_url: string | null
+  },
+  signal?: AbortSignal,
+): Promise<
+  ({ ok: true } & SimDiscoveryResult) | ({ ok: false } & SimDiscoveryFailure)
+> {
+  if (!creds.workspace_id) return { ok: false, reason: 'missing_workspace_id' }
+
+  // The deployment default is validated too: SIM_API_BASE_URL can be a local
+  // host, which is refused in production.
+  const simBaseUrl = validateSimBaseUrl(
+    (creds.base_url ?? SIM_DEFAULT_BASE_URL).replace(/\/$/, ''),
+  )
+  if (!simBaseUrl) return { ok: false, reason: 'invalid_base_url' }
+
+  try {
+    const result = await discoverSimWorkflows({
+      simBaseUrl,
+      apiKey: creds.api_key,
+      workspaceId: creds.workspace_id,
+      ...(signal && { signal }),
+    })
+    return { ok: true, ...result }
+  } catch (error) {
+    if (error instanceof SimListError) {
+      return { ok: false, reason: 'list_failed', status: error.status }
+    }
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return { ok: false, reason: 'timeout' }
+    }
+    return { ok: false, reason: 'request_failed', error, simBaseUrl }
   }
 }
