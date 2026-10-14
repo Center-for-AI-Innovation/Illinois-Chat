@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { type QueryClient, useQuery } from '@tanstack/react-query'
 import { type ChatCompletionMessageToolCall } from 'openai/resources/chat/completions'
 import posthog from 'posthog-js'
 import type { ToolOutput } from '~/types/chat'
@@ -397,6 +397,25 @@ export function clearCachedSimTools(course_name: string): void {
   }
 }
 
+const simToolsQueryKey = (course_name: string) => ['tools', course_name]
+
+/**
+ * Make a just-discovered workflow list the project's tool list, in both the
+ * query cache and the persisted copy, so every reader sees it without running
+ * discovery again.
+ */
+export async function storeDiscoveredSimTools(
+  queryClient: QueryClient,
+  course_name: string,
+  workflows: SimWorkflow[],
+): Promise<void> {
+  // Cancel all previous queries to avoid stale writes
+  await queryClient.cancelQueries({ queryKey: simToolsQueryKey(course_name) })
+  const tools = getUIUCToolFromSim(workflows)
+  writeCachedSimTools(course_name, tools)
+  queryClient.setQueryData(simToolsQueryKey(course_name), tools)
+}
+
 export const useFetchAllWorkflows = (course_name?: string) => {
   if (!course_name) {
     throw new Error('course_name is required')
@@ -405,7 +424,7 @@ export const useFetchAllWorkflows = (course_name?: string) => {
   const cached = readCachedSimTools(course_name)
 
   return useQuery({
-    queryKey: ['tools', course_name],
+    queryKey: simToolsQueryKey(course_name),
     // Errors deliberately propagate so callers can show what actually failed
     // rather than an empty list that reads as "no tools configured".
     queryFn: async (): Promise<UIUCTool[]> => {

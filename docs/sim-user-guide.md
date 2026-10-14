@@ -77,8 +77,14 @@ On the Tools page:
 
 Only deployed workflows are discovered — drafts do not appear until you deploy them in
 Sim. Give each workflow a clear description in Sim: the description is what the model
-reads when deciding whether to call your tool, and undescribed workflows are flagged on
-the Tools page with a placeholder description.
+reads when deciding whether to call your tool. Sim has several fields called
+"description", and only one of them reaches Illinois Chat: open the workflow, click
+**Deploy**, open the **API** tab, click **Edit API Info** and fill in **Description**
+(the same dialog edits the per-input descriptions). The version description on the
+General tab, the MCP tool description and the chat description are stored separately
+and are never read. A workflow with no description in that field is flagged on the
+Tools page with "No description in Sim", and the model is given a placeholder built from
+the workflow name and its input fields instead.
 
 The Tools page also shows the project's tool-routing status: **Custom router** (tool
 calls are routed through the project's own OpenAI or OpenAI-compatible provider),

@@ -221,4 +221,32 @@ describe('sim tool cache resilience', () => {
 
     expect(() => clearCachedSimTools('proj')).not.toThrow()
   })
+
+  it('storeDiscoveredSimTools cancels an in-flight discovery before storing', async () => {
+    const { storeDiscoveredSimTools, readCachedSimTools } =
+      await import('../handleFunctionCalling')
+    const calls: string[] = []
+    const queryClient = {
+      cancelQueries: vi.fn(async () => {
+        calls.push('cancel')
+      }),
+      setQueryData: vi.fn(() => {
+        calls.push('set')
+      }),
+    } as any
+
+    await storeDiscoveredSimTools(queryClient, 'proj', [
+      { id: 'wf-1', name: 'Greet', description: 'd', inputFields: [] },
+    ])
+
+    // Cancelled first, so a stale discovery cannot land on top afterwards.
+    expect(calls).toEqual(['cancel', 'set'])
+    expect(queryClient.cancelQueries).toHaveBeenCalledWith({
+      queryKey: ['tools', 'proj'],
+    })
+    const [key, tools] = queryClient.setQueryData.mock.calls[0]
+    expect(key).toEqual(['tools', 'proj'])
+    expect(tools.map((t: any) => t.name)).toEqual(['sim_greet'])
+    expect(readCachedSimTools('proj')?.tools).toEqual(tools)
+  })
 })
