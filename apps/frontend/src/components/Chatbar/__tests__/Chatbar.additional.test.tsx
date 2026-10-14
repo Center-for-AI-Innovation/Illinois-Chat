@@ -8,10 +8,17 @@ import { makeConversation } from '~/test-utils/mocks/chat'
 import { Chatbar } from '../Chatbar'
 
 vi.mock('framer-motion', () => {
+  // Stable per tag; a new type each render remounts children.
+  const components = new Map<PropertyKey, (props: any) => React.ReactElement>()
   const motion = new Proxy(
     {},
     {
-      get: () => (props: any) => React.createElement('div', props),
+      get: (_target, tag) => {
+        if (!components.has(tag)) {
+          components.set(tag, (props: any) => React.createElement('div', props))
+        }
+        return components.get(tag)
+      },
     },
   )
   return {
@@ -182,6 +189,38 @@ describe('Chatbar – additional coverage', () => {
         expect.objectContaining({ field: 'conversations' }),
       )
     })
+  })
+
+  it("forgets the deleted conversation's tool switches", async () => {
+    const user = userEvent.setup()
+    const { readDisabledToolIds, setToolDisabled } =
+      await import('~/utils/app/disabledTools')
+    localStorage.clear()
+    setToolDisabled('c1', 'wf-1', true)
+    setToolDisabled('c2', 'wf-2', true)
+    const c1 = makeConversation({ id: 'c1', name: 'First' })
+    const c2 = makeConversation({ id: 'c2', name: 'Second' })
+
+    renderChatbar({
+      homeState: {
+        showChatbar: true,
+        conversations: [c1, c2],
+        selectedConversation: c1,
+      },
+    })
+
+    await user.click(await screen.findByLabelText('Delete Chat'))
+    await user.click(await screen.findByLabelText('Confirm Delete'))
+
+    const [deleted, options] = mocks.deleteConversationMutate.mock.calls[0]!
+    expect(deleted).toBe(c1)
+    // Kept until the server confirms, in case the delete fails.
+    expect(readDisabledToolIds('c1')).toEqual(['wf-1'])
+
+    options.onSuccess()
+    expect(readDisabledToolIds('c1')).toEqual([])
+    expect(readDisabledToolIds('c2')).toEqual(['wf-2'])
+    localStorage.clear()
   })
 
   // -------------------------------------------------------------------

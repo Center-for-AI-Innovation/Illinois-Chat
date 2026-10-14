@@ -150,7 +150,7 @@ Clear the test values from `topic` and `author` when you are done. Anything left
 
 Click **Deploy**. Illinois Chat only sees deployed workflows. Drafts never appear on the Tools page.
 
-Then open the **API** tab of the deploy dialog and click **Edit API Info**. This is where you set the **workflow description**, which is the single most important thing the chatbot reads when deciding whether to use your tool. The same dialog also lets you edit each input's description.
+Then open the **API** tab of the deploy dialog and click **Edit API Info**. This is where you set the **workflow description**, which is the single most important thing the chatbot reads when deciding whether to use your tool. The same dialog also lets you edit each input's description. Sim has other fields called "description" (the version description on the General tab, the MCP tool description and the chat description); those are stored separately and never reach Illinois Chat.
 
 For this tool, the description is:
 
