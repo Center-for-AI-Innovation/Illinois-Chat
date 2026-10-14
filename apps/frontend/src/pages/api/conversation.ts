@@ -115,7 +115,7 @@ export async function persistMessageServer({
     prompt: conversation.prompt,
     temperature: conversation.temperature,
     user_email: userIdentifier,
-    project_name: conversation.projectName || courseName,
+    project_name: courseName,
     folder_id: folderId,
     created_at: conversation.createdAt
       ? new Date(conversation.createdAt)
@@ -487,6 +487,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     case 'POST':
       const { conversation }: { conversation?: ChatConversation } = req.body
       const { delta }: { delta?: SaveConversationDelta } = req.body
+      // Always write the project the access check authorized, never a name
+      // nested in the client payload (conversation.projectName) (#312).
+      const projectName = req.courseName!
       try {
         // Validate user identifier is available
         if (!userIdentifier) {
@@ -511,7 +514,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             prompt: meta.prompt,
             temperature: meta.temperature,
             user_email: userIdentifier || null,
-            project_name: meta.projectName,
+            project_name: projectName,
             folder_id: folderId,
             created_at: new Date(),
             updated_at: new Date(),
@@ -666,7 +669,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           prompt: dbConversation.prompt,
           temperature: dbConversation.temperature,
           user_email: userIdentifier || null,
-          project_name: dbConversation.project_name,
+          project_name: projectName,
           folder_id: folderId,
           created_at: dbConversation.created_at
             ? new Date(dbConversation.created_at)
@@ -689,7 +692,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 prompt: dbConversation.prompt,
                 temperature: dbConversation.temperature,
                 user_email: userIdentifier || null,
-                project_name: dbConversation.project_name,
+                project_name: projectName,
                 folder_id: folderId,
                 updated_at: new Date(),
               },

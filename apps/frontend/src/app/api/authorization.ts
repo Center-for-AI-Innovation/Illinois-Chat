@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAppRouterAuth } from '~/utils/appRouterAuth'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { AuthenticatedUser } from '~/proxy'
+import {
+  COURSE_NAME_HEADER_KEYS,
+  COURSE_NAME_KEYS,
+  resolveCourseName,
+  type ExtractedCourseName,
+} from '~/server/courseNameExtraction'
 
 // Helper function to get course metadata from Redis
 export async function getCourseMetadata(
@@ -52,37 +58,42 @@ export function hasCourseAccess(
   return false
 }
 
-// Utility function to extract course name from request (query params, body, or headers)
+// Resolve the single project name a request authorizes against. Every place a
+// name can appear (query, top-level body, headers) must agree; otherwise the
+// result is a conflict and the wrapper rejects the request (#312). Rules live
+// in `~/server/courseNameExtraction`, shared with the Pages Router wrapper;
+// this only adapts the NextRequest shape to it.
 export async function extractCourseName(
   req: NextRequest,
-): Promise<string | null> {
-  // Try to get course name from various sources
+): Promise<ExtractedCourseName> {
   const url = new URL(req.url)
-  let courseName =
-    url.searchParams.get('courseName') ||
-    url.searchParams.get('course_name') ||
-    url.searchParams.get('projectName') ||
-    url.searchParams.get('project_name') ||
-    req.headers.get('x-course-name') ||
-    req.headers.get('x-project_name') ||
-    null
+  const query: Record<string, unknown> = {}
+  for (const key of COURSE_NAME_KEYS) {
+    // Mirror the Pages Router: a repeated key arrives as an array (which the
+    // resolver treats as ambiguous), a single one as a string.
+    const values = url.searchParams.getAll(key)
+    if (values.length === 1) query[key] = values[0]
+    else if (values.length > 1) query[key] = values
+  }
 
-  // If not found in query params or headers, try to extract from body
-  if (!courseName && req.method === 'POST') {
+  const headers: Record<string, unknown> = {}
+  for (const key of COURSE_NAME_HEADER_KEYS) {
+    const value = req.headers.get(key)
+    if (value !== null) headers[key] = value
+  }
+
+  // Parse the body for every method that can carry one, not only when nothing
+  // else matched, so a body name that disagrees with the query is caught.
+  let body: unknown
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
     try {
-      const body = await req.clone().json()
-      courseName =
-        body.course_name ||
-        body.courseName ||
-        body.project_name ||
-        body.projectName ||
-        null
-    } catch (error) {
-      // Ignore body parsing errors
+      body = await req.clone().json()
+    } catch {
+      // Non-JSON or empty body: no name to read.
     }
   }
 
-  return courseName
+  return resolveCourseName({ query, body, headers })
 }
 
 // Middleware that automatically extracts course name and applies access control
@@ -104,7 +115,17 @@ export function withCourseAccessFromRequest(
     ) => Promise<NextResponse> | NextResponse,
   ) {
     return async (req: AuthenticatedRequest) => {
-      const courseName = await extractCourseName(req)
+      const { courseName, conflict } = await extractCourseName(req)
+      if (conflict) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'Conflicting project names',
+            message:
+              'The request specifies more than one project name; they must match',
+          }),
+          { status: 400 },
+        )
+      }
       if (!courseName) {
         return new NextResponse(
           JSON.stringify({
@@ -154,7 +175,7 @@ export function withCourseAccessFromRequest(
       // For public courses, allow unauthenticated access if access level is 'any'
       if (!courseMetadata.is_private && requiredAccess === 'any') {
         // Add course context to request
-        ;(req as any).courseName = courseName
+        req.courseName = courseName
         return await handler(req)
       }
 
@@ -209,7 +230,7 @@ export function withCourseAccessFromRequest(
         }
 
         // Add course context to request
-        ;(req as any).courseName = courseName
+        req.courseName = courseName
 
         return await handler(req)
       })(req)

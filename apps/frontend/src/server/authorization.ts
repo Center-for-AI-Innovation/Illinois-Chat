@@ -4,6 +4,10 @@ import { AuthenticatedUser } from '~/proxy'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import {
+  resolveCourseName,
+  type ExtractedCourseName,
+} from '~/server/courseNameExtraction'
 
 // Helper function to get course metadata from Redis
 export async function getCourseMetadata(
@@ -218,7 +222,14 @@ export function withCourseOwnerOrAdminAccess() {
         return res.status(401).json({ error: 'User not authenticated' })
       }
 
-      const courseName = extractCourseName(req)
+      const { courseName, conflict } = extractCourseName(req)
+      if (conflict) {
+        return res.status(400).json({
+          error: 'Conflicting project names',
+          message:
+            'The request specifies more than one project name; they must match',
+        })
+      }
       if (!courseName) {
         return res.status(400).json({
           error: 'Course name required',
@@ -263,25 +274,16 @@ export function withCourseOwnerOrAdminAccess() {
   }
 }
 
-// Utility function to extract course name from request (query params, body, or headers)
-export function extractCourseName(req: NextApiRequest): string | null {
-  // Try to get course name from various sources
-  const courseName =
-    (req.query.courseName as string) ||
-    (req.query.course_name as string) ||
-    (req.query.projectName as string) ||
-    (req.query.project_name as string) ||
-    req.body?.courseName ||
-    req.body?.course_name ||
-    (req.body?.projectName as string) ||
-    (req.body?.project_name as string) ||
-    req.body?.projectName ||
-    req.body?.project_name ||
-    (req.headers['x-course-name'] as string) ||
-    (req.headers['x-project_name'] as string) ||
-    null
-
-  return courseName
+// Resolve the single project name a request authorizes against. Every place a
+// name can appear (query, top-level body, headers) must agree; otherwise the
+// result is a conflict and the wrapper rejects the request (#312). Rules live
+// in `~/server/courseNameExtraction`, shared with the App Router wrapper.
+export function extractCourseName(req: NextApiRequest): ExtractedCourseName {
+  return resolveCourseName({
+    query: req.query,
+    body: req.body,
+    headers: req.headers,
+  })
 }
 
 // Middleware that automatically extracts course name and applies access control
@@ -324,7 +326,14 @@ export function withCourseAccessFromRequest(
   ) {
     return async (req: AuthenticatedRequest, res: NextApiResponse) => {
       // Extract course name from request
-      const courseName = extractCourseName(req)
+      const { courseName, conflict } = extractCourseName(req)
+      if (conflict) {
+        return res.status(400).json({
+          error: 'Conflicting project names',
+          message:
+            'The request specifies more than one project name; they must match',
+        })
+      }
       if (!courseName) {
         return res.status(400).json({
           error: 'Course name required',
