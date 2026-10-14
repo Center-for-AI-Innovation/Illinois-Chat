@@ -244,6 +244,24 @@ const Home = ({
     ) as FolderWithConversation
 
     deleteFolderMutation.mutate(deletedFolder)
+
+    // The database moves the folder's conversations back to the main list
+    // (folder_id SET NULL). Mirror that in local state so the open conversation
+    // does not keep sending the deleted folder's id on its next save.
+    if (selectedConversation?.folderId === folderId) {
+      dispatch({
+        field: 'selectedConversation',
+        value: { ...selectedConversation, folderId: null },
+      })
+    }
+    if (conversations.some((c) => c.folderId === folderId)) {
+      dispatch({
+        field: 'conversations',
+        value: conversations.map((c) =>
+          c.folderId === folderId ? { ...c, folderId: null } : c,
+        ),
+      })
+    }
   }
 
   const handleUpdateFolder = (folderId: string, name: string) => {
