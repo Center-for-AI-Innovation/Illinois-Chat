@@ -3,11 +3,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const hoisted = vi.hoisted(() => ({
+  isSuperAdminAsync: vi.fn(),
   getCourseMetadata: vi.fn(),
   hasCourseAccess: vi.fn(),
   resolveSimCredentials: vi.fn(),
   assertWorkflowInWorkspace: vi.fn(),
   discoverSimWorkflows: vi.fn(),
+}))
+
+vi.mock('~/utils/superAdmins.server', () => ({
+  isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
 vi.mock('~/utils/authMiddleware', () => ({
@@ -68,6 +73,7 @@ function listReq(query: Record<string, unknown>, overrides: any = {}) {
 }
 
 beforeEach(() => {
+  hoisted.isSuperAdminAsync.mockResolvedValue(false)
   hoisted.getCourseMetadata.mockResolvedValue({ course_owner: 'a@b.c' })
   hoisted.hasCourseAccess.mockReturnValue(true)
   hoisted.resolveSimCredentials.mockResolvedValue(CREDS)
@@ -80,6 +86,40 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs()
+})
+
+describe('super-admin tool access', () => {
+  it('allows a super admin outside the project member list to discover and run tools', async () => {
+    hoisted.hasCourseAccess.mockReturnValue(false)
+    hoisted.isSuperAdminAsync.mockResolvedValue(true)
+    const list = makeRes()
+    await getSimWorkflows(listReq({ course_name: 'cs101' }), list)
+    expect(list.statusCode).toBe(200)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), { status: 200 }),
+    )
+    const run = makeRes()
+    await runSimWorkflow(
+      runReq({ course_name: 'cs101', workflow_id: 'wf-1', input: {} }),
+      run,
+    )
+    expect(run.statusCode).toBe(200)
+  })
+
+  it('keeps frozen projects blocked for super admins', async () => {
+    hoisted.isSuperAdminAsync.mockResolvedValue(true)
+    hoisted.getCourseMetadata.mockResolvedValue({ is_frozen: true })
+    const list = makeRes()
+    await getSimWorkflows(listReq({ course_name: 'cs101' }), list)
+    expect(list.statusCode).toBe(403)
+    const run = makeRes()
+    await runSimWorkflow(
+      runReq({ course_name: 'cs101', workflow_id: 'wf-1', input: {} }),
+      run,
+    )
+    expect(run.statusCode).toBe(403)
+    expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
+  })
 })
 
 describe('runSimWorkflow handler', () => {

@@ -18,10 +18,12 @@ const MakeOldCoursePage = ({
   course_name,
   metadata,
   current_email,
+  isSuperAdmin = false,
 }: {
   course_name: string
   metadata: CourseMetadata
   current_email: string
+  isSuperAdmin?: boolean
 }) => {
   const [bannerUrl, setBannerUrl] = useState<string>('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -58,9 +60,9 @@ const MakeOldCoursePage = ({
     fetchData()
   }, [metadata])
 
-  // TODO: update this check to consider Admins & participants.
   if (
     metadata &&
+    !isSuperAdmin &&
     current_email !== (metadata.course_owner as string) &&
     metadata.course_admins.indexOf(current_email) === -1
   ) {
