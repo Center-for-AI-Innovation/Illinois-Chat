@@ -44,7 +44,7 @@ export const IntermediateStateAccordion = ({
           }}
         >
           <AccordionTrigger
-            className={`rounded-lg py-0 hover:bg-transparent hover:no-underline ${montserrat_paragraph.variable} font-montserratParagraph text-sm font-bold`}
+            className={`cursor-pointer items-center rounded-lg px-4 py-3 hover:bg-transparent hover:no-underline ${montserrat_paragraph.variable} font-montserratParagraph text-sm font-bold`}
             style={{
               textShadow: '0 0 0px' /* 10px */,
               color: 'var(--dashboard-foreground)',
@@ -72,7 +72,7 @@ export const IntermediateStateAccordion = ({
           <AccordionContent
             className={`${
               montserrat_paragraph.variable
-            } font-montserratParagraph rounded-lg bg-(--background-faded) pt-2 text-sm text-white ${
+            } font-montserratParagraph rounded-lg bg-(--background-faded) px-4 pt-2 text-sm text-white ${
               error ? 'border-2 border-red-500' : ''
             }`}
           >

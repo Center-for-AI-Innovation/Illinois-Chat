@@ -1,6 +1,7 @@
 import { NextApiResponse } from 'next'
 import {
   db,
+  folders,
   messages,
   conversations as conversationsTable,
 } from '~/db/dbClient'
@@ -60,6 +61,29 @@ export function convertChatToDBConversation(
   }
 }
 
+/**
+ * The folder id a conversation save may write. Clients can hold a stale id
+ * (e.g. the folder was deleted while the conversation was open), and the
+ * conversations.folder_id foreign key turns that into a failed save. Fall back
+ * to null, which is where ON DELETE SET NULL already put the conversation.
+ */
+async function resolveOwnedFolderId(
+  folderId: string | null | undefined,
+  userIdentifier: string | null | undefined,
+): Promise<string | null> {
+  if (!userIdentifier || !isUUID(folderId ?? '')) return null
+  const [folder] = await db
+    .select({ id: folders.id })
+    .from(folders)
+    .where(
+      and(
+        eq(folders.id, folderId as string),
+        eq(folders.user_email, userIdentifier),
+      ),
+    )
+  return folder?.id ?? null
+}
+
 export interface PersistMessageServerArgs {
   conversation: ChatConversation
   message: ChatMessage
@@ -79,6 +103,11 @@ export async function persistMessageServer({
     )
   }
 
+  const folderId = await resolveOwnedFolderId(
+    conversation.folderId,
+    userIdentifier,
+  )
+
   const conversationData: NewConversations = {
     id: conversation.id,
     name: conversation.name,
@@ -87,9 +116,7 @@ export async function persistMessageServer({
     temperature: conversation.temperature,
     user_email: userIdentifier,
     project_name: conversation.projectName || courseName,
-    folder_id: isUUID(conversation.folderId ?? '')
-      ? conversation.folderId
-      : null,
+    folder_id: folderId,
     created_at: conversation.createdAt
       ? new Date(conversation.createdAt)
       : new Date(),
@@ -473,6 +500,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           const { conversation: meta, messagesDelta } = delta
 
           // Upsert conversation using meta
+          const folderId = await resolveOwnedFolderId(
+            meta.folderId,
+            userIdentifier,
+          )
           const conversationData: NewConversations = {
             id: meta.id,
             name: meta.name,
@@ -481,7 +512,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             temperature: meta.temperature,
             user_email: userIdentifier || null,
             project_name: meta.projectName,
-            folder_id: isUUID(meta.folderId ?? '') ? meta.folderId : null,
+            folder_id: folderId,
             created_at: new Date(),
             updated_at: new Date(),
           }
@@ -624,6 +655,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
 
         // Create a correctly typed conversation object for DrizzleORM
+        const folderId = await resolveOwnedFolderId(
+          dbConversation.folder_id,
+          userIdentifier,
+        )
         const conversationData: NewConversations = {
           id: dbConversation.id,
           name: dbConversation.name,
@@ -632,9 +667,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           temperature: dbConversation.temperature,
           user_email: userIdentifier || null,
           project_name: dbConversation.project_name,
-          folder_id: isUUID(dbConversation.folder_id ?? '')
-            ? dbConversation.folder_id
-            : null,
+          folder_id: folderId,
           created_at: dbConversation.created_at
             ? new Date(dbConversation.created_at)
             : new Date(),
@@ -657,7 +690,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 temperature: dbConversation.temperature,
                 user_email: userIdentifier || null,
                 project_name: dbConversation.project_name,
-                folder_id: dbConversation.folder_id,
+                folder_id: folderId,
                 updated_at: new Date(),
               },
             })
