@@ -25,6 +25,7 @@ import {
 } from '~/utils/functionCalling/handleFunctionCalling'
 import { conversationToMessages as baseConversationToMessages } from '~/utils/functionCalling/conversationToMessages'
 import {
+  discoverWithCredentials,
   resolveSimCredentials,
   simConfigErrorResponse,
   SIM_DEFAULT_BASE_URL,
@@ -32,7 +33,6 @@ import {
 } from '~/utils/simConfig'
 import {
   assertWorkflowInWorkspace,
-  discoverSimWorkflows,
   parseSimErrorMessage,
   sanitizeSimWorkflowInput,
 } from '~/utils/simDiscovery'
@@ -472,42 +472,29 @@ export async function fetchToolsServer(
     return []
   }
 
-  const creds = resolved.creds
-
-  if (!creds.workspace_id) {
-    console.error(`[Agent] Sim workspace ID is not set for ${courseName}`)
-    return []
-  }
-
-  const rawBaseUrl = (creds.base_url ?? SIM_DEFAULT_BASE_URL).replace(/\/$/, '')
-  const simBaseUrl = validateSimBaseUrl(rawBaseUrl)
-  if (!simBaseUrl) return []
-
-  try {
-    const { workflows, failed } = await discoverSimWorkflows({
-      simBaseUrl,
-      apiKey: creds.api_key,
-      workspaceId: creds.workspace_id,
-      signal,
-    })
-
-    // Omitted rather than offered with a fabricated signature — see
-    // discoverSimWorkflows. Log so a partially-degraded tool list is visible.
-    if (failed.length > 0) {
+  const result = await discoverWithCredentials(resolved.creds, signal)
+  if (!result.ok) {
+    if (result.reason === 'missing_workspace_id') {
+      console.error(`[Agent] Sim workspace ID is not set for ${courseName}`)
+    } else if (result.reason !== 'invalid_base_url') {
       console.error(
-        `[Agent] Omitted ${failed.length} Sim workflow(s) that could not be described for ${courseName}:`,
-        failed,
+        `[Agent] Error fetching Sim tools for course ${courseName}:`,
+        result,
       )
     }
-
-    return getUIUCToolFromSim(workflows)
-  } catch (error) {
-    console.error(
-      `[Agent] Error fetching Sim tools for course ${courseName}:`,
-      error,
-    )
     return []
   }
+
+  // Omitted rather than offered with a fabricated signature — see
+  // discoverSimWorkflows. Log so a partially-degraded tool list is visible.
+  if (result.failed.length > 0) {
+    console.error(
+      `[Agent] Omitted ${result.failed.length} Sim workflow(s) that could not be described for ${courseName}:`,
+      result.failed,
+    )
+  }
+
+  return getUIUCToolFromSim(result.workflows)
 }
 
 /**

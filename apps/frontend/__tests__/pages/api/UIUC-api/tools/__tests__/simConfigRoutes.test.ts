@@ -1,6 +1,14 @@
 /* @vitest-environment node */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from 'vitest'
 import { decryptProjectConfig, encryptProjectConfig } from '~/utils/crypto'
 
 const MASTER_KEY = 'routes-test-master-key'
@@ -190,6 +198,20 @@ describe('upsertSimConfig handler', () => {
   const req = (body: any) =>
     ({ method: 'POST', courseName: 'cs101', user: {}, body }) as any
 
+  // Saving a key runs discovery against Sim first; by default Sim accepts it
+  // and the workspace has no deployed workflows.
+  let simFetch: MockInstance<typeof fetch>
+  beforeEach(() => {
+    simFetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }) as any,
+      )
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('leaves the stored key alone when the body omits it', async () => {
     const { handler } =
       await import('~/pages/api/UIUC-api/tools/upsertSimConfig')
@@ -219,6 +241,7 @@ describe('upsertSimConfig handler', () => {
 
     expect(res.statusCode).toBe(400)
     expect(res.body.error).toMatch(/base URL/i)
+    expect(res.body.fields).toEqual(['sim_base_url'])
     expect(updateCalls).toHaveLength(0)
     expect(invalidated).toEqual([])
   })
@@ -237,7 +260,10 @@ describe('upsertSimConfig handler', () => {
     const { handler } =
       await import('~/pages/api/UIUC-api/tools/upsertSimConfig')
     const res = makeRes()
-    await handler(req({ sim_api_key: PLAIN_KEY }), res)
+    await handler(
+      req({ sim_api_key: PLAIN_KEY, sim_workspace_id: 'ws-1' }),
+      res,
+    )
 
     expect(res.statusCode).toBe(200)
     expect(updateCalls).toHaveLength(1)
@@ -260,6 +286,7 @@ describe('upsertSimConfig handler', () => {
       { sim_api_key: null },
       { sim_api_key: null },
     ])
+    expect(simFetch).not.toHaveBeenCalled()
   })
 
   it('rejects a non-string key', async () => {
@@ -270,6 +297,7 @@ describe('upsertSimConfig handler', () => {
 
     expect(res.statusCode).toBe(400)
     expect(res.body.error).toMatch(/must be a string/)
+    expect(res.body.fields).toEqual(['sim_api_key'])
     expect(updateCalls).toHaveLength(0)
   })
 
@@ -292,9 +320,153 @@ describe('upsertSimConfig handler', () => {
     const { handler } =
       await import('~/pages/api/UIUC-api/tools/upsertSimConfig')
     const res = makeRes()
-    await handler(req({ sim_api_key: 'sk-sim-x' }), res)
+    await handler(
+      req({ sim_api_key: 'sk-sim-x', sim_workspace_id: 'ws-1' }),
+      res,
+    )
 
     expect(res.statusCode).toBe(404)
     expect(invalidated).toEqual([])
+  })
+})
+
+describe('upsertSimConfig checks the configuration with Sim before saving', () => {
+  const req = (body: any) =>
+    ({ method: 'POST', courseName: 'cs101', user: {}, body }) as any
+
+  // The list call answers with `listStatus`; each workflow's detail call
+  // describes it with one input field.
+  const mockSim = (listStatus: number, ids: string[] = []) =>
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+      const url = String(input)
+      if (url.includes('/api/v1/workflows?')) {
+        return new Response(
+          JSON.stringify({
+            data: ids.map((id) => ({ id, name: `Flow ${id}` })),
+          }),
+          { status: listStatus },
+        ) as any
+      }
+      const id = decodeURIComponent(url.split('/').pop()!)
+      return new Response(
+        JSON.stringify({
+          data: {
+            id,
+            name: `Flow ${id}`,
+            inputs: [{ name: 'q', type: 'string' }],
+          },
+        }),
+        { status: 200 },
+      ) as any
+    })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const save = async (body: Record<string, unknown>) => {
+    const { handler } =
+      await import('~/pages/api/UIUC-api/tools/upsertSimConfig')
+    const res = makeRes()
+    await handler(req(body), res)
+    return res
+  }
+
+  it('saves and returns the workflows Sim lists for the new key', async () => {
+    const fetchSpy = mockSim(200, ['wf-1', 'wf-2'])
+    const res = await save({
+      sim_api_key: PLAIN_KEY,
+      sim_workspace_id: 'ws-1',
+      sim_base_url: 'https://www.sim.ai',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(updateCalls).toHaveLength(1)
+    expect(res.body.success).toBe(true)
+    expect(res.body.workflows.map((w: any) => w.id)).toEqual(['wf-1', 'wf-2'])
+    expect(res.body.failed).toEqual([])
+    const [url, init] = fetchSpy.mock.calls[0]!
+    expect(String(url)).toBe(
+      'https://www.sim.ai/api/v1/workflows?workspaceId=ws-1&deployedOnly=true',
+    )
+    expect((init as RequestInit).headers).toEqual({ 'X-API-Key': PLAIN_KEY })
+  })
+
+  it('trims a pasted key before checking and storing it', async () => {
+    const fetchSpy = mockSim(200)
+    const res = await save({
+      sim_api_key: `  ${PLAIN_KEY}\n`,
+      sim_workspace_id: 'ws-1',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const [, init] = fetchSpy.mock.calls[0]!
+    expect((init as RequestInit).headers).toEqual({ 'X-API-Key': PLAIN_KEY })
+    const stored = updateCalls[0]!.set.sim_api_key as { encrypted: string }
+    await expect(decryptProjectConfig<string>(stored)).resolves.toBe(PLAIN_KEY)
+  })
+
+  it('checks a changed workspace against the stored key', async () => {
+    selectRows.push({
+      sim_api_key: await encryptProjectConfig(PLAIN_KEY),
+      sim_base_url: null,
+      sim_workspace_id: 'ws-old',
+    })
+    const fetchSpy = mockSim(200)
+    const res = await save({ sim_workspace_id: 'ws-new', sim_base_url: null })
+
+    expect(res.statusCode).toBe(200)
+    const [url, init] = fetchSpy.mock.calls[0]!
+    expect(String(url)).toContain('workspaceId=ws-new')
+    expect((init as RequestInit).headers).toEqual({ 'X-API-Key': PLAIN_KEY })
+  })
+
+  it.each([
+    [401, ['sim_api_key']],
+    [403, ['sim_api_key', 'sim_workspace_id']],
+    [404, ['sim_workspace_id']],
+  ])(
+    'does not save when Sim answers %i, and flags %j',
+    async (status, fields) => {
+      mockSim(status)
+      const res = await save({
+        sim_api_key: PLAIN_KEY,
+        sim_workspace_id: 'ws-1',
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.body.fields).toEqual(fields)
+      expect(updateCalls).toHaveLength(0)
+      expect(invalidated).toEqual([])
+    },
+  )
+
+  it('does not save a key without a workspace, and does not call Sim', async () => {
+    const fetchSpy = mockSim(200)
+    const res = await save({ sim_api_key: PLAIN_KEY, sim_workspace_id: null })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body.fields).toEqual(['sim_workspace_id'])
+    expect(updateCalls).toHaveLength(0)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not save when Sim cannot be reached', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('fetch failed'),
+    )
+    const res = await save({
+      sim_api_key: PLAIN_KEY,
+      sim_workspace_id: 'ws-1',
+      sim_base_url: 'https://www.sim.ai',
+    })
+
+    expect(res.statusCode).toBe(502)
+    expect(res.body.error).toMatch(
+      /request to Sim at https:\/\/www.sim.ai failed/,
+    )
+    expect(res.body.fields).toEqual(['sim_base_url'])
+    expect(updateCalls).toHaveLength(0)
   })
 })

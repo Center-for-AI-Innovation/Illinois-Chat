@@ -78,7 +78,6 @@ vi.mock('@/components/Chat/Chat', async () => {
     setIsQueryRewriting: (v: boolean) => void
     setQueryRewriteResult: (v: string) => void
     handleUpdateDocumentGroups: (id: string) => void
-    handleUpdateTools: (id: string) => void
   }
 
   return {
@@ -103,7 +102,6 @@ vi.mock('@/components/Chat/Chat', async () => {
         ctx.setIsQueryRewriting(true)
         ctx.setQueryRewriteResult('result')
         ctx.handleUpdateDocumentGroups('dg')
-        ctx.handleUpdateTools('tool')
       }, [ctx?.state?.selectedConversation?.id])
       return React.createElement('div', {
         'data-testid': 'chat',
