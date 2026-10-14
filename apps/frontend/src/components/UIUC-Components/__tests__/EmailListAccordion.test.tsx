@@ -13,6 +13,10 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
   }
 })
 
+vi.mock('~/utils/superAdmins', () => ({
+  superAdmins: ['superadmin@example.com'],
+}))
+
 import { callSetCourseMetadata } from '~/utils/apiUtils'
 import EmailListAccordion from '../EmailListAccordion'
 
@@ -96,7 +100,7 @@ describe('EmailListAccordion', () => {
         metadata={
           {
             course_owner: 'owner@example.com',
-            course_admins: ['admin1@example.com', 'rohan13@illinois.edu'],
+            course_admins: ['admin1@example.com', 'superadmin@example.com'],
           } as any
         }
         is_private={false}
@@ -106,6 +110,7 @@ describe('EmailListAccordion', () => {
 
     // Should show the non-super admin entry in the expanded list
     expect(await screen.findByText('admin1@example.com')).toBeInTheDocument()
+    expect(screen.queryByText('superadmin@example.com')).not.toBeInTheDocument()
 
     await user.click(
       screen.getByRole('button', { name: /Remove admin1@example.com/i }),
@@ -114,7 +119,7 @@ describe('EmailListAccordion', () => {
     expect(callSetCourseMetadata).toHaveBeenCalledWith(
       'CS101',
       expect.objectContaining({
-        course_admins: expect.arrayContaining(['rohan13@illinois.edu']),
+        course_admins: ['superadmin@example.com'],
       }),
     )
   })

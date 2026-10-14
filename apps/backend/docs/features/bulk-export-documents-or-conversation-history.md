@@ -132,12 +132,12 @@ Example of a single row:&#x20;
                      "OpenAI. Follow the user's instructions carefully. "
                      'Respond using markdown.',
            'temperature': 0.4,
-           'user_email': 'kvday2@illinois.edu'},
+           'user_email': 'genaisupport@mx.uillinois.edu'},
  'convo_id': '03a9ffb3-5bde-4766-a4eb-66dff42ed8ac',
  'course_name': 'test-video-ingest-21',
  'created_at': '2023-08-14T16:35:40.508062-07:00',
  'id': 3476,
- 'user_email': 'kvday2@illinois.edu'}
+ 'user_email': 'genaisupport@mx.uillinois.edu'}
 ```
 
 ## Export all Documents
