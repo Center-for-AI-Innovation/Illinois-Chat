@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
 import { server } from '~/test-utils/server'
+import { DEFAULT_NAVBAR_BRANDING_SETTINGS } from '~/utils/platformSettings.schema'
 import { PlatformSettingsForm } from '../PlatformSettingsForm'
 
 vi.mock('~/utils/toastUtils', () => ({
@@ -23,6 +24,7 @@ const initial = {
       linkUrl: '',
     },
     maintenance: { enabled: false, titleText: 'Initial title', bodyText: '' },
+    navbarBranding: DEFAULT_NAVBAR_BRANDING_SETTINGS,
   },
 }
 

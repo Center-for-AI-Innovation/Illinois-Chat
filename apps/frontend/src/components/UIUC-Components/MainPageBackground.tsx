@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import Head from 'next/head'
 import React, { type ReactNode } from 'react'
-import { LandingPageHeader } from './navbars/GlobalHeader'
 import Navbar from './navbars/Navbar'
 import { useRouter } from 'next/router'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -16,11 +15,10 @@ export const MainPageBackground: React.FC<MainPageBackgroundProps> = ({
 }) => {
   return (
     <>
-      {/* <LandingPageHeader forGeneralPurposeNotLandingpage={true} /> */}
       <main
         id="main-content"
         tabIndex={-1}
-        className="items-left justify-left course-page-main flex min-h-screen flex-col"
+        className="items-left justify-left course-page-main flex min-h-(--viewport-height) flex-col"
       >
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-5 pt-20">
           <Link href="/">
@@ -69,12 +67,12 @@ export const LoadingPlaceholderForAdminPages = ({}) => {
       <main
         id="main-content"
         tabIndex={-1}
-        className="items-left justify-left course-page-main flex min-h-screen flex-col"
+        className="items-left justify-left course-page-main flex min-h-(--viewport-height) flex-col"
       >
         <h1 className="sr-only">
           {courseName ? `Loading ${courseName}` : 'Loading'}
         </h1>
-        <Navbar course_name={courseName} />
+        <Navbar />
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-5">
           <div className="pt-4" />
           <LoadingSpinner />
