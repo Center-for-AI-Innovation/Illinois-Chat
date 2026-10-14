@@ -22,6 +22,10 @@
   --ic-nav-fg: var(--illinois-blue);
   --ic-sidebar-fg: var(--illinois-blue);
   --ic-sidebar-accent-fg: var(--illinois-blue);
+  /* Hover and current-page colour in the header tabs and sidebars: Altgeld on
+     white (4.9:1); dark mode swaps in a lighter orange (Altgeld on navy is
+     only 2.6:1). */
+  --ic-nav-active: var(--illinois-orange);
   --ic-text-secondary: var(--illinois-storm-dark);
   --ic-muted-fg: var(--illinois-storm-medium);
   --ic-bg: var(--illinois-white);
@@ -89,6 +93,7 @@ html {
   --ic-nav-fg: var(--illinois-white);
   --ic-sidebar-fg: var(--illinois-white);
   --ic-sidebar-accent-fg: var(--illinois-white);
+  --ic-nav-active: #ff8a3d;
   --ic-text-secondary: var(--illinois-storm-light);
   --ic-muted-fg: var(--illinois-storm-medium);
   --ic-bg: var(--illinois-blue);
@@ -127,7 +132,6 @@ html {
   background-color: var(--ic-bg);
   color: var(--ic-nav-fg);
   box-shadow: none;
-  border-bottom: 1px solid var(--ic-border);
 }
 
 .md-header--shadow {
@@ -214,7 +218,8 @@ html {
   color: var(--illinois-white);
 }
 
-/* Tabs ≈ GlobalHeader orange outline nav (13px / Montserrat 700) */
+/* Tabs ≈ GlobalHeader orange outline nav (13px / Montserrat 700). Header
+   and tabs read as one band: no line between them, one hairline below. */
 
 .md-tabs {
   background-color: var(--ic-bg);
@@ -232,15 +237,15 @@ html {
 }
 
 .md-tabs__link:hover {
-  color: var(--illinois-orange-branding);
+  color: var(--ic-nav-active);
 }
 
 .md-tabs__item--active {
-  border-bottom: 2px solid var(--illinois-orange-branding);
+  border-bottom: 2px solid var(--ic-nav-active);
 }
 
 .md-tabs__item--active .md-tabs__link {
-  color: var(--illinois-orange);
+  color: var(--ic-nav-active);
   font-weight: 700;
 }
 
@@ -267,11 +272,12 @@ html {
 }
 
 /* ----- Sidebar -----
-   Three visual levels: the tab title and section labels are small uppercase
-   headings in the secondary colour with no hover/active state; pages are
-   regular-weight links; pages inside a section are indented behind a thin
-   rule so a section reads as a group, not as another page. Material removes
-   the indent for section children on purpose, so it is restored here. */
+   Flat, after Material's own docs: no panel background, no rule lines, no
+   pills. The tab title and the table-of-contents title are bold labels in
+   the secondary colour; pages are plain links; the current page is the only
+   coloured entry, and it is also bold so it does not rely on colour alone.
+   Groups inside a tab (Dashboard, Tools, CropWizard) are bold labels whose
+   pages sit one step in. */
 
 @media screen and (min-width: 76.25em) {
   .md-nav--primary .md-nav__title,
@@ -279,142 +285,115 @@ html {
     background: transparent;
     box-shadow: none;
     color: var(--ic-text-secondary);
-    font-size: 0.6875rem;
+    font-size: 0.875rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    line-height: 1;
+  }
+
+  .md-sidebar--primary .md-sidebar__scrollwrap,
+  .md-sidebar--secondary .md-sidebar__scrollwrap {
+    background-color: transparent;
+    border: none;
   }
 }
 
-/* Every nav entry (sidebar and table of contents) is a padded pill so the
-   hover/active background has breathing room around the text. Section labels
-   share the horizontal padding, which keeps labels and pages left-aligned. */
 .md-nav__link {
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  border-radius: var(--ic-radius-md);
   color: var(--ic-sidebar-fg);
-  padding: 0.3rem 0.6rem;
-  margin-top: 0.15rem;
+  margin-top: 0.5em;
 }
 
-.md-nav__link:hover {
-  background-color: var(--ic-slate-100);
-  color: var(--illinois-orange);
+.md-nav__link:hover,
+.md-nav__link:focus {
+  color: var(--ic-nav-active);
 }
 
-/* Active page only — never a section label (the section item is also
-   "active" whenever one of its pages is). */
-.md-nav__item--active:not(.md-nav__item--section) > .md-nav__link,
+/* Current page only — never a group label (a group's item is also "active"
+   whenever one of its pages is). */
+.md-nav__item--active:not(.md-nav__item--section):not(.md-nav__item--nested) > .md-nav__link,
 .md-nav__link--active {
-  background-color: var(--ic-slate-100);
-  color: var(--illinois-orange);
+  color: var(--ic-nav-active);
   font-weight: 700;
 }
 
-/* Section labels (navigation.sections) */
-.md-nav--primary .md-nav__item--section {
-  margin-top: 1.25em;
+/* Sections and groups are a desktop layout; in the mobile drawer every
+   level is its own drill-down list, so these rules stay out of it. */
+@media screen and (min-width: 76.25em) {
+  /* Section labels (navigation.sections): bold, secondary colour, not links. */
+  .md-nav--primary .md-nav__item--section {
+    margin-top: 1.25em;
+  }
+
+  .md-nav--primary .md-nav__item--section > .md-nav__link {
+    color: var(--ic-text-secondary);
+    font-weight: 700;
+    pointer-events: none;
+  }
+
+  /* A section whose first entry is its own index page (navigation.indexes)
+     keeps that index clickable. Material renders it as a container
+     (div.md-nav__link.md-nav__container) holding the real link and the
+     expand toggle, so the block above would otherwise swallow the click:
+     pointer-events is inherited. Re-enable it on the container and the link,
+     keep it off the toggle. */
+  .md-nav--primary .md-nav__item--section > .md-nav__container {
+    pointer-events: auto;
+  }
+
+  .md-nav--primary .md-nav__item--section > .md-nav__container > label {
+    pointer-events: none;
+  }
+
+  .md-nav--primary .md-nav__item--section > .md-nav__container:hover {
+    color: var(--ic-nav-active);
+  }
+
+  /* Groups under a tab sit among ordinary pages, so they take the page colour
+     and less space above; bold marks them as a group. */
+  .md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section {
+    margin-top: 0.5em;
+  }
+
+  .md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section > .md-nav__link {
+    color: var(--ic-sidebar-fg);
+  }
+
+  /* When a group's own index page is the current page, colour the label. */
+  .md-nav--primary .md-nav__item--section > .md-nav__link.md-nav__container:has(> .md-nav__link.md-nav__link--active) {
+    color: var(--ic-nav-active);
+  }
+
+  /* Inside a container the inner link takes the container's colour and
+     spacing instead of its own. */
+  .md-nav__container > .md-nav__link {
+    margin-top: 0;
+    color: inherit;
+    font-weight: inherit;
+  }
+
+  /* Pages inside a group: one step in, no rule line. */
+  .md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list,
+  .md-nav__item--nested:not(.md-nav__item--section) > .md-nav > .md-nav__list {
+    margin-left: 0.75rem;
+  }
+
+  .md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
+    padding-left: 0;
+  }
+
+  /* The tab's own list starts flush with the tab title. */
+  .md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav > .md-nav__list {
+    margin-left: 0;
+  }
 }
 
-.md-nav--primary .md-nav__item--section > .md-nav__link {
-  color: var(--ic-text-secondary);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: transparent;
-  pointer-events: none;
-}
-
-/* A section whose first entry is its own index page (navigation.indexes)
-   keeps that index clickable. Material renders it as a container
-   (div.md-nav__link.md-nav__container) holding the real link and the
-   expand toggle, so the block above would otherwise swallow the click:
-   pointer-events is inherited. Re-enable it on the container and the link,
-   keep it off the toggle, and let the container act as the hover pill. */
-.md-nav--primary .md-nav__item--section > .md-nav__container {
-  pointer-events: auto;
-}
-
-.md-nav--primary .md-nav__item--section > .md-nav__container > label {
-  pointer-events: none;
-}
-
-.md-nav--primary .md-nav__item--section > .md-nav__container:hover {
-  background-color: var(--ic-slate-100);
-  color: var(--illinois-orange);
-}
-
-/* Under a tab, Material also marks every group that has children as a
-   section (Dashboard, Tools, CropWizard). Those sit beside ordinary pages in
-   the same list, so they take the page-link size and colour, semibold to
-   show they open a group; only the tab title at the top of the sidebar keeps
-   the small uppercase treatment. */
-.md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section {
-  margin-top: 0.15rem;
-}
-
-.md-nav--primary .md-nav[data-md-level="1"] .md-nav__item--section > .md-nav__link {
-  color: var(--ic-sidebar-fg);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: normal;
-  text-transform: none;
-}
-
-/* When the section's own index page is the current page, the container is
-   the active pill, exactly like a selected page at the same level. */
-.md-nav--primary .md-nav__item--section > .md-nav__link.md-nav__container:has(> .md-nav__link.md-nav__link--active) {
-  background-color: var(--ic-slate-100);
-  color: var(--illinois-orange);
-  font-weight: 700;
-}
-
-/* Inside any container the inner link inherits the container's padding and
-   colour instead of adding its own pill. */
-.md-nav__container > .md-nav__link {
-  padding: 0;
-  margin-top: 0;
-  color: inherit;
-  font-weight: inherit;
-  background: transparent;
-}
-
-/* Indent section children behind a rule line */
-.md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list {
-  margin-left: 0.4rem;
-  padding-left: 0.5rem;
-  border-left: 1px solid var(--ic-border);
-}
-
-.md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
-  padding-left: 0;
-}
-
-/* Collapsible groups below section level keep a medium weight so they sit
-   between a section label and a page. */
 .md-nav__item--nested:not(.md-nav__item--section) > .md-nav__link {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ic-sidebar-fg);
-}
-
-.md-nav__item--nested:not(.md-nav__item--section) > .md-nav > .md-nav__list {
-  margin-left: 0.4rem;
-  padding-left: 0.5rem;
-  border-left: 1px solid var(--ic-border);
 }
 
 .md-sidebar--primary {
   background-color: transparent;
-}
-
-@media screen and (min-width: 76.25em) {
-  .md-sidebar--primary .md-sidebar__scrollwrap {
-    background-color: var(--ic-sidebar-bg);
-    border-right: 1px solid var(--ic-border);
-  }
 }
 
 /* 16px root, 18px body — Source Sans runs small next to Montserrat headings. */
