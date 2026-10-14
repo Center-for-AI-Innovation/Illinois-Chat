@@ -1,5 +1,6 @@
 import { Button, buttonVariants } from '@/components/shadcn/ui/button'
 import { type GetStaticProps, type NextPage } from 'next'
+import { PHASE_PRODUCTION_BUILD } from 'next/constants'
 import Head from 'next/head'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -7,14 +8,16 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
-import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
 import router from 'next/router'
 import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
 // Server-only (imports `redis`). Referenced solely from getStaticProps below,
 // so Next's SSG transform drops it from the client bundle.
-import { readAnnouncementBanner } from '~/utils/platformSettings.server'
+import {
+  readAnnouncementBanner,
+  toPublicAnnouncementBanner,
+} from '~/utils/platformSettings.server'
 
 // Typing animation component
 const TypingAnimation: React.FC = () => {
@@ -135,13 +138,15 @@ const TypingAnimation: React.FC = () => {
 interface HomeProps {
   /**
    * The runtime announcement banner, or `null` when Redis holds no usable
-   * configuration. Optional so the page still renders (on the legacy fallback)
-   * when mounted directly in tests.
+   * configuration. Not rendered here: `_app` hands it to the site-wide
+   * `SiteAnnouncementBanner` so the bar is in the first paint on this page.
    */
   announcementBanner?: AnnouncementBannerValue | null
+  /** Epoch ms of the Redis read, so the client knows how stale it is. */
+  announcementBannerReadAt?: number
 }
 
-const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
+const Home: NextPage<HomeProps> = () => {
   const useIllinoisChatConfig = useMemo(() => {
     return (
       process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
@@ -176,8 +181,6 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
           `}
         </style>
       </Head>
-
-      <AnnouncementBanner banner={announcementBanner} />
 
       <LandingPageHeader />
 
@@ -775,33 +778,28 @@ const Home: NextPage<HomeProps> = ({ announcementBanner = null }) => {
  *
  * `readAnnouncementBanner()` is deliberately non-throwing: Next also runs this
  * during `next build` inside Docker, where Redis is unreachable. A throw there
- * fails the image build, so an unreachable store has to degrade to the legacy
- * banner and let the first live request fill in the real value.
+ * fails the image build, so at build time an unreachable store degrades to the
+ * legacy banner. At runtime it throws instead, so Next keeps serving the last
+ * good page rather than regenerating one with the wrong banner.
  *
- * `revalidate: 30` is the real propagation bound. `res.revalidate('/')` from
- * the settings PUT only regenerates the replica that served that request; the
- * others pick the change up on this timer.
+ * `revalidate: 30` bounds how stale a fresh page load can be. `res.revalidate('/')`
+ * from the settings PUT only regenerates the replica that served that request;
+ * the others pick the change up on this timer. Tabs already open follow
+ * changes through `SiteAnnouncementBanner`, which polls.
  */
 export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const read = await readAnnouncementBanner()
+  if (
+    read.state === 'unavailable' &&
+    process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD
+  ) {
+    throw new Error('Redis unavailable; keeping the previous home page')
+  }
 
   return {
     props: {
-      // Only a genuinely configured record becomes a non-null prop. `absent`,
-      // `invalid`, and `unavailable` all map to null, which is what makes the
-      // legacy fallback fire for those cases and *only* those cases.
-      //
-      // `updatedAt`/`updatedBy` are stripped rather than spread: `updatedBy`
-      // is an administrator's email address, and this page is public.
-      announcementBanner:
-        read.state === 'configured'
-          ? {
-              enabled: read.value.enabled,
-              message: read.value.message,
-              linkText: read.value.linkText,
-              linkUrl: read.value.linkUrl,
-            }
-          : null,
+      announcementBanner: toPublicAnnouncementBanner(read),
+      announcementBannerReadAt: Date.now(),
     },
     revalidate: 30,
   }
