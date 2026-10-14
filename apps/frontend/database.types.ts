@@ -76,7 +76,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'conversations_folder_id_fkey'
+            foreignKeyName: 'conversations_folder_id_folders_id_fk'
             columns: ['folder_id']
             isOneToOne: false
             referencedRelation: 'folders'
@@ -512,6 +512,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          project_id: number | null
           type: string | null
           updated_at: string | null
           user_email: string
@@ -520,6 +521,7 @@ export type Database = {
           created_at?: string
           id: string
           name: string
+          project_id?: number | null
           type?: string | null
           updated_at?: string | null
           user_email: string
@@ -528,11 +530,20 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          project_id?: number | null
           type?: string | null
           updated_at?: string | null
           user_email?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'folders_project_id_projects_id_fk'
+            columns: ['project_id']
+            isOneToOne: false
+            referencedRelation: 'projects'
+            referencedColumns: ['id']
+          },
+        ]
       }
       'llm-convo-monitor': {
         Row: {

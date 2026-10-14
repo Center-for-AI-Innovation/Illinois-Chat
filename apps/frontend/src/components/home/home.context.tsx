@@ -27,7 +27,6 @@ export interface HomeContextProps {
   // setRunningTool: (isRunningTool: boolean) => void
   setIsRetrievalLoading: (isRetrievalLoading: boolean) => void
   handleUpdateDocumentGroups: (id: string) => void
-  handleUpdateTools: (id: string) => void
   setIsQueryRewriting: (isQueryRewriting: boolean) => void
   setQueryRewriteResult: (queryText: string) => void
 }

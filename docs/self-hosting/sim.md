@@ -84,11 +84,17 @@ The relevant code:
 | `apps/frontend/src/pages/api/UIUC-api/runSimWorkflow.ts` | Executes a workflow |
 | `apps/frontend/src/components/UIUC-Components/SimPage.tsx` | The project Tools page |
 
-Four things worth knowing before you change any of it:
+Five things worth knowing before you change any of it:
 
 - **Discovery is deployed-only.** A workflow that exists but is not deployed is invisible to
   Illinois Chat. A workflow whose inputs have no descriptions is skipped and reported,
   rather than published with a guessed signature.
+- **Only `workflow.description` is read.** Sim's v1 API (`/api/v1/workflows` and
+  `/api/v1/workflows/{id}`) exposes that one column; in Sim's UI it is written from
+  Deploy → API → Edit API Info. The deployment-version, MCP-tool and chat descriptions
+  live in other tables and are not exposed to API keys. When the column is empty,
+  `getUIUCToolFromSim` synthesises a fallback from the name and input fields and sets
+  `hasAuthoredDescription: false`, which the Tools page flags.
 - **Execution is authorised against the same listing**, so a hand-crafted workflow ID cannot
   spend a project's key on an undeployed or unrelated workflow.
 - **Reserved control fields are stripped** from both advertised schemas and model-generated
