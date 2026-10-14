@@ -42,8 +42,7 @@ export default function Unsubscribe() {
       if (!response.ok) {
         showToast({
           title: 'Our database is having a bad day. 😢',
-          message:
-            `Seems like we couldn't unsubscribe you. Please try again later. Email ${SUPPORT_EMAIL} for assistance.`,
+          message: `Seems like we couldn't unsubscribe you. Please try again later. Email ${SUPPORT_EMAIL} for assistance.`,
           type: 'error',
           autoClose: 20000,
         })
