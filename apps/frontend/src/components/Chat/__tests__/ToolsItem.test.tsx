@@ -4,6 +4,7 @@ import { fireEvent, screen, within } from '@testing-library/react'
 
 import { ToolsItem } from '../ToolsItem'
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
+import { readDisabledToolIds, setToolDisabled } from '~/utils/app/disabledTools'
 
 describe('ToolsItem', () => {
   it('filters tools by search and toggles via HomeContext dispatch', () => {
@@ -41,6 +42,30 @@ describe('ToolsItem', () => {
         }),
       ]),
     })
+  })
+
+  it('saves each switch under the selected conversation', () => {
+    localStorage.clear()
+    setToolDisabled('conv-1', 't2', true)
+    const tools = [
+      { id: 't1', readableName: 'Tool One', enabled: true },
+      { id: 't2', readableName: 'Tool Two', enabled: false },
+    ]
+    renderWithProviders(<ToolsItem />, {
+      homeState: { tools, selectedConversation: { id: 'conv-1' } } as any,
+      homeContext: { dispatch: vi.fn() } as any,
+    })
+
+    const switchFor = (name: string) =>
+      within(screen.getByText(name).closest('tr') as HTMLElement).getByRole(
+        'switch',
+      )
+    fireEvent.click(switchFor('Tool One'))
+    expect(readDisabledToolIds('conv-1')).toEqual(['t2', 't1'])
+    fireEvent.click(switchFor('Tool Two'))
+    expect(readDisabledToolIds('conv-1')).toEqual(['t1'])
+    expect(readDisabledToolIds('conv-2')).toEqual([])
+    localStorage.clear()
   })
 
   it('shows an empty state when tools list is empty', () => {

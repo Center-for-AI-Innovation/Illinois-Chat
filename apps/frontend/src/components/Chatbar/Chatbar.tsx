@@ -27,6 +27,7 @@ import { saveConversationToServer } from '@/hooks/__internal__/conversation'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { useFetchFolders } from '~/hooks/queries/useFetchFolders'
+import { removeDisabledTools } from '~/utils/app/disabledTools'
 
 interface DownloadResult {
   message: string
@@ -390,7 +391,10 @@ export const Chatbar = ({
     homeDispatch({ field: 'conversations', value: updatedConversations })
     chatDispatch({ field: 'searchTerm', value: '' })
 
-    deleteConversationMutation.mutate(conversation)
+    // Only once deleted: a failed delete restores the conversation.
+    deleteConversationMutation.mutate(conversation, {
+      onSuccess: () => removeDisabledTools(conversation.id),
+    })
 
     if (updatedConversations.length > 0) {
       const lastConversation = updatedConversations[0]

@@ -19,7 +19,6 @@ export function makeHomeContext(
     setIsRouting: () => undefined,
     setIsRetrievalLoading: () => undefined,
     handleUpdateDocumentGroups: () => undefined,
-    handleUpdateTools: () => undefined,
     setIsQueryRewriting: () => undefined,
     setQueryRewriteResult: () => undefined,
     ...overrides,

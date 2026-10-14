@@ -132,7 +132,6 @@ const Home = ({
       selectedConversation,
       llmProviders,
       documentGroups,
-      tools,
     },
     dispatch,
   } = contextValue
@@ -418,15 +417,6 @@ const Home = ({
     dispatch({ field: 'documentGroups', value: documentGroups })
   }
 
-  // Update actions for a prompt
-  // Fetch workflow tools instead of OpenAI-compatible tools.
-  const handleUpdateTools = (id: string) => {
-    tools.map((tool) =>
-      tool.id === id ? { ...tool, checked: !tool.enabled } : tool,
-    )
-    dispatch({ field: 'tools', value: tools })
-  }
-
   const GradientIconPhoto = () => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -570,7 +560,6 @@ const Home = ({
           // setIsRunningTool,
           setIsRetrievalLoading,
           handleUpdateDocumentGroups,
-          handleUpdateTools,
           setIsQueryRewriting,
           setQueryRewriteResult,
         }}
