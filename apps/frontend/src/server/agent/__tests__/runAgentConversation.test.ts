@@ -25,15 +25,15 @@ vi.mock('~/utils/streamProcessing', () => ({
 
 import { runAgentConversation } from '../runAgentConversation'
 
-const makeTool = (name: string) => ({
-  id: name,
+const makeTool = (id: string, name: string) => ({
+  id,
   name,
   readableName: name,
   description: '',
   enabled: true,
 })
 
-const run = (disabledTools?: string[]) =>
+const run = (disabledToolIds?: string[]) =>
   runAgentConversation({
     conversation: {
       id: 'conv-1',
@@ -47,7 +47,7 @@ const run = (disabledTools?: string[]) =>
     courseName: 'CS101',
     userMessage: { id: 'msg-1', role: 'user', content: 'hi' } as any,
     documentGroups: [],
-    disabledTools,
+    disabledToolIds,
     courseMetadata: {} as any,
     llmProviders: {} as any,
     openaiKey: '',
@@ -57,13 +57,13 @@ const run = (disabledTools?: string[]) =>
     emit: vi.fn(),
   })
 
-describe('runAgentConversation disabledTools', () => {
+describe('runAgentConversation disabledToolIds', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     hoisted.fetchToolsServer.mockResolvedValue([
-      makeTool('tool_a'),
-      makeTool('tool_b'),
+      makeTool('wf-a', 'tool_a'),
+      makeTool('wf-b', 'tool_b'),
     ])
     // Abort the loop right after capturing what the router was offered.
     hoisted.selectToolsServer.mockRejectedValue(new Error('stop'))
@@ -75,7 +75,7 @@ describe('runAgentConversation disabledTools', () => {
     )
 
   it('omits disabled tools from what the router is offered', async () => {
-    await run(['tool_a'])
+    await run(['wf-a'])
 
     expect(offeredToolNames()).toEqual(['search_documents', 'tool_b'])
   })
@@ -87,8 +87,23 @@ describe('runAgentConversation disabledTools', () => {
   })
 
   it('keeps the retrieval tool even if every Sim tool is disabled', async () => {
-    await run(['tool_a', 'tool_b'])
+    await run(['wf-a', 'wf-b'])
 
     expect(offeredToolNames()).toEqual(['search_documents'])
+  })
+
+  it('omits only the disabled workflow when two share a tool name', async () => {
+    hoisted.fetchToolsServer.mockResolvedValue([
+      makeTool('wf-1', 'sim_grade_report'),
+      makeTool('wf-2', 'sim_grade_report'),
+    ])
+
+    await run(['wf-1'])
+
+    const offeredIds = (
+      hoisted.selectToolsServer.mock.calls[0]![0].availableTools as any[]
+    ).map((t) => t.id)
+    expect(offeredIds).not.toContain('wf-1')
+    expect(offeredIds).toContain('wf-2')
   })
 })

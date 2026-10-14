@@ -40,7 +40,7 @@ export interface RunAgentParams {
   courseName: string
   userMessage: Message
   documentGroups: string[]
-  disabledTools?: string[]
+  disabledToolIds?: string[]
   courseMetadata: CourseMetadata
   llmProviders: AllLLMProviders
   openaiKey: string
@@ -73,7 +73,7 @@ export async function runAgentConversation(
     courseName,
     userMessage,
     documentGroups,
-    disabledTools,
+    disabledToolIds,
     courseMetadata,
     llmProviders,
     openaiKey,
@@ -151,9 +151,9 @@ export async function runAgentConversation(
     if (abortIfNeeded()) {
       return cancelledResult
     }
-    const disabled = new Set(disabledTools ?? [])
+    const disabled = new Set(disabledToolIds ?? [])
     availableTools = (await fetchToolsServer(courseName, signal)).filter(
-      (tool) => !disabled.has(tool.name),
+      (tool) => !disabled.has(tool.id),
     )
   } catch (error) {
     console.error(

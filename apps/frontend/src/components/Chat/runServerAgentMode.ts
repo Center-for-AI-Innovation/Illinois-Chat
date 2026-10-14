@@ -26,7 +26,7 @@ interface RunServerAgentModeParams {
   conversations: Conversation[] | undefined
   courseName: string
   enabledDocumentGroups: string[]
-  disabledTools?: string[]
+  disabledToolIds?: string[]
   errorToast: (args: ToastArgs) => void
   homeDispatch: HomeDispatch
   message: Message
@@ -45,7 +45,7 @@ export async function runServerAgentMode({
   conversations,
   courseName,
   enabledDocumentGroups,
-  disabledTools,
+  disabledToolIds,
   errorToast,
   homeDispatch,
   message,
@@ -192,7 +192,7 @@ export async function runServerAgentMode({
       imageUrls: message.imageUrls,
     },
     documentGroups: enabledDocumentGroups,
-    disabledTools,
+    disabledToolIds,
     model: {
       id: selectedConversation.model.id,
       name: selectedConversation.model.name,

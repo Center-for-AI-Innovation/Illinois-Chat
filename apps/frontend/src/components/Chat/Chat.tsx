@@ -957,9 +957,9 @@ export const Chat = memo(
               conversations,
               courseName,
               enabledDocumentGroups: documentGroups,
-              disabledTools: tools
+              disabledToolIds: tools
                 .filter((tool) => tool.enabled === false)
-                .map((tool) => tool.name),
+                .map((tool) => tool.id),
               errorToast,
               homeDispatch,
               message,

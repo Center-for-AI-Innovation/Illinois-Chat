@@ -244,7 +244,7 @@ export function simConfigErrorResponse(reason: SimConfigError): {
   }
 }
 
-const ALLOWED_SIM_HOSTS = new Set(['www.sim.ai', 'sim.ai', 'api.sim.ai'])
+const ALLOWED_SIM_HOSTS = new Set(['www.sim.ai', 'sim.ai', 'api.sim.ai', 'sim.chat.illinois.edu'])
 
 /**
  * Origins the deployment operator has declared as trusted Sim instances:
