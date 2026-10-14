@@ -21,6 +21,7 @@ import { callSetCourseMetadata } from '~/utils/apiUtils'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { LoadingSpinner } from './LoadingSpinner'
 import { showToast } from '~/utils/toastUtils'
+import { SUPPORT_EMAIL } from '~/utils/app/const'
 
 interface WebScrapeProps {
   is_new_course: boolean
@@ -117,7 +118,7 @@ export const WebScrape = ({
       if (url.includes('coursera.org')) {
         // TODO: coursera ingest
         alert(
-          'Coursera ingest is not yet automated (auth is hard). Please email rohan13@illinois.edu to do it for you',
+          `Coursera ingest is not yet automated (auth is hard). Please email ${SUPPORT_EMAIL} to do it for you`,
         )
       } else if (url.includes('ocw.mit.edu')) {
         data = downloadMITCourse(url, courseName, 'local_dir') // no await -- do in background
@@ -206,8 +207,7 @@ export const WebScrape = ({
       type: 'info',
       autoClose: 15000,
       title: 'Web scraping started',
-      message:
-        "It'll scrape in the background, just wait for the results to show up in your project (~3 minutes total).\nThis feature is stable but the web is a messy place. If you have trouble, I'd love to fix it. Just shoot me an email: rohan13@illinois.edu.",
+      message: `It'll scrape in the background, just wait for the results to show up in your project (~3 minutes total).\nThis feature is stable but the web is a messy place. If you have trouble, we'd love to fix it. Just send us an email: ${SUPPORT_EMAIL}.`,
       icon: <IconWorldDownload size={16} />,
     })
   }
