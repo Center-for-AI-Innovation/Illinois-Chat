@@ -111,6 +111,15 @@ describe('SimPage', () => {
     expect(screen.getByText('Summarize Paper')).toBeInTheDocument()
     expect(screen.getByText('paper_url')).toBeInTheDocument()
     expect(screen.getByText('No description in Sim')).toBeInTheDocument()
+    // The fallback is labelled as what the model gets, and the hint names the
+    // one Sim field that is read.
+    expect(screen.getByText('Sent to the model instead')).toBeInTheDocument()
+    expect(screen.getByText(/No description provided/)).toBeInTheDocument()
+    expect(screen.getByText(/Edit API Info/)).toBeInTheDocument()
+    // A described workflow shows its description plainly.
+    expect(
+      screen.getByText('Summarizes an uploaded paper.'),
+    ).toBeInTheDocument()
   })
 
   it('saves the config and shows a failed save under the Save button', async () => {

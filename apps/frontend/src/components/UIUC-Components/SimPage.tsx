@@ -645,14 +645,28 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                                 No description in Sim
                               </Badge>
                             )}
-                            <p className="line-clamp-2 text-sm">
-                              {tool.description}
-                            </p>
-                            {tool.hasAuthoredDescription === false && (
-                              <p className="text-xs opacity-60">
-                                The chat model decides when to use a tool from
-                                its description. Add one to this workflow in Sim
-                                so it gets picked reliably.
+                            {tool.hasAuthoredDescription === false ? (
+                              <>
+                                {/* Nothing authored, so what the router model
+                                    is given is a fallback built from the name
+                                    and input fields; label it as such. */}
+                                <p className="mt-1 text-xs font-semibold tracking-wide text-(--foreground) uppercase">
+                                  Sent to the model instead
+                                </p>
+                                <p className="line-clamp-2 text-sm text-(--foreground-faded) italic">
+                                  {tool.description}
+                                </p>
+                                <p className="text-xs opacity-60">
+                                  The chat model decides when to use a tool from
+                                  its description. In Sim, open the workflow,
+                                  choose Deploy, then the API tab, then Edit API
+                                  Info, and fill in Description. The version,
+                                  MCP and chat descriptions are not read.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="line-clamp-2 text-sm">
+                                {tool.description}
                               </p>
                             )}
                           </TableCell>
