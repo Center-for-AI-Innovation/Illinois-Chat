@@ -26,6 +26,8 @@
      white (4.9:1); dark mode swaps in a lighter orange (Altgeld on navy is
      only 2.6:1). */
   --ic-nav-active: var(--illinois-orange);
+  /* Rule under the header band; dark mode needs a blue that shows on navy. */
+  --ic-header-rule: var(--illinois-blue);
   --ic-text-secondary: var(--illinois-storm-dark);
   --ic-muted-fg: var(--illinois-storm-medium);
   --ic-bg: var(--illinois-white);
@@ -94,6 +96,7 @@ html {
   --ic-sidebar-fg: var(--illinois-white);
   --ic-sidebar-accent-fg: var(--illinois-white);
   --ic-nav-active: #ff8a3d;
+  --ic-header-rule: var(--illinois-industrial);
   --ic-text-secondary: var(--illinois-storm-light);
   --ic-muted-fg: var(--illinois-storm-medium);
   --ic-bg: var(--illinois-blue);
@@ -224,7 +227,21 @@ html {
 .md-tabs {
   background-color: var(--ic-bg);
   color: var(--ic-nav-fg);
-  border-bottom: 1px solid var(--ic-border);
+  border-bottom: 1px solid var(--ic-header-rule);
+}
+
+/* Taller tab row with the labels centred, so they don't sit on the rule. */
+.md-tabs__list,
+.md-tabs__item {
+  height: 3.25rem;
+}
+
+.md-tabs__link {
+  margin-top: 1rem;
+}
+
+.md-main__inner {
+  margin-top: 2rem;
 }
 
 .md-tabs__link {
