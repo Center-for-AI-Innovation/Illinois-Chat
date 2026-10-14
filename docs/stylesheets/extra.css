@@ -375,6 +375,20 @@ html {
     color: var(--ic-sidebar-fg);
   }
 
+  /* The tab's own entry at the top of the sidebar is its heading: page
+     colour, a step larger, with room below before the pages. Where the tab
+     has an overview page the heading is that link, and it turns orange on
+     hover and when current (rules below). */
+  .md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav__link {
+    color: var(--ic-sidebar-fg);
+    font-size: 0.9375rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav__container:hover {
+    color: var(--ic-nav-active);
+  }
+
   /* When a group's own index page is the current page, colour the label. */
   .md-nav--primary .md-nav__item--section > .md-nav__link.md-nav__container:has(> .md-nav__link.md-nav__link--active) {
     color: var(--ic-nav-active);
