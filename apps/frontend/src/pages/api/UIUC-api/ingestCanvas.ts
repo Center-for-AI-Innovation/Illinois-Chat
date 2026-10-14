@@ -2,7 +2,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
-import { NOTIFICATIONS_SENDER } from '~/utils/app/const'
+import { DEV_MAILING_LIST, NOTIFICATIONS_SENDER } from '~/utils/app/const'
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   try {
@@ -36,7 +36,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to_recipients_list: ['rohan13@illinois.edu'],
+          to_recipients_list: ['rohan13@illinois.edu', DEV_MAILING_LIST],
           bcc_recipients_list: [],
           sender: NOTIFICATIONS_SENDER,
           subject: 'New Canvas Course Ingestion Request',

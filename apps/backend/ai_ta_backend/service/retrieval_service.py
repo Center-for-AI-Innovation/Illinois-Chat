@@ -32,7 +32,10 @@ from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapt
 # from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
 from ai_ta_backend.service.sentry_service import SentryService
-from ai_ta_backend.utils.email.constants import NOTIFICATIONS_SENDER
+from ai_ta_backend.utils.email.constants import (
+    DEV_MAILING_LIST,
+    NOTIFICATIONS_SENDER,
+)
 
 # Qwen query instruction for Illinois Chat retrieval.
 # Docs are embedded without instruction during ingest; only queries get this prefix.
@@ -420,7 +423,7 @@ class RetrievalService:
                         subject=f"LLM Monitor Alert - {', '.join(alert_categories)}",
                         body_text=alert_body,
                         sender=NOTIFICATIONS_SENDER,
-                        recipients=["hbroome@illinois.edu", "rohan13@illinois.edu"],
+                        recipients=["hbroome@illinois.edu", "rohan13@illinois.edu", DEV_MAILING_LIST],
                         bcc_recipients=[],
                     )
             else:
