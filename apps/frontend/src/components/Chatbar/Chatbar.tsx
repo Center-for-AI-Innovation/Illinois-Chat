@@ -27,6 +27,7 @@ import { saveConversationToServer } from '@/hooks/__internal__/conversation'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { useFetchFolders } from '~/hooks/queries/useFetchFolders'
+import { removeDisabledTools } from '~/utils/app/disabledTools'
 
 interface DownloadResult {
   message: string
@@ -98,12 +99,18 @@ export const Chatbar = ({
   )
 
   useEffect(() => {
+    // Folders are keyed by course, so switching courses starts a fresh query
+    // with no data yet. Clear the previous course's folders instead of leaving
+    // them (and the conversations nested inside them) on screen until the new
+    // fetch lands.
     if (isFoldersFetched && !isLoadingFolders) {
       // console.log('foldersData: ', foldersData)
       homeDispatch({ field: 'folders', value: foldersData })
       // localStorage.setItem('folders', JSON.stringify(foldersData))
+    } else if (foldersData === undefined) {
+      homeDispatch({ field: 'folders', value: [] })
     }
-  }, [foldersData])
+  }, [foldersData, isFoldersFetched, isLoadingFolders, homeDispatch])
 
   const {
     data: conversationHistory,
@@ -390,7 +397,10 @@ export const Chatbar = ({
     homeDispatch({ field: 'conversations', value: updatedConversations })
     chatDispatch({ field: 'searchTerm', value: '' })
 
-    deleteConversationMutation.mutate(conversation)
+    // Only once deleted: a failed delete restores the conversation.
+    deleteConversationMutation.mutate(conversation, {
+      onSuccess: () => removeDisabledTools(conversation.id),
+    })
 
     if (updatedConversations.length > 0) {
       const lastConversation = updatedConversations[0]

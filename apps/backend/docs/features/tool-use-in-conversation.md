@@ -16,7 +16,7 @@ The full walkthrough, from signing in to Sim through connecting a workspace to a
 
 ## Usage - Write your own tool
 
-1. Build a workflow in Sim. Give it a clear name and description: the LLM uses both to decide when to call the tool.
+1. Build a workflow in Sim. Give it a clear name and description: the LLM uses both to decide when to call the tool. The description must be set under Deploy → API → Edit API Info; the version, MCP and chat descriptions are not read.
 2. Deploy the workflow. Only deployed workflows are discoverable.
 3. In Illinois Chat, open `/<YOUR-PROJECT>/tools`, save your Sim API key and workspace, and enable the workflows you want active.
 4. Start chatting. Tools are invoked as needed.

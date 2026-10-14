@@ -36,6 +36,7 @@ import {
   deriveAgentModeEnabled,
   shouldShowChatLoader,
 } from '~/utils/app/agentMode'
+import { readDisabledToolIds } from '~/utils/app/disabledTools'
 
 import { SourcesSidebarProvider } from './ChatMessage'
 
@@ -276,21 +277,29 @@ export const Chat = memo(
     }, [documentGroups])
 
     // TOOLS
+    // Apply this conversation's saved switches.
     useEffect(() => {
-      if (isSuccessTools) {
-        homeDispatch({
-          field: 'tools',
-          value: [...toolsHook],
-        })
-      } else if (isErrorTools) {
-        errorToast({
-          title: 'Error loading tools',
-          message:
-            (toolLoadingError as Error).message +
-            '.\nPlease refresh the page or try again later. Regular chat features may still work.',
-        })
-      }
-    }, [toolsHook, isSuccessTools])
+      if (!isSuccessTools) return
+      const disabled = new Set(readDisabledToolIds(selectedConversation?.id))
+      homeDispatch({
+        field: 'tools',
+        value: toolsHook.map((tool) => ({
+          ...tool,
+          enabled: !disabled.has(tool.id),
+        })),
+      })
+    }, [toolsHook, isSuccessTools, selectedConversation?.id])
+
+    // Separate so switching conversations doesn't repeat the toast.
+    useEffect(() => {
+      if (!isErrorTools) return
+      errorToast({
+        title: 'Error loading tools',
+        message:
+          (toolLoadingError as Error).message +
+          '.\nPlease refresh the page or try again later. Regular chat features may still work.',
+      })
+    }, [isErrorTools])
 
     useEffect(() => {
       setEnabledTools(
@@ -937,7 +946,7 @@ export const Chat = memo(
         }
 
         // Action 3: Tool Execution (with Agent Mode support)
-        if (tools.length > 0 || agentModeEnabled) {
+        if (tools.some((tool) => tool.enabled !== false) || agentModeEnabled) {
           if (agentModeEnabled) {
             if (courseMetadata?.agent_mode_enabled !== true) {
               handleUpdateConversation(updatedConversation, {
@@ -957,6 +966,9 @@ export const Chat = memo(
               conversations,
               courseName,
               enabledDocumentGroups: documentGroups,
+              disabledToolIds: tools
+                .filter((tool) => tool.enabled === false)
+                .map((tool) => tool.id),
               errorToast,
               homeDispatch,
               message,
@@ -980,7 +992,7 @@ export const Chat = memo(
             )
 
             // Non-agent mode: just use the provided tools directly
-            const toolsToUse = tools
+            const toolsToUse = tools.filter((tool) => tool.enabled !== false)
 
             homeDispatch({ field: 'isRouting', value: true })
 

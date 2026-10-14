@@ -54,6 +54,7 @@ vi.mock('~/db/schema', () => ({
 
 import { decryptProjectConfig, encryptProjectConfig } from '~/utils/crypto'
 import {
+  discoverWithCredentials,
   invalidateSimConfigCache,
   resolveSimCredentials,
   resolveStoredSimApiKey,
@@ -421,6 +422,34 @@ describe('config cache bound', () => {
     // the oldest survivor and is still served from cache.
     await resolveSimCredentials('p2')
     expect(hoisted.selectCalls).toBe(502)
+  })
+})
+
+describe('discoverWithCredentials', () => {
+  const creds = {
+    api_key: 'sk-sim',
+    workspace_id: 'ws-1',
+    base_url: 'https://www.sim.ai',
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('reports a timeout separately from other request failures', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException('The operation timed out.', 'TimeoutError'),
+        ),
+    )
+
+    await expect(discoverWithCredentials(creds)).resolves.toEqual({
+      ok: false,
+      reason: 'timeout',
+    })
   })
 })
 
