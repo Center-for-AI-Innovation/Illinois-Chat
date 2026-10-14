@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DISABLED_TOOLS_KEY,
   readDisabledToolIds,
@@ -10,7 +10,10 @@ const stored = () => JSON.parse(localStorage.getItem(DISABLED_TOOLS_KEY)!)
 
 describe('disabledTools', () => {
   beforeEach(() => localStorage.clear())
-  afterEach(() => localStorage.clear())
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
 
   it('reads nothing disabled when the store is empty or the id is missing', () => {
     expect(readDisabledToolIds('conv-1')).toEqual([])
@@ -63,6 +66,15 @@ describe('disabledTools', () => {
     setToolDisabled('conv-1', 'wf-1', true)
     setToolDisabled('conv-1', 'wf-1', true)
     expect(readDisabledToolIds('conv-1')).toEqual(['wf-1'])
+  })
+
+  it('does not throw when storage rejects the write', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    })
+
+    expect(() => setToolDisabled('conv-1', 'wf-1', true)).not.toThrow()
+    expect(readDisabledToolIds('conv-1')).toEqual([])
   })
 
   it('removes one conversation', () => {
