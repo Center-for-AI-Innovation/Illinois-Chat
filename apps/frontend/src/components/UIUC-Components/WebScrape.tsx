@@ -524,7 +524,7 @@ export const WebScrape = ({
                         className={
                           'text-(--dashboard-button) hover:text-(--dashboard-button-hover)'
                         }
-                        href="https://docs.uiuc.chat/features/web-crawling-details"
+                        href="https://docs.chat.illinois.edu/building/dashboard/web-crawling/"
                         target="_blank"
                         rel="noopener noreferrer"
                       >

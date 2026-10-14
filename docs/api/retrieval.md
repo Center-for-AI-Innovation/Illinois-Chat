@@ -1,66 +1,85 @@
 # Retrieval API
 
-Fetch the most relevant document contexts for a query without generating an answer. These endpoints are served by the Flask backend.
+Fetch the most relevant document contexts for a query without generating an answer.
 
-!!! info "Retrieval via the Chat API"
-    The [Chat API](chat.md) also supports a free `retrieval_only` mode if you're already integrating against it.
+Retrieval runs inside the web app: by default it searches **pgvector** in the chatbot's Postgres database. How ranking works is described on the [Retrieval](../how-it-works/retrieval.md) page.
 
-## `POST /getTopContexts`
+## `retrieval_only` on the Chat API
 
-Fast, single-query vector retrieval.
-
-### Request body
+Send a normal [Chat request](chat.md) with `"retrieval_only": true`. The app embeds the last user message, searches the chatbot's documents and returns the contexts instead of an answer. `model` is still required and must be enabled on the chatbot; if nothing matches, the request falls through to the LLM and returns a normal `{"message": ..., "contexts": []}` answer.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `search_query` | string | yes | The query to match against the project's documents. |
-| `course_name` | string | yes | Project name. |
-| `token_limit` | integer | no | Token budget for the returned contexts. |
-| `top_n` | integer | no | Maximum number of contexts to return. |
-| `doc_groups` | array | no | Restrict retrieval to specific [document groups](../guides/uploading-materials.md#organizing-with-document-groups). |
-
-### Example
+| `model` | string | yes | A model enabled on the chatbot's [LLMs page](../building/llms.md). |
+| `messages` | array | yes | OpenAI-style messages; the last `user` message is the search query. |
+| `course_name` | string | yes | Chatbot name. |
+| `api_key` | string | yes | Your API key. |
+| `retrieval_only` | boolean | yes | `true`. |
+| `doc_groups` | array | no | Restrict retrieval to specific [document groups](../building/dashboard/document-groups.md). Default `["All Documents"]`. |
+| `top_n` | integer | no | Maximum number of contexts to return. Default `100`. |
+| `conversation_id` | string | no | Conversation UUID, recorded with the retrieval. |
 
 ```bash
-curl -X POST https://backend.chat.illinois.edu/getTopContexts \
+curl -X POST https://chat.illinois.edu/api/chat-api/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "search_query": "What is a finite state machine?",
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "What is a finite state machine?"}],
     "course_name": "ece-385",
+    "api_key": "uc_YOUR_API_KEY",
+    "retrieval_only": true,
     "doc_groups": ["lectures", "readings"],
     "top_n": 5
   }'
 ```
 
-### Response
-
 ```json
-[
-  {
-    "readable_filename": "Lumetta_notes",
-    "pagenumber_or_timestamp": "pg. 19",
-    "s3_pdf_path": "/courses/ece-385/Lumetta_notes.pdf",
-    "text": "In FSM, we do this..."
-  }
-]
+{
+  "contexts": [
+    {
+      "id": 48213,
+      "text": "In FSM, we do this...",
+      "readable_filename": "Lumetta_notes.pdf",
+      "course_name": "ece-385",
+      "course_name ": "ece-385",
+      "s3_path": "courses/ece-385/Lumetta_notes.pdf",
+      "pagenumber": "19",
+      "url": "",
+      "base_url": "",
+      "doc_groups": ["lectures"]
+    }
+  ]
+}
 ```
 
-## `GET /getTopContextsWithMQR`
+Status codes are the Chat API's; see its [status table](chat.md#status-codes).
 
-Multi-query retrieval with LLM filtering — higher precision at higher latency. See [Concepts → Retrieval](../concepts/retrieval.md#3-multi-query-retrieval-with-filtering).
+## The context object
 
-### Query parameters
+| Key | Meaning |
+| --- | --- |
+| `id` | Chunk ID in the vector store. |
+| `text` | The chunk text. |
+| `readable_filename` | Display name of the source document. |
+| `course_name` | Chatbot name. The same value is repeated under the key `"course_name "` (with a trailing space); Qdrant-backed chatbots return only the trailing-space form, so read that key when you need to support both. |
+| `s3_path` | Object-storage path of the uploaded file, empty for crawled pages. |
+| `pagenumber` | Page (or timestamp) the chunk came from, as a string. |
+| `url`, `base_url` | Source URL of a crawled page and the crawl's starting URL; empty for uploads. |
+| `doc_groups` | Groups the chunk's document belongs to. |
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `search_query` | string | yes | The query. |
-| `course_name` | string | yes | Project name. |
-| `token_limit` | integer | no | Token budget for returned contexts, default `3000`. |
+## Chatbots with an external Qdrant connection
 
-### Example
+A chatbot that has an [external Qdrant connection](../building/external-connections.md) is searched by the Flask backend, and the app forwards retrieval to it, so nothing changes for callers. If you run the stack yourself and have exposed the backend, you can also call it directly. The body takes `search_query`, `course_name`, and optionally `doc_groups`, `top_n` (default `100`) and `conversation_id`:
 
 ```bash
-curl "https://backend.chat.illinois.edu/getTopContextsWithMQR?search_query=finite%20state%20machines&course_name=ece-385&token_limit=3000"
+curl -X POST https://<your-backend-host>/getTopContexts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "search_query": "What is a finite state machine?",
+    "course_name": "ece-385",
+    "doc_groups": ["lectures"],
+    "top_n": 5
+  }'
 ```
 
-Returns the same context format as `/getTopContexts`.
+The response is the bare array of context objects, with the chatbot name under the `"course_name "` key only.

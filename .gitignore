@@ -175,8 +175,6 @@ pip-selfcheck.json
 # IDE
 .idea
 
-# MkDocs build output
-site/
 
 # Claude Code
 .claude/

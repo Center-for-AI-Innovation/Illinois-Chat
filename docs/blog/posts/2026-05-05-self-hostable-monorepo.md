@@ -13,7 +13,7 @@ Illinois Chat's frontend, backend, and crawler now live together in a single rep
 
 ## What changed
 
-- **One repository.** The previously separate `uiuc-chat-frontend`, `ai-ta-backend`, and `crawlee` repositories were merged (via `git subtree`, with full history preserved) into `apps/frontend`, `apps/backend`, and `apps/crawlee`. See [Monorepo Migration](../../developers/monorepo-migration.md) for the details.
+- **One repository.** The previously separate `uiuc-chat-frontend`, `ai-ta-backend`, and `crawlee` repositories were merged (via `git subtree`, with full history preserved) into `apps/frontend`, `apps/backend`, and `apps/crawlee`. See [Monorepo Migration](../../contributing/repository-layout.md) for the details.
 - **One-command self-hosting.** `bash infra/scripts/start-all.sh` brings up the frontend, backend, ingest worker, Crawlee, Postgres, Redis, RabbitMQ, MinIO, Qdrant, and Keycloak, then initializes the database and vector collection. See the [Self-Hosting guide](../../self-hosting/index.md).
 - **Infrastructure as code.** Compose files, database migrations, and Keycloak realms all live under `infra/`.
 - **RabbitMQ ingest queue.** The document-ingest pipeline now runs on RabbitMQ with a dedicated worker process.

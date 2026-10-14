@@ -1,6 +1,6 @@
-# CropWizard Document License Information
+# Document Licenses
 
-Information about the copyrights and licenses of the documents in the CropWizard knowledge base. The database contains:
+*CropWizard document license information.* The copyrights and licenses of the documents in the CropWizard knowledge base. The database contains:
 
 1. Extension website content and publications
 2. Springer journals

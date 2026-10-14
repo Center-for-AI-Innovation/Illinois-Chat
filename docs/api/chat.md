@@ -1,6 +1,6 @@
 # Chat API
 
-The primary endpoint for developers: RAG-grounded chat over your project's documents, with streaming, multi-turn conversations, image input, and automatic tool use.
+The primary endpoint for developers: RAG-grounded chat over your chatbot's documents, with streaming, multi-turn conversations, image input, and automatic tool use.
 
 ```
 POST https://chat.illinois.edu/api/chat-api/chat
@@ -10,14 +10,16 @@ POST https://chat.illinois.edu/api/chat-api/chat
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `model` | string | yes | Model to use, e.g. `gpt-4o-mini`, or a free NCSA-hosted model like `llama3.1:70b`. See [LLM Providers](../concepts/llm-providers.md). |
-| `messages` | array | yes | OpenAI-style message list (`role`: `system` \| `user` \| `assistant`; `content`: string or content-part array for images). |
-| `course_name` | string | yes | Your project name (the slug in your project URL). |
-| `api_key` | string | yes | Project API key. See [Authentication](authentication.md). |
-| `openai_key` | string | no* | Your LLM provider key. *Required for commercial models; omit for free NCSA-hosted models and `retrieval_only` requests.* |
-| `temperature` | number | no | `0.0`–`1.0`, default `0.1`. |
-| `stream` | boolean | no | Stream the response as newline-delimited chunks. Default `false`. |
-| `retrieval_only` | boolean | no | Skip the LLM entirely and return only the retrieved contexts. Free of charge. Default `false`. |
+| `model` | string | yes | Model ID, e.g. `gpt-4o-mini`. The model must be enabled on the chatbot's [LLMs page](../building/llms.md), which also shows the IDs of the models available there. Required even with `retrieval_only`. |
+| `messages` | array | yes | OpenAI-style message list (`role`: `system` \| `user` \| `assistant`; `content`: string or content-part array for images). Must contain at least one `user` message. |
+| `course_name` | string | yes | Your chatbot name (the slug in its URL). |
+| `api_key` | string | yes | Your API key. See [Authentication](authentication.md). |
+| `temperature` | number | no | `0.0`–`1.0`. Default: the chatbot's default model's temperature setting, else `0.1`. |
+| `stream` | boolean | no | Stream the response. Default `false`. |
+| `retrieval_only` | boolean | no | Return only the retrieved contexts without calling the LLM. Default `false`. If no contexts are found, the request falls through to the LLM anyway. |
+| `conversation_id` | string | no | UUID of an existing conversation to continue; a new one is created when omitted. |
+| `doc_groups` | array | no | [Document groups](../building/dashboard/document-groups.md) to search. Default `["All Documents"]`. |
+| `top_n` | integer | no | Maximum number of contexts to retrieve. Positive integer, default `100`. |
 
 ## Response
 
@@ -38,7 +40,25 @@ Non-streaming responses include **both** the LLM answer and the retrieved contex
 }
 ```
 
-Streaming responses (`"stream": true`) return the answer text incrementally.
+With `"retrieval_only": true` and at least one context found, the response is `{"contexts": [...]}`.
+
+Streaming responses (`"stream": true`) are raw text chunks over `text/event-stream`, written as the model generates them; citation markers are rewritten into links as they stream.
+
+### Status codes
+
+| Status | When |
+| --- | --- |
+| `405` | Method other than `POST`. |
+| `400` | Invalid body: a required field is missing, the model is not a supported model ID, `messages` is empty or has no `user` message, `temperature` is outside `0`–`1`, `top_n` is not a positive integer, or an image was sent to a model without vision support. The `error` field says which. |
+| `403` | Invalid API key. |
+| `404` | Unknown chatbot (`course_name`). |
+| `403` | The chatbot is frozen by an administrator. |
+| `400` | The model is not enabled on this chatbot; the message lists the enabled models. |
+| `403` | Your key is valid but you cannot edit this chatbot. |
+| `400` | No messages in the conversation. |
+| `200` | `{"contexts": [...]}` (retrieval only) or `{"message": "...", "contexts": [...]}`; streaming responses send text chunks. |
+| *upstream* | Errors from the model provider are passed through with the provider's status code and `{"error": "API error: ..."}`. |
+| `500` | The response could not be processed. |
 
 ## Examples
 
@@ -53,9 +73,8 @@ Streaming responses (`"stream": true`) return the answer text incrementally.
           {"role": "system", "content": "Your system prompt here"},
           {"role": "user", "content": "What is in these documents?"}
         ],
-        "openai_key": "sk-YOUR-PROVIDER-KEY",
         "temperature": 0.1,
-        "course_name": "your-project-name",
+        "course_name": "your-chatbot-name",
         "stream": true,
         "api_key": "uc_YOUR_API_KEY"
       }'
@@ -73,9 +92,8 @@ Streaming responses (`"stream": true`) return the answer text incrementally.
             {"role": "system", "content": "Your system prompt here"},
             {"role": "user", "content": "What is in these documents?"},
         ],
-        "openai_key": "sk-YOUR-PROVIDER-KEY",
         "temperature": 0.1,
-        "course_name": "your-project-name",
+        "course_name": "your-chatbot-name",
         "stream": True,
         "api_key": "uc_YOUR_API_KEY",
     }
@@ -97,9 +115,8 @@ Streaming responses (`"stream": true`) return the answer text incrementally.
             {"role": "system", "content": "Your system prompt here"},
             {"role": "user", "content": "What is in these documents?"},
         ],
-        "openai_key": "sk-YOUR-PROVIDER-KEY",
         "temperature": 0.1,
-        "course_name": "your-project-name",
+        "course_name": "your-chatbot-name",
         "stream": False,
         "api_key": "uc_YOUR_API_KEY",
     }
@@ -111,16 +128,19 @@ Streaming responses (`"stream": true`) return the answer text incrementally.
 
 ### Retrieval only
 
-Return relevant contexts without invoking an LLM — free of charge:
+Return relevant contexts without invoking an LLM. `model` is still required and must be enabled on the chatbot; if nothing matches, the request falls through to the LLM and returns a normal answer.
 
 ```python
 import requests
 
 data = {
+    "model": "gpt-4o-mini",
     "messages": [{"role": "user", "content": "What is in these documents?"}],
-    "course_name": "your-project-name",
+    "course_name": "your-chatbot-name",
     "api_key": "uc_YOUR_API_KEY",
     "retrieval_only": True,
+    "doc_groups": ["Lectures"],
+    "top_n": 20,
 }
 result = requests.post("https://chat.illinois.edu/api/chat-api/chat", json=data).json()
 print(result["contexts"])
@@ -128,7 +148,7 @@ print(result["contexts"])
 
 ### Image input
 
-Send images as part of a message using a vision-capable model:
+Send images as part of a message using a vision-capable model; other models return `400`:
 
 ```python
 data = {
@@ -143,33 +163,19 @@ data = {
             ],
         },
     ],
-    "openai_key": "sk-YOUR-PROVIDER-KEY",
-    "course_name": "your-project-name",
+    "course_name": "your-chatbot-name",
     "api_key": "uc_YOUR_API_KEY",
 }
 ```
 
 ### Multi-turn conversations
 
-Pass the full conversation history in `messages`, alternating `user` and `assistant` roles — exactly like the OpenAI chat format. Text and image parts can be mixed in the same conversation.
+Pass the full conversation history in `messages`, alternating `user` and `assistant` roles — exactly like the OpenAI chat format. Text and image parts can be mixed in the same conversation. Pass the same `conversation_id` to keep the turns in one conversation in the chatbot's history.
 
-### Free NCSA-hosted models
+### Choosing a model
 
-```python
-data = {
-    "model": "llama3.1:70b",
-    "messages": [{"role": "user", "content": "What is in these documents?"}],
-    "temperature": 0.1,
-    "course_name": "your-project-name",
-    "stream": True,
-    "api_key": "uc_YOUR_API_KEY",
-    # no openai_key needed
-}
-```
-
-!!! warning "Free vs. frontier models"
-    NCSA-hosted open models are free but not the strongest performers. For superior instruction-following, response quality, and source citation, we recommend a frontier commercial model.
+Any model enabled on the chatbot's [LLMs page](../building/llms.md) can be requested, including the free NCSA-hosted models; the page lists each model's ID. Response quality and citation accuracy vary by model.
 
 ### Tool use
 
-Tools enabled in your project are invoked automatically based on the LLM's judgment — there is no way to force invocation, but you can encourage it via prompting. A strong commercial model is always used for tool selection. See [Tools & Workflows](../guides/tools-workflows.md).
+Tools connected to your chatbot are invoked automatically based on the LLM's judgment — there is no way to force invocation, but you can encourage it via prompting. Which model decides on tool calls is described in [Tool routing](../how-it-works/tool-routing.md). See [Tools](../building/tools/index.md).

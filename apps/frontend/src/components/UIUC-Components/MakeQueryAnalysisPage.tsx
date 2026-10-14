@@ -1111,7 +1111,7 @@ export const showToastOnUpdate = (
     autoClose: 30000,
     title: message,
     message:
-      'Check our docs (https://docs.uiuc.chat/features/bulk-export-documents-or-conversation-history) for example code to process this data.',
+      'Check our docs (https://docs.chat.illinois.edu/building/analysis-exports/) for example code to process this data.',
     type: 'success',
   })
 }
