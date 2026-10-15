@@ -8,10 +8,12 @@ import logging
 import json
 import sys
 import threading
+import time
 import multiprocessing as mp
 
 from rmsql import SQLAlchemyIngestDB
 from connection_resolver import WorkerConnectionResolver
+from purge import ProjectPurger, find_resumable_deletions, is_project_deleting
 from flask import Flask, jsonify
 
 
@@ -22,6 +24,10 @@ MAX_JOB_RETRIES = int(os.getenv('MAX_JOB_RETRIES', '10'))  # messages
 
 worker_thread: threading.Thread | None = None
 worker_running = threading.Event()
+delete_thread: threading.Thread | None = None
+
+DELETE_MAX_ATTEMPTS = int(os.getenv('DELETE_MAX_ATTEMPTS', '3'))
+DELETE_RETRY_BACKOFF = int(os.getenv('DELETE_RETRY_BACKOFF_SECONDS', '30'))  # x attempt number
 
 
 logging.getLogger('pika').setLevel(logging.WARNING)
@@ -156,6 +162,14 @@ class Worker:
                 if resolved.documents_sql_engine else self.sql_session
             )
 
+            # A job queued before its project was deleted must not write
+            # documents back behind the purge.
+            if is_project_deleting(self.sql_session.engine, course_name):
+                logging.info(f"Dropping job {job_id}: project {course_name!r} is being deleted")
+                status_db.delete_document_in_progress(job_id)
+                channel.basic_ack(delivery_tag=method.delivery_tag)
+                return
+
             # flag this message as "processing started" so we can ack it later if memory runs out
 
             prog_doc = status_db.fetch_document_in_progress(job_id)
@@ -250,12 +264,80 @@ class Worker:
         logging.info("Worker exiting")
 
 
+class DeleteConsumer:
+    """Consumes the chatbot-delete queue on its own connection and thread.
+
+    A purge of a large chatbot can run for a long time; keeping it off the
+    ingest consumer means deletes never hold up uploads (and vice versa).
+
+    Messages are acked on receipt: the job's state lives in project_deletions,
+    not in the queue. Jobs a crashed worker left behind are picked up again by
+    the resume sweep that runs on every (re)connect.
+    """
+
+    def __init__(self):
+        self.rabbitmq_url = os.getenv('RABBITMQ_URL', 'amqp://guest:guest@localhost:5672')
+        self.rabbitmq_ssl = os.getenv('RABBITMQ_SSL', False)
+        self.queue = os.getenv('RABBITMQ_DELETE_QUEUE', 'uiuc-chat-delete')
+        self.sql_session = SQLAlchemyIngestDB()
+        self.resolver = WorkerConnectionResolver(self.sql_session)
+
+    def purge(self, deletion_id: int) -> None:
+        for attempt in range(1, DELETE_MAX_ATTEMPTS + 1):
+            outcome = ProjectPurger(self.sql_session, self.resolver).run(deletion_id)
+            if outcome != "failed":
+                return
+            if attempt < DELETE_MAX_ATTEMPTS:
+                time.sleep(DELETE_RETRY_BACKOFF * attempt)
+        logging.error(f"Deletion {deletion_id} still failing after {DELETE_MAX_ATTEMPTS} attempts; "
+                      "left as 'failed' for a super admin to retry")
+
+    def on_message(self, channel, method, header, body):
+        channel.basic_ack(delivery_tag=method.delivery_tag)
+        try:
+            deletion_id = int(json.loads(body.decode())['deletion_id'])
+        except (ValueError, KeyError, TypeError):
+            logging.error(f"Malformed delete message, dropping: {body!r}")
+            return
+        self.purge(deletion_id)
+
+    def _connect(self):
+        parameters = pika.URLParameters(self.rabbitmq_url)
+        # The purge runs inside the callback and can outlast any heartbeat
+        # window; with messages acked up front there is nothing to redeliver.
+        parameters.heartbeat = 0
+        if self.rabbitmq_ssl:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            ssl_context.set_ciphers('ECDHE+AESGCM:!ECDSA')
+            parameters.ssl_options = pika.SSLOptions(context=ssl_context)
+        connection = pika.BlockingConnection(parameters)
+        channel = connection.channel()
+        channel.queue_declare(queue=self.queue, durable=True)
+        channel.basic_qos(prefetch_count=1)
+        return connection, channel
+
+    def run_forever(self):
+        while True:
+            try:
+                for deletion_id in find_resumable_deletions(self.sql_session.engine):
+                    logging.info(f"Resuming deletion {deletion_id}")
+                    self.purge(deletion_id)
+                connection, channel = self._connect()
+                channel.basic_consume(queue=self.queue, on_message_callback=self.on_message, auto_ack=False)
+                logging.info(f"Delete consumer listening on {self.queue}")
+                channel.start_consuming()
+            except Exception:  # pylint: disable=broad-except
+                logging.error("Delete consumer crashed/disconnected:\n%s", traceback.format_exc())
+            time.sleep(10)
+
+
 @app.route('/api/healthcheck', methods=['GET'])
 def return_health():
     # Healthy when the worker loop is actively consuming
     status = {
         "status": "OK" if worker_running.is_set() else "DOWN",
-        "worker_thread_alive": worker_thread.is_alive() if worker_thread else False
+        "worker_thread_alive": worker_thread.is_alive() if worker_thread else False,
+        "delete_thread_alive": delete_thread.is_alive() if delete_thread else False,
     }
     return jsonify(status), (200 if worker_running.is_set() else 500)
 
@@ -267,6 +349,9 @@ if __name__ == '__main__':
     worker_thread = threading.Thread(target=worker.listen_for_jobs)
     worker_thread.start()
     worker_thread.join(0)
+
+    delete_thread = threading.Thread(target=lambda: DeleteConsumer().run_forever(), daemon=True)
+    delete_thread.start()
 
     logging.info("Running healthcheck endpoint")
     try:
