@@ -37,8 +37,9 @@ isCourseRegularUser(user: AuthenticatedUser, courseMetadata: CourseMetadata): bo
 // Get course metadata from Redis
 getCourseMetadata(courseName: string): Promise<CourseMetadata | null>
 
-// Extract course name from request (query params, body, or headers)
-extractCourseName(req: NextApiRequest): string | null
+// Resolve the single course name a request names (query params, body and
+// headers must agree); `conflict` is true when they do not
+extractCourseName(req: NextApiRequest): { courseName: string | null; conflict: boolean }
 ```
 
 ## Middleware Functions
@@ -112,13 +113,21 @@ export default withCourseAccessFromRequest('owner')(handler)
 
 ## Course Name Extraction
 
-The `withCourseAccessFromRequest` middleware automatically looks for course names in the following order:
+The `withCourseAccessFromRequest` and `withCourseOwnerOrAdminAccess` middleware
+read the course name from every place a request can carry one:
 
-1. Query parameter: `?courseName=my-course`
-2. Query parameter: `?course_name=my-course`
-3. Request body: `{ "courseName": "my-course" }`
-4. Request body: `{ "course_name": "my-course" }`
-5. Header: `X-Course-Name: my-course`
+- Query parameters: `courseName`, `course_name`, `projectName`, `project_name`
+- Top-level JSON body fields with the same four names
+- Headers: `X-Course-Name`, `X-Project_Name` (legacy; no client sends them)
+
+Every value present must be the same string. If two differ, a query key is
+repeated, or a value is not a string, the request is rejected with `400
+Conflicting project names` before any access check runs. This guarantees the
+project the middleware authorizes is the one the handler reads, whichever field
+the handler uses. Handlers that need the name should read `req.courseName`,
+which the middleware sets, rather than a name nested elsewhere in the payload
+(for example `conversation.projectName`). The shared rules live in
+`src/server/courseNameExtraction.ts`.
 
 ## Usage Examples
 

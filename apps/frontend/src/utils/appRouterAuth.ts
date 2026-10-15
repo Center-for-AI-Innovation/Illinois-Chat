@@ -28,6 +28,9 @@ function getTokenFromCookies(req: NextRequest): string | null {
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: AuthenticatedUser
+  // The single project name the access check resolved and authorized. Handlers
+  // must use this, never their own copy from the query or body (#312).
+  courseName?: string
 }
 
 export function getUserIdentifier(req: AuthenticatedRequest): string | null {

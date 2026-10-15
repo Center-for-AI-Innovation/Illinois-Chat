@@ -8,8 +8,13 @@ const hoisted = vi.hoisted(() => {
   }
 })
 
+// The real wrapper resolves and authorizes the project, then sets req.courseName.
+// Emulate that so the handler reads the authorized project (#312), not the body.
 vi.mock('~/app/api/authorization', () => ({
-  withCourseAccessFromRequest: () => (h: any) => h,
+  withCourseAccessFromRequest: () => (h: any) => (req: any) => {
+    req.courseName = 'CS101'
+    return h(req)
+  },
 }))
 
 vi.mock('~/pages/api/conversation', () => ({
@@ -218,6 +223,8 @@ describe('app/api/chat/openaiFunctionCall POST', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.choices?.[0]?.message?.tool_calls?.[0]?.id).toBe('call1')
-    expect(hoisted.persistMessageServer).toHaveBeenCalled()
+    expect(hoisted.persistMessageServer).toHaveBeenCalledWith(
+      expect.objectContaining({ courseName: 'CS101' }),
+    )
   })
 })
