@@ -5,7 +5,7 @@ This guide will help you set up the UIUC.chat development environment for local 
 ## Prerequisites
 
 - Docker and Docker Compose
-- Python 3.10 or 3.11 for the backend and ingest worker
+- [uv](https://docs.astral.sh/uv/) for the backend and ingest worker (`brew install uv` on macOS, `curl -LsSf https://astral.sh/uv/install.sh | sh` elsewhere). It installs the Python version pinned in `apps/backend/.python-version`, so no separate Python install is needed.
 - Node.js 20.19+ or 22.12+ for the frontend toolchain
 
 ## Quick Start
@@ -92,16 +92,24 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:10000
 
 ### 3. Start Development Services
 
+Install the backend environment once (and again after pulling a changed `uv.lock`):
+
+```bash
+cd apps/backend && uv sync --all-extras
+```
+
+`uv run` executes a command inside that environment, so there is nothing to activate and no `PYTHONPATH` to set. Start the Flask backend:
+
 ```bash
 cd apps/backend
-flask --app ai_ta_backend.main:app --debug run --port 8000
+uv run flask --app ai_ta_backend.main:app --debug run --port 8000
 ```
 
 In another terminal, start the ingest worker:
 
 ```bash
 cd apps/backend
-python ai_ta_backend/rabbitmq/worker.py
+uv run python ai_ta_backend/rabbitmq/worker.py
 ```
 
 In another terminal, start the frontend:
@@ -120,21 +128,21 @@ If you prefer to set up manually:
 ```bash
 cd apps/backend
 
-# Create virtual environment
-python3.11 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -r ai_ta_backend/rabbitmq/requirements.txt
+# Install the pinned Python and every dependency into apps/backend/.venv
+uv sync --all-extras
 
 # Set up environment variables (see apps/backend/.env)
 # Start the server
-flask --app ai_ta_backend.main:app --debug run --port 8000
+uv run flask --app ai_ta_backend.main:app --debug run --port 8000
 
 # In another terminal, start the ingest worker
-python ai_ta_backend/rabbitmq/worker.py
+uv run python ai_ta_backend/rabbitmq/worker.py
+
+# Run the tests
+uv run pytest
 ```
+
+Dependencies are declared in `apps/backend/pyproject.toml` and locked in `uv.lock`. To add or change one, edit `pyproject.toml`, run `uv lock`, and commit both files. An old `apps/backend/venv/` from the previous pip-based setup can be deleted.
 
 ### Frontend Setup
 
@@ -194,7 +202,7 @@ SQLITE_DB_NAME=uiuc_chat_local.db
 
 ### Missing Dependencies
 
-- Backend: Ensure you're in the virtual environment and run `pip install -r requirements.txt`
+- Backend: Run `uv sync --all-extras` in `apps/backend` (re-run after pulling a changed `uv.lock`)
 - Frontend: Run `npm install` in the frontend directory
 
 ### Environment Variables
@@ -205,8 +213,8 @@ SQLITE_DB_NAME=uiuc_chat_local.db
 ## Development Workflow
 
 1. **Start infrastructure**: `bash infra/scripts/start-dev.sh`
-2. **Start backend**: `cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000`
-3. **Start worker**: `cd apps/backend && python ai_ta_backend/rabbitmq/worker.py`
+2. **Start backend**: `cd apps/backend && uv run flask --app ai_ta_backend.main:app --debug run --port 8000`
+3. **Start worker**: `cd apps/backend && uv run python ai_ta_backend/rabbitmq/worker.py`
 4. **Start frontend**: `cd apps/frontend && npm run local`
 5. **Make changes** to your code
 6. **Stop services**: `Ctrl+C` in each app terminal

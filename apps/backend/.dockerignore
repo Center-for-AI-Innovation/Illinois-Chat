@@ -1,0 +1,26 @@
+# Secrets: images get their config from the compose/ECS environment, never from a baked-in .env.
+**/.env
+**/.env.*
+!**/.env.template
+
+# Local environments and caches
+.venv/
+venv/
+venv-*/
+**/__pycache__
+**/*.py[cod]
+.pytest_cache/
+
+# Not needed at runtime
+.git/
+.github/
+.gitbook/
+.trunk/
+.vscode/
+.infisical.json
+tests/
+test-docs/
+docs/
+media/
+misc/
+**/*.md
