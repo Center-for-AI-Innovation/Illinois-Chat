@@ -96,8 +96,8 @@ cd infra/scripts/add_external_project_script
 cp .external.env.template .external.env   # gitignored — never commit it
 ```
 
-The script declares its own dependency inline, so there is nothing to install:
-[uv](https://docs.astral.sh/uv/) fetches it into a cached environment on first run.
+Its one dependency is `python-dotenv`; install it once with
+`pip install -r requirements.txt` (a virtual environment is recommended).
 
 Fill in `.external.env`:
 
@@ -112,24 +112,24 @@ Then:
 
 ```bash
 # Probe a config without persisting anything (recommended first step):
-uv run external_connections_cli.py test database
+python external_connections_cli.py test database
 
 # Register the external documents/pgvector database for the project:
-uv run external_connections_cli.py upsert database
+python external_connections_cli.py upsert database
 
 # Other kinds work the same way (config built from .external.env):
-uv run external_connections_cli.py upsert s3
-uv run external_connections_cli.py upsert qdrant
-uv run external_connections_cli.py upsert embedding
+python external_connections_cli.py upsert s3
+python external_connections_cli.py upsert qdrant
+python external_connections_cli.py upsert embedding
 
 # Inspect what is stored (secrets come back masked):
-uv run external_connections_cli.py get
+python external_connections_cli.py get
 
 # Disable / re-enable a project's overrides without deleting them:
-uv run external_connections_cli.py set-active --active false
+python external_connections_cli.py set-active --active false
 
 # Remove one kind (or the whole row when --kind is omitted):
-uv run external_connections_cli.py delete --kind qdrant
+python external_connections_cli.py delete --kind qdrant
 ```
 
 Every command also accepts an explicit project name, a literal JSON config,
@@ -139,7 +139,7 @@ You can also probe the config **already stored** for a project (decrypted
 server-side, never echoed back):
 
 ```bash
-uv run external_connections_cli.py test database --stored
+python external_connections_cli.py test database --stored
 ```
 
 ### Supabase / pooled Postgres
