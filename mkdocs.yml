@@ -154,4 +154,5 @@ nav:
       - Testing & CI: contributing/testing-ci.md
       - Writing docs: contributing/writing-docs.md
       - Lightweight ingest bridge: contributing/ingest-bridge.md
+  - Support & Funding: support-funding.md
   - Blog: blog/index.md

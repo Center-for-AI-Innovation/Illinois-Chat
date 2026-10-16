@@ -787,6 +787,15 @@ const Home: NextPage = () => {
                 >
                   National Center for Supercomputing Applications
                 </a>
+                , with support from{' '}
+                <a
+                  tabIndex={0}
+                  className="underline"
+                  style={{ color: '#9e3010' }}
+                  href="https://computes.illinois.edu/"
+                >
+                  Illinois Computes
+                </a>
                 .
               </div>
             </div>

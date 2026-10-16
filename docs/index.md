@@ -38,4 +38,4 @@ Curious what happens between a question and an answer? See [How It Works](how-it
 
 ## Acknowledgements
 
-Illinois Chat is developed by the [Center for AI Innovation (CAII)](https://ai.ncsa.illinois.edu/) at the National Center for Supercomputing Applications (NCSA), University of Illinois Urbana-Champaign, with support from [Illinois Computes](https://computes.illinois.edu/), the Office of the CIO, the Healthcare Innovation Program Office at NCSA, and the Gies College of Business, among others.
+Illinois Chat is developed by the [Center for AI Innovation (CAII)](https://ai.ncsa.illinois.edu/) at the [National Center for Supercomputing Applications (NCSA)](https://ncsa.illinois.edu/), University of Illinois Urbana-Champaign, with support from [Illinois Computes](https://computes.illinois.edu/), the Office of the CIO, the Healthcare Innovation Program Office at NCSA, and the Gies College of Business, among others. See [Support & Funding](support-funding.md) for details.
