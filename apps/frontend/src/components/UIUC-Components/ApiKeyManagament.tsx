@@ -375,7 +375,7 @@ axios.post('${baseUrl}/api/chat-api/chat', data, {
                               />
                               <a
                                 className={`text-sm text-(--dashboard-button) underline transition-colors duration-200 hover:text-(--dashboard-button-hover) ${montserrat_paragraph.variable} font-montserratParagraph`}
-                                href="https://docs.uiuc.chat/api/endpoints"
+                                href="https://docs.chat.illinois.edu/api/chat/"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
