@@ -206,7 +206,7 @@ function ComboboxGroup({ className, ...props }: ComboboxPrimitive.Group.Props) {
   return (
     <ComboboxPrimitive.Group
       data-slot="combobox-group"
-      className={cn('scroll-my-1', className)}
+      className={cn('scroll-my-1 not-first:mt-1', className)}
       {...props}
     />
   )
@@ -224,7 +224,10 @@ function ComboboxGroupLabel({
   return (
     <ComboboxPrimitive.GroupLabel
       data-slot="combobox-group-label"
-      className={cn('text-muted-foreground px-2 py-1.5 text-xs', className)}
+      className={cn(
+        'text-muted-foreground px-4 py-3 text-xs leading-[1.55] font-normal',
+        className,
+      )}
       {...props}
     />
   )
