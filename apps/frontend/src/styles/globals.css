@@ -46,6 +46,22 @@
   outline-offset: 2px !important;
 }
 
+/*
+ * Tailwind v4 preflight sets `cursor: default` on buttons. Mantine controls
+ * used a pointer. Restore it for buttons and button-role controls.
+ * Element-level specificity, so a utility (cursor-not-allowed, cursor-text)
+ * still wins. Disabled buttons fall back to the default cursor unless a
+ * utility says otherwise.
+ */
+button,
+:where([role='button']) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
 /* Skip navigation link for keyboard/screen reader users */
 .skip-nav-link {
   position: absolute;

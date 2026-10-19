@@ -53,7 +53,7 @@ function ComboboxTrigger({
     <ComboboxPrimitive.Trigger
       data-slot="combobox-trigger"
       className={cn(
-        'text-muted-foreground flex h-7 w-6 shrink-0 items-center justify-center border-0 bg-transparent p-0 outline-hidden',
+        'text-muted-foreground flex h-7 w-6 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 outline-hidden',
         className,
       )}
       {...props}
@@ -72,7 +72,7 @@ function ComboboxClear({
     <ComboboxPrimitive.Clear
       data-slot="combobox-clear"
       className={cn(
-        'text-muted-foreground flex h-7 w-6 shrink-0 items-center justify-center border-0 bg-transparent p-0 outline-hidden',
+        'text-muted-foreground flex h-7 w-6 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 outline-hidden',
         className,
       )}
       {...props}
@@ -117,7 +117,7 @@ function ComboboxChipRemove({
     <ComboboxPrimitive.ChipRemove
       data-slot="combobox-chip-remove"
       className={cn(
-        'hover:bg-foreground/10 flex size-4 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0 text-inherit outline-hidden',
+        'hover:bg-foreground/10 flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0 text-inherit outline-hidden',
         className,
       )}
       {...props}
@@ -189,7 +189,7 @@ function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        'data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50',
+        'data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex w-full cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50',
         className,
       )}
       {...props}
