@@ -544,7 +544,7 @@ describe('WebScrape - additional coverage', () => {
       const docsLink = screen.getByRole('link', { name: /read the docs/i })
       expect(docsLink).toHaveAttribute(
         'href',
-        'https://docs.uiuc.chat/features/web-crawling-details',
+        'https://docs.chat.illinois.edu/building/dashboard/web-crawling/',
       )
       expect(docsLink).toHaveAttribute('target', '_blank')
       expect(docsLink).toHaveAttribute('rel', 'noopener noreferrer')

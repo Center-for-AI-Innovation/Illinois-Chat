@@ -602,7 +602,7 @@ const Home: NextPage = () => {
                   className:
                     'mt-8 rounded-sm border border-(--illinois-white) bg-transparent text-(--illinois-white) hover:bg-white/10 focus:bg-(--dashboard-button)',
                 })}
-                href="https://docs.uiuc.chat/api"
+                href="https://docs.chat.illinois.edu/api/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -787,6 +787,15 @@ const Home: NextPage = () => {
                   href="https://ncsa.illinois.edu/"
                 >
                   National Center for Supercomputing Applications
+                </a>
+                , with support from{' '}
+                <a
+                  tabIndex={0}
+                  className="underline"
+                  style={{ color: '#9e3010' }}
+                  href="https://computes.illinois.edu/"
+                >
+                  Illinois Computes
                 </a>
                 .
               </div>
