@@ -22,6 +22,7 @@ import {
   ComboboxInputGroup,
   ComboboxItem,
   ComboboxList,
+  ComboboxTrigger,
 } from '@/components/shadcn/ui/combobox'
 import { IconCheck, IconCopy } from '@tabler/icons-react'
 import { useFetchLLMProviders } from '@/hooks/queries/useFetchLLMProviders'
@@ -283,6 +284,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
                   aria-label="Select model"
                   placeholder="Select model"
                 />
+                <ComboboxTrigger aria-label="Open model list" />
               </ComboboxInputGroup>
               <ComboboxContent>
                 <ComboboxEmpty>No models found.</ComboboxEmpty>
