@@ -492,17 +492,25 @@ button:disabled {
 }
 
 /*
- * Document-group combobox ("Select Group"): the shadcn combobox already draws
- * its own focus indicator (`focus-within:border-ring` plus a 3px
- * around the first. Suppress the outline on the input group and its text
- * input only — the chips' remove buttons have no ring of their own and keep
- * the global one. Higher specificity than the `*:focus-visible` rule above,
- * so it wins without needing to be declared later.
+ * Searchable dropdowns: focus lands on the inner text field, which has no
+ * border radius, so the global outline draws a rectangle inside the control.
+ * Suppress that inner outline and draw one ring on the rounded shell so it
+ * covers the logo, field, and chevron together.
+ * Higher specificity than `*:focus-visible`, and !important so it wins.
  */
-[data-slot='combobox-input-group'].doc-group-multiselect:focus-visible,
-[data-slot='combobox-input-group'].doc-group-multiselect:focus-within,
-.doc-group-multiselect [data-slot='combobox-input']:focus-visible {
+[data-slot='combobox-input']:focus,
+[data-slot='combobox-input']:focus-visible,
+[data-slot='combobox-trigger']:focus,
+[data-slot='combobox-trigger']:focus-visible,
+[data-slot='combobox-clear']:focus,
+[data-slot='combobox-clear']:focus-visible {
   outline: none !important;
+  outline-offset: 0 !important;
+}
+
+[data-slot='combobox-input-group']:focus-within {
+  outline: 2px solid var(--illinois-orange) !important;
+  outline-offset: 2px !important;
 }
 
 /*
