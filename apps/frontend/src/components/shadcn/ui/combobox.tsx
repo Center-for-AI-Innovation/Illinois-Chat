@@ -20,7 +20,7 @@ function ComboboxInputGroup({
     <ComboboxPrimitive.InputGroup
       data-slot="combobox-input-group"
       className={cn(
-        'border-input dark:bg-input/30 flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border bg-background px-2.5 py-1 shadow-xs',
+        'border-input dark:bg-input/30 flex min-h-[42px] w-full flex-wrap items-center gap-1 rounded-md border bg-background px-2.5 py-1 shadow-xs',
         className,
       )}
       {...props}
