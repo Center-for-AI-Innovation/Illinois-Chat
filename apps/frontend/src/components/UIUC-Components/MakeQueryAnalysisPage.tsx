@@ -435,7 +435,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   <Button
                     type="button"
                     variant="dashboard"
-                    className={`${montserrat_paragraph.variable} font-montserratParagraph h-12 w-full items-center justify-center gap-2.5 rounded-4xl px-2 text-sm transition-colors sm:w-auto sm:px-4 sm:text-base`}
+                    className={`${montserrat_paragraph.variable} font-montserratParagraph h-12 w-full items-center justify-center gap-2.5 rounded-4xl px-2 text-sm font-normal transition-colors sm:w-auto sm:px-4 sm:text-base`}
                     onClick={() => handleDownload(course_name)}
                   >
                     <span className="hidden sm:inline">
