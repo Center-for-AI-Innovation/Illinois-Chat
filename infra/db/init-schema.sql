@@ -341,6 +341,23 @@ CREATE TABLE "project_external_connections" (
 	CONSTRAINT "project_external_connections_project_name_unique" UNIQUE("project_name")
 );
 --> statement-breakpoint
+CREATE TABLE "project_deletions" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_name" text NOT NULL,
+	"project_id" bigint,
+	"requested_by" text NOT NULL,
+	"include_external" boolean DEFAULT false NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"progress" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"metadata_backup" jsonb,
+	"error" text,
+	"attempts" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"started_at" timestamp with time zone,
+	"heartbeat_at" timestamp with time zone,
+	"completed_at" timestamp with time zone
+);
+--> statement-breakpoint
 CREATE TABLE "project_stats" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"project_id" integer NOT NULL,
@@ -445,7 +462,8 @@ CREATE UNIQUE INDEX "documents_doc_groups_pkey" ON "documents_doc_groups" USING 
 CREATE INDEX "embeddings_embedding_1536_hnsw_idx" ON "embeddings" USING hnsw ((subvector("embedding", 1, 1536)::vector(1536)) vector_cosine_ops) WITH (m=16,ef_construction=64);--> statement-breakpoint
 CREATE INDEX "project_connection_audit_log_project_idx" ON "project_connection_audit_log" USING btree ("project_name","occurred_at" DESC);--> statement-breakpoint
 CREATE INDEX "folders_user_email_project_id_idx" ON "folders" USING btree ("user_email","project_id");--> statement-breakpoint
-CREATE INDEX "conversations_folder_id_idx" ON "conversations" USING btree ("folder_id");
+CREATE INDEX "conversations_folder_id_idx" ON "conversations" USING btree ("folder_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "project_deletions_active_name_idx" ON "project_deletions" USING btree ("project_name") WHERE "status" <> 'completed';
 -- ---------------------------------------------------------------------------
 -- Functions and triggers (0001_custom_functions.sql, verbatim)
 -- ---------------------------------------------------------------------------

@@ -11,7 +11,8 @@ Coverage:
   - is_valid_project_name: charset, length, and the Python ``$``-newline trap.
   - get_default_course_admins: parsing of DEFAULT_COURSE_ADMINS.
   - create_project: inserts the projects row with DEFAULT_SCHEMA before the
-    Redis hset; duplicate names raise ProjectAlreadyExistsError; DB insert
+    Redis hset; duplicate names, and names whose deletion is still running,
+    raise ProjectAlreadyExistsError; DB insert
     failure raises before any Redis write; retries skip the insert but still
     write Redis; pre-assigned-LLM-key failures do not fail the request.
   - generate_json_schema: updates (never inserts) the projects row.
@@ -35,6 +36,7 @@ from ai_ta_backend.utils.schema_generation import DEFAULT_SCHEMA
 def make_service() -> ProjectService:
     service = object.__new__(ProjectService)
     service.sqlDb = MagicMock()
+    service.sqlDb.hasActiveProjectDeletion.return_value = False
     service.posthog = MagicMock()
     service.sentry = MagicMock()
     service.redis_client = MagicMock()
@@ -120,6 +122,21 @@ def test_create_project_duplicate_raises_409_error():
     with pytest.raises(ProjectAlreadyExistsError):
         service.create_project("my-bot", None, "owner@example.com")
 
+    service.sqlDb.insertProject.assert_not_called()
+    service.redis_client.hset.assert_not_called()
+
+
+def test_create_project_refuses_name_still_being_deleted():
+    # The deleted project's metadata is gone, but its projects row and data
+    # remain until the purge finishes; creating on top of them must fail.
+    service = make_service()
+    service.redis_client.hexists.return_value = False
+    service.sqlDb.hasActiveProjectDeletion.return_value = True
+
+    with pytest.raises(ProjectAlreadyExistsError, match="still being deleted"):
+        service.create_project("my-bot", None, "owner@example.com")
+
+    service.sqlDb.hasActiveProjectDeletion.assert_called_once_with("my-bot")
     service.sqlDb.insertProject.assert_not_called()
     service.redis_client.hset.assert_not_called()
 
