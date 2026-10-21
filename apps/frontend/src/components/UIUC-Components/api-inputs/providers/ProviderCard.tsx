@@ -31,7 +31,7 @@ export default function ProviderCard({
   children,
 }: ProviderCardProps) {
   const bgClass =
-    'w-full min-w-[min(330px,100%)] flex-[1_1_calc(50%-0.5rem)] rounded-md border-0 bg-(--dashboard-background-faded) p-5 text-(--dashboard-foreground) shadow-none'
+    'w-full min-w-[min(330px,100%)] flex-[1_1_calc(50%-0.5rem)] rounded-2xl border-0 bg-(--dashboard-background-faded) p-5 text-(--dashboard-foreground) shadow-none'
 
   if (isLoading || !provider) {
     return <Skeleton className={`${bgClass} min-h-[200px]`} />

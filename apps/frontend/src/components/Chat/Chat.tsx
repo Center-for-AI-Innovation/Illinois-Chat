@@ -1866,7 +1866,7 @@ export const Chat = memo(
                     key={index}
                     role="button"
                     tabIndex={0}
-                    className="w-full rounded-lg hover:cursor-pointer hover:bg-(--welcome-button-hover) hover:text-(--background)"
+                    className="w-full cursor-pointer rounded-lg hover:bg-(--welcome-button-hover) hover:text-(--background)"
                     onClick={() => {
                       setInputContent('') // First clear the input
                       setTimeout(() => {
@@ -1890,14 +1890,16 @@ export const Chat = memo(
                       type="button"
                       variant="link"
                       tabIndex={-1}
-                      className={`text-md h-auto p-2 leading-relaxed font-bold text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph`}
+                      className={`text-md h-auto w-full items-start justify-start gap-2 p-2 text-left leading-relaxed font-bold whitespace-normal text-inherit hover:underline ${montserrat_paragraph.variable} font-montserratParagraph`}
                     >
                       <IconArrowRight
-                        size={25}
+                        size={20}
                         aria-hidden="true"
-                        className="mr-2 min-w-[40px]"
+                        className="mt-0.5 size-5! shrink-0"
                       />
-                      <p className="whitespace-break-spaces">{statement}</p>
+                      <span className="min-w-0 flex-1 text-left whitespace-normal">
+                        {statement}
+                      </span>
                     </Button>
                   </div>
                 ))}
