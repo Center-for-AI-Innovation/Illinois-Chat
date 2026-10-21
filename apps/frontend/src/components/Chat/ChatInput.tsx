@@ -41,11 +41,6 @@ import { PluginSelect } from './PluginSelect'
 import { PromptList } from './PromptList'
 import { VariableModal } from './VariableModal'
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   showToast,
@@ -74,14 +69,16 @@ import type ChatUI from '~/utils/modelProviders/WebLLM'
 import { webLLMModels } from '~/utils/modelProviders/WebLLM'
 import { ContextWithMetadata } from '~/types/chat'
 import {
-  COUNTRY_OF_CONCERN_INFO_URL,
   getCountryOfConcern,
   getCountryOfConcernBannerLede,
-  getCountryOfConcernShortMessage,
   isCocBannerDismissed,
   isLocallyHostedProvider,
   markCocBannerDismissed,
 } from '~/utils/modelProviders/countriesOfConcern'
+import {
+  CountryOfConcernIcon,
+  CountryOfConcernNotice,
+} from '~/components/UIUC-Components/CountryOfConcern'
 import posthog from 'posthog-js'
 import { deriveAgentModeEnabled } from '~/utils/app/agentMode'
 
@@ -974,17 +971,8 @@ export const ChatInput = ({
                     LLM from Country of Concern ({country})
                   </div>
                   <p className="text-sm leading-snug">
-                    {getCountryOfConcernBannerLede(country, cocLocallyHosted)}{' '}
-                    Users may click{' '}
-                    <a
-                      href={COUNTRY_OF_CONCERN_INFO_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline underline-offset-2 hover:opacity-80"
-                    >
-                      here
-                    </a>{' '}
-                    for further information
+                    <CountryOfConcernNotice />{' '}
+                    {getCountryOfConcernBannerLede(cocLocallyHosted)}
                   </p>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <button
@@ -1476,41 +1464,12 @@ export const ChatInput = ({
               style={{ cursor: 'pointer', pointerEvents: 'auto' }}
             >
               {selectBestModel(llmProviders)?.name}
-              {(() => {
-                const activeModelId =
-                  selectedConversation?.model?.id ??
-                  selectBestModel(llmProviders)?.id
-                const country = getCountryOfConcern(activeModelId)
-                if (!country) return null
-                return (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <span
-                          aria-label={`Country of concern warning: ${country}`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            marginLeft: '4px',
-                            opacity: 1,
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      }
-                    >
-                      <IconAlertTriangle
-                        size={isSmallScreen ? '12px' : '14px'}
-                        stroke={2}
-                        aria-hidden="true"
-                        className="text-yellow-500"
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[280px] text-wrap">
-                      {getCountryOfConcernShortMessage(country)}
-                    </TooltipContent>
-                  </Tooltip>
-                )
-              })()}
+              <CountryOfConcernIcon
+                modelId={cocActiveModelId}
+                size={isSmallScreen ? '12px' : '14px'}
+                className="ml-1"
+                onClick={(e) => e.stopPropagation()}
+              />
               {selectedConversation?.model &&
                 webLLMModels.some(
                   (m) => m.name === selectedConversation?.model?.name,

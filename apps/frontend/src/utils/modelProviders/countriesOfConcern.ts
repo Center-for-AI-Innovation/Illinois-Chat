@@ -1,9 +1,8 @@
 /**
  * Countries-of-Concern registry.
  *
- * Maps individual LLM model IDs to a country flagged by the
- * U.S. Department of Commerce as a country of concern (China, Russia, Iran,
- * North Korea). UI surfaces (admin model toggles, chat model selector)
+ * Maps individual LLM model IDs to a US government designated country of
+ * concern (China, Russia, Iran, North Korea). UI surfaces (admin model toggles, chat model selector)
  * read this registry to render warning iconography and confirmation
  * popups before a user enables or selects a flagged model.
  */
@@ -179,14 +178,10 @@ export function isCountryOfConcern(
   return getCountryOfConcern(modelId) !== null
 }
 
-/**
- * Short label used inline next to a model name (tooltip/icon hover).
- */
-export function getCountryOfConcernShortMessage(
-  country: CountryOfConcern,
-): string {
-  return `This model originates from ${country}, a country of concern flagged by the U.S. Department of Commerce. Use with caution.`
-}
+export const COUNTRY_OF_CONCERN_WARNING =
+  'This model was trained in a US government designated Country of Concern. ' +
+  'It may exhibit biases based on differences in geopolitical environments, ' +
+  'cultural norms, policy constraints, or censorship behaviors.'
 
 const ACK_STORAGE_KEY = 'coc-acknowledged-chatbots'
 
@@ -241,22 +236,6 @@ export function markChatbotCocAcknowledged(chatbotId: string): void {
 }
 
 /**
- * Longer message shown in the admin confirmation popup before enabling.
- */
-export function getCountryOfConcernLongMessage(
-  modelName: string,
-  country: CountryOfConcern,
-): string {
-  return (
-    `${modelName} originates from ${country}, which the U.S. Department of Commerce ` +
-    `has identified as a country of concern. Models from these jurisdictions may carry ` +
-    `data-handling, supply-chain, or compliance risks for your organization. ` +
-    `You can still enable this model, but please confirm that doing so is consistent ` +
-    `with your institution's policy.`
-  )
-}
-
-/**
  * Providers that serve models from university-controlled infrastructure.
  *
  * Compared as plain strings (rather than importing the `ProviderNames` enum)
@@ -278,8 +257,7 @@ export function isLocallyHostedProvider(
 }
 
 /**
- * Banner prose shown above the chat input, up to the "further information"
- * link (which the caller renders as JSX).
+ * Banner prose shown above the chat input, after the shared warning.
  *
  * Two variants because the locality claim is only true for locally-hosted
  * models. The registry flags OpenRouter-routed models too, and telling a user
@@ -288,22 +266,16 @@ export function isLocallyHostedProvider(
  * exposure. When provenance is known but hosting is not, we fall back to the
  * variant that makes no locality promise.
  */
-export function getCountryOfConcernBannerLede(
-  country: CountryOfConcern,
-  locallyHosted: boolean,
-): string {
+export function getCountryOfConcernBannerLede(locallyHosted: boolean): string {
   if (locallyHosted) {
     return (
       `This model is hosted locally at the U of I, so Illinois Chat does not ` +
-      `send your conversation to external servers. Users should still be ` +
-      `aware that the model itself was initially developed in a country deemed ` +
-      `worthy of extra caution.`
+      `send your conversation to external servers.`
     )
   }
   return (
-    `This model was developed in ${country}, a country deemed worthy of extra ` +
-    `caution, and it is served by a third-party provider rather ` +
-    `than hosted locally at the U of I. Your conversation leaves university ` +
+    `This model is served by a third-party provider rather than hosted ` +
+    `locally at the U of I. Your conversation leaves university ` +
     `infrastructure when you use this model, so please avoid sharing sensitive ` +
     `information.`
   )
