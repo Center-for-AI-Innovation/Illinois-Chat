@@ -178,7 +178,6 @@ export function isCountryOfConcern(
   return getCountryOfConcern(modelId) !== null
 }
 
-// Matches Lumen's wording; keep the two in sync.
 export const COUNTRY_OF_CONCERN_WARNING =
   'This model was trained in a US government designated Country of Concern. ' +
   'It may exhibit biases based on differences in geopolitical environments, ' +

@@ -3,9 +3,8 @@ import {
   COUNTRY_OF_CONCERN_INFO_URL,
   CountryOfConcern,
   getCountryOfConcern,
+  COUNTRY_OF_CONCERN_WARNING,
   getCountryOfConcernBannerLede,
-  getCountryOfConcernLongMessage,
-  getCountryOfConcernShortMessage,
   isCocBannerDismissed,
   isCountryOfConcern,
   isLocallyHostedProvider,
@@ -116,15 +115,14 @@ describe('isLocallyHostedProvider', () => {
 
 describe('getCountryOfConcernBannerLede', () => {
   it('only claims local hosting when the model is locally hosted', () => {
-    const local = getCountryOfConcernBannerLede(CountryOfConcern.China, true)
+    const local = getCountryOfConcernBannerLede(true)
     expect(local).toContain('hosted locally at the U of I')
     expect(local).toContain('does not send your conversation to external')
   })
 
   it('warns that data leaves the university for third-party-served models', () => {
-    const remote = getCountryOfConcernBannerLede(CountryOfConcern.China, false)
+    const remote = getCountryOfConcernBannerLede(false)
     expect(remote).toContain('leaves university infrastructure')
-    expect(remote).toContain('China')
     expect(remote).toContain('rather than hosted locally')
     // Must never reassure the user that their data stays put on a model
     // served by a third party — that was the original bug.
@@ -133,20 +131,13 @@ describe('getCountryOfConcernBannerLede', () => {
 })
 
 describe('message helpers', () => {
-  it('short message names the country', () => {
-    const message = getCountryOfConcernShortMessage(CountryOfConcern.China)
-    expect(message).toContain('country of concern')
-    expect(message).toContain('China')
-  })
+  it('warning matches the expected text', () => {
 
-  it('long message names the model and country', () => {
-    const message = getCountryOfConcernLongMessage(
-      'DeepSeek V3',
-      CountryOfConcern.China,
+    expect(COUNTRY_OF_CONCERN_WARNING).toBe(
+      'This model was trained in a US government designated Country of Concern. ' +
+        'It may exhibit biases based on differences in geopolitical environments, ' +
+        'cultural norms, policy constraints, or censorship behaviors.',
     )
-    expect(message).toContain('DeepSeek V3')
-    expect(message).toContain('China')
-    expect(message).toContain('U.S. Department of Commerce')
   })
 
   it('exposes a canonical info URL', () => {
