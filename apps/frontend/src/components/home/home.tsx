@@ -33,6 +33,7 @@ import { useDeleteFolder } from '~/hooks/queries/useDeleteFolder'
 import { useUpdateFolder } from '~/hooks/queries/useUpdateFolder'
 import { saveConversationToLocalStorage } from '~/hooks/__internal__/conversation'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import { type FolderType, type FolderWithConversation } from '~/types/folder'
 import { selectBestModel } from '~/utils/modelProviders/LLMProvider'
 
@@ -602,7 +603,10 @@ const Home = ({
               tabIndex={-1}
               className="flex h-full w-full overflow-y-auto sm:pt-0"
             >
-              <h1 className="sr-only">{course_name} — Illinois Chat</h1>
+              <h1 className="sr-only">
+                {getChatbotDisplayName(course_name, course_metadata)} — Illinois
+                Chat
+              </h1>
               <Chatbar
                 current_email={current_email}
                 courseName={course_name}

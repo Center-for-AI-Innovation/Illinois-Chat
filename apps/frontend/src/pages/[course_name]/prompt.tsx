@@ -23,6 +23,7 @@ import PromptEditor from '~/components/UIUC-Components/PromptEditor'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
 import GlobalFooter from '../../components/UIUC-Components/GlobalFooter'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { useChatbotDisplayName } from '~/hooks/queries/useChatbotDisplayName'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
 
@@ -43,6 +44,7 @@ const CourseMain: NextPage = () => {
         : undefined
   }
   const courseName = getCurrentPageName() as string
+  const displayName = useChatbotDisplayName(courseName)
 
   const auth = useAuth()
   const isLoaded = !auth.isLoading
@@ -150,14 +152,14 @@ const CourseMain: NextPage = () => {
       setSidebarCollapsed={setSidebarCollapsed}
     >
       <Head>
-        <title>{courseName} — Prompt Settings — Illinois Chat</title>
+        <title>{`${displayName} — Prompt Settings — Illinois Chat`}</title>
       </Head>
       <main
         id="main-content"
         tabIndex={-1}
         className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
-        <h1 className="sr-only">{courseName} Prompt Settings</h1>
+        <h1 className="sr-only">{displayName} Prompt Settings</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
           <div className="flex w-full flex-col items-center">
             <Card

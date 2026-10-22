@@ -137,6 +137,16 @@ describe('Sidebar – additional coverage', () => {
     expect(screen.getByText('Intro To Cs')).toBeInTheDocument()
   })
 
+  it('shows a display name exactly as typed instead of the prettified name', () => {
+    renderSidebar({
+      courseName: 'intro-to-cs',
+      courseMetadata: { display_name: 'iCS: intro to CS', course_admins: [] },
+    })
+
+    expect(screen.getByText('iCS: intro to CS')).toBeInTheDocument()
+    expect(screen.queryByText('Intro To Cs')).not.toBeInTheDocument()
+  })
+
   it('preserves all-uppercase acronyms in course name', () => {
     renderSidebar({ courseName: 'CS-101-UIUC' })
 
