@@ -3,6 +3,11 @@ import { Button } from '@/components/shadcn/ui/button'
 import { Card } from '@/components/shadcn/ui/card'
 import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import {
   type CourseMetadata,
@@ -112,6 +117,14 @@ export const UploadCard = memo(function UploadCard({
   const displayNameChanged =
     normalizeDisplayName(displayNameInput) !==
     normalizeDisplayName(metadata?.display_name)
+  const displayNameHelp = (
+    <>
+      A friendly name people see instead of the project name. It is only a
+      label: the chatbot is not renamed, and its link{' '}
+      <span className="font-mono break-all">/{projectName}</span> and API name
+      stay the same. Leave empty to show the project name.
+    </>
+  )
 
   const saveDisplayName = async () => {
     if (!metadata || displayNameError) return
@@ -293,16 +306,21 @@ export const UploadCard = memo(function UploadCard({
                 >
                   <label htmlFor="display-name-input">Display Name</label>
                 </h3>
-                <Badge variant="outline">Alias</Badge>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    aria-label="What is a display name?"
+                    className="cursor-help rounded-full focus-visible:ring-2 focus-visible:ring-(--ring) focus-visible:outline-none"
+                  >
+                    <Badge variant="outline">Alias</Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[280px] text-wrap">
+                    {displayNameHelp}
+                  </TooltipContent>
+                </Tooltip>
               </div>
-              <p
-                id="display-name-help"
-                className={`mb-3 px-1 ${montserrat_light.className} text-sm`}
-              >
-                A friendly name people see instead of the project name. It is
-                only a label: the chatbot is not renamed, and its link{' '}
-                <span className="font-mono break-all">/{projectName}</span> and
-                API name stay the same. Leave empty to show the project name.
+              <p id="display-name-help" className="sr-only">
+                {displayNameHelp}
               </p>
               <Input
                 id="display-name-input"
