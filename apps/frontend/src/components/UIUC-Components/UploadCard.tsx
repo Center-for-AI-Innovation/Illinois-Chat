@@ -314,7 +314,7 @@ export const UploadCard = memo(function UploadCard({
                   >
                     <Badge variant="outline">Alias</Badge>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-[280px] text-wrap">
+                  <TooltipContent className="block max-w-[280px] text-wrap">
                     {displayNameHelp}
                   </TooltipContent>
                 </Tooltip>
