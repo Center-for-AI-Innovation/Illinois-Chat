@@ -32,6 +32,7 @@ import { ErrorMessageDiv } from './ErrorMessageDiv'
 import { MemoizedChatMessage } from './MemoizedChatMessage'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import {
   deriveAgentModeEnabled,
   shouldShowChatLoader,
@@ -2092,7 +2093,9 @@ export const Chat = memo(
     return (
       <>
         <Head>
-          <title>{getCurrentPageName()} - Illinois Chat</title>
+          <title>
+            {`${getChatbotDisplayName(getCurrentPageName(), courseMetadata)} - Illinois Chat`}
+          </title>
           <meta
             name="description"
             content="The easiest way to train your own AI model and share it like a Google doc."

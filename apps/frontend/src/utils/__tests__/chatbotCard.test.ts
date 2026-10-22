@@ -107,6 +107,27 @@ describe('toChatbotCardData', () => {
   })
 })
 
+describe('toChatbotCardData display name', () => {
+  it('uses the display name as the title and keeps course_name for links', () => {
+    const card = toChatbotCardData(
+      'cs101-fa24',
+      makeMetadata({ display_name: 'Intro to CS' }),
+      'someone@example.com',
+    )
+    expect(card.title).toBe('Intro to CS')
+    expect(card.course_name).toBe('cs101-fa24')
+  })
+
+  it('falls back to the project name', () => {
+    const card = toChatbotCardData(
+      'cs101-fa24',
+      makeMetadata(),
+      'someone@example.com',
+    )
+    expect(card.title).toBe('cs101-fa24')
+  })
+})
+
 describe('chatbotUserTier', () => {
   it('returns 0 for the owner', () => {
     const meta = makeMetadata({ course_owner: 'me@example.com' })

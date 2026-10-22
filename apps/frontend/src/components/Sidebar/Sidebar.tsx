@@ -24,6 +24,7 @@ import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { useAuth } from 'react-oidc-context'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
+import { normalizeDisplayName } from '~/utils/chatbotDisplayName'
 
 interface Props<T> {
   isOpen: boolean
@@ -70,6 +71,9 @@ const Sidebar = <T,>({
   const permission = courseMetadata
     ? get_user_permission(courseMetadata, auth)
     : 'no_permission'
+  // A display name is shown exactly as the owner typed it; without one, the
+  // project name is prettified (dashes to spaces, title case).
+  const displayName = normalizeDisplayName(courseMetadata?.display_name)
   const { data: presignedBannerUrl } = useQuery({
     queryKey: ['bannerUrl', courseName, courseMetadata?.banner_image_s3],
     enabled:
@@ -218,12 +222,13 @@ const Sidebar = <T,>({
                 title={
                   courseName === 'chat'
                     ? 'Illinois flagship chatbot'
-                    : (courseName || '').replace(/-/g, ' ')
+                    : (displayName ?? (courseName || '').replace(/-/g, ' '))
                 }
               >
                 {courseName === 'chat'
                   ? 'Illinois flagship chatbot'
-                  : (() => {
+                  : (displayName ??
+                    (() => {
                       const normalized = (courseName || '').replace(/-/g, ' ')
                       return normalized
                         .split(/\s+/)
@@ -236,7 +241,7 @@ const Sidebar = <T,>({
                                 word.slice(1).toLowerCase(),
                         )
                         .join(' ')
-                    })()}
+                    })())}
               </div>
               {/* Description */}
               <div className="mt-1 line-clamp-2 max-w-full overflow-hidden text-[13.5px] leading-[145%] text-(--foreground-faded) md:text-[15px]">
