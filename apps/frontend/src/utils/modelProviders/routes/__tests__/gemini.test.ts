@@ -7,7 +7,7 @@ vi.mock('~/utils/crypto', () => ({
 }))
 
 vi.mock('@ai-sdk/google', () => ({
-  createGoogleGenerativeAI: vi.fn(() => (modelId: string) => ({ id: modelId })),
+  createGoogle: vi.fn(() => (modelId: string) => ({ id: modelId })),
 }))
 
 const aiHoisted = vi.hoisted(() => {
@@ -15,7 +15,8 @@ const aiHoisted = vi.hoisted(() => {
   const generateText = vi.fn()
   return { streamText, generateText }
 })
-vi.mock('ai', () => ({
+vi.mock('ai', async () => ({
+  ...(await vi.importActual<typeof import('ai')>('ai')),
   streamText: aiHoisted.streamText,
   generateText: aiHoisted.generateText,
 }))
@@ -91,7 +92,16 @@ describe('runGeminiChat', () => {
 
   it('streams via streamText when stream=true', async () => {
     aiHoisted.streamText.mockResolvedValueOnce({
-      toTextStreamResponse: () => new Response('stream', { status: 200 }),
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'text-delta',
+            id: 'text-1',
+            text: 'stream',
+          })
+          controller.close()
+        },
+      }),
     })
 
     const conversation: any = {
@@ -109,7 +119,16 @@ describe('runGeminiChat', () => {
 
   it('converts conversation messages to CoreMessage format', async () => {
     aiHoisted.streamText.mockResolvedValueOnce({
-      toTextStreamResponse: () => new Response('stream', { status: 200 }),
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'text-delta',
+            id: 'text-1',
+            text: 'stream',
+          })
+          controller.close()
+        },
+      }),
     })
 
     const conversation: any = {
