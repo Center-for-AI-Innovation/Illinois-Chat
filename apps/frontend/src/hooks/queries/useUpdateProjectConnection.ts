@@ -5,6 +5,7 @@ import {
   PROJECT_CONNECTIONS_QUERY_KEY,
   projectConnectionQueryKey,
 } from './useFetchProjectConnections'
+import { toRequestError } from './requestError'
 
 /**
  * The four write shapes the connections editor needs.
@@ -49,7 +50,7 @@ async function request(
   const response = await fetch(url, init)
   const body = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(body?.error ?? `Request failed (${response.status})`)
+    throw toRequestError(body?.error, `Request failed (${response.status})`)
   }
   return body as UpdateProjectConnectionResponse
 }
