@@ -10,8 +10,10 @@ vi.mock('~/pages/api/UIUC-api/getCourseMetadata', () => ({
 
 import {
   _buildToolsOutputResults,
+  _getSystemPrompt,
   truncateToolOutputToBudget,
 } from '../buildPromptUtils'
+import { getCourseMetadata } from '~/pages/api/UIUC-api/getCourseMetadata'
 import type { Content, Conversation, Message, UIUCTool } from '@/types/chat'
 
 const makeTool = (overrides: Partial<UIUCTool>): UIUCTool =>
@@ -44,6 +46,25 @@ const imageEntries = (conversation: Conversation): Content[] => {
     ? content.filter((c) => c.type === 'tool_image_url')
     : []
 }
+
+describe('_getSystemPrompt project scoping (#312)', () => {
+  it('looks up the authorized project, not conversation.name, when courseMetadata has no system prompt', async () => {
+    vi.mocked(getCourseMetadata).mockClear()
+    const conversation = {
+      name: 'zz312-priv', // a different project named in the chat title
+      messages: [],
+    } as unknown as Conversation
+
+    await _getSystemPrompt({
+      courseMetadata: undefined,
+      conversation,
+      projectName: 'zz312-pub',
+    })
+
+    expect(getCourseMetadata).toHaveBeenCalledWith('zz312-pub')
+    expect(getCourseMetadata).not.toHaveBeenCalledWith('zz312-priv')
+  })
+})
 
 describe('_buildToolsOutputResults', () => {
   it('serializes data AND images when a tool returns both (issue #112)', () => {

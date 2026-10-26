@@ -13,7 +13,7 @@
 #   ./apply.sh --only 0001 "postgresql://..."
 #
 # Use a direct or session-mode connection (e.g. Supabase port 5432), not the
-# transaction pooler — these run DDL. See docs/external-connections-setup.md.
+# transaction pooler — these run DDL. See docs/self-hosting/external-connections.md.
 
 set -euo pipefail
 
@@ -35,7 +35,7 @@ Options:
   -h, --help      Show this help.
 
 Use a direct or session-mode connection (e.g. Supabase port 5432), not the
-transaction pooler — these run DDL. See docs/external-connections-setup.md.
+transaction pooler — these run DDL. See docs/self-hosting/external-connections.md.
 EOF
 }
 

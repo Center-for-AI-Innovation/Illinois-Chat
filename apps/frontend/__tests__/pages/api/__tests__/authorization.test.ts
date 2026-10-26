@@ -35,17 +35,119 @@ describe('authorization helpers', () => {
   it('extractCourseName finds course name from query/body/headers', () => {
     expect(
       extractCourseName(createMockReq({ query: { courseName: 'A' } })),
-    ).toBe('A')
+    ).toEqual({ courseName: 'A', conflict: false })
     expect(
       extractCourseName(createMockReq({ query: { project_name: 'B' } })),
-    ).toBe('B')
+    ).toEqual({ courseName: 'B', conflict: false })
     expect(
       extractCourseName(createMockReq({ body: { course_name: 'C' } })),
-    ).toBe('C')
+    ).toEqual({ courseName: 'C', conflict: false })
     expect(
       extractCourseName(createMockReq({ headers: { 'x-course-name': 'D' } })),
-    ).toBe('D')
-    expect(extractCourseName(createMockReq())).toBeNull()
+    ).toEqual({ courseName: 'D', conflict: false })
+    expect(extractCourseName(createMockReq())).toEqual({
+      courseName: null,
+      conflict: false,
+    })
+  })
+
+  it('extractCourseName flags conflicts and ignores empty values (#312)', () => {
+    // Same name in two places is fine.
+    expect(
+      extractCourseName(
+        createMockReq({
+          query: { course_name: 'A' },
+          body: { project_name: 'A' },
+        }),
+      ),
+    ).toEqual({ courseName: 'A', conflict: false })
+
+    // Different names across query and body -> conflict.
+    expect(
+      extractCourseName(
+        createMockReq({
+          query: { courseName: 'A' },
+          body: { courseName: 'B' },
+        }),
+      ).conflict,
+    ).toBe(true)
+
+    // Different names within the query (courseName vs course_name) -> conflict.
+    expect(
+      extractCourseName(
+        createMockReq({ query: { courseName: 'A', course_name: 'B' } }),
+      ).conflict,
+    ).toBe(true)
+
+    // Header disagreeing with body -> conflict.
+    expect(
+      extractCourseName(
+        createMockReq({
+          headers: { 'x-course-name': 'A' },
+          body: { course_name: 'B' },
+        }),
+      ).conflict,
+    ).toBe(true)
+
+    // Repeated query key arrives as an array -> non-string -> conflict.
+    expect(
+      extractCourseName(
+        createMockReq({ query: { course_name: ['A', 'B'] as any } }),
+      ).conflict,
+    ).toBe(true)
+
+    // A non-string body value is rejected.
+    expect(
+      extractCourseName(
+        createMockReq({ body: { course_name: { nested: 'x' } as any } }),
+      ).conflict,
+    ).toBe(true)
+
+    // Empty string and null are skipped, not treated as names.
+    expect(
+      extractCourseName(
+        createMockReq({
+          query: { courseName: '' },
+          body: { course_name: null as any },
+        }),
+      ),
+    ).toEqual({ courseName: null, conflict: false })
+  })
+
+  it('withCourseOwnerOrAdminAccess rejects conflicting names with 400 before the handler', async () => {
+    const handler = vi.fn()
+    const wrapped = withCourseOwnerOrAdminAccess()(handler)
+    const res = createMockRes()
+    await wrapped(
+      createMockReq({
+        method: 'POST',
+        query: { course_name: 'A' },
+        body: { courseName: 'B' },
+        user: { email: 'owner@example.com' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('withCourseAccessFromRequest rejects a public/private name mismatch with 400 (anonymous)', async () => {
+    const handler = vi.fn()
+    const wrapped = withCourseAccessFromRequest('any')(handler)
+    const res = createMockRes()
+    // Public project A in the query, private project B in the body: the old
+    // behavior ran the handler unauthenticated against B.
+    await wrapped(
+      createMockReq({
+        method: 'POST',
+        query: { courseName: 'A' },
+        body: { courseName: 'B' },
+        user: null,
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(handler).not.toHaveBeenCalled()
   })
 
   it('getCourseMetadata returns null when redis has no record or JSON parse fails', async () => {

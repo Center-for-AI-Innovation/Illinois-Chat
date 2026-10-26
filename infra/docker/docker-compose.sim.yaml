@@ -43,7 +43,7 @@ services:
       # image - "slack" does NOT permit "slack_v2". Core blocks are NOT exempt.
       # Re-verify every id after an image digest bump: upstream later canonicalizes
       # versions, which would silently widen the list.
-      # See docs/sim-developer-guide.md section 5.
+      # See "The block whitelist" in docs/self-hosting/sim.md.
       ALLOWED_INTEGRATIONS: ${ALLOWED_INTEGRATIONS:?ALLOWED_INTEGRATIONS is unset or empty. Sim treats an empty value as UNRESTRICTED, so the stack will not start without it. Copy the list from .env.template into your .env.}
     depends_on:
       sim-db:
