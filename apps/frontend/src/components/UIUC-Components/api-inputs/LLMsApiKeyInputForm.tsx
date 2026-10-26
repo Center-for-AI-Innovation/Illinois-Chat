@@ -333,8 +333,8 @@ const NewModelDropdown: React.FC<{
                 </TooltipContent>
               </Tooltip>
             )}
-            <ComboboxTrigger>
-              <IconChevronDown size={14} color="#adb5bd" aria-hidden="true" />
+            <ComboboxTrigger className="text-(--foreground-faded)">
+              <IconChevronDown size={14} aria-hidden="true" />
             </ComboboxTrigger>
           </div>
         </ComboboxInputGroup>
