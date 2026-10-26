@@ -43,18 +43,18 @@ class ProjectAlreadyExistsError(Exception):
 
 
 class ProjectService:
-  """
+    """
       This class contains all methods related to project management.
       """
 
-  @inject
-  def __init__(self, sql_db: SQLDatabase, posthog_service: PosthogService, sentry_service: SentryService):
-    self.sqlDb = sql_db
-    self.posthog = posthog_service
-    self.sentry = sentry_service
+    @inject
+    def __init__(self, sql_db: SQLDatabase, posthog_service: PosthogService, sentry_service: SentryService):
+        self.sqlDb = sql_db
+        self.posthog = posthog_service
+        self.sentry = sentry_service
 
-    print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
-    self.redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
+        print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
+        self.redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
 
     def generate_json_schema(self, project_name: str, project_description: str | None) -> None:
         """
