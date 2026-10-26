@@ -1,15 +1,10 @@
 import { type NextApiResponse } from 'next'
 import {
+  discoverWithCredentials,
   resolveSimCredentials,
   simConfigErrorResponse,
-  SIM_DEFAULT_BASE_URL,
-  validateSimBaseUrl,
 } from '~/utils/simConfig'
-import {
-  discoverSimWorkflows,
-  SimListError,
-  simUpstreamErrorResponse,
-} from '~/utils/simDiscovery'
+import { simUpstreamErrorResponse } from '~/utils/simDiscovery'
 import { getCourseMetadata, hasCourseAccess } from '~/server/authorization'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
@@ -64,52 +59,51 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(status).json({ error })
   }
 
-  const creds = resolved.creds
+  const result = await discoverWithCredentials(resolved.creds)
 
-  if (!creds.workspace_id) {
-    const { status, error } = simConfigErrorResponse('missing_workspace_id')
-    return res.status(status).json({ error })
+  if (!result.ok) {
+    switch (result.reason) {
+      case 'missing_workspace_id': {
+        const { status, error } = simConfigErrorResponse('missing_workspace_id')
+        return res.status(status).json({ error })
+      }
+      case 'invalid_base_url':
+        return res.status(400).json({ error: 'Invalid Sim base URL' })
+      case 'list_failed': {
+        console.error('[getSimWorkflows] list failed', {
+          status: result.status,
+        })
+        const mapped = simUpstreamErrorResponse(result.status)
+        return res.status(mapped.status).json({ error: mapped.error })
+      }
+      default: {
+        const error =
+          result.reason === 'request_failed' ? result.error : result.reason
+        console.error('[getSimWorkflows] error', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return res.status(500).json({ error: 'Failed to fetch Sim workflows' })
+      }
+    }
   }
 
-  const rawBaseUrl = (creds.base_url ?? SIM_DEFAULT_BASE_URL).replace(/\/$/, '')
-  const simBaseUrl = validateSimBaseUrl(rawBaseUrl)
-  if (!simBaseUrl) {
-    return res.status(400).json({ error: 'Invalid Sim base URL' })
+  const { workflows, failed } = result
+
+  if (failed.length > 0) {
+    console.error('[getSimWorkflows] could not describe workflows', failed)
   }
 
-  try {
-    const { workflows, failed } = await discoverSimWorkflows({
-      simBaseUrl,
-      apiKey: creds.api_key,
-      workspaceId: creds.workspace_id,
+  // Every workflow failed to describe: report it rather than returning an
+  // empty list, which the caller cannot distinguish from an empty workspace.
+  if (workflows.length === 0 && failed.length > 0) {
+    return res.status(502).json({
+      error: `Could not read input fields for any Sim workflow (${failed.length} failed)`,
+      failed,
     })
-
-    if (failed.length > 0) {
-      console.error('[getSimWorkflows] could not describe workflows', failed)
-    }
-
-    // Every workflow failed to describe: report it rather than returning an
-    // empty list, which the caller cannot distinguish from an empty workspace.
-    if (workflows.length === 0 && failed.length > 0) {
-      return res.status(502).json({
-        error: `Could not read input fields for any Sim workflow (${failed.length} failed)`,
-        failed,
-      })
-    }
-
-    console.debug('[getSimWorkflows]', workflows.length, 'workflows discovered')
-    return res.status(200).json({ workflows, failed })
-  } catch (error: unknown) {
-    if (error instanceof SimListError) {
-      console.error('[getSimWorkflows] list failed', { status: error.status })
-      const mapped = simUpstreamErrorResponse(error.status)
-      return res.status(mapped.status).json({ error: mapped.error })
-    }
-    console.error('[getSimWorkflows] error', {
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return res.status(500).json({ error: 'Failed to fetch Sim workflows' })
   }
+
+  console.debug('[getSimWorkflows]', workflows.length, 'workflows discovered')
+  return res.status(200).json({ workflows, failed })
 }
 
 export default withAuth(handler)

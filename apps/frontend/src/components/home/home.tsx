@@ -132,7 +132,6 @@ const Home = ({
       selectedConversation,
       llmProviders,
       documentGroups,
-      tools,
     },
     dispatch,
   } = contextValue
@@ -244,6 +243,24 @@ const Home = ({
     ) as FolderWithConversation
 
     deleteFolderMutation.mutate(deletedFolder)
+
+    // The database moves the folder's conversations back to the main list
+    // (folder_id SET NULL). Mirror that in local state so the open conversation
+    // does not keep sending the deleted folder's id on its next save.
+    if (selectedConversation?.folderId === folderId) {
+      dispatch({
+        field: 'selectedConversation',
+        value: { ...selectedConversation, folderId: null },
+      })
+    }
+    if (conversations.some((c) => c.folderId === folderId)) {
+      dispatch({
+        field: 'conversations',
+        value: conversations.map((c) =>
+          c.folderId === folderId ? { ...c, folderId: null } : c,
+        ),
+      })
+    }
   }
 
   const handleUpdateFolder = (folderId: string, name: string) => {
@@ -418,15 +435,6 @@ const Home = ({
     dispatch({ field: 'documentGroups', value: documentGroups })
   }
 
-  // Update actions for a prompt
-  // Fetch workflow tools instead of OpenAI-compatible tools.
-  const handleUpdateTools = (id: string) => {
-    tools.map((tool) =>
-      tool.id === id ? { ...tool, checked: !tool.enabled } : tool,
-    )
-    dispatch({ field: 'tools', value: tools })
-  }
-
   const GradientIconPhoto = () => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -570,7 +578,6 @@ const Home = ({
           // setIsRunningTool,
           setIsRetrievalLoading,
           handleUpdateDocumentGroups,
-          handleUpdateTools,
           setIsQueryRewriting,
           setQueryRewriteResult,
         }}

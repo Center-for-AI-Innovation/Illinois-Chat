@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import type { ConnectionKind } from '~/utils/projectConnections/validation'
+import { toRequestError } from './requestError'
 
 export interface TestConnectionResult {
   ok: boolean
@@ -33,7 +34,7 @@ export async function testProjectConnection({
 
   const body = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(body?.error ?? `Test failed (${response.status})`)
+    throw toRequestError(body?.error, `Test failed (${response.status})`)
   }
 
   // A failed probe is a 200 with `ok: false` — the request itself succeeded.

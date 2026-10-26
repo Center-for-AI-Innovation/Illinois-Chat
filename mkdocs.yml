@@ -1,0 +1,158 @@
+site_name: Illinois Chat
+site_description: >-
+  Illinois Chat is a self-hostable AI chat platform for building course,
+  research, and organization-specific assistants over curated documents and
+  web content.
+site_url: https://docs.chat.illinois.edu/
+repo_url: https://github.com/Center-for-AI-Innovation/Illinois-Chat
+repo_name: Center-for-AI-Innovation/Illinois-Chat
+
+theme:
+  name: material
+  custom_dir: overrides
+  # Material's own Google Fonts loading is off; overrides/main.html loads
+  # Montserrat and Source Sans 3, which stylesheets/extra.css applies.
+  font: false
+  logo: assets/logo_illinois.png
+  favicon: assets/favicon.ico
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+validation:
+  anchors: warn
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/brand.js
+
+plugins:
+  - search
+  - blog:
+      blog_dir: blog
+      blog_toc: true
+      post_url_format: "{date}/{slug}"
+      draft_if_future_date: true
+      categories_allowed:
+        - Releases
+        - Announcements
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Center-for-AI-Innovation/Illinois-Chat
+    - icon: material/web
+      link: https://chat.illinois.edu
+    - icon: material/email
+      link: mailto:genaisupport@mx.uillinois.edu
+
+nav:
+  - Introduction: index.md
+  - Getting Started:
+      - Quickstart: getting-started/quickstart.md
+      - Using a chatbot: getting-started/using-a-chatbot.md
+      - Finding chatbots: getting-started/finding-chatbots.md
+      - FAQs: getting-started/faqs.md
+      - Video Walkthroughs: getting-started/video-walkthroughs.md
+  - Building a Chatbot:
+      - building/index.md
+      - Dashboard:
+          - Uploading files: building/dashboard/uploading-files.md
+          - Web crawling: building/dashboard/web-crawling.md
+          - Importing: building/dashboard/importing.md
+          - Document groups & deleting: building/dashboard/document-groups.md
+          - Sharing & access: building/dashboard/sharing-access.md
+      - LLMs: building/llms.md
+      - Prompting: building/prompting.md
+      - Tools:
+          - building/tools/index.md
+          - Sim AI User Guide: building/tools/sim-user-guide.md
+          - Build a Tool in Sim: building/tools/build-a-tool.md
+      - Analysis & exports: building/analysis-exports.md
+      - External connections: building/external-connections.md
+  - How It Works:
+      - how-it-works/index.md
+      - Documents & ingest: how-it-works/documents-ingest.md
+      - Retrieval: how-it-works/retrieval.md
+      - Tool routing: how-it-works/tool-routing.md
+      - Glossary: how-it-works/glossary.md
+  - API Reference:
+      - api/index.md
+      - Authentication: api/authentication.md
+      - Chat: api/chat.md
+      - Retrieval: api/retrieval.md
+  - Self-Hosting:
+      - self-hosting/index.md
+      - Configuration reference: self-hosting/configuration.md
+      - Services, ports & architecture: self-hosting/architecture.md
+      - Tools Platform (Sim AI): self-hosting/sim.md
+      - External connections (operators): self-hosting/external-connections.md
+      - External connections config reference: self-hosting/external-connections-config.md
+      - Cloud deployment (ECS): self-hosting/cloud-deployment.md
+      - Upgrading: self-hosting/upgrading.md
+      - Backup & restore: self-hosting/backup-restore.md
+      - Troubleshooting: self-hosting/troubleshooting.md
+  - Use Cases:
+      - use-cases/index.md
+      - CropWizard:
+          - use-cases/cropwizard/index.md
+          - CropWizard Documents: use-cases/cropwizard/documents.md
+          - Pest Detection Tool: use-cases/cropwizard/pest-detection.md
+          - Seasonal Characterization Tool: use-cases/cropwizard/seasonal-characterization.md
+          - Document Licenses: use-cases/cropwizard/licenses.md
+  - Contributing:
+      - Development setup: contributing/dev-setup.md
+      - Repository layout: contributing/repository-layout.md
+      - Testing & CI: contributing/testing-ci.md
+      - Writing docs: contributing/writing-docs.md
+      - Lightweight ingest bridge: contributing/ingest-bridge.md
+  - Support & Funding: support-funding.md
+  - Blog: blog/index.md

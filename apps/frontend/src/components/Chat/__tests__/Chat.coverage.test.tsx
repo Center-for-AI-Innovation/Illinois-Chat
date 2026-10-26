@@ -333,6 +333,99 @@ describe('Chat (coverage)', () => {
     globalThis.__TEST_WORKFLOWS_ERROR__ = false
   })
 
+  it('does not repeat the tools error toast when the conversation changes', async () => {
+    const { showToast } = await import('~/utils/toastUtils')
+    vi.mocked(showToast).mockClear()
+    globalThis.__TEST_WORKFLOWS_ERROR__ = true
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat' }
+
+    const { Chat } = await import('../Chat')
+    // A fresh element each time, or React skips the rerender.
+    const chat = () => (
+      <Chat
+        stopConversationRef={{ current: false }}
+        courseMetadata={{} as any}
+        courseName="CS101"
+        currentEmail="me@example.com"
+        documentExists={false}
+      />
+    )
+    const { rerender, homeContext } = renderWithProviders(chat(), {
+      homeState: {
+        selectedConversation: makeConversation({ id: 'conv-1' }) as any,
+        loading: false,
+        messageIsStreaming: false,
+      },
+      homeContext: { dispatch: vi.fn() },
+    })
+    const toolErrorToasts = () =>
+      vi
+        .mocked(showToast)
+        .mock.calls.filter(
+          ([args]: any[]) => args?.title === 'Error loading tools',
+        ).length
+    expect(toolErrorToasts()).toBe(1)
+
+    homeContext.state.selectedConversation = makeConversation({
+      id: 'conv-2',
+    }) as any
+    rerender(chat())
+
+    expect(toolErrorToasts()).toBe(1)
+    globalThis.__TEST_WORKFLOWS_ERROR__ = false
+  })
+
+  it.each([
+    ['conv-1', [false, true]],
+    // Other conversations start all on.
+    ['conv-2', [true, true]],
+  ])(
+    'applies the switches saved for %s when it loads the tools',
+    async (conversationId, expectedEnabled) => {
+      const { setToolDisabled } = await import('~/utils/app/disabledTools')
+      localStorage.clear()
+      setToolDisabled('conv-1', 'wf-1', true)
+      globalThis.__TEST_WORKFLOWS_DATA__ = [
+        { id: 'wf-1', name: 'sim_one', readableName: 'One', enabled: true },
+        { id: 'wf-2', name: 'sim_two', readableName: 'Two', enabled: true },
+      ]
+      globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat' }
+      const conversation = makeConversation({ id: conversationId })
+      const dispatch = vi.fn()
+
+      const { Chat } = await import('../Chat')
+
+      renderWithProviders(
+        <Chat
+          stopConversationRef={{ current: false }}
+          courseMetadata={{} as any}
+          courseName="CS101"
+          currentEmail="me@example.com"
+          documentExists={false}
+        />,
+        {
+          homeState: {
+            selectedConversation: conversation as any,
+            conversations: [conversation as any],
+            loading: false,
+            messageIsStreaming: false,
+          },
+          homeContext: { dispatch },
+        },
+      )
+
+      const toolsDispatch = dispatch.mock.calls.find(
+        ([action]) => action.field === 'tools',
+      )
+      expect(toolsDispatch![0].value.map((tool: any) => tool.enabled)).toEqual(
+        expectedEnabled,
+      )
+
+      globalThis.__TEST_WORKFLOWS_DATA__ = undefined
+      localStorage.clear()
+    },
+  )
+
   it('fetches llmProviders on send and guards invalid selectedConversation.model', async () => {
     const user = userEvent.setup()
     globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat' }

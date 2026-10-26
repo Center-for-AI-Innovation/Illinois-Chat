@@ -40,7 +40,10 @@ describe('app/api authorization helpers', () => {
       headers: { 'content-type': 'application/json' },
     })
 
-    await expect(extractCourseName(req)).resolves.toBeNull()
+    await expect(extractCourseName(req)).resolves.toEqual({
+      courseName: null,
+      conflict: false,
+    })
   })
 
   it('extractCourseName reads from query, headers, and JSON body', async () => {
@@ -48,20 +51,70 @@ describe('app/api authorization helpers', () => {
       extractCourseName(
         new NextRequest('http://localhost/api?courseName=Q', { method: 'GET' }),
       ),
-    ).resolves.toBe('Q')
+    ).resolves.toEqual({ courseName: 'Q', conflict: false })
 
     const withHeader = new NextRequest('http://localhost/api', {
       method: 'GET',
       headers: { 'x-course-name': 'H' },
     })
-    await expect(extractCourseName(withHeader)).resolves.toBe('H')
+    await expect(extractCourseName(withHeader)).resolves.toEqual({
+      courseName: 'H',
+      conflict: false,
+    })
 
     const withBody = new NextRequest('http://localhost/api', {
       method: 'POST',
       body: JSON.stringify({ course_name: 'B' }),
       headers: { 'content-type': 'application/json' },
     })
-    await expect(extractCourseName(withBody)).resolves.toBe('B')
+    await expect(extractCourseName(withBody)).resolves.toEqual({
+      courseName: 'B',
+      conflict: false,
+    })
+  })
+
+  it('extractCourseName flags conflicting names (#312)', async () => {
+    // Query name and POST body name disagree.
+    const queryVsBody = new NextRequest('http://localhost/api?courseName=A', {
+      method: 'POST',
+      body: JSON.stringify({ course_name: 'B' }),
+      headers: { 'content-type': 'application/json' },
+    })
+    expect((await extractCourseName(queryVsBody)).conflict).toBe(true)
+
+    // Header disagrees with body.
+    const headerVsBody = new NextRequest('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ course_name: 'B' }),
+      headers: { 'content-type': 'application/json', 'x-course-name': 'A' },
+    })
+    expect((await extractCourseName(headerVsBody)).conflict).toBe(true)
+
+    // Repeated query key is ambiguous.
+    const repeated = new NextRequest(
+      'http://localhost/api?course_name=A&course_name=B',
+      { method: 'GET' },
+    )
+    expect((await extractCourseName(repeated)).conflict).toBe(true)
+
+    // A non-string body value is ambiguous (matches the Pages Router).
+    const nonString = new NextRequest('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ course_name: { nested: 'x' } }),
+      headers: { 'content-type': 'application/json' },
+    })
+    expect((await extractCourseName(nonString)).conflict).toBe(true)
+
+    // The same name in query and body is not a conflict.
+    const same = new NextRequest('http://localhost/api?courseName=A', {
+      method: 'POST',
+      body: JSON.stringify({ course_name: 'A' }),
+      headers: { 'content-type': 'application/json' },
+    })
+    await expect(extractCourseName(same)).resolves.toEqual({
+      courseName: 'A',
+      conflict: false,
+    })
   })
 
   it('getCourseMetadata returns null on missing or malformed redis values', async () => {
@@ -253,5 +306,48 @@ describe('app/api authorization helpers', () => {
     }) as unknown as TestRequest
     asOwner.user = { email: 'owner@example.com' } as AuthenticatedUser
     expect((await wrapped(asOwner)).status).toBe(200)
+  })
+
+  it('withCourseAccessFromRequest returns 400 on conflicting names before the handler (#312)', async () => {
+    const handler = vi.fn(async (_req: AuthenticatedRequest) =>
+      NextResponse.json({ ok: true }),
+    )
+    const wrapped = withCourseAccessFromRequest('any')(handler)
+
+    const req = new NextRequest('http://localhost/api?courseName=A', {
+      method: 'POST',
+      body: JSON.stringify({ course_name: 'B' }),
+      headers: { 'content-type': 'application/json' },
+    }) as unknown as TestRequest
+    const res = await wrapped(req)
+    expect(res.status).toBe(400)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('cloning the body in the extractor leaves it readable by the handler', async () => {
+    hoisted.hGet.mockResolvedValueOnce(JSON.stringify({ is_private: false }))
+
+    const handler = vi.fn(async (req: TestRequest) => {
+      const body = await req.json()
+      return NextResponse.json({ course: req.courseName, got: body.extra })
+    })
+    const wrapped = withCourseAccessFromRequest('any')(
+      handler as unknown as (
+        req: AuthenticatedRequest,
+      ) => Promise<NextResponse>,
+    )
+
+    const req = new NextRequest('http://localhost/api', {
+      method: 'POST',
+      body: JSON.stringify({ course_name: 'CS101', extra: 'payload' }),
+      headers: { 'content-type': 'application/json' },
+    }) as unknown as TestRequest
+
+    const res = await wrapped(req)
+    expect(handler).toHaveBeenCalled()
+    await expect(res.json()).resolves.toEqual({
+      course: 'CS101',
+      got: 'payload',
+    })
   })
 })

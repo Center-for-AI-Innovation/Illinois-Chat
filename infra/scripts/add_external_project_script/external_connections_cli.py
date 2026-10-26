@@ -88,7 +88,7 @@ ALL_KINDS = ("s3", "database", "qdrant", "embedding")
 # Config blocks built from .external.env. Field shapes match:
 #   - apps/frontend/src/utils/projectConnections/validation.ts
 #   - apps/frontend/src/utils/connectionManager.ts
-#   - apps/backend/docs/developers/external-connections-config.md
+#   - docs/self-hosting/external-connections-config.md
 # Optional keys are included only when the corresponding variable is set.
 # ---------------------------------------------------------------------------
 

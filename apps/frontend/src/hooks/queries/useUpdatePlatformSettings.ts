@@ -6,6 +6,7 @@ import {
   PLATFORM_SETTINGS_QUERY_KEY,
   type PlatformSettingsResponse,
 } from './useFetchPlatformSettings'
+import { toRequestError } from './requestError'
 
 export interface UpdatePlatformSettingsResponse {
   saved: true
@@ -46,8 +47,9 @@ export async function updatePlatformSettings(
     throw new PlatformSettingsConflictError(body.error, body.current)
   }
   if (!response.ok) {
-    throw new Error(
-      body?.error ?? `Failed to save settings (${response.status})`,
+    throw toRequestError(
+      body?.error,
+      `Failed to save settings (${response.status})`,
     )
   }
 

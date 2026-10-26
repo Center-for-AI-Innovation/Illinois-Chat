@@ -5,15 +5,17 @@ import {
   PROJECT_CONNECTIONS_QUERY_KEY,
   projectConnectionQueryKey,
 } from './useFetchProjectConnections'
+import { toRequestError } from './requestError'
 
 /**
  * The four write shapes the connections editor needs.
  *
  * `upsert` and `patch` are deliberately separate rather than one "save":
- * POST hardcodes `is_active: true`, so routing a toggle change through it
- * would silently reactivate a connection an operator had disabled. `patch`
- * merges server-side against the stored config, which is also what lets the
- * UI hold masked secrets — omitted fields keep their real values.
+ * a toggle goes through `setActive`, the only write that changes `is_active`.
+ * POST inserts a new row as active and leaves the flag alone when the row
+ * already exists. `patch` merges server-side against the stored config, which
+ * is also what lets the UI hold masked secrets — omitted fields keep their
+ * real values.
  */
 export type UpdateProjectConnectionVariables =
   | {
@@ -48,7 +50,7 @@ async function request(
   const response = await fetch(url, init)
   const body = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(body?.error ?? `Request failed (${response.status})`)
+    throw toRequestError(body?.error, `Request failed (${response.status})`)
   }
   return body as UpdateProjectConnectionResponse
 }

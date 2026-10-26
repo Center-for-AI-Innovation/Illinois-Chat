@@ -33,8 +33,14 @@ const hoisted = vi.hoisted(() => {
     folder_id: { name: 'folder_id' },
   }
 
+  const folders = {
+    id: { name: 'id' },
+    user_email: { name: 'user_email' },
+  }
+
   return {
     db: { insert, select, delete: del, execute },
+    folders,
     messages,
     conversations,
     insert,
@@ -53,6 +59,7 @@ vi.mock('~/server/authorization', () => ({
 
 vi.mock('~/db/dbClient', () => ({
   db: hoisted.db,
+  folders: hoisted.folders,
   messages: hoisted.messages,
   conversations: hoisted.conversations,
 }))
@@ -607,6 +614,9 @@ describe('conversation API', () => {
 
   it('POST (legacy) saves conversation + messages and deletes subsequent messages when edited', async () => {
     const editedId = uuidv4()
+    const folderId = uuidv4()
+    // First select resolves the conversation's folder, second loads messages.
+    hoisted.selectWhere.mockResolvedValueOnce([{ id: folderId }])
     hoisted.selectWhere.mockResolvedValueOnce([
       {
         id: editedId,
@@ -631,7 +641,7 @@ describe('conversation API', () => {
             model: { id: 'gpt-4o' },
             prompt: '',
             temperature: 0.1,
-            folderId: uuidv4(),
+            folderId,
             projectName: 'CS101',
             messages: [
               { id: editedId, role: 'user', content: 'new' },
@@ -645,6 +655,99 @@ describe('conversation API', () => {
 
     expect(hoisted.db.delete).toHaveBeenCalled()
     expect(res.status).toHaveBeenCalledWith(200)
+  })
+
+  it('persistMessageServer writes the authorized course, not conversation.projectName (#312)', async () => {
+    hoisted.selectWhere.mockResolvedValueOnce([]) // no existing messages
+
+    await persistMessageServer({
+      conversation: {
+        id: 'c1',
+        name: 'n',
+        model: { id: 'gpt-4o' },
+        prompt: '',
+        temperature: 0.1,
+        folderId: 'not-a-uuid',
+        projectName: 'B',
+      } as any,
+      message: { id: uuidv4(), role: 'user', content: 'hi' } as any,
+      courseName: 'A',
+      userIdentifier: 'u@example.com',
+    })
+
+    const convoInsert = (hoisted.insertValues.mock.calls as any)[0][0]
+    expect(convoInsert.project_name).toBe('A')
+  })
+
+  it('POST (delta) pins project_name to req.courseName, ignoring conversation.projectName (#312)', async () => {
+    hoisted.selectWhere.mockResolvedValueOnce([])
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        user: { email: 'u@example.com' },
+        courseName: 'A', // set by the (mocked) access wrapper
+        body: {
+          delta: {
+            conversation: {
+              id: 'c1',
+              name: 'Conversation',
+              modelId: 'gpt-4o',
+              prompt: '',
+              temperature: 0.1,
+              projectName: 'B', // attacker-controlled nested name
+              folderId: null,
+              userEmail: 'u@example.com',
+            },
+            messagesDelta: [{ id: uuidv4(), role: 'user', content: 'hi' }],
+          },
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const insertedValues = (hoisted.insertValues.mock.calls as any)[0][0]
+    expect(insertedValues.project_name).toBe('A')
+    const conflictSet = (
+      hoisted.insertOnConflictDoUpdate.mock.calls[0]![0] as any
+    ).set
+    expect(conflictSet.project_name).toBe('A')
+  })
+
+  it('POST (legacy) pins project_name to req.courseName, ignoring conversation.projectName (#312)', async () => {
+    hoisted.selectWhere.mockResolvedValueOnce([]) // existing messages
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        user: { email: 'u@example.com' },
+        courseName: 'A',
+        body: {
+          conversation: {
+            id: 'c1',
+            name: 'Conversation',
+            model: { id: 'gpt-4o' },
+            prompt: '',
+            temperature: 0.1,
+            folderId: null,
+            projectName: 'B',
+            messages: [{ id: uuidv4(), role: 'user', content: 'new' }],
+          },
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const insertedValues = (hoisted.insertValues.mock.calls as any)[0][0]
+    expect(insertedValues.project_name).toBe('A')
+    const conflictSet = (
+      hoisted.insertOnConflictDoUpdate.mock.calls[0]![0] as any
+    ).set
+    expect(conflictSet.project_name).toBe('A')
   })
 
   it('GET returns 400 when query params are invalid', async () => {

@@ -22,8 +22,11 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(200).json({
       connections: connections.map((c) => ({
         project_name: c.project_name,
-        // The column is nullable in the schema; older rows predate the default.
-        is_active: c.is_active ?? false,
+        // NULL means active. connectionManager skips overrides only when
+        // is_active === false, so older rows that predate the column default
+        // are live. Showing them as Disabled would let an operator think the
+        // overrides are off while traffic still uses them.
+        is_active: c.is_active !== false,
         configured_kinds: c.configured_kinds,
         updated_at: c.updated_at?.toISOString() ?? null,
         created_at: c.created_at?.toISOString() ?? null,
