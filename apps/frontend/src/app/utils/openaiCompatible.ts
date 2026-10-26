@@ -1,5 +1,10 @@
-import { type CoreMessage, streamText } from 'ai'
-import { smoothStream } from 'ai'
+import {
+  type ModelMessage,
+  type FilePart,
+  generateText,
+  streamText,
+  smoothStream,
+} from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { type Conversation } from '~/types/chat'
 import {
@@ -9,7 +14,7 @@ import {
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 export const dynamic = 'force-dynamic'
 
-const PROVIDER_NAME = 'openai-compatible'
+const PROVIDER_NAME = 'openaiCompatible'
 
 /**
  * Reasoning request parameter patterns:
@@ -42,25 +47,6 @@ function detectReasoningRequestPattern(
   }
   // All other providers output reasoning by default without special params
   return 'none'
-}
-
-/**
- * Add reasoning parameters to request body based on detected pattern
- */
-function addReasoningParams(
-  body: Record<string, unknown>,
-  pattern: ReasoningRequestPattern,
-): Record<string, unknown> {
-  if (pattern === 'reasoning_effort') {
-    // Groq-style: add reasoning_effort as top-level string parameter
-    // Supported values: 'low', 'medium', 'high'
-    return {
-      ...body,
-      reasoning_effort: 'medium',
-    }
-  }
-  // OpenRouter is handled via providerOptions, others need no special params
-  return body
 }
 
 /**
@@ -108,39 +94,42 @@ export async function runOpenAICompatibleChat(
       name: PROVIDER_NAME,
       baseURL: baseUrl,
       apiKey: apiKey,
-      fetch:
-        isReasoningModel && stream
-          ? createReasoningFetchMiddleware(reasoningPattern)
-          : undefined,
+      fetch: isReasoningModel ? createReasoningFetchMiddleware() : undefined,
     })
 
     const model = provider(modelId)
 
     const commonParams = {
       model: model,
+      allowSystemInMessages: true,
       messages: convertConversationToVercelAISDKv3(conversation),
       temperature: conversation.temperature,
-      maxTokens: 16384,
-      // OpenRouter requires reasoning via providerOptions
-      ...(isReasoningModel &&
-        reasoningPattern === 'openrouter' && {
-          providerOptions: {
-            [PROVIDER_NAME]: {
+      maxOutputTokens: 16384,
+      ...(isReasoningModel && {
+        providerOptions: {
+          [PROVIDER_NAME]: {
+            ...(reasoningPattern === 'openrouter' && {
               reasoning: { effort: 'medium' },
-            },
+            }),
+            ...(reasoningPattern === 'reasoning_effort' && {
+              reasoningEffort: 'medium',
+            }),
           },
-        }),
+        },
+      }),
     }
 
     if (stream) {
       return await handleStreamingResponse(commonParams)
     } else {
-      return await handleNonStreamingResponse(
-        baseUrl,
-        apiKey,
-        conversation,
-        isReasoningModel,
-      )
+      const result = await generateText(commonParams)
+      const content =
+        isReasoningModel &&
+        result.finalStep.reasoningText &&
+        !result.text.includes('<think>')
+          ? `<think>${result.finalStep.reasoningText}</think>\n${result.text}`
+          : result.text
+      return Response.json({ choices: [{ message: { content } }] })
     }
   } catch (error) {
     console.error('OpenAI-compatible error:', error)
@@ -158,7 +147,7 @@ export async function runOpenAICompatibleChat(
 
 /**
  * Custom fetch middleware to handle reasoning for multiple providers
- * - Modifies request body with reasoning parameters based on detected pattern
+ * - Normalizes provider-specific JSON and streaming reasoning fields
  * - Transforms response stream to extract reasoning into <think> tags
  *
  * Response formats handled (all providers):
@@ -167,27 +156,12 @@ export async function runOpenAICompatibleChat(
  * - delta.reasoning_content (DeepSeek)
  * - delta.content[].type="thinking" (Mistral Magistral)
  */
-function createReasoningFetchMiddleware(
-  reasoningPattern: ReasoningRequestPattern,
-) {
+function createReasoningFetchMiddleware() {
   return async (
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> => {
-    let modifiedInit = init
-    if (init?.body && reasoningPattern === 'reasoning_effort') {
-      try {
-        const body = JSON.parse(init.body as string)
-        modifiedInit = {
-          ...init,
-          body: JSON.stringify(addReasoningParams(body, reasoningPattern)),
-        }
-      } catch {
-        /* ignore parse errors */
-      }
-    }
-
-    const response = await fetch(input, modifiedInit)
+    const response = await fetch(input, init)
 
     // For error responses, throw an error that will propagate to the caller
     if (!response.ok) {
@@ -210,20 +184,49 @@ function createReasoningFetchMiddleware(
 
     const contentType = response.headers.get('content-type') || ''
     if (!contentType.includes('text/event-stream')) {
-      // Check if it's a JSON error
-      const text = await response.text()
-      try {
-        const json = JSON.parse(text)
-        if (json.error) {
-          throw new Error(json.error.message || JSON.stringify(json.error))
+      const data = await response.json()
+      const message = data.choices?.[0]?.message
+      if (message) {
+        let content = ''
+        let reasoning = ''
+        if (Array.isArray(message.content)) {
+          for (const item of message.content) {
+            if (item.type === 'thinking' && Array.isArray(item.thinking)) {
+              reasoning += item.thinking
+                .filter(
+                  (thought: { type: string; text?: string }) =>
+                    thought.type === 'text',
+                )
+                .map((thought: { text?: string }) => thought.text || '')
+                .join('')
+            } else if (item.type === 'text') {
+              content += item.text || ''
+            }
+          }
+        } else {
+          content = message.content || ''
         }
-      } catch (e) {
-        if (e instanceof Error && e.message !== text) throw e
+        if (!reasoning) {
+          reasoning = (message.reasoning_details || [])
+            .filter(
+              (detail: { type: string; text?: string }) =>
+                detail.type === 'reasoning.text',
+            )
+            .map((detail: { text?: string }) => detail.text || '')
+            .join('')
+          reasoning += message.reasoning || ''
+          reasoning += message.reasoning_content || ''
+        }
+        message.content = content
+        message.reasoning_content = reasoning
+        delete message.reasoning
       }
-      // Return as response
-      return new Response(text, {
+      const headers = new Headers(response.headers)
+      headers.delete('content-length')
+      return new Response(JSON.stringify(data), {
         status: response.status,
-        headers: response.headers,
+        statusText: response.statusText,
+        headers,
       })
     }
     // Transform stream to extract reasoning
@@ -420,7 +423,7 @@ async function handleStreamingResponse(commonParams: any): Promise<Response> {
   })
 
   const encoder = new TextEncoder()
-  const iterator = result.fullStream[Symbol.asyncIterator]()
+  const iterator = result.stream[Symbol.asyncIterator]()
 
   // Read first part to catch errors before returning
   const first = await iterator.next()
@@ -431,12 +434,12 @@ async function handleStreamingResponse(commonParams: any): Promise<Response> {
   const stream = new ReadableStream({
     async start(controller) {
       if (!first.done && first.value.type === 'text-delta') {
-        controller.enqueue(encoder.encode(first.value.textDelta))
+        controller.enqueue(encoder.encode(first.value.text))
       }
       for await (const part of { [Symbol.asyncIterator]: () => iterator }) {
         if (part.type === 'error') throw part.error
         if (part.type === 'text-delta')
-          controller.enqueue(encoder.encode(part.textDelta))
+          controller.enqueue(encoder.encode(part.text))
       }
       controller.close()
     },
@@ -447,110 +450,10 @@ async function handleStreamingResponse(commonParams: any): Promise<Response> {
   })
 }
 
-async function handleNonStreamingResponse(
-  baseUrl: string,
-  apiKey: string,
-  conversation: Conversation,
-  isReasoningModel: boolean,
-): Promise<Response> {
-  const reasoningPattern = detectReasoningRequestPattern(baseUrl)
-  // OpenRouter requires lowercase model IDs
-  const modelId =
-    reasoningPattern === 'openrouter'
-      ? conversation.model.id.toLowerCase()
-      : conversation.model.id
-
-  let requestBody: Record<string, unknown> = {
-    model: modelId,
-    messages: convertConversationToVercelAISDKv3(conversation).map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    })),
-    temperature: conversation.temperature,
-    max_tokens: 16384,
-    stream: false,
-  }
-
-  // Add reasoning parameters based on detected pattern
-  if (isReasoningModel) {
-    if (reasoningPattern === 'openrouter') {
-      requestBody.reasoning = { effort: 'medium' }
-    } else {
-      requestBody = addReasoningParams(requestBody, reasoningPattern)
-    }
-  }
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`API error: ${response.status} - ${errorText}`)
-  }
-
-  const data = await response.json()
-  const message = data.choices?.[0]?.message
-  if (!message) throw new Error('No message in response')
-
-  let content = ''
-  let reasoning = ''
-
-  // Handle Mistral Magistral format: content is array with type: "thinking" and type: "text"
-  if (Array.isArray(message.content)) {
-    for (const item of message.content) {
-      if (item.type === 'thinking' && Array.isArray(item.thinking)) {
-        for (const thought of item.thinking) {
-          if (thought.type === 'text' && thought.text) {
-            reasoning += thought.text
-          }
-        }
-      } else if (item.type === 'text' && item.text) {
-        content += item.text
-      }
-    }
-  } else {
-    content = message.content || ''
-  }
-
-  const hasNativeThinkTags = content.includes('<think>')
-
-  if (isReasoningModel && !hasNativeThinkTags) {
-    // Extract from various formats (if not already extracted from Mistral format)
-    if (!reasoning) {
-      if (
-        message.reasoning_details &&
-        Array.isArray(message.reasoning_details)
-      ) {
-        for (const detail of message.reasoning_details) {
-          if (detail.type === 'reasoning.text' && detail.text) {
-            reasoning += detail.text
-          }
-        }
-      }
-      if (message.reasoning) reasoning += message.reasoning
-      if (message.reasoning_content) reasoning += message.reasoning_content
-    }
-
-    if (reasoning) {
-      content = `<think>${reasoning}</think>\n${content}`
-    }
-  }
-
-  return new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
-
 function convertConversationToVercelAISDKv3(
   conversation: Conversation,
-): CoreMessage[] {
-  const coreMessages: CoreMessage[] = []
+): ModelMessage[] {
+  const coreMessages: ModelMessage[] = []
 
   const systemMessage = conversation.messages.findLast(
     (msg) => msg.latestSystemMessage !== undefined,
@@ -570,9 +473,7 @@ function convertConversationToVercelAISDKv3(
 
     if (Array.isArray(message.content)) {
       const contentParts: Array<
-        | string
-        | { type: 'image_url'; image_url: { url: string } }
-        | { type: 'text'; text: string }
+        string | FilePart | { type: 'text'; text: string }
       > = []
 
       message.content.forEach((c) => {
@@ -585,8 +486,9 @@ function convertConversationToVercelAISDKv3(
           const imageUrl = c.image_url?.url || ''
           if (imageUrl) {
             contentParts.push({
-              type: 'image_url',
-              image_url: { url: imageUrl },
+              type: 'file',
+              mediaType: 'image',
+              data: { type: 'url', url: new URL(imageUrl) },
             })
           }
         } else if (c.type === 'file') {
@@ -597,18 +499,17 @@ function convertConversationToVercelAISDKv3(
       })
 
       const hasImages = contentParts.some(
-        (part) => typeof part === 'object' && part.type === 'image_url',
+        (part) => typeof part === 'object' && part.type === 'file',
       )
 
       if (hasImages || contentParts.length > 1) {
         const formattedContent: Array<
-          | { type: 'text'; text: string }
-          | { type: 'image_url'; image_url: { url: string } }
+          { type: 'text'; text: string } | FilePart
         > = []
         contentParts.forEach((part) => {
           if (typeof part === 'string') {
             formattedContent.push({ type: 'text', text: part })
-          } else if (part.type === 'image_url') {
+          } else if (part.type === 'file') {
             formattedContent.push(part)
           } else if (part.type === 'text') {
             formattedContent.push(part)
@@ -617,7 +518,7 @@ function convertConversationToVercelAISDKv3(
         coreMessages.push({
           role: message.role as 'user' | 'assistant',
           content: formattedContent,
-        } as CoreMessage)
+        } as ModelMessage)
       } else {
         const textContent =
           typeof contentParts[0] === 'string'
