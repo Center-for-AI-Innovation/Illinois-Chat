@@ -1,32 +1,9 @@
-import {
-  createParser,
-  type ParsedEvent,
-  type ReconnectInterval,
-} from 'eventsource-parser'
-import { type CoreMessage } from 'ai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { type ModelMessage, generateText, streamText } from 'ai'
 import { type Conversation } from '~/types/chat'
+import { toThinkingTextResponse } from '~/utils/aiStream'
 
 export const dynamic = 'force-dynamic'
-
-interface VLLMChatMessage {
-  reasoning?: string | null
-  content?: string | null
-}
-
-interface VLLMChatCompletionResponse {
-  choices?: Array<{
-    message?: VLLMChatMessage
-  }>
-}
-
-interface VLLMChatCompletionChunk {
-  choices?: Array<{
-    delta?: {
-      reasoning?: string
-      content?: string
-    }
-  }>
-}
 
 function buildVLLMResponseContent({
   content,
@@ -47,111 +24,6 @@ function buildVLLMResponseContent({
   return content.trimStart()
 }
 
-function normalizeVLLMStreamResponse(response: Response): Response {
-  if (!response.body) {
-    return response
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  const encoder = new TextEncoder()
-
-  const normalizedStream = new ReadableStream({
-    async start(controller) {
-      let isThinkingOpen = false
-      let hasStartedContent = false
-
-      const emit = (text: string) => {
-        if (text.length > 0) {
-          controller.enqueue(encoder.encode(text))
-        }
-      }
-
-      const onParse = (event: ParsedEvent | ReconnectInterval) => {
-        if (event.type !== 'event') {
-          return
-        }
-
-        const data = event.data
-        if (data.trim() === '[DONE]') {
-          if (isThinkingOpen) {
-            emit('</think>\n\n')
-            isThinkingOpen = false
-          }
-          controller.close()
-          return
-        }
-
-        try {
-          const json = JSON.parse(data) as VLLMChatCompletionChunk
-          const choice = json.choices?.[0]
-          const delta = choice?.delta
-
-          if (!delta) {
-            return
-          }
-
-          const reasoningText = delta.reasoning ?? ''
-          const contentText = delta.content ?? ''
-
-          let output = ''
-
-          if (reasoningText) {
-            if (!isThinkingOpen) {
-              output += '<think>'
-              isThinkingOpen = true
-            }
-            output += reasoningText
-          }
-
-          if (contentText) {
-            const normalizedContentText = hasStartedContent
-              ? contentText
-              : contentText.trimStart()
-            if (isThinkingOpen && !hasStartedContent) {
-              output += '</think>\n\n'
-              isThinkingOpen = false
-            }
-            hasStartedContent = true
-            output += normalizedContentText
-          }
-
-          emit(output)
-        } catch (error) {
-          controller.error(error)
-        }
-      }
-
-      const parser = createParser(onParse)
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-
-          if (done) {
-            if (isThinkingOpen) {
-              emit('</think>\n\n')
-            }
-            controller.close()
-            return
-          }
-
-          const decodedChunk = decoder.decode(value, { stream: true })
-          parser.feed(decodedChunk)
-        }
-      } catch (error) {
-        controller.error(error)
-      }
-    },
-  })
-
-  return new Response(normalizedStream, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  })
-}
-
 export async function runVLLM(conversation: Conversation, stream: boolean) {
   try {
     if (!conversation) {
@@ -166,57 +38,46 @@ export async function runVLLM(conversation: Conversation, stream: boolean) {
     const baseUrl = process.env.NCSA_HOSTED_VLM_BASE_URL
     const apiKey = process.env.NCSA_HOSTED_API_KEY || ''
 
-    const requestBody = {
-      model: modelId,
+    if (!baseUrl) {
+      throw new Error('VLLM server URL is not configured')
+    }
+
+    const provider = createOpenAICompatible({
+      name: 'vllm',
+      baseURL: baseUrl,
+      headers: { Authorization: `Bearer ${apiKey}` },
+    })
+    const commonParams = {
+      model: provider(modelId),
+      allowSystemInMessages: true,
       messages: convertConversationToVercelAISDKv3(conversation),
       temperature: conversation.temperature,
-      max_tokens: 8192,
-      top_p: 0.8,
-      repetition_penalty: 1.05,
-      stream,
+      maxOutputTokens: 8192,
+      topP: 0.8,
+      providerOptions: { vllm: { repetition_penalty: 1.05 } },
     }
 
     try {
-      const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`VLLM API error ${response.status}: ${errorText}`)
-      }
-
       if (stream) {
-        return normalizeVLLMStreamResponse(response)
+        return toThinkingTextResponse(streamText(commonParams), {
+          reasoningSeparator: '\n\n',
+          trimStart: true,
+        })
       }
 
-      const data = (await response.json()) as VLLMChatCompletionResponse
-      const message = data.choices?.[0]?.message
-      const content = message?.content ?? ''
-      const reasoning = message?.reasoning
-
-      return new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: buildVLLMResponseContent({
-                  content,
-                  reasoning,
-                }),
-              },
+      const result = await generateText(commonParams)
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: buildVLLMResponseContent({
+                content: result.text,
+                reasoning: result.finalStep.reasoningText,
+              }),
             },
-          ],
-        }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-        },
-      )
+          },
+        ],
+      })
     } catch (error) {
       console.error('VLLM API error:', error)
       if (error instanceof Error && error.message.includes('timeout')) {
@@ -251,8 +112,8 @@ export async function runVLLM(conversation: Conversation, stream: boolean) {
 
 function convertConversationToVercelAISDKv3(
   conversation: Conversation,
-): CoreMessage[] {
-  const coreMessages: CoreMessage[] = []
+): ModelMessage[] {
+  const coreMessages: ModelMessage[] = []
 
   const systemMessage = conversation.messages.findLast(
     (msg) => msg.latestSystemMessage !== undefined,
@@ -288,4 +149,4 @@ function convertConversationToVercelAISDKv3(
   return coreMessages
 }
 
-export { buildVLLMResponseContent, normalizeVLLMStreamResponse }
+export { buildVLLMResponseContent }
