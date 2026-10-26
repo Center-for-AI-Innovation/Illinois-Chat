@@ -6,8 +6,22 @@ const hoisted = vi.hoisted(() => {
     createAnthropic: vi.fn(() => (modelId: string) => ({ modelId })),
     smoothStream: vi.fn(() => ({ kind: 'smooth' })),
     streamText: vi.fn(async () => ({
-      toTextStreamResponse: () => new Response('text-stream'),
-      toDataStreamResponse: () => new Response('data-stream'),
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'reasoning-delta',
+            id: 'reasoning-1',
+            text: 'thinking',
+          })
+          controller.enqueue({ type: 'reasoning-end', id: 'reasoning-1' })
+          controller.enqueue({
+            type: 'text-delta',
+            id: 'text-1',
+            text: 'answer',
+          })
+          controller.close()
+        },
+      }),
     })),
     generateText: vi.fn(async () => ({ text: 'generated' })),
   }
@@ -25,7 +39,8 @@ vi.mock('@ai-sdk/anthropic', () => ({
   createAnthropic: hoisted.createAnthropic,
 }))
 
-vi.mock('ai', () => ({
+vi.mock('ai', async () => ({
+  ...(await vi.importActual<typeof import('ai')>('ai')),
   smoothStream: hoisted.smoothStream,
   streamText: hoisted.streamText,
   generateText: hoisted.generateText,
@@ -90,7 +105,7 @@ describe('app/api/chat/anthropic POST', () => {
     expect(hoisted.createAnthropic).toHaveBeenCalled()
   })
 
-  it('streams via data stream when extended thinking enabled', async () => {
+  it('streams reasoning as plain text when extended thinking enabled', async () => {
     const req = new Request('http://localhost', {
       method: 'POST',
       body: JSON.stringify({
@@ -109,7 +124,7 @@ describe('app/api/chat/anthropic POST', () => {
     })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
-    await expect(res.text()).resolves.toContain('data-stream')
+    await expect(res.text()).resolves.toBe('<think>thinking</think>\nanswer')
     expect(hoisted.smoothStream).toHaveBeenCalled()
   })
 
@@ -126,7 +141,7 @@ describe('app/api/chat/anthropic POST', () => {
     })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
-    await expect(res.text()).resolves.toContain('text-stream')
+    await expect(res.text()).resolves.toBe('answer')
   })
 
   it('returns 500 when conversation is missing', async () => {

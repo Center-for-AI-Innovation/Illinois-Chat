@@ -1,5 +1,13 @@
+import {
+  createTextStreamResponse,
+  toTextStream,
+  generateText,
+  smoothStream,
+  streamText,
+  type ModelMessage,
+} from 'ai'
+import { toThinkingTextResponse } from '~/utils/aiStream'
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { generateText, smoothStream, streamText, type CoreMessage } from 'ai'
 import { type ChatBody, type Conversation } from '~/types/chat'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
@@ -77,6 +85,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       const result = await streamText({
         model: anthropic(modelId),
         temperature: conversation.temperature,
+        allowSystemInMessages: true,
         messages: convertConversationToVercelAISDKv3(conversation),
         ...(experimentalTransform && {
           experimental_transform: experimentalTransform,
@@ -86,18 +95,15 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
 
       if (isThinking) {
         console.log('Using Claude with reasoning enabled')
-        const response = result.toDataStreamResponse({
-          sendReasoning: true,
-          getErrorMessage: () => {
-            return `An error occurred while streaming the response.`
-          },
-        })
+        const response = toThinkingTextResponse(result)
         return new NextResponse(response.body, {
           status: response.status,
           headers: response.headers,
         })
       } else {
-        const response = result.toTextStreamResponse()
+        const response = createTextStreamResponse({
+          stream: toTextStream({ stream: result.stream }),
+        })
         return new NextResponse(response.body, {
           status: response.status,
           headers: response.headers,
@@ -107,6 +113,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       const result = await generateText({
         model: anthropic(modelId),
         temperature: conversation.temperature,
+        allowSystemInMessages: true,
         messages: convertConversationToVercelAISDKv3(conversation),
         ...(providerOptions && { providerOptions }),
       })
@@ -149,8 +156,8 @@ export const POST = withCourseAccessFromRequest('any')(handler)
 
 function convertConversationToVercelAISDKv3(
   conversation: Conversation,
-): CoreMessage[] {
-  const coreMessages: CoreMessage[] = []
+): ModelMessage[] {
+  const coreMessages: ModelMessage[] = []
 
   const systemMessage = conversation.messages.findLast(
     (msg) => msg.latestSystemMessage !== undefined,

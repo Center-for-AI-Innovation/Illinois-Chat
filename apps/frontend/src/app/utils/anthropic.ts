@@ -1,4 +1,12 @@
-import { type CoreMessage, generateText, streamText, smoothStream } from 'ai'
+import {
+  createTextStreamResponse,
+  toTextStream,
+  type ModelMessage,
+  generateText,
+  streamText,
+  smoothStream,
+} from 'ai'
+import { toThinkingTextResponse } from '~/utils/aiStream'
 import { type Conversation } from '~/types/chat'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import {
@@ -53,9 +61,10 @@ export async function runAnthropicChat(
   // Common parameters for both streaming and non-streaming requests
   const commonParams = {
     model: model,
+    allowSystemInMessages: true,
     messages: convertConversationToVercelAISDKv3(conversation),
     temperature: conversation.temperature,
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     ...(isAnthropicModelWithThinking && {
       providerOptions: {
         anthropic: {
@@ -95,173 +104,12 @@ async function handleStreamingResponse(
   })
 
   if (!isThinkingEnabled) {
-    return result.toTextStreamResponse()
+    return createTextStreamResponse({
+      stream: toTextStream({ stream: result.stream }),
+    })
   }
 
-  // Get the original stream response
-  const originalResponse = result.toDataStreamResponse({
-    sendReasoning: true,
-    getErrorMessage: () => {
-      return `An error occurred while streaming the response.`
-    },
-  })
-
-  // Create new headers with content type text/plain
-  const responseHeaders = new Headers(originalResponse.headers)
-  responseHeaders.set('Content-Type', 'text/plain; charset=utf-8')
-
-  // Create a new response with transformed data for thinking-enabled models
-  return new Response(
-    new ReadableStream({
-      async start(controller) {
-        const reader = originalResponse.body?.getReader()
-
-        if (!reader) {
-          controller.close()
-          return
-        }
-
-        const textDecoder = new TextDecoder()
-
-        try {
-          let isThinkingOpen = false
-          let currentThinking = ''
-
-          while (true) {
-            const { done, value } = await reader.read()
-
-            if (done) {
-              // Final output for any remaining content
-              if (isThinkingOpen && currentThinking) {
-                controller.enqueue(
-                  new TextEncoder().encode(`${currentThinking}</think>`),
-                )
-              }
-              controller.close()
-              break
-            }
-
-            const text = textDecoder.decode(value)
-
-            // Process each line of the incoming text
-            const lines = text.split('\n')
-            let outputBuffer = ''
-
-            // Detect content types present in this chunk
-            let hasThinking = false
-            let hasRegular = false
-            let hasThinkingEnd = false
-
-            for (const line of lines) {
-              if (!line.trim()) continue
-
-              if (line.startsWith('g:')) hasThinking = true
-              if (line.startsWith('0:')) hasRegular = true
-              if (line.startsWith('j:')) hasThinkingEnd = true
-            }
-
-            // Process thinking content (g: lines)
-            if (hasThinking) {
-              for (const line of lines) {
-                if (!line.trim() || !line.startsWith('g:')) continue
-
-                const rawContent = line.slice(2).trim()
-                let parsedContent = ''
-
-                try {
-                  if (rawContent.startsWith('"') && rawContent.endsWith('"')) {
-                    parsedContent = JSON.parse(rawContent)
-                  } else {
-                    parsedContent = rawContent
-                  }
-                  currentThinking += parsedContent
-                } catch (error) {
-                  // Fallback for parsing errors
-                  if (rawContent.startsWith('"') && rawContent.endsWith('"')) {
-                    parsedContent = rawContent.slice(1, -1)
-                  } else {
-                    parsedContent = rawContent
-                  }
-                  currentThinking += parsedContent
-                }
-              }
-
-              // Open thinking tag if not already open
-              if (!isThinkingOpen && currentThinking.length > 0) {
-                outputBuffer += `<think>${currentThinking}`
-                isThinkingOpen = true
-                currentThinking = ''
-              }
-              // If tag is already open, just stream the content
-              else if (isThinkingOpen && currentThinking.length > 0) {
-                outputBuffer += currentThinking
-                currentThinking = ''
-              }
-            }
-
-            // Process end of thinking marker (j: lines)
-            if (hasThinkingEnd && isThinkingOpen) {
-              outputBuffer += '</think>'
-              isThinkingOpen = false
-            }
-
-            // Process regular content (0: lines)
-            if (hasRegular) {
-              // If we still have an open thinking tag, close it
-              if (isThinkingOpen) {
-                outputBuffer += '</think>'
-                isThinkingOpen = false
-              }
-
-              // Extract and process regular content
-              let regularContent = ''
-              for (const line of lines) {
-                if (!line.trim() || !line.startsWith('0:')) continue
-
-                const rawContent = line.slice(2).trim()
-                let parsedContent = ''
-
-                try {
-                  if (rawContent.startsWith('"') && rawContent.endsWith('"')) {
-                    parsedContent = JSON.parse(rawContent)
-                  } else {
-                    parsedContent = rawContent
-                  }
-                  regularContent += parsedContent
-                } catch (error) {
-                  // Fallback for parsing errors
-                  if (rawContent.startsWith('"') && rawContent.endsWith('"')) {
-                    parsedContent = rawContent.slice(1, -1)
-                  } else {
-                    parsedContent = rawContent
-                  }
-                  regularContent += parsedContent
-                }
-              }
-
-              // Add regular content to output buffer
-              if (regularContent.length > 0) {
-                outputBuffer += regularContent
-              }
-            }
-
-            // Send output if we have any
-            if (outputBuffer.length > 0) {
-              controller.enqueue(new TextEncoder().encode(outputBuffer))
-            }
-          }
-        } catch (error) {
-          console.error('Error processing stream:', error)
-          controller.error(error)
-        }
-      },
-    }),
-    {
-      headers: responseHeaders,
-      status: originalResponse.status,
-      statusText: originalResponse.statusText,
-    },
-  )
+  return toThinkingTextResponse(result)
 }
 
 /**
@@ -272,13 +120,16 @@ async function handleNonStreamingResponse(
   isThinkingEnabled: boolean,
 ): Promise<Response> {
   if (isThinkingEnabled) {
-    const { text, reasoning } = await generateText({
+    const {
+      text,
+      finalStep: { reasoningText },
+    } = await generateText({
       ...commonParams,
     })
 
     // Format the response with reasoning wrapped in <think> tags at the beginning
-    const formattedContent = reasoning
-      ? `<think>${reasoning}</think>\n${text}`
+    const formattedContent = reasoningText
+      ? `<think>${reasoningText}</think>\n${text}`
       : text
 
     return new Response(
@@ -306,8 +157,8 @@ async function handleNonStreamingResponse(
  */
 function convertConversationToVercelAISDKv3(
   conversation: Conversation,
-): CoreMessage[] {
-  const coreMessages: CoreMessage[] = []
+): ModelMessage[] {
+  const coreMessages: ModelMessage[] = []
 
   const systemMessage = conversation.messages.findLast(
     (msg) => msg.latestSystemMessage !== undefined,
