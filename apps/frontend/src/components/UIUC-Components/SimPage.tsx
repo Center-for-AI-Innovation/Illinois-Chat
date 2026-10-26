@@ -1,18 +1,26 @@
-import { IconAlertCircle, IconExternalLink } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconExternalLink,
+  IconTrash,
+} from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { cva } from 'class-variance-authority'
 import { useAuth } from 'react-oidc-context'
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
 import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { type SimConfigField, type SimWorkflow } from '~/types/sim'
+import { type SimWorkflowFailure } from '~/utils/simDiscovery'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
-import { showToast } from '~/utils/toastUtils'
 import {
   clearCachedSimTools,
+  storeDiscoveredSimTools,
   useFetchAllWorkflows,
 } from '~/utils/functionCalling/handleFunctionCalling'
 import { Badge } from '@/components/shadcn/ui/badge'
@@ -41,6 +49,36 @@ interface ToolRoutingStatus {
   reason?: string
 }
 
+// Shown under the Save button; `fields` are the inputs the server blamed,
+// which are outlined in red.
+interface SaveError {
+  message: string
+  fields: SimConfigField[]
+}
+
+const SIM_CONFIG_FIELDS = [
+  'sim_api_key',
+  'sim_workspace_id',
+  'sim_base_url',
+] as const satisfies readonly SimConfigField[]
+
+const FORM_ERROR_ID = 'sim-form-error'
+
+const storedKeyVariants = cva('font-mono text-sm', {
+  variants: {
+    invalid: {
+      true: 'text-(--error)',
+      false: 'text-(--foreground-faded)',
+    },
+  },
+})
+
+function asSimConfigFields(value: unknown): SimConfigField[] {
+  return Array.isArray(value)
+    ? SIM_CONFIG_FIELDS.filter((field) => value.includes(field))
+    : []
+}
+
 function maskKey(key: string): string {
   if (key.length <= 8) return '*'.repeat(key.length)
   return key.slice(0, 4) + '*'.repeat(key.length - 8) + key.slice(-4)
@@ -51,21 +89,27 @@ const SimPage = ({ course_name }: { course_name: string }) => {
   const auth = useAuth()
   const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
     useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
+  const queryClient = useQueryClient()
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
   const [currentEmail, setCurrentEmail] = useState('')
-  // The key input holds only what the admin types this session. The stored
-  // key never reaches the browser — the server sends a masked form for
-  // display, and a blank input on save means "keep the stored key".
+  // The stored key never reaches the browser — the server sends a masked
+  // form, shown read-only. The input is only for a new key, so leaving it
+  // empty can never delete the stored one; that takes the Remove button.
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [storedKeyMasked, setStoredKeyMasked] = useState<string | null>(null)
+  // Remove takes effect on Save, like every other change in the form.
+  const [keyRemoved, setKeyRemoved] = useState(false)
   // Server-reported problem reading the stored key (e.g. rotated master key);
   // shown on the input so the admin knows to enter the key again.
   const [storedKeyError, setStoredKeyError] = useState<string | null>(null)
   const [workspaceIdInput, setWorkspaceIdInput] = useState('')
   const [baseUrlInput, setBaseUrlInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<SaveError | null>(null)
+  // Cleared by the next edit, so it never vouches for unsaved changes.
+  const [justSaved, setJustSaved] = useState(false)
   const [hasSavedConfig, setHasSavedConfig] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState(),
@@ -139,18 +183,23 @@ const SimPage = ({ course_name }: { course_name: string }) => {
     fetchData()
   }, [course_name, auth.isLoading, auth.user?.profile.email])
 
+  const showStoredKey = storedKeyMasked !== null && !keyRemoved
+
   const handleSave = async () => {
     setIsSaving(true)
+    setSaveError(null)
+    setJustSaved(false)
+    const newKey = apiKeyInput.trim()
     try {
-      // A blank key input means "keep the stored key" — the field is omitted
-      // so the partial update leaves the column alone. The other fields are
-      // always visible, so what the form shows is what gets stored.
+      // The key is sent only when one was typed, or as null when the stored
+      // one was removed; otherwise it is omitted and the stored key kept.
       const payload: Record<string, string | null> = {
         course_name,
-        sim_workspace_id: workspaceIdInput || null,
+        sim_workspace_id: workspaceIdInput.trim() || null,
         sim_base_url: baseUrlInput.trim() || null,
       }
-      if (apiKeyInput) payload.sim_api_key = apiKeyInput
+      if (newKey) payload.sim_api_key = newKey
+      else if (keyRemoved) payload.sim_api_key = null
 
       const upsertRes = await fetch('/api/UIUC-api/tools/upsertSimConfig', {
         method: 'POST',
@@ -160,47 +209,79 @@ const SimPage = ({ course_name }: { course_name: string }) => {
 
       // `fetch` only rejects on transport failure, so a 4xx/5xx save would
       // otherwise fall through to the success toast below.
+      // Nothing was stored, so the form keeps what was typed for correcting.
       if (!upsertRes.ok) {
         const body = (await upsertRes.json().catch(() => ({}))) as {
           error?: string
+          fields?: unknown
         }
-        throw new Error(
-          body.error ?? `Save failed with status ${upsertRes.status}`,
-        )
+        setSaveError({
+          message: body.error ?? `Save failed with status ${upsertRes.status}`,
+          fields: asSimConfigFields(body.fields),
+        })
+        return
       }
 
-      const hasKey = Boolean(apiKeyInput || storedKeyMasked)
-      setHasSavedConfig(Boolean(hasKey && workspaceIdInput))
-      if (apiKeyInput) {
-        setStoredKeyMasked(maskKey(apiKeyInput))
+      const { workflows: discovered = [], failed = [] } = (await upsertRes
+        .json()
+        .catch(() => ({}))) as {
+        workflows?: SimWorkflow[]
+        failed?: SimWorkflowFailure[]
+      }
+
+      const savedKeyMasked = newKey
+        ? maskKey(newKey)
+        : keyRemoved
+          ? null
+          : storedKeyMasked
+      setHasSavedConfig(Boolean(savedKeyMasked && workspaceIdInput))
+      if (newKey || keyRemoved) {
+        setStoredKeyMasked(savedKeyMasked)
         setStoredKeyError(null)
         setApiKeyInput('')
+        setKeyRemoved(false)
       }
-      // The credentials just changed, so any tools discovered under the old
-      // ones are wrong; drop the cache before refetching.
-      clearCachedSimTools(course_name)
-      refetchWorkflows()
+      // The save discovered the workflows with these exact credentials, so
+      // show that list rather than asking Sim again. If none could be
+      // described, a refetch reports why instead of claiming there are none.
+      if (discovered.length === 0 && failed.length > 0) {
+        clearCachedSimTools(course_name)
+        refetchWorkflows()
+      } else {
+        await storeDiscoveredSimTools(queryClient, course_name, discovered)
+      }
 
-      showToast({
-        title: 'Saved',
-        message: 'Sim AI configuration saved successfully.',
-        type: 'success',
-        autoClose: 5000,
-      })
+      setJustSaved(true)
     } catch (error) {
       console.error('[SimPage] failed to save Sim config', error)
-      showToast({
-        title: 'Error',
+      setSaveError({
         message:
           error instanceof Error
             ? error.message
             : 'Failed to save Sim AI configuration.',
-        type: 'error',
-        autoClose: 10000,
+        fields: [],
       })
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // One message, under the Save button. A save error replaces the stored-key
+  // warning, since it is about what the admin just tried.
+  const formError = saveError?.message ?? storedKeyError
+  const isFlagged = (field: SimConfigField) =>
+    saveError
+      ? saveError.fields.includes(field)
+      : field === 'sim_api_key' && Boolean(storedKeyError)
+  const fieldErrorProps = (field: SimConfigField, descriptionId: string) => ({
+    'aria-invalid': isFlagged(field) ? true : undefined,
+    'aria-describedby': isFlagged(field)
+      ? `${descriptionId} ${FORM_ERROR_ID}`
+      : descriptionId,
+  })
+  const onFieldEdit = (field: SimConfigField) => {
+    setJustSaved(false)
+    if (saveError?.fields.includes(field)) setSaveError(null)
   }
 
   if (auth.isLoading || isSuperAdminLoading || !courseMetadata) {
@@ -299,36 +380,61 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                         <div
                           className={`${montserrat_paragraph.variable} font-montserratParagraph`}
                         >
-                          <Label htmlFor="sim-api-key">API Key</Label>
+                          {/* A stored key is plain text, so the label only
+                              targets the input shown for a new key. */}
+                          <Label
+                            htmlFor={showStoredKey ? undefined : 'sim-api-key'}
+                          >
+                            API Key
+                          </Label>
                           <p
                             id="sim-api-key-description"
                             className="text-xs text-(--foreground-faded)"
                           >
-                            {storedKeyMasked
-                              ? 'A key is stored. Leave blank to keep it, or enter a new one to replace it.'
-                              : 'Your Sim AI API key (sk-sim-...). Found in Settings → Sim Keys.'}
+                            {showStoredKey
+                              ? 'A key is stored. Remove it to enter a different one.'
+                              : 'Your Sim AI API key. Found in Settings.'}
                           </p>
-                          <Input
-                            id="sim-api-key"
-                            type="password"
-                            placeholder={storedKeyMasked ?? 'sk-sim-...'}
-                            value={apiKeyInput}
-                            onChange={(e) => setApiKeyInput(e.target.value)}
-                            aria-invalid={storedKeyError ? true : undefined}
-                            aria-describedby={
-                              storedKeyError
-                                ? 'sim-api-key-description sim-api-key-error'
-                                : 'sim-api-key-description'
-                            }
-                            className="my-2 bg-(--background) text-(--foreground)"
-                          />
-                          {storedKeyError && (
-                            <p
-                              id="sim-api-key-error"
-                              className="text-xs text-(--error)"
-                            >
-                              {storedKeyError}
-                            </p>
+                          {showStoredKey ? (
+                            <div className="my-2 flex items-center justify-between gap-2">
+                              <span
+                                className={storedKeyVariants({
+                                  invalid: isFlagged('sim_api_key'),
+                                })}
+                              >
+                                {storedKeyMasked}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Remove API key"
+                                title="Remove API key"
+                                onClick={() => {
+                                  setKeyRemoved(true)
+                                  onFieldEdit('sim_api_key')
+                                }}
+                                className="rounded-lg text-(--foreground-faded) hover:text-(--error)"
+                              >
+                                <IconTrash size={16} aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Input
+                              id="sim-api-key"
+                              type="password"
+                              placeholder="sk-sim-..."
+                              value={apiKeyInput}
+                              onChange={(e) => {
+                                setApiKeyInput(e.target.value)
+                                onFieldEdit('sim_api_key')
+                              }}
+                              {...fieldErrorProps(
+                                'sim_api_key',
+                                'sim-api-key-description',
+                              )}
+                              className="my-2 bg-(--background) text-(--foreground)"
+                            />
                           )}
                         </div>
 
@@ -348,10 +454,14 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                             id="sim-workspace-id"
                             placeholder="Enter workspace ID"
                             value={workspaceIdInput}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setWorkspaceIdInput(e.target.value)
-                            }
-                            aria-describedby="sim-workspace-id-description"
+                              onFieldEdit('sim_workspace_id')
+                            }}
+                            {...fieldErrorProps(
+                              'sim_workspace_id',
+                              'sim-workspace-id-description',
+                            )}
                             className="my-2 bg-(--background) text-(--foreground)"
                           />
                         </div>
@@ -374,8 +484,14 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                             id="sim-base-url"
                             placeholder="https://www.sim.ai"
                             value={baseUrlInput}
-                            onChange={(e) => setBaseUrlInput(e.target.value)}
-                            aria-describedby="sim-base-url-description"
+                            onChange={(e) => {
+                              setBaseUrlInput(e.target.value)
+                              onFieldEdit('sim_base_url')
+                            }}
+                            {...fieldErrorProps(
+                              'sim_base_url',
+                              'sim-base-url-description',
+                            )}
                             className="my-2 bg-(--background) text-(--foreground)"
                           />
                         </div>
@@ -390,11 +506,21 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                         >
                           {isSaving ? 'Saving...' : 'Save'}
                         </Button>
-                        {storedKeyMasked && (
+                        {formError && (
                           <p
-                            className={`mt-2.5 text-xs opacity-60 ${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground)`}
+                            id={FORM_ERROR_ID}
+                            role={saveError ? 'alert' : undefined}
+                            className={`mt-2.5 text-xs text-(--error) ${montserrat_paragraph.variable} font-montserratParagraph`}
                           >
-                            Stored key: {storedKeyMasked}
+                            {formError}
+                          </p>
+                        )}
+                        {justSaved && (
+                          <p
+                            role="status"
+                            className={`mt-2.5 text-xs text-(--foreground-faded) ${montserrat_paragraph.variable} font-montserratParagraph`}
+                          >
+                            Saved.
                           </p>
                         )}
                       </div>
@@ -523,14 +649,28 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                                 No description in Sim
                               </Badge>
                             )}
-                            <p className="line-clamp-2 text-sm">
-                              {tool.description}
-                            </p>
-                            {tool.hasAuthoredDescription === false && (
-                              <p className="text-xs opacity-60">
-                                The chat model decides when to use a tool from
-                                its description. Add one to this workflow in Sim
-                                so it gets picked reliably.
+                            {tool.hasAuthoredDescription === false ? (
+                              <>
+                                {/* Nothing authored, so what the router model
+                                    is given is a fallback built from the name
+                                    and input fields; label it as such. */}
+                                <p className="mt-1 text-xs font-semibold tracking-wide text-(--foreground) uppercase">
+                                  Sent to the model instead
+                                </p>
+                                <p className="line-clamp-2 text-sm text-(--foreground-faded) italic">
+                                  {tool.description}
+                                </p>
+                                <p className="text-xs opacity-60">
+                                  The chat model decides when to use a tool from
+                                  its description. In Sim, open the workflow,
+                                  choose Deploy, then the API tab, then Edit API
+                                  Info, and fill in Description. The version,
+                                  MCP and chat descriptions are not read.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="line-clamp-2 text-sm">
+                                {tool.description}
                               </p>
                             )}
                           </TableCell>

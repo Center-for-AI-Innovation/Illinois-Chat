@@ -5,6 +5,10 @@ import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 
 const hoisted = vi.hoisted(() => ({
   vectorSearchWithDrizzle: vi.fn(),
+  getDocGroupsForVectorSearch: vi.fn(async () => ({
+    disabled_doc_groups: [],
+    public_doc_groups: [],
+  })),
 }))
 
 vi.mock('~/server/authorization', () => ({
@@ -15,6 +19,10 @@ vi.mock('~/server/authorization', () => ({
 
 vi.mock('~/db/vectorSearch', () => ({
   vectorSearchWithDrizzle: hoisted.vectorSearchWithDrizzle,
+}))
+
+vi.mock('~/db/dbHelpers', () => ({
+  getDocGroupsForVectorSearch: hoisted.getDocGroupsForVectorSearch,
 }))
 
 import handler from '~/pages/api/getContextsDrizzle'
@@ -92,6 +100,10 @@ describe('getContextsDrizzle API', () => {
       },
     ]
     hoisted.vectorSearchWithDrizzle.mockResolvedValueOnce(data)
+    hoisted.getDocGroupsForVectorSearch.mockResolvedValueOnce({
+      disabled_doc_groups: ['g2'],
+      public_doc_groups: [{ course_name: 'CS225', name: 'pub', enabled: true }],
+    })
 
     const res = createMockRes()
     await handler(
@@ -101,8 +113,6 @@ describe('getContextsDrizzle API', () => {
           queryEmbedding: [0.1, 0.2, 0.3],
           course_name: 'CS225',
           doc_groups: ['g1'],
-          disabled_doc_groups: ['g2'],
-          public_doc_groups: [],
           conversation_id: 'conv-1',
           top_n: 50,
         },
@@ -110,12 +120,13 @@ describe('getContextsDrizzle API', () => {
       res as any,
     )
 
+    expect(hoisted.getDocGroupsForVectorSearch).toHaveBeenCalledWith('CS225')
     expect(hoisted.vectorSearchWithDrizzle).toHaveBeenCalledWith('CS225', {
       queryEmbedding: [0.1, 0.2, 0.3],
       course_name: 'CS225',
       doc_groups: ['g1'],
       disabled_doc_groups: ['g2'],
-      public_doc_groups: [],
+      public_doc_groups: [{ course_name: 'CS225', name: 'pub', enabled: true }],
       conversation_id: 'conv-1',
       top_n: 50,
     })
@@ -123,7 +134,7 @@ describe('getContextsDrizzle API', () => {
     expect(res.json).toHaveBeenCalledWith(data)
   })
 
-  it('passes default doc_groups, disabled_doc_groups, public_doc_groups and top_n when omitted', async () => {
+  it('passes default doc_groups and top_n when omitted', async () => {
     hoisted.vectorSearchWithDrizzle.mockResolvedValueOnce([])
 
     const res = createMockRes()
@@ -147,6 +158,37 @@ describe('getContextsDrizzle API', () => {
       conversation_id: undefined,
       top_n: 100,
     })
+    expect(res.status).toHaveBeenCalledWith(200)
+  })
+
+  it("ignores client-supplied disabled/public doc groups and uses the project's own (#312)", async () => {
+    hoisted.vectorSearchWithDrizzle.mockResolvedValueOnce([])
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          queryEmbedding: [0.1],
+          course_name: 'CS101',
+          // A client naming another project's group must not widen the search.
+          public_doc_groups: [
+            { course_name: 'other-project', name: 'foreign', enabled: true },
+          ],
+          disabled_doc_groups: ['client-says-disabled'],
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(hoisted.getDocGroupsForVectorSearch).toHaveBeenCalledWith('CS101')
+    expect(hoisted.vectorSearchWithDrizzle).toHaveBeenCalledWith(
+      'CS101',
+      expect.objectContaining({
+        public_doc_groups: [],
+        disabled_doc_groups: [],
+      }),
+    )
     expect(res.status).toHaveBeenCalledWith(200)
   })
 

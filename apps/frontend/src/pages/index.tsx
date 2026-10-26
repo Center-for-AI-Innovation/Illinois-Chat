@@ -10,6 +10,7 @@ import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
 import router from 'next/router'
 import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
 // Server-only (imports `redis`). Referenced solely from getStaticProps below,
@@ -572,7 +573,7 @@ const Home: NextPage<HomeProps> = () => {
                   className:
                     'mt-8 rounded-sm border border-(--illinois-white) bg-transparent text-(--illinois-white) hover:bg-white/10 focus:bg-(--dashboard-button)',
                 })}
-                href="https://docs.uiuc.chat/api"
+                href="https://docs.chat.illinois.edu/api/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -676,9 +677,9 @@ const Home: NextPage<HomeProps> = () => {
                   tabIndex={0}
                   className="underline"
                   style={{ color: 'var(--illinois-orange)' }}
-                  href="mailto:caii_ai@lists.illinois.edu"
+                  href={SUPPORT_MAILTO}
                 >
-                  contact us
+                  {SUPPORT_EMAIL}
                 </a>
                 .
               </div>
@@ -706,7 +707,7 @@ const Home: NextPage<HomeProps> = () => {
                   tabIndex={0}
                   className="underline"
                   style={{ color: '#9e3010' }}
-                  href="mailto:genaisupport@mx.uillinois.edu"
+                  href={SUPPORT_MAILTO}
                 >
                   email us
                 </a>
@@ -757,6 +758,15 @@ const Home: NextPage<HomeProps> = () => {
                   href="https://ncsa.illinois.edu/"
                 >
                   National Center for Supercomputing Applications
+                </a>
+                , with support from{' '}
+                <a
+                  tabIndex={0}
+                  className="underline"
+                  style={{ color: '#9e3010' }}
+                  href="https://computes.illinois.edu/"
+                >
+                  Illinois Computes
                 </a>
                 .
               </div>

@@ -162,7 +162,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const metadata = row.raw_metadata as CourseMetadata
       return {
         tier: chatbotUserTier(metadata, userEmail),
-        card: toChatbotCardData(row.course_name, metadata, userEmail),
+        card: toChatbotCardData(
+          row.course_name,
+          metadata,
+          userEmail,
+          isPlatformSuperAdmin,
+        ),
         tags: sanitizeChatbotTags(metadata.tags),
       }
     })

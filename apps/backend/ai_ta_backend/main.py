@@ -74,7 +74,7 @@ def index() -> Response:
       JSON: _description_
   """
   response = jsonify(
-      {"hi there, this is a 404": "Welcome to UIUC.chat backend 🚅 Read the docs here: https://docs.uiuc.chat/ "})
+      {"hi there, this is a 404": "Welcome to UIUC.chat backend 🚅 Read the docs here: https://docs.chat.illinois.edu/ "})
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 

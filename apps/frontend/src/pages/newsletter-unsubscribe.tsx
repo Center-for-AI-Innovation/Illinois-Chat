@@ -4,6 +4,7 @@ import { Badge } from '@/components/shadcn/ui/badge'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { IconSunset2 } from '@tabler/icons-react'
 import { showToast } from '~/utils/toastUtils'
+import { SUPPORT_EMAIL } from '~/utils/app/const'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 
@@ -41,8 +42,7 @@ export default function Unsubscribe() {
       if (!response.ok) {
         showToast({
           title: 'Our database is having a bad day. 😢',
-          message:
-            "Seems like we couldn't unsubscribe you. Please try again later. Email help@uiuc.chat for assistance.",
+          message: `Seems like we couldn't unsubscribe you. Please try again later. Email ${SUPPORT_EMAIL} for assistance.`,
           type: 'error',
           autoClose: 20000,
         })
@@ -65,7 +65,7 @@ export default function Unsubscribe() {
       console.error('There was a problem with the fetch operation:', error)
       showToast({
         title: 'Our database is having a bad day. 😢',
-        message: `Seems like we couldn't unsubscribe you. Please try again later. Email help@uiuc.chat for assistance. Full error: ${error}`,
+        message: `Seems like we couldn't unsubscribe you. Please try again later. Email ${SUPPORT_EMAIL} for assistance. Full error: ${error}`,
         type: 'error',
         autoClose: 20000,
       })

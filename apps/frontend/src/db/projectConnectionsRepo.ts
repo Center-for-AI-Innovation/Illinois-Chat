@@ -53,10 +53,11 @@ export async function upsertConnectionField(args: {
   const { projectName, projectId, kind, encryptedBlob } = args
   const column = KIND_TO_COLUMN[kind]
 
-  // Build the field-set we want for both INSERT and the UPDATE branch.
+  // INSERT defaults a new row to active. The update branch must not touch
+  // is_active: adding a kind to a row an operator disabled would otherwise
+  // turn every kind back on for live traffic.
   const fieldUpdate: Record<string, unknown> = {
     [column]: encryptedBlob,
-    is_active: true,
     updated_at: new Date(),
   }
   const insertValues = {
@@ -95,11 +96,10 @@ export type PatchConnectionResult =
  *
  * Two things this does that `upsertConnectionField` cannot:
  *
- * 1. It leaves `is_active` alone. `upsertConnectionField` hardcodes
- *    `is_active: true` in both its INSERT and its UPDATE branch, so reusing it
- *    for a partial edit would quietly re-enable a connection that an operator
- *    had deliberately disabled — a toggle flip turning traffic back on is not
- *    an acceptable side effect.
+ * 1. It leaves `is_active` alone. `upsertConnectionField` defaults
+ *    `is_active` to true only on INSERT; its update branch does not write the
+ *    flag. Reusing this patch for a partial edit still must not flip it — a
+ *    toggle belongs on the `/active` route.
  *
  * 2. The read and the write happen in one transaction with the row locked
  *    (`SELECT … FOR UPDATE`). A read-then-write outside a transaction races a

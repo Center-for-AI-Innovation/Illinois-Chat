@@ -13,10 +13,11 @@ import { IconSearch } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useContext, useMemo, useState } from 'react'
 import HomeContext from '~/components/home/home.context'
+import { setToolDisabled } from '~/utils/app/disabledTools'
 
 export const ToolsItem = ({}) => {
   const {
-    state: { tools },
+    state: { tools, selectedConversation },
     dispatch: homeDispatch,
   } = useContext(HomeContext)
 
@@ -42,13 +43,17 @@ export const ToolsItem = ({}) => {
   }
 
   const handleToggleChecked = (id: string) => {
-    // handleUpdateActions(id)
+    const tool = tools.find((t) => t.id === id)
+    if (!tool) return
+    const enabled = !tool.enabled
     homeDispatch({
       field: 'tools',
-      value: tools.map((tool) =>
-        tool.id === id ? { ...tool, checked: !tool.enabled } : tool,
-      ),
+      value: tools.map((t) => (t.id === id ? { ...t, enabled } : t)),
     })
+    // Persisted per conversation; Chat reapplies it on load.
+    if (selectedConversation?.id) {
+      setToolDisabled(selectedConversation.id, id, !enabled)
+    }
   }
   return (
     <>

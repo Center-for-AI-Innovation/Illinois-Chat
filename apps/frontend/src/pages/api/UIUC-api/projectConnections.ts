@@ -100,7 +100,10 @@ async function handleGet(req: AuthenticatedRequest, res: NextApiResponse) {
   return res.status(200).json({
     found: true,
     project_name: row.project_name,
-    is_active: row.is_active,
+    // Same rule as the list route: only an explicit false is disabled.
+    // The editor treats anything other than true as off, so a NULL here
+    // would show a live override as Disabled.
+    is_active: row.is_active !== false,
     created_at: row.created_at,
     updated_at: row.updated_at,
     s3_config: maskConfig(s3),
