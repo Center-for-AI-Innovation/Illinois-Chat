@@ -1,9 +1,15 @@
+import {
+  createTextStreamResponse,
+  toTextStream,
+  type ModelMessage,
+  generateText,
+  streamText,
+} from 'ai'
 import type { Conversation } from '~/types/chat'
 import type { SambaNovaProvider } from '~/utils/modelProviders/LLMProvider'
 import { createOpenAI } from '@ai-sdk/openai'
 import { decrypt } from '~/utils/crypto'
 import { SambaNovaModels } from '~/utils/modelProviders/types/SambaNova'
-import { type CoreMessage, generateText, streamText } from 'ai'
 
 export async function runSambaNovaChat(
   conversation: Conversation,
@@ -25,7 +31,6 @@ export async function runSambaNovaChat(
         sambaNovaProvider.apiKey,
         process.env.NEXT_PUBLIC_SIGNING_KEY as string,
       ),
-      compatibility: 'compatible',
     })
 
     if (conversation.messages.length === 0) {
@@ -41,7 +46,7 @@ export async function runSambaNovaChat(
       throw new Error(`Invalid SambaNova model ID: ${conversation.model.id}`)
     }
 
-    const model = openai(conversation.model.id)
+    const model = openai.chat(conversation.model.id)
     console.log('Using SambaNova model:', conversation.model.id)
 
     const messages = convertConversationToVercelAISDKv3(conversation)
@@ -58,10 +63,11 @@ export async function runSambaNovaChat(
     }
 
     const commonParams = {
-      model: model as any,
+      model: model,
+      allowSystemInMessages: true,
       messages: messages,
       temperature: conversation.temperature || 0.7,
-      max_tokens: 4096,
+      maxOutputTokens: 4096,
     }
 
     console.log(
@@ -70,7 +76,7 @@ export async function runSambaNovaChat(
         {
           modelId: conversation.model.id,
           temperature: commonParams.temperature,
-          max_tokens: commonParams.max_tokens,
+          maxOutputTokens: commonParams.maxOutputTokens,
           messageCount: messages.length,
         },
         null,
@@ -81,7 +87,9 @@ export async function runSambaNovaChat(
     if (stream) {
       try {
         const result = await streamText(commonParams)
-        return result.toTextStreamResponse()
+        return createTextStreamResponse({
+          stream: toTextStream({ stream: result.stream }),
+        })
       } catch (error) {
         console.log('SambaNova streaming error:', error)
         console.error('SambaNova streaming error:', error)
@@ -106,8 +114,8 @@ export async function runSambaNovaChat(
 
 function convertConversationToVercelAISDKv3(
   conversation: Conversation,
-): CoreMessage[] {
-  const coreMessages: CoreMessage[] = []
+): ModelMessage[] {
+  const coreMessages: ModelMessage[] = []
 
   const systemMessage = conversation.messages.findLast(
     (msg) => msg.latestSystemMessage !== undefined,
