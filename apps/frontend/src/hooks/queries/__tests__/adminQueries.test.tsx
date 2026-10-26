@@ -461,6 +461,71 @@ describe('project connection queries', () => {
     })
   })
 
+  it('formats a validation object instead of throwing [object Object]', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              message: 'Validation failed',
+              issues: [
+                { path: 'base_url', message: 'Required for Ollama' },
+                { path: '', message: 'Masked values cannot be saved' },
+              ],
+            },
+          },
+          400,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              message: 'Validation failed',
+              issues: [
+                {
+                  path: 'api_key',
+                  message: 'Masked values cannot be saved',
+                },
+              ],
+            },
+          },
+          400,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: {
+              message: 'Validation failed',
+              issues: [{ path: 'message', message: 'Too long' }],
+            },
+          },
+          400,
+        ),
+      )
+
+    const connectionError = await updateProjectConnection({
+      action: 'patch',
+      projectName: 'chat',
+      kind: 'embedding',
+      config: { base_url: null },
+    }).catch((error: unknown) => error)
+    expect(connectionError).toBeInstanceOf(Error)
+    expect((connectionError as Error).message).toBe(
+      'Validation failed: base_url: Required for Ollama; Masked values cannot be saved',
+    )
+
+    await expect(
+      testProjectConnection({ projectName: 'chat', kind: 'embedding' }),
+    ).rejects.toThrow(
+      'Validation failed: api_key: Masked values cannot be saved',
+    )
+    await expect(updatePlatformSettings(settings)).rejects.toThrow(
+      'Validation failed: message: Too long',
+    )
+  })
+
   it('throws the server message, a status fallback, and on an unknown action', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ error: 'Unknown project' }, 404))
