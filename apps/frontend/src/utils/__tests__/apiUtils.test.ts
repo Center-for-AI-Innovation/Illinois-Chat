@@ -343,7 +343,11 @@ describe('apiUtils (browser/jsdom)', () => {
 
     const core = convertConversationToCoreMessagesWithoutSystem(conversation)
     expect(core[0]?.content).toEqual([
-      { type: 'image', image: 'https://img.example/x.png' },
+      {
+        type: 'file',
+        mediaType: 'image',
+        data: { type: 'url', url: new URL('https://img.example/x.png') },
+      },
       { type: 'unknown', extra: true },
     ])
   })
