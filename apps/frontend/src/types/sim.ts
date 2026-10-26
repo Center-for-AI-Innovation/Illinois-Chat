@@ -72,3 +72,6 @@ export interface SimProjectConfig {
   sim_base_url: string | null
   sim_workspace_id: string | null
 }
+
+/** A config input that a save error can point at. */
+export type SimConfigField = keyof SimProjectConfig

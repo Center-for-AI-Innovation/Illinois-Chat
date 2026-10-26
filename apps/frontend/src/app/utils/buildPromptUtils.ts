@@ -206,7 +206,9 @@ export const buildPrompt = async ({
     }
     const allPromises = []
     allPromises.push(_getLastUserTextInput({ conversation }))
-    allPromises.push(_getSystemPrompt({ courseMetadata, conversation }))
+    allPromises.push(
+      _getSystemPrompt({ courseMetadata, conversation, projectName }),
+    )
     const [lastUserTextInput, systemPrompt] = (await Promise.all(
       allPromises,
     )) as [string, string | undefined]
@@ -602,19 +604,23 @@ function _buildQueryTopContext({
   }
 }
 
-const _getSystemPrompt = async ({
+export const _getSystemPrompt = async ({
   courseMetadata,
   conversation,
+  projectName,
 }: {
   courseMetadata: CourseMetadata | undefined
   conversation: Conversation
+  projectName: string
 }): Promise<string> => {
   // First get the user defined system prompt
   let userDefinedSystemPrompt: string | undefined | null
   if (courseMetadata?.system_prompt) {
     userDefinedSystemPrompt = courseMetadata.system_prompt
   } else {
-    userDefinedSystemPrompt = await getCourseMetadata(conversation.name)
+    // Look up the authorized project, not conversation.name (the chat title),
+    // which a caller can set to any project to read its system prompt (#312).
+    userDefinedSystemPrompt = await getCourseMetadata(projectName)
       .then((metadata) => metadata?.system_prompt)
       .catch((error) => {
         console.warn('Failed to fetch course metadata:', error)

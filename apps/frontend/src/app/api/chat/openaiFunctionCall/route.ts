@@ -110,15 +110,17 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     openaiKey,
     imageUrls = [],
     imageDescription = '',
-    course_name,
   }: {
     tools: ChatCompletionTool[]
     conversation: Conversation
     imageUrls?: string[]
     imageDescription?: string
     openaiKey?: string
-    course_name?: string
   } = await req.json()
+
+  // Use the project the access check authorized, not a name in the body or
+  // nested in the conversation payload (#312).
+  const courseName = req.courseName!
 
   const lastMessage = conversation.messages[conversation.messages.length - 1]
   if (!lastMessage) {
@@ -134,7 +136,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     await persistMessageServer({
       conversation,
       message: lastMessage,
-      courseName: conversation.projectName ?? '',
+      courseName,
       userIdentifier: conversation.userEmail ?? '',
     })
   }
@@ -185,7 +187,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
 
   try {
     const router = await resolveToolRouter({
-      projectName: course_name || conversation.projectName || '',
+      projectName: courseName,
       clientOpenAIKey: openaiKey,
       selectedModelId: conversation.model?.id,
     })
@@ -229,7 +231,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     await persistMessageServer({
       conversation,
       message: lastMessage,
-      courseName: conversation.projectName ?? '',
+      courseName,
       userIdentifier: conversation.userEmail ?? '',
     })
 

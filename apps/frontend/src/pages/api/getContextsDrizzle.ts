@@ -6,6 +6,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { vectorSearchWithDrizzle } from '~/db/vectorSearch'
+import { getDocGroupsForVectorSearch } from '~/db/dbHelpers'
 
 export default withCourseAccessFromRequest('any')(handler)
 
@@ -19,8 +20,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       queryEmbedding,
       course_name,
       doc_groups = [],
-      disabled_doc_groups = [],
-      public_doc_groups = [],
       conversation_id,
       top_n = 100,
     } = req.body
@@ -35,6 +34,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           'queryEmbedding (number[]) and course_name are required. Get queryEmbedding from your embedding API or backend.',
       })
     }
+
+    // Which groups are disabled and which public groups are searchable is
+    // project state, so read it from the database (as the in-process path in
+    // fetchContextsViaDrizzleVectorSearch does) instead of the request body,
+    // where a client could name another project's group and read its
+    // embeddings (#312).
+    const { disabled_doc_groups, public_doc_groups } =
+      await getDocGroupsForVectorSearch(course_name)
 
     const data = await vectorSearchWithDrizzle(course_name, {
       queryEmbedding,

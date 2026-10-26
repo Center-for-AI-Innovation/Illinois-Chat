@@ -549,7 +549,7 @@ export default function WebsiteIngestForm({
                             For more detail{' '}
                             <a
                               className={'font-bold text-(--link)'}
-                              href="https://docs.uiuc.chat/features/web-crawling-details"
+                              href="https://docs.chat.illinois.edu/building/dashboard/web-crawling/"
                               target="_blank"
                               rel="noopener noreferrer"
                             >
