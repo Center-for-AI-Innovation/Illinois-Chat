@@ -1,5 +1,11 @@
+import {
+  createTextStreamResponse,
+  toTextStream,
+  generateText,
+  streamText,
+  type ModelMessage,
+} from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
-import { generateText, streamText, type CoreMessage } from 'ai'
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
@@ -82,27 +88,29 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     const openAIClient = createOpenAI({
       apiKey,
       baseURL: 'https://api.openai.com/v1', // Default OpenAI API URL
-      compatibility: 'strict', // Use strict mode for OpenAI API
     })
 
-    const openAIModel = openAIClient(model)
+    const openAIModel = openAIClient.chat(model)
 
     const commonParams = {
       model: openAIModel,
-      messages: messages as CoreMessage[],
+      allowSystemInMessages: true,
+      messages: messages as ModelMessage[],
       temperature: 0.7, // You might want to make this configurable
-      maxTokens: 8192,
+      maxOutputTokens: 8192,
     }
 
     if (stream) {
-      const result = await streamText(commonParams as any)
-      const response = result.toTextStreamResponse()
+      const result = await streamText(commonParams)
+      const response = createTextStreamResponse({
+        stream: toTextStream({ stream: result.stream }),
+      })
       return new NextResponse(response.body, {
         status: response.status,
         headers: response.headers,
       })
     } else {
-      const result = await generateText(commonParams as any)
+      const result = await generateText(commonParams)
       return NextResponse.json({
         choices: [{ message: { content: result.text } }],
       })

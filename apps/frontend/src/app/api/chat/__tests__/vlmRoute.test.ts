@@ -2,9 +2,18 @@ import { describe, expect, it, vi } from 'vitest'
 
 const hoisted = vi.hoisted(() => {
   return {
-    createOpenAI: vi.fn(() => (modelId: string) => ({ modelId })),
+    createOpenAI: vi.fn(() => ({ chat: (modelId: string) => ({ modelId }) })),
     streamText: vi.fn(async () => ({
-      toTextStreamResponse: () => new Response('vlm-stream'),
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'text-delta',
+            id: 'text-1',
+            text: 'vlm-stream',
+          })
+          controller.close()
+        },
+      }),
     })),
     generateText: vi.fn(async () => ({ text: 'vlm-text' })),
     convertConversationToCoreMessagesWithoutSystem: vi.fn(() => []),
@@ -19,7 +28,8 @@ vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: hoisted.createOpenAI,
 }))
 
-vi.mock('ai', () => ({
+vi.mock('ai', async () => ({
+  ...(await vi.importActual<typeof import('ai')>('ai')),
   streamText: hoisted.streamText,
   generateText: hoisted.generateText,
 }))

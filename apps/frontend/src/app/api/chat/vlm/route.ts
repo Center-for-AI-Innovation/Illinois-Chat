@@ -1,5 +1,10 @@
+import {
+  createTextStreamResponse,
+  toTextStream,
+  generateText,
+  streamText,
+} from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
-import { generateText, streamText } from 'ai'
 import { NextResponse } from 'next/server'
 import { convertConversationToCoreMessagesWithoutSystem } from '~/utils/apiUtils'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
@@ -19,28 +24,29 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     const openai = createOpenAI({
       baseURL: process.env.NCSA_HOSTED_VLM_BASE_URL,
       apiKey: 'non-empty',
-      compatibility: 'compatible', // strict/compatible - enable 'strict' when using the OpenAI API
     })
 
     const messages =
       convertConversationToCoreMessagesWithoutSystem(conversation)
-    // const messages = convertToCoreMessages(conversation)
+    // const messages = convertToModelMessages(conversation)
     console.log('⭐️ messages', JSON.stringify(messages, null, 2))
 
     if (stream) {
       const result = await streamText({
-        model: openai(conversation.model.id) as any,
+        model: openai.chat(conversation.model.id),
         temperature: conversation.temperature,
         messages,
       })
-      const response = result.toTextStreamResponse()
+      const response = createTextStreamResponse({
+        stream: toTextStream({ stream: result.stream }),
+      })
       return new NextResponse(response.body, {
         status: response.status,
         headers: response.headers,
       })
     } else {
       const result = await generateText({
-        model: openai(conversation.model.id) as any,
+        model: openai.chat(conversation.model.id),
         temperature: conversation.temperature,
         messages,
       })
