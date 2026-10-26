@@ -65,7 +65,7 @@ const navbarVariants = cva(
 const GLOBAL_NAV_ITEMS: readonly NavItem[] = [
   {
     label: 'Docs',
-    href: 'https://docs.uiuc.chat/',
+    href: 'https://docs.chatbot.illinois.edu/',
     icon: IconClipboardText,
     external: true,
   },
