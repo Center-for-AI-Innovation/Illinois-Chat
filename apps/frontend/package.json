@@ -33,12 +33,12 @@
     "shadcn:add": "npx shadcn@latest add"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^1.0.7",
-    "@ai-sdk/anthropic": "^1.1.15",
-    "@ai-sdk/google": "^1.0.7",
-    "@ai-sdk/openai": "^0.0.34",
-    "@ai-sdk/openai-compatible": "^0.2.12",
-    "@ai-sdk/provider": "^1.0.7",
+    "@ai-sdk/amazon-bedrock": "^5.0.125",
+    "@ai-sdk/anthropic": "^4.0.89",
+    "@ai-sdk/google": "^4.0.106",
+    "@ai-sdk/openai": "^4.0.103",
+    "@ai-sdk/openai-compatible": "^3.0.79",
+    "@ai-sdk/provider": "^4.0.34",
     "@aws-sdk/client-bedrock-runtime": "^3.751.0",
     "@aws-sdk/client-rds-data": "^3.825.0",
     "@aws-sdk/client-s3": "3.1065.0",
@@ -68,7 +68,7 @@
     "@vercel/edge-config": "^0.2.0",
     "@vercel/kv": "^0.2.1",
     "@vercel/speed-insights": "^1.1.0",
-    "ai": "^4.3.19",
+    "ai": "^7.0.154",
     "axios": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -98,7 +98,6 @@
     "next-themes": "^0.4.6",
     "oidc-client-ts": "^3.2.1",
     "ollama": "^0.5.6",
-    "ollama-ai-provider": "^0.10.0",
     "openai": "^4.42.0",
     "postgres": "^3.4.9",
     "posthog-js": "^1.258.5",
@@ -182,5 +181,8 @@
   "browser": {
     "fs": false,
     "path": false
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
