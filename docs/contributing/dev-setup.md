@@ -139,7 +139,7 @@ python ai_ta_backend/rabbitmq/worker.py
 ```bash
 # Next.js frontend
 cd apps/frontend
-npm run local
+npm run local    # or npm run dev; both read apps/frontend/.env
 ```
 
 ```bash
