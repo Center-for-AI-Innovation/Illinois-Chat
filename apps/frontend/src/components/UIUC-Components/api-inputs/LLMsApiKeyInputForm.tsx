@@ -300,8 +300,8 @@ const NewModelDropdown: React.FC<{
           />
           <div className="flex items-center gap-1">
             <CountryOfConcernIcon modelId={value?.id} />
-            <ComboboxTrigger className="text-(--foreground)">
-              <IconChevronDown size="1rem" aria-hidden="true" />
+            <ComboboxTrigger className="text-(--foreground-faded)">
+              <IconChevronDown size={14} aria-hidden="true" />
             </ComboboxTrigger>
           </div>
         </ComboboxInputGroup>
