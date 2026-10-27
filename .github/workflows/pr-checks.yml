@@ -85,12 +85,52 @@ jobs:
         working-directory: apps/frontend
         run: npm run test:coverage:check
 
-      # Build (no push) both backend images so a broken Dockerfile fails the PR
-      # instead of the push-to-main deploy. Same contexts as illinois-chat-dev.yml.
-      - name: Build backend image
-        working-directory: apps/backend
-        run: docker build -f Self-Hosted-Dockerfile -t ic-backend:pr .
+  # Only PRs that touch the backend need to prove the images still build.
+  backend-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Build worker image
-        working-directory: apps/backend
-        run: docker build -f ai_ta_backend/rabbitmq/Dockerfile -t ic-worker:pr .
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+              - '.github/workflows/pr-checks.yml'
+
+  # Build (no push) both backend images so a broken Dockerfile fails the PR
+  # instead of the push-to-main deploy. Same contexts as illinois-chat-dev.yml.
+  # Runs beside trunk-and-tests, so a frontend failure never hides a broken
+  # Dockerfile, and only when the backend changed. Layers are cached in the
+  # GitHub Actions cache per image, so an unchanged apt/uv layer is not rebuilt.
+  backend-images:
+    needs: backend-changes
+    if: needs.backend-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: Self-Hosted-Dockerfile
+          - name: worker
+            dockerfile: ai_ta_backend/rabbitmq/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/backend
+          file: apps/backend/${{ matrix.dockerfile }}
+          push: false
+          tags: ic-${{ matrix.name }}:pr
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

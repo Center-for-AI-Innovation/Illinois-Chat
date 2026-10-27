@@ -3,13 +3,15 @@
 **/.env.*
 !**/.env.template
 
-# Local environments and caches
-.venv/
-venv/
-venv-*/
+# Local environments and caches. Patterns are matched from the build-context
+# root, so they need **/ to also catch nested environments such as
+# ai_ta_backend/rabbitmq/.venv from the old per-directory worker setup.
+**/.venv/
+**/venv/
+**/venv-*/
 **/__pycache__
 **/*.py[cod]
-.pytest_cache/
+**/.pytest_cache/
 
 # Not needed at runtime
 .git/
