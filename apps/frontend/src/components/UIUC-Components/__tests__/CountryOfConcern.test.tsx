@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react'
 import {
   CountryOfConcernIcon,
   CountryOfConcernNotice,
+  DeepSeekDirectiveNotice,
 } from '../CountryOfConcern'
 import {
   COUNTRY_OF_CONCERN_INFO_URL,
@@ -18,6 +19,19 @@ describe('CountryOfConcernNotice', () => {
     expect(
       screen.getByRole('link', { name: 'Country of Concern' }),
     ).toHaveAttribute('href', COUNTRY_OF_CONCERN_INFO_URL)
+  })
+})
+
+describe('DeepSeekDirectiveNotice', () => {
+  it('renders the directive notice with the Federal Register link', () => {
+    const { container } = render(<DeepSeekDirectiveNotice />)
+    expect(container.textContent).toContain(
+      'Homeland Security issued a directive ordering federal civilian agencies',
+    )
+    expect(screen.getByRole('link', { name: 'directive' })).toHaveAttribute(
+      'href',
+      'https://public-inspection.federalregister.gov/2026-21447.pdf',
+    )
   })
 })
 

@@ -286,10 +286,10 @@ export const COUNTRY_OF_CONCERN_INFO_URL =
 
 const BANNER_ACK_STORAGE_KEY = 'coc-banner-dismissed-pairs'
 
-function readBannerDismissedSet(): Set<string> {
+function readBannerDismissedSet(storageKey: string): Set<string> {
   if (typeof window === 'undefined') return new Set()
   try {
-    const raw = window.localStorage.getItem(BANNER_ACK_STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKey)
     if (!raw) return new Set()
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return new Set()
@@ -299,13 +299,10 @@ function readBannerDismissedSet(): Set<string> {
   }
 }
 
-function writeBannerDismissedSet(set: Set<string>): void {
+function writeBannerDismissedSet(storageKey: string, set: Set<string>): void {
   if (typeof window === 'undefined') return
   try {
-    window.localStorage.setItem(
-      BANNER_ACK_STORAGE_KEY,
-      JSON.stringify(Array.from(set)),
-    )
+    window.localStorage.setItem(storageKey, JSON.stringify(Array.from(set)))
   } catch {
     // ignore quota / serialization errors — banner will simply re-fire next time
   }
@@ -325,7 +322,9 @@ export function isCocBannerDismissed(
   modelId: string | undefined | null,
 ): boolean {
   if (!chatbotId || !modelId) return false
-  return readBannerDismissedSet().has(bannerKey(chatbotId, modelId))
+  return readBannerDismissedSet(BANNER_ACK_STORAGE_KEY).has(
+    bannerKey(chatbotId, modelId),
+  )
 }
 
 /**
@@ -335,10 +334,43 @@ export function markCocBannerDismissed(
   chatbotId: string,
   modelId: string,
 ): void {
+  markPairDismissed(BANNER_ACK_STORAGE_KEY, chatbotId, modelId)
+}
+
+function markPairDismissed(
+  storageKey: string,
+  chatbotId: string,
+  modelId: string,
+): void {
   if (!chatbotId || !modelId) return
-  const set = readBannerDismissedSet()
+  const set = readBannerDismissedSet(storageKey)
   const key = bannerKey(chatbotId, modelId)
   if (set.has(key)) return
   set.add(key)
-  writeBannerDismissedSet(set)
+  writeBannerDismissedSet(storageKey, set)
+}
+
+export function isDeepSeekModel(modelId: string | undefined | null): boolean {
+  if (!modelId) return false
+  return normalizeModelId(modelId).includes('deepseek')
+}
+
+// Separate from the CoC key so users who dismissed the old banner still see this notice.
+const DEEPSEEK_NOTICE_STORAGE_KEY = 'deepseek-directive-dismissed-pairs'
+
+export function isDeepSeekNoticeDismissed(
+  chatbotId: string | undefined | null,
+  modelId: string | undefined | null,
+): boolean {
+  if (!chatbotId || !modelId) return false
+  return readBannerDismissedSet(DEEPSEEK_NOTICE_STORAGE_KEY).has(
+    bannerKey(chatbotId, modelId),
+  )
+}
+
+export function markDeepSeekNoticeDismissed(
+  chatbotId: string,
+  modelId: string,
+): void {
+  markPairDismissed(DEEPSEEK_NOTICE_STORAGE_KEY, chatbotId, modelId)
 }

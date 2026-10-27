@@ -72,12 +72,16 @@ import {
   getCountryOfConcern,
   getCountryOfConcernBannerLede,
   isCocBannerDismissed,
+  isDeepSeekModel,
+  isDeepSeekNoticeDismissed,
   isLocallyHostedProvider,
   markCocBannerDismissed,
+  markDeepSeekNoticeDismissed,
 } from '~/utils/modelProviders/countriesOfConcern'
 import {
   CountryOfConcernIcon,
   CountryOfConcernNotice,
+  DeepSeekDirectiveNotice,
 } from '~/components/UIUC-Components/CountryOfConcern'
 import posthog from 'posthog-js'
 import { deriveAgentModeEnabled } from '~/utils/app/agentMode'
@@ -349,6 +353,7 @@ export const ChatInput = ({
       ? selectBestModel(llmProviders)?.id
       : undefined)
   const cocCountry = getCountryOfConcern(cocActiveModelId)
+  const cocIsDeepSeek = isDeepSeekModel(cocActiveModelId)
   const [cocBannerVisible, setCocBannerVisible] = useState(false)
 
   useEffect(() => {
@@ -356,8 +361,12 @@ export const ChatInput = ({
       setCocBannerVisible(false)
       return
     }
-    setCocBannerVisible(!isCocBannerDismissed(courseName, cocActiveModelId))
-  }, [cocCountry, cocActiveModelId, courseName])
+    setCocBannerVisible(
+      !isCocBannerDismissed(courseName, cocActiveModelId) ||
+        (cocIsDeepSeek &&
+          !isDeepSeekNoticeDismissed(courseName, cocActiveModelId)),
+    )
+  }, [cocCountry, cocIsDeepSeek, cocActiveModelId, courseName])
 
   // While the country-of-concern banner is visible, the chat input is locked.
   const isInputLockedByCoc = cocBannerVisible
@@ -974,12 +983,23 @@ export const ChatInput = ({
                     <CountryOfConcernNotice />{' '}
                     {getCountryOfConcernBannerLede(cocLocallyHosted)}
                   </p>
+                  {cocIsDeepSeek && (
+                    <p className="mt-2 text-sm leading-snug font-medium">
+                      <DeepSeekDirectiveNotice />
+                    </p>
+                  )}
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         if (courseName && activeModelId) {
                           markCocBannerDismissed(courseName, activeModelId)
+                          if (cocIsDeepSeek) {
+                            markDeepSeekNoticeDismissed(
+                              courseName,
+                              activeModelId,
+                            )
+                          }
                           setCocBannerVisible(false)
                           // Auto-select the textarea once the banner is dismissed
                           requestAnimationFrame(() => {

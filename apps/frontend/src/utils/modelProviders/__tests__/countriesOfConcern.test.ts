@@ -7,14 +7,18 @@ import {
   getCountryOfConcernBannerLede,
   isCocBannerDismissed,
   isCountryOfConcern,
+  isDeepSeekModel,
+  isDeepSeekNoticeDismissed,
   isLocallyHostedProvider,
   isChatbotCocAcknowledged,
   markChatbotCocAcknowledged,
   markCocBannerDismissed,
+  markDeepSeekNoticeDismissed,
 } from '~/utils/modelProviders/countriesOfConcern'
 
 const CHAT_KEY = 'coc-acknowledged-chatbots'
 const BANNER_KEY = 'coc-banner-dismissed-pairs'
+const DEEPSEEK_KEY = 'deepseek-directive-dismissed-pairs'
 
 describe('getCountryOfConcern / isCountryOfConcern', () => {
   it('returns null for missing input', () => {
@@ -132,7 +136,6 @@ describe('getCountryOfConcernBannerLede', () => {
 
 describe('message helpers', () => {
   it('warning matches the expected text', () => {
-
     expect(COUNTRY_OF_CONCERN_WARNING).toBe(
       'This model was trained in a US government designated Country of Concern. ' +
         'It may exhibit biases based on differences in geopolitical environments, ' +
@@ -273,6 +276,48 @@ describe('isCocBannerDismissed / markCocBannerDismissed', () => {
       markCocBannerDismissed('bot-a', 'qwen/qwen3-32b'),
     ).not.toThrow()
     spy.mockRestore()
+  })
+})
+
+describe('isDeepSeekModel', () => {
+  it('matches OpenRouter and Ollama DeepSeek ids case-insensitively', () => {
+    expect(isDeepSeekModel('deepseek/deepseek-v3.2')).toBe(true)
+    expect(isDeepSeekModel('deepseek-r1:70b')).toBe(true)
+    expect(isDeepSeekModel('DeepSeek/DeepSeek-R1-Zero')).toBe(true)
+  })
+
+  it('does not match other models or empty ids', () => {
+    expect(isDeepSeekModel('qwen/qwen3-32b')).toBe(false)
+    expect(isDeepSeekModel('z-ai/glm-4.6')).toBe(false)
+    expect(isDeepSeekModel('gpt-4o')).toBe(false)
+    expect(isDeepSeekModel(null)).toBe(false)
+    expect(isDeepSeekModel('')).toBe(false)
+  })
+})
+
+describe('isDeepSeekNoticeDismissed / markDeepSeekNoticeDismissed', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('stays visible for users who already dismissed the CoC banner', () => {
+    markCocBannerDismissed('bot-a', 'deepseek-r1:70b')
+    expect(isDeepSeekNoticeDismissed('bot-a', 'deepseek-r1:70b')).toBe(false)
+  })
+
+  it('persists dismissal per (chatbot, model) pair under its own key', () => {
+    markDeepSeekNoticeDismissed('bot-a', 'deepseek-r1:70b')
+    expect(isDeepSeekNoticeDismissed('bot-a', 'deepseek-r1:70b')).toBe(true)
+    expect(isDeepSeekNoticeDismissed('bot-b', 'deepseek-r1:70b')).toBe(false)
+    expect(isCocBannerDismissed('bot-a', 'deepseek-r1:70b')).toBe(false)
+    expect(JSON.parse(window.localStorage.getItem(DEEPSEEK_KEY)!)).toEqual([
+      'bot-a::deepseek-r1:70b',
+    ])
+  })
+
+  it('returns false for missing ids', () => {
+    expect(isDeepSeekNoticeDismissed(null, 'deepseek-r1:70b')).toBe(false)
+    expect(isDeepSeekNoticeDismissed('bot-a', '')).toBe(false)
   })
 })
 
