@@ -30,7 +30,7 @@ export function DeepSeekDirectiveNotice() {
       ordering federal civilian agencies to remove DeepSeek from their systems.
       We are seeking guidance from the university on the implications of this
       for us. We are not yet removing DeepSeek, but that could end up happening
-      with little to no advanced notice.
+      with little to no advance notice.
     </>
   )
 }
