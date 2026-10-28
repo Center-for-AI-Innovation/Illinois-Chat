@@ -333,6 +333,7 @@ services:
       NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY}
       # other
       POSTHOG_API_KEY: ${POSTHOG_API_KEY:-not_a_key}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
 
   worker:
     build:

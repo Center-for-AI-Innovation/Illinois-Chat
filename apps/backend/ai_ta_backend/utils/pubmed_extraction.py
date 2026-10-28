@@ -42,7 +42,8 @@ def extractPubmedData():
   if 'POSTHOG' not in globals():
         POSTHOG = Posthog(sync_mode=False, 
                          project_api_key=os.environ['POSTHOG_API_KEY'], 
-                         host="https://app.posthog.com")
+                         host=os.getenv("POSTHOG_HOST"),
+                         disabled=not os.getenv("POSTHOG_HOST"))
 
   # TODO: Replace with DATABASE_CLIENT
   if 'SUPABASE_CLIENT' not in globals():
