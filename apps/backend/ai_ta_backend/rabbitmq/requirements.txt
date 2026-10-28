@@ -37,3 +37,4 @@ Flask-SQLAlchemy==3.0.0
 canvasapi==3.2.0
 bs4==0.0.2
 yt-dlp==2024.7.16
+brotli>=1.2.1  # CVE-2026-111497; yt-dlp pulls brotli in unpinned
