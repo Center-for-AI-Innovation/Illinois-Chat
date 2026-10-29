@@ -20,7 +20,8 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
       <h2 className="mb-6 text-2xl font-bold text-(--illinois-blue) dark:text-white">
         {title}
       </h2>
-      <div className="grid auto-rows-[minmax(436px,1fr)] grid-cols-[repeat(auto-fit,minmax(240px,290px))] justify-center gap-5 py-6">
+      {/* max-w = CHATBOTS_PER_PAGE columns of 290px + gaps */}
+      <div className="mx-auto grid max-w-[calc(5*290px+4*1.25rem)] auto-rows-[minmax(436px,1fr)] grid-cols-[repeat(auto-fit,minmax(240px,290px))] gap-5 py-6">
         {pageCards.map((card) => (
           <div
             key={`${title}-${card.course_name}`}
