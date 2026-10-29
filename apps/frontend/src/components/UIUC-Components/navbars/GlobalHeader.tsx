@@ -516,7 +516,7 @@ export function LandingPageHeader({
           <div
             className="fixed z-50"
             style={{
-              top: `${headerHeight + 30}px`,
+              top: `calc(${headerHeight + 30}px + var(--announcement-banner-height))`,
               right: menuPosition.right,
             }}
           >
