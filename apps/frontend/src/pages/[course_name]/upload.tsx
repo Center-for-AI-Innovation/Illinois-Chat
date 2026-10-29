@@ -12,6 +12,7 @@ import { CannotEditCourse } from '~/components/UIUC-Components/CannotEditCourse'
 import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 
@@ -23,6 +24,8 @@ const CourseMain: NextPage = () => {
   )
   const [isFetchingCourseMetadata, setIsFetchingCourseMetadata] = useState(true)
   const auth = useAuth()
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const isLoaded = !auth.isLoading
   const isSignedIn = auth.isAuthenticated
   const user_email = auth.user?.profile.email
@@ -52,14 +55,22 @@ const CourseMain: NextPage = () => {
 
   if (
     metadata &&
+    !auth.isLoading &&
+    !isSuperAdminLoading &&
+    isSuperAdmin !== true &&
     user_email !== (metadata.course_owner as string) &&
-    metadata.course_admins.indexOf(getCurrentPageName()) === -1
+    !metadata.course_admins.includes(user_email ?? '')
   ) {
     void router.push(`/new?course_name=${projectName}`)
 
     return <CannotEditCourse course_name={getCurrentPageName() as string} />
   }
-  if (!isLoaded || isFetchingCourseMetadata || projectName == null) {
+  if (
+    !isLoaded ||
+    isSuperAdminLoading ||
+    isFetchingCourseMetadata ||
+    projectName == null
+  ) {
     return <LoadingPlaceholderForAdminPages />
   }
 

@@ -29,6 +29,7 @@ const hoisted = vi.hoisted(() => {
 
   return {
     db: makeDbChain(),
+    isSuperAdminAsync: vi.fn(async () => false),
     setNextRows: (rows: Row[]) => {
       nextRows = rows
     },
@@ -42,6 +43,10 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock('~/utils/authMiddleware', () => ({
   withAuth: (h: any) => h,
+}))
+
+vi.mock('~/utils/superAdmins.server', () => ({
+  isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
 vi.mock('~/db/dbClient', async () => {
@@ -96,6 +101,8 @@ function fixtureRow(
 describe('UIUC-api/searchChatbots', () => {
   beforeEach(() => {
     hoisted.resetCaptures()
+    hoisted.isSuperAdminAsync.mockReset()
+    hoisted.isSuperAdminAsync.mockResolvedValue(false)
   })
 
   it('returns 405 for non-GET requests', async () => {
@@ -247,5 +254,36 @@ describe('UIUC-api/searchChatbots', () => {
     expect(payload.results[1].userRole).toBeUndefined()
     // The caller doesn't own this one, so raw metadata is not exposed.
     expect(payload.results[1].metadata).toBeUndefined()
+  })
+
+  it('gives a super admin who is not a project member Admin Settings on a search result', async () => {
+    hoisted.isSuperAdminAsync.mockResolvedValue(true)
+    hoisted.setNextRows([
+      fixtureRow({
+        course_name: 'new-project',
+        course_owner: 'owner@example.com',
+        course_admins: [],
+        is_private: true,
+      }),
+    ])
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'GET',
+        user: { email: 'operator@example.com' },
+        query: { q: 'new-project' },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const payload = (res.json as any).mock.calls[0][0]
+    expect(payload.results).toHaveLength(1)
+    expect(payload.results[0].userRole).toBe('admin')
+    expect(payload.results[0].owner).toBe('owner@example.com')
+    // The role is enough for the settings gear and Admin Settings button.
+    // Raw metadata stays off the card for someone who is not a stored member.
+    expect(payload.results[0].metadata).toBeUndefined()
   })
 })

@@ -19,9 +19,22 @@ export const CONNECTION_KINDS = [
 ] as const
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number]
 
+/** Matches the placeholder emitted by maskConfig, never a saved credential. */
+export function isMaskedSecret(value: unknown): boolean {
+  return typeof value === 'string' && /^\*{4}.{0,4}$/.test(value)
+}
+
+const secretSchema = z
+  .string()
+  .min(1)
+  .refine((value) => !isMaskedSecret(value), {
+    message:
+      'Masked values cannot be saved. Omit the field to keep the stored secret.',
+  })
+
 export const s3ConfigSchema = z.object({
-  aws_access_key_id: z.string().min(1),
-  aws_secret_access_key: z.string().min(1),
+  aws_access_key_id: secretSchema,
+  aws_secret_access_key: secretSchema,
   bucket_name: z.string().min(1).optional(),
   endpoint_url: z.string().url().optional(),
   region: z.string().min(1).optional(),
@@ -30,12 +43,12 @@ export const s3ConfigSchema = z.object({
 export const databaseConfigSchema = z.object({
   // Postgres-only guard: enforced here (not just in the live probe) so both
   // /test and upsert reject non-postgres URIs at the boundary.
-  connection_uri: z
-    .string()
-    .min(1)
-    .refine((uri) => /^postgres(ql)?:\/\//i.test(uri), {
+  connection_uri: secretSchema.refine(
+    (uri) => /^postgres(ql)?:\/\//i.test(uri),
+    {
       message: 'connection_uri must be a postgres:// or postgresql:// URI',
-    }),
+    },
+  ),
 }) satisfies z.ZodType
 
 /**
@@ -102,7 +115,7 @@ export const qdrantConfigSchema = z.object({
   // because `z.object()` strips unknown keys by default; the Python
   // backend already tolerated absence via `.get("https", False)`.
   url: z.string().url(),
-  api_key: z.string().min(1),
+  api_key: secretSchema,
   port: z.coerce.number().int().positive(),
   default_collection: z.string().min(1),
   // Optional read-side fan-out. Each entry is a dict, not a bare string —
@@ -159,7 +172,7 @@ export const embeddingConfigSchema = z
     model: z.string().min(1),
     base_url: z.string().url().optional(),
     api_base: z.string().url().optional(),
-    api_key: z.string().min(1).optional(),
+    api_key: secretSchema.optional(),
     query_instruction: z.string().optional(),
   })
   .refine((cfg) => cfg.provider !== 'ollama' || !!cfg.base_url, {
@@ -193,6 +206,61 @@ export const upsertBodySchema = z.discriminatedUnion('kind', [
   }),
 ])
 export type UpsertBody = z.infer<typeof upsertBodySchema>
+
+// Per-kind schemas for the partial-update path. `.partial()` on the object
+// schemas only — the merged result is validated against the full schema
+// server-side, which is what actually enforces required fields. Validating the
+// patch itself against the full schema would be wrong: the UI holds masked
+// secrets, so a request that changes one toggle legitimately arrives without
+// `api_key`.
+//
+// `embedding` uses its inner object because `embeddingConfigSchema` carries a
+// `.refine()` and ZodEffects has no `.partial()`. The refinement still runs on
+// the merged result.
+function patchSchema<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const shape: z.ZodRawShape = {}
+  for (const [name, field] of Object.entries(schema.shape)) {
+    shape[name] = field.isOptional()
+      ? field.nullable().optional()
+      : field.optional()
+  }
+  return z.object(shape).strict()
+}
+
+const partialConfigSchemas = {
+  s3: patchSchema(s3ConfigSchema),
+  database: patchSchema(databaseConfigSchema),
+  qdrant: patchSchema(qdrantConfigSchema),
+  embedding: patchSchema(embeddingConfigSchema.innerType()),
+} as const
+
+export const patchBodySchema = z.discriminatedUnion('kind', [
+  upsertBaseSchema.extend({
+    kind: z.literal('s3'),
+    config: partialConfigSchemas.s3,
+  }),
+  upsertBaseSchema.extend({
+    kind: z.literal('database'),
+    config: partialConfigSchemas.database,
+  }),
+  upsertBaseSchema.extend({
+    kind: z.literal('qdrant'),
+    config: partialConfigSchemas.qdrant,
+  }),
+  upsertBaseSchema.extend({
+    kind: z.literal('embedding'),
+    config: partialConfigSchemas.embedding,
+  }),
+])
+export type PatchBody = z.infer<typeof patchBodySchema>
+
+/** The full schema for a kind, used to validate a merged patch result. */
+export const configSchemaByKind = {
+  s3: s3ConfigSchema,
+  database: databaseConfigSchema,
+  qdrant: qdrantConfigSchema,
+  embedding: embeddingConfigSchema,
+} as const satisfies Record<ConnectionKind, z.ZodTypeAny>
 
 export const setActiveBodySchema = z.object({
   project_name: z.string().min(1),

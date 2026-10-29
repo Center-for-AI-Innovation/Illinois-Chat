@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAppRouterAuth } from '~/utils/appRouterAuth'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { AuthenticatedUser } from '~/proxy'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 import {
   COURSE_NAME_HEADER_KEYS,
   COURSE_NAME_KEYS,
@@ -188,10 +189,21 @@ export function withCourseAccessFromRequest(
           )
         }
 
+        // Platform super admins get project access through a live check
+        // rather than by being written into `course_admins` — see the note in
+        // `src/pages/api/authorization.ts` for why. Memoized because both the
+        // private-course gate and the admin-tier gate below can need it, and
+        // only evaluated after a normal check has already failed, so ordinary
+        // authorized requests never pay for the extra Redis read.
+        let superAdminCheck: Promise<boolean> | undefined
+        const isPlatformSuperAdmin = () =>
+          (superAdminCheck ??= isSuperAdminAsync(req.user?.email))
+
         // Check course access for private courses
         if (
           courseMetadata.is_private &&
-          !hasCourseAccess(req.user, courseMetadata)
+          !hasCourseAccess(req.user, courseMetadata) &&
+          !(await isPlatformSuperAdmin())
         ) {
           return new NextResponse(
             JSON.stringify({
@@ -205,7 +217,8 @@ export function withCourseAccessFromRequest(
         // Check specific access level
         if (
           requiredAccess === 'admin' &&
-          !courseMetadata.course_admins?.includes(req.user.email)
+          !courseMetadata.course_admins?.includes(req.user.email) &&
+          !(await isPlatformSuperAdmin())
         ) {
           return new NextResponse(
             JSON.stringify({
@@ -216,6 +229,7 @@ export function withCourseAccessFromRequest(
           )
         }
 
+        // Owner tier: no super-admin bypass by design.
         if (
           requiredAccess === 'owner' &&
           req.user.email !== courseMetadata.course_owner

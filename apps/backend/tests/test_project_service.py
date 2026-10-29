@@ -11,9 +11,11 @@ Coverage:
   - is_valid_project_name: charset, length, and the Python ``$``-newline trap.
   - get_default_course_admins: parsing of DEFAULT_COURSE_ADMINS.
   - create_project: inserts the projects row with DEFAULT_SCHEMA before the
-    Redis hset; duplicate names raise ProjectAlreadyExistsError; DB insert
-    failure raises before any Redis write; retries skip the insert but still
-    write Redis; pre-assigned-LLM-key failures do not fail the request.
+    Redis hset; course_admins starts empty (never seeded from
+    DEFAULT_COURSE_ADMINS); duplicate names raise ProjectAlreadyExistsError;
+    DB insert failure raises before any Redis write; retries skip the insert
+    but still write Redis; pre-assigned-LLM-key failures do not fail the
+    request.
   - generate_json_schema: updates (never inserts) the projects row.
 """
 
@@ -163,9 +165,11 @@ def test_create_project_llm_keys_failure_is_non_fatal():
     service.sentry.capture_exception.assert_called_once()
 
 
-def test_create_project_uses_default_course_admins(monkeypatch):
+def test_create_project_starts_with_empty_course_admins(monkeypatch):
     import json
 
+    # Even when DEFAULT_COURSE_ADMINS is set, create_project must not persist
+    # it — that would make those grants unrevocable (stored snapshot).
     monkeypatch.setenv("DEFAULT_COURSE_ADMINS", "admin@x.edu")
     service = make_service()
     service.redis_client.hexists.return_value = False
@@ -176,7 +180,7 @@ def test_create_project_uses_default_course_admins(monkeypatch):
     service.create_project("my-bot", None, "owner@example.com")
 
     metadata = json.loads(service.redis_client.hset.call_args.kwargs["value"])
-    assert metadata["course_admins"] == ["admin@x.edu"]
+    assert metadata["course_admins"] == []
     assert metadata["course_owner"] == "owner@example.com"
 
 
