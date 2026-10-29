@@ -179,6 +179,7 @@ Read by `docker-compose.sim.yaml`, which both start scripts load unless `--no-si
 | Variable | Read by | Required or default | In template |
 | --- | --- | --- | --- |
 | `POSTHOG_API_KEY` | full (backend), dev | `not_a_key` | root, worker |
+| `POSTHOG_HOST` | full (backend), dev, worker | empty; backend and worker send no PostHog events | root, backend, worker |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | dev | empty; not passed by Compose | root |
 | `NOMIC_API_KEY` | dev | empty; not passed by Compose | root |
 | `SENTRY_DSN` | dev | empty; not passed by Compose | root |

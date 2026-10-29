@@ -99,6 +99,7 @@ class Ingest:
         self.aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         self.s3_bucket_name = os.getenv('S3_BUCKET_NAME')
         self.posthog_api_key = os.getenv('POSTHOG_API_KEY')
+        self.posthog_host = os.getenv('POSTHOG_HOST')
 
         # Qdrant fields are always defined so engine-agnostic code paths can
         # inspect them without raising. They're populated only when a
@@ -211,12 +212,12 @@ class Ingest:
             )
 
         # ── PostHog ──
-        if self.posthog_api_key:
+        if self.posthog_api_key and self.posthog_host:
             self.posthog = Posthog(sync_mode=False, project_api_key=self.posthog_api_key,
-                                   host='https://app.posthog.com')
+                                   host=self.posthog_host)
         else:
             self.posthog = None
-            print("POSTHOG API KEY NOT FOUND!")
+            print("POSTHOG_API_KEY or POSTHOG_HOST not set, PostHog disabled")
 
         self.sql_session = SQLAlchemyIngestDB(engine=documents_sql_engine)
 
