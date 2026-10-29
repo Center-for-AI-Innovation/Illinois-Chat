@@ -564,6 +564,49 @@ export const projectConnectionAuditLog = pgTable(
   }),
 )
 
+// Chatbot deletions (migration 0019). The request hides the chatbot and
+// inserts a row; the worker's delete consumer purges its data in the
+// background. An active row (status <> 'completed') reserves the name.
+// `project_id` has no FK: the projects row is deleted at the end of the purge.
+export type ProjectDeletionStatus =
+  | 'pending'
+  | 'running'
+  | 'failed'
+  | 'completed'
+
+export const projectDeletions = pgTable(
+  'project_deletions',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    project_name: text('project_name').notNull(),
+    project_id: bigint('project_id', { mode: 'number' }),
+    requested_by: text('requested_by').notNull(),
+    include_external: boolean('include_external').default(false).notNull(),
+    status: text('status')
+      .$type<ProjectDeletionStatus>()
+      .default('pending')
+      .notNull(),
+    progress: jsonb('progress')
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    metadata_backup: jsonb('metadata_backup'),
+    error: text('error'),
+    attempts: integer('attempts').default(0).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    started_at: timestamp('started_at', { withTimezone: true }),
+    heartbeat_at: timestamp('heartbeat_at', { withTimezone: true }),
+    completed_at: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => ({
+    activeNameIdx: uniqueIndex('project_deletions_active_name_idx')
+      .on(t.project_name)
+      .where(sql`${t.status} <> 'completed'`),
+  }),
+)
+
 // PubMed Daily Update (from schema.sql)
 export const pubmedDailyUpdate = pgTable('pubmed_daily_update', {
   id: serial('id').primaryKey(),

@@ -84,6 +84,12 @@ class ProjectService:
             """
         if self.redis_client.hexists('course_metadatas', project_name):
             raise ProjectAlreadyExistsError(f"A project named '{project_name}' already exists.")
+        # A deleted project's metadata is gone at once, but its data (and its
+        # projects row, which the retry path below would reuse) remain until
+        # the background purge finishes.
+        if self.sqlDb.hasActiveProjectDeletion(project_name):
+            raise ProjectAlreadyExistsError(
+                f"A project named '{project_name}' is still being deleted. Try again once deletion finishes.")
 
         try:
             # A retry after a partial failure may find the row already inserted.
