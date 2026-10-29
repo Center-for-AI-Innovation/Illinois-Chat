@@ -53,13 +53,10 @@ export function ChatbotsSearchResults({
       <p className="mb-4 text-sm text-(--illinois-storm-medium) dark:text-[#94a3b8]">
         {total} {total === 1 ? 'result' : 'results'}
       </p>
-      {/* Match the default page: each card is locked to 320px (see
-          ChatbotsSection.tsx) so search results don't render fatter than
-          the cards on the landing page. Flex-wrap left-aligns rows
-          naturally when the last row is partial. */}
-      <div className="flex flex-wrap gap-5">
+      {/* auto-rows-fr: every row matches the tallest card. */}
+      <div className="grid auto-rows-fr grid-cols-[repeat(auto-fill,min(100%,320px))] justify-center gap-5">
         {results.map((card) => (
-          <div key={card.course_name} className="w-[320px] shrink-0">
+          <div key={card.course_name} className="min-w-0 [&>*]:h-full">
             <ChatbotHubCard {...card} />
           </div>
         ))}
