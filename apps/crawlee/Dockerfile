@@ -1,7 +1,9 @@
 # Specify the base Docker image. You can read more about
 # the available images at https://crawlee.dev/docs/guides/docker-images
 # You can also use any other image from Docker Hub.
-FROM apify/actor-node-playwright-chrome:20 AS builder
+# The tag suffix is the playwright version the image bundles a browser for; keep it
+# in sync with the exact "playwright" version in package.json (see final stage).
+FROM apify/actor-node-playwright-chrome:22-1.64.1 AS builder
 
 # Copy just package.json and package-lock.json
 # to speed up the build using Docker layer cache.
@@ -19,16 +21,13 @@ COPY --chown=myuser . ./
 RUN npm run build
 
 # Create final image
-FROM apify/actor-node-playwright-chrome:20
+FROM apify/actor-node-playwright-chrome:22-1.64.1
 
-# Install the browser into a runtime-user-writable path. The base image bundles a
-# chromium that matches ITS playwright (1.60); our package.json pins playwright
-# 1.42.1, which expects a different chromium revision than the one at the root-owned
-# /pw-browsers, so the bundled browser is unusable and the launch fails with
-# BrowserLaunchError. Pointing PLAYWRIGHT_BROWSERS_PATH at a myuser-owned dir lets us
-# install the chromium that matches our pinned playwright (no EACCES, no --with-deps:
-# the base image already carries chromium's system libraries).
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/myuser/pw-browsers
+# Use the browser the base image bundles under /pw-browsers instead of downloading
+# our own. It only launches when package.json pins the same playwright version as the
+# image tag (1.64.1); a mismatch fails with BrowserLaunchError. The image is rebuilt
+# with current Chrome, so bumping the tag and playwright together is how the crawler
+# picks up browser security fixes.
 
 # Copy only built JS files from builder image
 COPY --from=builder --chown=myuser /home/myuser/dist ./dist
@@ -48,9 +47,6 @@ RUN npm --quiet set progress=false \
     && node --version \
     && echo "NPM version:" \
     && npm --version
-
-# Install the chromium build matching the pinned playwright into the writable path.
-RUN npx playwright install chromium
 
 # Next, copy the remaining files and directories with the source code.
 # Since we do this after NPM install, quick build will be really fast
