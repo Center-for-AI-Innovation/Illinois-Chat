@@ -3,34 +3,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/shadcn/ui/button'
 import { ChatbotHubCard } from './ChatbotHubCard'
 import { type ChatbotSectionData } from './chatbots.types'
-
-export const CHATBOTS_PER_PAGE = 5
-const MIN_CARD_WIDTH = 240
-const GRID_GAP = 20
-
-const columnsForWidth = (width: number) =>
-  Math.min(
-    CHATBOTS_PER_PAGE,
-    Math.max(1, Math.floor((width + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))),
-  )
+import { useCardGridColumns } from './useCardGridColumns'
 
 export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
-  const gridRef = useRef<HTMLDivElement>(null)
-  const [columns, setColumns] = useState(CHATBOTS_PER_PAGE)
+  const { ref: gridRef, columns } = useCardGridColumns()
   // Index of the first visible card, so a resize keeps the user's place.
   const [firstIndex, setFirstIndex] = useState(0)
-
-  useEffect(() => {
-    const el = gridRef.current
-    if (!el) return
-    const update = () => {
-      if (el.clientWidth > 0) setColumns(columnsForWidth(el.clientWidth))
-    }
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  const prevRef = useRef<HTMLButtonElement>(null)
+  const nextRef = useRef<HTMLButtonElement>(null)
+  // Arrow to focus once paging disables the one that was clicked.
+  const pendingFocus = useRef<'prev' | 'next' | null>(null)
 
   // One row per page: page size follows the column count.
   const perPage = columns
@@ -39,6 +21,21 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
   const currentPage = Math.min(Math.floor(firstIndex / perPage) + 1, totalPages)
   const start = (currentPage - 1) * perPage
   const pageCards = cards.slice(start, start + perPage)
+
+  // Re-anchor so the list growing back doesn't jump to the old page.
+  if (firstIndex >= cards.length && firstIndex !== start) setFirstIndex(start)
+
+  useEffect(() => {
+    if (pendingFocus.current === 'prev') prevRef.current?.focus()
+    if (pendingFocus.current === 'next') nextRef.current?.focus()
+    pendingFocus.current = null
+  }, [currentPage])
+
+  const goToPage = (page: number) => {
+    if (page <= 1) pendingFocus.current = 'next'
+    else if (page >= totalPages) pendingFocus.current = 'prev'
+    setFirstIndex((page - 1) * perPage)
+  }
 
   return (
     <section className="px-4 py-10 sm:px-8">
@@ -62,13 +59,14 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 text-sm text-(--illinois-storm-medium) dark:text-[#94a3b8]">
           <Button
+            ref={prevRef}
             type="button"
             variant="outline"
             size="icon-sm"
             className="rounded-full"
             aria-label={`Previous page of ${title}`}
             disabled={currentPage <= 1}
-            onClick={() => setFirstIndex((currentPage - 2) * perPage)}
+            onClick={() => goToPage(currentPage - 1)}
           >
             <ChevronLeft aria-hidden="true" />
           </Button>
@@ -76,13 +74,14 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
             {start + 1}–{start + pageCards.length} of {cards.length}
           </span>
           <Button
+            ref={nextRef}
             type="button"
             variant="outline"
             size="icon-sm"
             className="rounded-full"
             aria-label={`Next page of ${title}`}
             disabled={currentPage >= totalPages}
-            onClick={() => setFirstIndex(currentPage * perPage)}
+            onClick={() => goToPage(currentPage + 1)}
           >
             <ChevronRight aria-hidden="true" />
           </Button>

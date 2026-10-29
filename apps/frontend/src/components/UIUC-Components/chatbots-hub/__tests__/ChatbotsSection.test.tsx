@@ -83,4 +83,35 @@ describe('ChatbotsSection pagination', () => {
     expect(titles()).toEqual(['bot-1', 'bot-2', 'bot-3'])
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('stays on the first page when the list grows back', async () => {
+    const user = userEvent.setup()
+    const { rerender } = renderWithProviders(
+      <ChatbotsSection title="Course" cards={makeCards(12)} />,
+    )
+    const next = screen.getByRole('button', { name: 'Next page of Course' })
+    await user.click(next)
+    await user.click(next)
+    rerender(<ChatbotsSection title="Course" cards={makeCards(3)} />)
+    rerender(<ChatbotsSection title="Course" cards={makeCards(12)} />)
+    expect(screen.getByText('1–5 of 12')).toBeInTheDocument()
+  })
+
+  it('keeps focus on the pager when an arrow becomes disabled', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ChatbotsSection title="Course" cards={makeCards(12)} />,
+    )
+    const next = screen.getByRole('button', { name: 'Next page of Course' })
+    const prev = screen.getByRole('button', {
+      name: 'Previous page of Course',
+    })
+    await user.click(next)
+    expect(next).toHaveFocus()
+    await user.click(next)
+    expect(prev).toHaveFocus()
+    await user.click(prev)
+    await user.click(prev)
+    expect(next).toHaveFocus()
+  })
 })

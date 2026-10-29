@@ -2,6 +2,7 @@ import { SearchX } from 'lucide-react'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { ChatbotHubCard } from './ChatbotHubCard'
 import type { ChatbotCardData } from './chatbots.types'
+import { useCardGridColumns } from './useCardGridColumns'
 
 type ChatbotsSearchResultsProps = {
   results: ChatbotCardData[]
@@ -16,6 +17,8 @@ export function ChatbotsSearchResults({
   isLoading,
   isError,
 }: ChatbotsSearchResultsProps) {
+  const { ref: gridRef, columns } = useCardGridColumns()
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -54,7 +57,11 @@ export function ChatbotsSearchResults({
         {total} {total === 1 ? 'result' : 'results'}
       </p>
       {/* auto-rows-fr: every row matches the tallest card. */}
-      <div className="grid auto-rows-fr grid-cols-[repeat(auto-fill,min(100%,320px))] justify-center gap-5">
+      <div
+        ref={gridRef}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        className="grid auto-rows-fr gap-5"
+      >
         {results.map((card) => (
           <div key={card.course_name} className="min-w-0 [&>*]:h-full">
             <ChatbotHubCard {...card} />
