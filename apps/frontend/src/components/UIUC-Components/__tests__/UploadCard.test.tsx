@@ -474,4 +474,104 @@ describe('UploadCard', () => {
       screen.getByText(/This logo will appear in the header of the chat page/i),
     ).toBeInTheDocument()
   })
+
+  describe('display name', () => {
+    it('saves a new display name and shows it in the header', async () => {
+      const user = userEvent.setup()
+      const apiUtils = await import('~/utils/apiUtils')
+      const setMetadata = (apiUtils as any).callSetCourseMetadata
+      setMetadata.mockClear()
+      const queryClient = createTestQueryClient()
+      const { UploadCard } = await import('../UploadCard')
+
+      renderWithProviders(
+        <UploadCard
+          projectName="cs101-fa24"
+          current_user_email="owner@example.com"
+          metadata={baseMetadata}
+        />,
+        { queryClient },
+      )
+
+      const save = screen.getByRole('button', { name: 'Update display name' })
+      expect(save).toBeDisabled()
+      expect(screen.getByText('Alias')).toBeInTheDocument()
+      expect(screen.getByText(/only a label/)).toHaveTextContent('/cs101-fa24')
+      expect(screen.queryByText(/alias of/)).not.toBeInTheDocument()
+
+      await user.type(screen.getByLabelText('Display Name'), '  Intro   to CS ')
+      await user.click(save)
+
+      await waitFor(() =>
+        expect(setMetadata).toHaveBeenCalledWith(
+          'cs101-fa24',
+          expect.objectContaining({ display_name: 'Intro to CS' }),
+        ),
+      )
+      expect(
+        await screen.findByRole('heading', { name: 'Intro to CS' }),
+      ).toBeInTheDocument()
+      expect(screen.getByText('alias of /cs101-fa24')).toBeInTheDocument()
+      expect(
+        queryClient.getQueryData(['chatbotDisplayName', 'cs101-fa24']),
+      ).toBe('Intro to CS')
+    })
+
+    it('blocks names over the limit', async () => {
+      const user = userEvent.setup()
+      const { UploadCard } = await import('../UploadCard')
+      renderWithProviders(
+        <UploadCard
+          projectName="CS101"
+          current_user_email="owner@example.com"
+          metadata={baseMetadata}
+        />,
+      )
+
+      const input = screen.getByLabelText('Display Name')
+      await user.click(input)
+      await user.paste('a'.repeat(81))
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /80 characters or fewer/,
+      )
+      expect(input).toHaveAttribute('aria-invalid', 'true')
+      expect(
+        screen.getByRole('button', { name: 'Update display name' }),
+      ).toBeDisabled()
+    })
+
+    it('can clear an existing display name', async () => {
+      const user = userEvent.setup()
+      const apiUtils = await import('~/utils/apiUtils')
+      const setMetadata = (apiUtils as any).callSetCourseMetadata
+      setMetadata.mockClear()
+      const { UploadCard } = await import('../UploadCard')
+      renderWithProviders(
+        <UploadCard
+          projectName="CS101"
+          current_user_email="owner@example.com"
+          metadata={{ ...baseMetadata, display_name: 'Old Name' }}
+        />,
+      )
+
+      expect(
+        screen.getByRole('heading', { name: 'Old Name' }),
+      ).toBeInTheDocument()
+      await user.clear(screen.getByLabelText('Display Name'))
+      await user.click(
+        screen.getByRole('button', { name: 'Update display name' }),
+      )
+
+      await waitFor(() =>
+        expect(setMetadata).toHaveBeenCalledWith(
+          'CS101',
+          expect.objectContaining({ display_name: null }),
+        ),
+      )
+      expect(
+        await screen.findByRole('heading', { name: 'CS101' }),
+      ).toBeInTheDocument()
+    })
+  })
 })

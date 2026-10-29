@@ -14,6 +14,7 @@ import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import { type SimConfigField, type SimWorkflow } from '~/types/sim'
 import { type SimWorkflowFailure } from '~/utils/simDiscovery'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
@@ -302,7 +303,9 @@ const SimPage = ({ course_name }: { course_name: string }) => {
       setSidebarCollapsed={setSidebarCollapsed}
     >
       <Head>
-        <title>{course_name} - Sim AI Tools</title>
+        <title>
+          {`${getChatbotDisplayName(course_name, courseMetadata)} - Sim AI Tools`}
+        </title>
         <meta
           name="description"
           content="Configure Sim AI tool calling for your project."

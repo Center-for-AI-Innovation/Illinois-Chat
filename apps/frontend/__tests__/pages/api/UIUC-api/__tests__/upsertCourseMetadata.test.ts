@@ -142,4 +142,75 @@ describe('UIUC-api/upsertCourseMetadata', () => {
     expect(res.status).toHaveBeenCalledWith(200)
     expect(hoisted.upsertChatbotTags).not.toHaveBeenCalled()
   })
+
+  describe('display_name', () => {
+    async function save(display_name: unknown) {
+      hoisted.getCourseMetadata.mockResolvedValueOnce({
+        course_admins: ['owner@example.com'],
+        is_private: false,
+        display_name: 'Old Name',
+      })
+      hoisted.writeCourseMetadata.mockClear()
+      const res = createMockRes()
+      await handler(
+        createMockReq({
+          method: 'POST',
+          body: { courseName: 'CS101', courseMetadata: { display_name } },
+        }) as any,
+        res as any,
+      )
+      return res
+    }
+
+    it('saves a normalized display name', async () => {
+      const res = await save('  Intro   to CS ')
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(hoisted.writeCourseMetadata).toHaveBeenCalledWith(
+        'CS101',
+        expect.objectContaining({ display_name: 'Intro to CS' }),
+      )
+    })
+
+    it('clears it when empty', async () => {
+      const res = await save('   ')
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(hoisted.writeCourseMetadata).toHaveBeenCalledWith(
+        'CS101',
+        expect.objectContaining({ display_name: null }),
+      )
+    })
+
+    it('rejects names that are too long or not strings', async () => {
+      const tooLong = await save('a'.repeat(81))
+      expect(tooLong.status).toHaveBeenCalledWith(400)
+      const notString = await save(42)
+      expect(notString.status).toHaveBeenCalledWith(400)
+      expect(hoisted.writeCourseMetadata).not.toHaveBeenCalled()
+    })
+
+    it('leaves an existing display name alone when the field is absent', async () => {
+      hoisted.getCourseMetadata.mockResolvedValueOnce({
+        course_admins: ['owner@example.com'],
+        is_private: false,
+        display_name: 'Keep Me',
+      })
+      hoisted.writeCourseMetadata.mockClear()
+      const res = createMockRes()
+      await handler(
+        createMockReq({
+          method: 'POST',
+          body: {
+            courseName: 'CS101',
+            courseMetadata: { project_description: 'x' },
+          },
+        }) as any,
+        res as any,
+      )
+      expect(res.status).toHaveBeenCalledWith(200)
+      expect(hoisted.writeCourseMetadata).toHaveBeenCalledWith(
+        'CS101',
+        expect.objectContaining({ display_name: 'Keep Me' }),
+      )
+    })
+  })
 })
