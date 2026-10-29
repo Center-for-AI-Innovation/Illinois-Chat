@@ -1,5 +1,5 @@
 // Read and write runtime platform settings (announcement banner, maintenance
-// mode). Super-admin only via withSuperAdminOnly — the guard runs inside the
+// mode, navbar branding). Super-admin only via withSuperAdminOnly — the guard runs inside the
 // handler, not in Next middleware (see CVE-2025-29927).
 
 import type { NextApiResponse } from 'next'

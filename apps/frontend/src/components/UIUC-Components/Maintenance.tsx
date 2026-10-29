@@ -61,7 +61,7 @@ const Maintenance = () => {
     <main
       id="main-content"
       tabIndex={-1}
-      className={`relative flex min-h-screen flex-col items-center overflow-hidden bg-white px-4 py-8 outline-none sm:px-6 sm:py-12 dark:bg-[#081735] ${montserrat_paragraph.variable} font-montserratParagraph`}
+      className={`relative flex min-h-(--viewport-height) flex-col items-center overflow-hidden bg-white px-4 py-8 outline-none sm:px-6 sm:py-12 dark:bg-[#081735] ${montserrat_paragraph.variable} font-montserratParagraph`}
     >
       <div
         aria-hidden="true"

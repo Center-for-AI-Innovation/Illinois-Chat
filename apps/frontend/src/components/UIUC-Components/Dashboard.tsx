@@ -104,9 +104,9 @@ const Dashboard = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main mt-20"
+        className="course-page-main mt-(--navbar-height)"
         style={{
-          minHeight: '100vh',
+          minHeight: 'var(--viewport-height)',
           padding: '1rem',
         }}
       >

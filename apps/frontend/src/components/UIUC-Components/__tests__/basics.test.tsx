@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { renderWithProviders } from '~/test-utils/renderWithProviders'
 
 import { LoadingSpinner } from '../LoadingSpinner'
 import {
@@ -24,7 +25,7 @@ describe('UIUC-Components basics', () => {
   })
 
   it('LoadingPlaceholderForAdminPages renders', () => {
-    render(<LoadingPlaceholderForAdminPages />)
+    renderWithProviders(<LoadingPlaceholderForAdminPages />)
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0)
   })
 })
