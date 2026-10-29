@@ -2,6 +2,7 @@ import { SearchX } from 'lucide-react'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { ChatbotHubCard } from './ChatbotHubCard'
 import type { ChatbotCardData } from './chatbots.types'
+import { useCardGridColumns } from './useCardGridColumns'
 
 type ChatbotsSearchResultsProps = {
   results: ChatbotCardData[]
@@ -16,6 +17,8 @@ export function ChatbotsSearchResults({
   isLoading,
   isError,
 }: ChatbotsSearchResultsProps) {
+  const { ref: gridRef, columns } = useCardGridColumns()
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -53,13 +56,14 @@ export function ChatbotsSearchResults({
       <p className="mb-4 text-sm text-(--illinois-storm-medium) dark:text-[#94a3b8]">
         {total} {total === 1 ? 'result' : 'results'}
       </p>
-      {/* Match the default page: each card is locked to 320px (see
-          ChatbotsSection.tsx) so search results don't render fatter than
-          the cards on the landing page. Flex-wrap left-aligns rows
-          naturally when the last row is partial. */}
-      <div className="flex flex-wrap gap-5">
+      {/* auto-rows-fr: every row matches the tallest card. */}
+      <div
+        ref={gridRef}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        className="grid auto-rows-fr gap-5"
+      >
         {results.map((card) => (
-          <div key={card.course_name} className="w-[320px] shrink-0">
+          <div key={card.course_name} className="min-w-0 [&>*]:h-full">
             <ChatbotHubCard {...card} />
           </div>
         ))}
