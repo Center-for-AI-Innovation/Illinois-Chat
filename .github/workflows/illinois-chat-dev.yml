@@ -82,11 +82,11 @@ jobs:
           WORKER_IMAGE_TAG: ${{ github.sha }}
         run: |
           cd apps/backend
-          docker build \
+          docker build -f ai_ta_backend/rabbitmq/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:$WORKER_IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:latest \
             -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:main \
-            ai_ta_backend/rabbitmq/
+            .
 
       - name: Push worker image
         env:
