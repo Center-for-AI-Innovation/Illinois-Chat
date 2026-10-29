@@ -1,27 +1,17 @@
 import React, { useState } from 'react'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
-import { IconAlertTriangleFilled } from '@tabler/icons-react'
 import { CountryOfConcernModal } from './CountryOfConcernModal'
+import { CountryOfConcernIcon } from '../CountryOfConcern'
 import { Switch } from '@/components/shadcn/ui/switch'
 import { type LLMProvider } from '~/utils/modelProviders/LLMProvider'
 import {
-  type CountryOfConcern,
-  getCountryOfConcern,
-  getCountryOfConcernLongMessage,
-  getCountryOfConcernShortMessage,
+  isCountryOfConcern,
   isChatbotCocAcknowledged,
   markChatbotCocAcknowledged,
 } from '~/utils/modelProviders/countriesOfConcern'
 import { GetCurrentPageName } from '../CanViewOnlyCourse'
 
 interface PendingFlaggedModel {
-  modelId: string
   modelName: string
-  country: CountryOfConcern
   field: any
 }
 
@@ -56,8 +46,7 @@ export function ModelToggles({
       {Object.entries(providerModels).map(
         ([modelId, modelData]: [string, any]) => {
           const realModelId = modelData?.id ?? modelId
-          const country = getCountryOfConcern(realModelId)
-          const isFlagged = country !== null
+          const isFlagged = isCountryOfConcern(realModelId)
           return (
             <form.Field
               key={modelId}
@@ -68,15 +57,9 @@ export function ModelToggles({
                   if (
                     checked &&
                     isFlagged &&
-                    country &&
                     !isChatbotCocAcknowledged(chatbotId)
                   ) {
-                    setPendingModel({
-                      modelId: realModelId,
-                      modelName: modelData.name,
-                      country,
-                      field,
-                    })
+                    setPendingModel({ modelName: modelData.name, field })
                     return
                   }
                   field.handleChange(checked)
@@ -94,27 +77,7 @@ export function ModelToggles({
                       checked={field.state.value}
                       onCheckedChange={handleChange}
                     />
-                    {isFlagged && country && (
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <span
-                              aria-label={`Country of concern warning: ${country}`}
-                              className="inline-flex"
-                            />
-                          }
-                        >
-                          <IconAlertTriangleFilled
-                            size="1rem"
-                            className="text-yellow-500"
-                            aria-hidden="true"
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[280px] text-wrap">
-                          {getCountryOfConcernShortMessage(country)}
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                    <CountryOfConcernIcon modelId={realModelId} />
                   </div>
                 )
               }}
@@ -124,18 +87,12 @@ export function ModelToggles({
       )}
 
       <CountryOfConcernModal
-        opened={pendingModel !== null}
+        modelName={pendingModel?.modelName ?? null}
         onClose={closeModal}
         onConfirm={confirmEnable}
         title="Country of Concern Warning"
         confirmLabel="Enable anyway"
-      >
-        {pendingModel &&
-          getCountryOfConcernLongMessage(
-            pendingModel.modelName,
-            pendingModel.country,
-          )}
-      </CountryOfConcernModal>
+      />
     </div>
   )
 }
