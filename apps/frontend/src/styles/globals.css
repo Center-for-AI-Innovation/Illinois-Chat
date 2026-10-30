@@ -35,6 +35,22 @@
   border-color: var(--color-gray-200, currentcolor);
 }
 
+/*
+ * Tailwind v4 preflight sets `cursor: default` on buttons. Mantine controls
+ * used a pointer. Restore it for buttons and button-role controls.
+ * Element-level specificity, so a utility (cursor-not-allowed, cursor-text)
+ * still wins. Disabled buttons fall back to the default cursor unless a
+ * utility says otherwise.
+ */
+button,
+:where([role='button']) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
 /* Skip navigation link for keyboard/screen reader users */
 .skip-nav-link {
   position: absolute;
@@ -494,17 +510,25 @@
 }
 
 /*
- * Document-group combobox ("Select Group"): the shadcn combobox already draws
- * its own focus indicator (`focus-within:border-ring` plus a 3px
- * around the first. Suppress the outline on the input group and its text
- * input only — the chips' remove buttons have no ring of their own and keep
- * the global one. Higher specificity than the `*:focus-visible` rule above,
- * so it wins without needing to be declared later.
+ * Searchable dropdowns: focus lands on the inner text field, which has no
+ * border radius, so the global outline draws a rectangle inside the control.
+ * Suppress that inner outline and draw one ring on the rounded shell so it
+ * covers the logo, field, and chevron together.
+ * Higher specificity than `*:focus-visible`, and !important so it wins.
  */
-[data-slot='combobox-input-group'].doc-group-multiselect:focus-visible,
-[data-slot='combobox-input-group'].doc-group-multiselect:focus-within,
-.doc-group-multiselect [data-slot='combobox-input']:focus-visible {
+[data-slot='combobox-input']:focus,
+[data-slot='combobox-input']:focus-visible,
+[data-slot='combobox-trigger']:focus,
+[data-slot='combobox-trigger']:focus-visible,
+[data-slot='combobox-clear']:focus,
+[data-slot='combobox-clear']:focus-visible {
   outline: none !important;
+  outline-offset: 0 !important;
+}
+
+[data-slot='combobox-input-group']:focus-within {
+  outline: 3px solid color-mix(in srgb, var(--ring) 50%, transparent) !important;
+  outline-offset: 0 !important;
 }
 
 /*
@@ -558,7 +582,12 @@ html[data-input-modality='keyboard']
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
 
+  --muted-foreground: rgba(from var(--foreground) r g b / 0.8);
+
   --chat-background: color-mix(in srgb, var(--background), black 20%);
+
+  --citation-foreground: hsl(from var(--link) h s 61%);
+  --citation-hover-border: var(--citation-foreground);
 
   --dashboard-background: var(--illinois-blue);
   --dashboard-background-faded: color-mix(

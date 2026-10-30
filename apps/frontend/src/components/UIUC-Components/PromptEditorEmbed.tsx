@@ -60,10 +60,7 @@ import { useDebouncedCallback } from 'use-debounce'
 import { v4 as uuidv4 } from 'uuid'
 import CustomCopyButton from '~/components/Buttons/CustomCopyButton'
 import { getModelLogo } from '~/components/Chat/ModelSelect'
-import {
-  getCountryOfConcern,
-  getCountryOfConcernShortMessage,
-} from '~/utils/modelProviders/countriesOfConcern'
+import { CountryOfConcernIcon } from '~/components/UIUC-Components/CountryOfConcern'
 import { LinkGeneratorModal } from '~/components/Modals/LinkGeneratorModal'
 import { findDefaultModel } from '~/components/UIUC-Components/api-inputs/LLMsApiKeyInputForm'
 import { type ChatBody } from '~/types/chat'
@@ -354,7 +351,6 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
 
   const selectedModelOption =
     modelOptions.find((option) => option.value === selectedModel) ?? null
-  const selectedModelCountry = getCountryOfConcern(selectedModel)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1077,30 +1073,10 @@ CRITICAL: The optimized prompt must:
                         aria-label="Select model"
                         className={`${montserrat_paragraph.variable} font-montserratParagraph cursor-pointer text-sm`}
                       />
-                      {selectedModelCountry && (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <span
-                                aria-label={`Country of concern warning: ${selectedModelCountry}`}
-                                className="inline-flex items-center"
-                              />
-                            }
-                          >
-                            <IconAlertTriangle
-                              size={isSmallScreen ? 12 : 14}
-                              stroke={2}
-                              aria-hidden="true"
-                              className="text-yellow-500"
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-[280px] text-wrap">
-                            {getCountryOfConcernShortMessage(
-                              selectedModelCountry,
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
+                      <CountryOfConcernIcon
+                        modelId={selectedModel}
+                        size={isSmallScreen ? 12 : 14}
+                      />
                       <ComboboxTrigger className="text-(--foreground-faded)">
                         <IconChevronDown
                           size={isSmallScreen ? 12 : 14}
@@ -1136,36 +1112,11 @@ CRITICAL: The optimized prompt must:
                                       <span className="ml-3 text-sm">
                                         {item.label}
                                       </span>
-                                      {(() => {
-                                        const country = getCountryOfConcern(
-                                          item.modelId ?? item.value,
-                                        )
-                                        if (!country) return null
-                                        return (
-                                          <Tooltip>
-                                            <TooltipTrigger
-                                              render={
-                                                <span
-                                                  aria-label={`Country of concern warning: ${country}`}
-                                                  className="ml-1.5 inline-flex items-center"
-                                                />
-                                              }
-                                            >
-                                              <IconAlertTriangle
-                                                size="0.9rem"
-                                                stroke={2}
-                                                aria-hidden="true"
-                                                className="text-yellow-500"
-                                              />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-[280px] text-wrap">
-                                              {getCountryOfConcernShortMessage(
-                                                country,
-                                              )}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        )
-                                      })()}
+                                      <CountryOfConcernIcon
+                                        modelId={item.modelId ?? item.value}
+                                        size="0.9rem"
+                                        className="ml-1.5"
+                                      />
                                     </div>
                                     {item.downloadSize && (
                                       <div className="mt-1 ml-8 flex items-center">

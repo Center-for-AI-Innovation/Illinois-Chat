@@ -111,6 +111,10 @@ describe('Chatbar', () => {
 
   it('clears conversations via ChatbarSettings', async () => {
     const user = userEvent.setup()
+    const { readDisabledToolIds, setToolDisabled } =
+      await import('~/utils/app/disabledTools')
+    // Stands in for another project's conversation, which clear-all keeps.
+    setToolDisabled('other-project-conv', 'wf-1', true)
     const handleNewConversation = vi.fn()
     const dispatch = vi.fn()
 
@@ -151,6 +155,8 @@ describe('Chatbar', () => {
     expect(mocks.deleteAllConversationsMutate).toHaveBeenCalled()
     expect(handleNewConversation).toHaveBeenCalled()
     expect(dispatch).toHaveBeenCalledWith({ field: 'conversations', value: [] })
+    expect(readDisabledToolIds('other-project-conv')).toEqual(['wf-1'])
+    localStorage.clear()
   })
 
   it('exports conversation history (JSON response branch)', async () => {

@@ -4,6 +4,7 @@ import { Separator } from '@/components/shadcn/ui/separator'
 import React, { useEffect, useState } from 'react'
 import { IconInfoCircle } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { SUPPORT_MAILTO } from '~/utils/app/const'
 
 function NomicDocumentMap({ course_name }: { course_name: string }) {
   const [accordionOpened, setAccordionOpened] = useState(false)
@@ -160,7 +161,7 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                   Note you are unable to login or edit this map. It&apos;s for
                   your visualization only. Please{' '}
                   <a
-                    href="mailto:rohan13@illinois.edu"
+                    href={SUPPORT_MAILTO}
                     className="text-(--dashboard-button) underline hover:text-(--dashboard-button-hover)"
                   >
                     contact us

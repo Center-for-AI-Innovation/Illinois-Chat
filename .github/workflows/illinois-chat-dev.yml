@@ -35,10 +35,10 @@ jobs:
       # These commits already passed the same linters as a PR diff, so this is
       # a cheap guard against anything that lands on main outside a PR.
       #
-      # Non-frontend paths (apps/backend, infra, etc.) are ignored repo-wide
-      # in .trunk/trunk.yaml for now, so this stays diff-only while only
-      # ever surfacing frontend issues. Drop that ignore rule once those
-      # trees are ready to be linted too.
+      # Non-frontend paths (apps/backend, infra, docs, overrides, etc.)
+      # are ignored repo-wide in .trunk/trunk.yaml, so this stays
+      # diff-only while only ever surfacing frontend issues. Drop that
+      # ignore rule once those trees are ready to be linted too.
       - name: Trunk Check (pushed commits only)
         uses: trunk-io/trunk-action@v1
         with:
@@ -108,6 +108,7 @@ jobs:
           NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
           NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: ${{ vars.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG || 'True' }}
           NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ${{ vars.NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT }}
+          NEXT_PUBLIC_SUPER_ADMIN_EMAILS: ${{ vars.NEXT_PUBLIC_SUPER_ADMIN_EMAILS }}
         run: |
           cd apps/frontend
 
@@ -130,6 +131,7 @@ jobs:
             --build-arg NEXT_PUBLIC_POSTHOG_HOST="$NEXT_PUBLIC_POSTHOG_HOST" \
             --build-arg NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG="$NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG" \
             --build-arg NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT="$NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT" \
+            --build-arg NEXT_PUBLIC_SUPER_ADMIN_EMAILS="$NEXT_PUBLIC_SUPER_ADMIN_EMAILS" \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:main \

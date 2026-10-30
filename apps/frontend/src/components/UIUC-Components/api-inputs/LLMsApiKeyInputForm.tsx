@@ -14,21 +14,9 @@ import {
   ComboboxList,
   ComboboxTrigger,
 } from '@/components/shadcn/ui/combobox'
+import { IconChevronDown, IconX } from '@tabler/icons-react'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
-import {
-  IconAlertTriangleFilled,
-  IconChevronDown,
-  IconX,
-} from '@tabler/icons-react'
-import {
-  type CountryOfConcern,
-  getCountryOfConcern,
-  getCountryOfConcernLongMessage,
-  getCountryOfConcernShortMessage,
+  isCountryOfConcern,
   isChatbotCocAcknowledged,
   markChatbotCocAcknowledged,
 } from '~/utils/modelProviders/countriesOfConcern'
@@ -67,6 +55,7 @@ import { showToast } from '~/utils/toastUtils'
 import { Skeleton } from '@/components/shadcn/ui/skeleton'
 import { GetCurrentPageName } from '../CanViewOnlyCourse'
 import { CountryOfConcernModal } from './CountryOfConcernModal'
+import { CountryOfConcernIcon } from '../CountryOfConcern'
 import GlobalFooter from '../GlobalFooter'
 import AnthropicProviderInput from './providers/AnthropicProviderInput'
 import AzureProviderInput from './providers/AzureProviderInput'
@@ -216,20 +205,16 @@ const NewModelDropdown: React.FC<{
   )
   const selectedModel =
     allModels.find((model) => model.id === value?.id) || undefined
-  const selectedModelCountry = getCountryOfConcern(value?.id)
 
-  const [pendingDefault, setPendingDefault] = useState<{
-    model: AnySupportedModel
-    country: CountryOfConcern
-  } | null>(null)
+  const [pendingDefault, setPendingDefault] =
+    useState<AnySupportedModel | null>(null)
 
   const closePendingModal = () => setPendingDefault(null)
   const confirmPendingDefault = async () => {
     if (!pendingDefault) return
-    const next = pendingDefault.model
     markChatbotCocAcknowledged(chatbotId)
     setPendingDefault(null)
-    await onChange(next)
+    await onChange(pendingDefault)
   }
 
   // Grouped by provider, in LLM_PROVIDER_ORDER, nested per Base UI
@@ -282,9 +267,11 @@ const NewModelDropdown: React.FC<{
             (model) => model.id === selected.value,
           )
           if (!nextModel) return
-          const country = getCountryOfConcern(nextModel.id)
-          if (country && !isChatbotCocAcknowledged(chatbotId)) {
-            setPendingDefault({ model: nextModel, country })
+          if (
+            isCountryOfConcern(nextModel.id) &&
+            !isChatbotCocAcknowledged(chatbotId)
+          ) {
+            setPendingDefault(nextModel)
             return
           }
           await onChange(nextModel)
@@ -312,29 +299,9 @@ const NewModelDropdown: React.FC<{
             }`}
           />
           <div className="flex items-center gap-1">
-            {selectedModelCountry && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span
-                      aria-label={`Country of concern warning: ${selectedModelCountry}`}
-                      className="inline-flex items-center"
-                    />
-                  }
-                >
-                  <IconAlertTriangleFilled
-                    size="1rem"
-                    aria-hidden="true"
-                    className="text-yellow-500"
-                  />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-[280px] text-wrap">
-                  {getCountryOfConcernShortMessage(selectedModelCountry)}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            <ComboboxTrigger className="text-(--foreground)">
-              <IconChevronDown size="1rem" aria-hidden="true" />
+            <CountryOfConcernIcon modelId={value?.id} />
+            <ComboboxTrigger className="text-(--foreground-faded)">
+              <IconChevronDown size={14} aria-hidden="true" />
             </ComboboxTrigger>
           </div>
         </ComboboxInputGroup>
@@ -367,24 +334,12 @@ const NewModelDropdown: React.FC<{
       </Combobox>
 
       <CountryOfConcernModal
-        opened={pendingDefault !== null}
+        modelName={pendingDefault?.name ?? null}
         onClose={closePendingModal}
         onConfirm={confirmPendingDefault}
         title="Default Model — Country of Concern Warning"
         confirmLabel="Set as default anyway"
-      >
-        {pendingDefault && (
-          <>
-            Setting <strong>{pendingDefault.model.name}</strong> as the default
-            model is discouraged because it originates from a country of
-            concern.{' '}
-            {getCountryOfConcernLongMessage(
-              pendingDefault.model.name,
-              pendingDefault.country,
-            )}
-          </>
-        )}
-      </CountryOfConcernModal>
+      />
     </>
   )
 }
@@ -405,7 +360,6 @@ interface ModelComboboxGroup {
 }
 
 export function ModelItem({ label, modelId, modelType }: ModelComboboxItem) {
-  const countryOfConcern = getCountryOfConcern(modelId)
   return (
     <div className="flex flex-nowrap items-center">
       <Image
@@ -417,27 +371,11 @@ export function ModelItem({ label, modelId, modelType }: ModelComboboxItem) {
         style={{ marginRight: '8px', borderRadius: '4px' }}
       />
       <span className="ml-2 text-sm">{label}</span>
-      {countryOfConcern && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span
-                aria-label={`Country of concern warning: ${countryOfConcern}`}
-                className="ml-1.5 inline-flex items-center"
-              />
-            }
-          >
-            <IconAlertTriangleFilled
-              size="0.9rem"
-              aria-hidden="true"
-              className="text-yellow-500"
-            />
-          </TooltipTrigger>
-          <TooltipContent className="max-w-[280px] text-wrap">
-            {getCountryOfConcernShortMessage(countryOfConcern)}
-          </TooltipContent>
-        </Tooltip>
-      )}
+      <CountryOfConcernIcon
+        modelId={modelId}
+        size="0.9rem"
+        className="ml-1.5"
+      />
     </div>
   )
 }

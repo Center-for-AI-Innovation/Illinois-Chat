@@ -22,6 +22,7 @@ import {
   ComboboxInputGroup,
   ComboboxItem,
   ComboboxList,
+  ComboboxTrigger,
 } from '@/components/shadcn/ui/combobox'
 import { IconCheck, IconCopy } from '@tabler/icons-react'
 import { useFetchLLMProviders } from '@/hooks/queries/useFetchLLMProviders'
@@ -282,6 +283,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
                   aria-label="Select model"
                   placeholder="Select model"
                 />
+                <ComboboxTrigger aria-label="Open model list" />
               </ComboboxInputGroup>
               <ComboboxContent>
                 <ComboboxEmpty>No models found.</ComboboxEmpty>
@@ -409,7 +411,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
 
         <div className="text-sm">
           <a
-            href="https://docs.uiuc.chat/api/endpoints#image-input-example"
+            href="https://docs.chat.illinois.edu/api/chat/#image-input"
             target="_blank"
             rel="noopener noreferrer"
             className="text-(--foreground) underline hover:text-(--dashboard-button-hover)"

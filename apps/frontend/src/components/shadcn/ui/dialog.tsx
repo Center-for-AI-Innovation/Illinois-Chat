@@ -19,8 +19,17 @@ function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
 }
 
-function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+function DialogClose({ className, ...props }: DialogPrimitive.Close.Props) {
+  return (
+    <DialogPrimitive.Close
+      data-slot="dialog-close"
+      className={cn(
+        'inline-flex cursor-pointer items-center justify-center rounded-md p-1',
+        className,
+      )}
+      {...props}
+    />
+  )
 }
 
 function DialogOverlay({
