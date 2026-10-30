@@ -3,20 +3,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const hoisted = vi.hoisted(() => ({
-  getCourseMetadata: vi.fn(),
-  hasCourseAccess: vi.fn(),
   resolveSimCredentials: vi.fn(),
   assertWorkflowInWorkspace: vi.fn(),
   discoverSimWorkflows: vi.fn(),
 }))
 
-vi.mock('~/utils/authMiddleware', () => ({
-  withAuth: (handler: any) => handler,
-}))
-
+// Access control is the wrapper's job and is covered against the real wrapper
+// in simWorkflowsAccess.test.ts. Here it only hands over the authorized name.
 vi.mock('~/server/authorization', () => ({
-  getCourseMetadata: hoisted.getCourseMetadata,
-  hasCourseAccess: hoisted.hasCourseAccess,
+  withCourseAccessFromRequest: () => (handler: any) => (req: any, res: any) => {
+    req.courseName = req.body?.course_name ?? req.query?.course_name
+    return handler(req, res)
+  },
 }))
 
 // The routes never touch the database directly; the credential lookup is
@@ -68,8 +66,6 @@ function listReq(query: Record<string, unknown>, overrides: any = {}) {
 }
 
 beforeEach(() => {
-  hoisted.getCourseMetadata.mockResolvedValue({ course_owner: 'a@b.c' })
-  hoisted.hasCourseAccess.mockReturnValue(true)
   hoisted.resolveSimCredentials.mockResolvedValue(CREDS)
   hoisted.assertWorkflowInWorkspace.mockResolvedValue(true)
   hoisted.discoverSimWorkflows.mockResolvedValue({ workflows: [], failed: [] })
@@ -124,33 +120,6 @@ describe('runSimWorkflow handler', () => {
       expect(res.statusCode).toBe(400)
       expect(res.body.error).toMatch(/JSON object/)
     }
-    expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
-  })
-
-  it('requires course_name', async () => {
-    const res = makeRes()
-    await runSimWorkflow(runReq({ workflow_id: 'wf-1', input: {} }), res)
-    expect(res.statusCode).toBe(400)
-    expect(res.body.error).toMatch(/course_name/)
-  })
-
-  it('reports an unknown project', async () => {
-    hoisted.getCourseMetadata.mockResolvedValue(null)
-    const res = makeRes()
-    await runSimWorkflow(runReq(BODY), res)
-    expect(res.statusCode).toBe(404)
-  })
-
-  it('denies callers without project access, and unauthenticated callers', async () => {
-    hoisted.hasCourseAccess.mockReturnValue(false)
-    let res = makeRes()
-    await runSimWorkflow(runReq(BODY), res)
-    expect(res.statusCode).toBe(403)
-
-    hoisted.hasCourseAccess.mockReturnValue(true)
-    res = makeRes()
-    await runSimWorkflow(runReq(BODY, { user: undefined }), res)
-    expect(res.statusCode).toBe(403)
     expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
   })
 
@@ -349,30 +318,6 @@ describe('getSimWorkflows handler', () => {
     const res = makeRes()
     await getSimWorkflows(listReq(QUERY, { method: 'POST' }), res)
     expect(res.statusCode).toBe(405)
-  })
-
-  it('requires course_name', async () => {
-    const res = makeRes()
-    await getSimWorkflows(listReq({}), res)
-    expect(res.statusCode).toBe(400)
-  })
-
-  it('reports an unknown project and denies callers without access', async () => {
-    hoisted.getCourseMetadata.mockResolvedValue(null)
-    let res = makeRes()
-    await getSimWorkflows(listReq(QUERY), res)
-    expect(res.statusCode).toBe(404)
-
-    hoisted.getCourseMetadata.mockResolvedValue({ course_owner: 'x' })
-    hoisted.hasCourseAccess.mockReturnValue(false)
-    res = makeRes()
-    await getSimWorkflows(listReq(QUERY), res)
-    expect(res.statusCode).toBe(403)
-
-    hoisted.hasCourseAccess.mockReturnValue(true)
-    res = makeRes()
-    await getSimWorkflows(listReq(QUERY, { user: undefined }), res)
-    expect(res.statusCode).toBe(403)
   })
 
   it('answers an unconfigured project with an empty list, not an error', async () => {

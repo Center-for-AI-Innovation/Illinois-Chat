@@ -97,6 +97,21 @@ describe('Sim workflow routes access', () => {
     expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
   })
 
+  it('reports a missing project name and an unknown project', async () => {
+    let res = createMockRes()
+    await getSimWorkflows(
+      createMockReq({ method: 'GET', query: {} }) as never,
+      res,
+    )
+    expect(res.status).toHaveBeenCalledWith(400)
+
+    hoisted.hGet.mockResolvedValue(null)
+    res = createMockRes()
+    await getSimWorkflows(listRequest(), res)
+    expect(res.status).toHaveBeenCalledWith(404)
+    expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
+  })
+
   it('lets an anonymous visitor reach a public project tool run', async () => {
     setProject({ is_private: false, course_owner: 'owner@x.edu' })
     const res = createMockRes()
