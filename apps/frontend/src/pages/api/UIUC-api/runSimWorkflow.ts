@@ -13,8 +13,8 @@ import {
   SimListError,
   simUpstreamErrorResponse,
 } from '~/utils/simDiscovery'
-import { getCourseMetadata, hasCourseAccess } from '~/server/authorization'
-import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { withCourseAccessFromRequest } from '~/server/authorization'
+import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 
 const TIMEOUT_MS = 300_000 // 5 minutes
 
@@ -27,17 +27,21 @@ export const config = { maxDuration: 300 }
  * Credentials come from the project's stored configuration, never the caller,
  * and `workflow_id` is checked against that project's workspace before the
  * project's API key is spent on it.
+ *
+ * Access matches `getSimWorkflows`: anyone who can chat with a public project
+ * may run its tools, while a private project requires membership.
  */
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { workflow_id, input, course_name } = req.body as {
+  const { workflow_id, input } = req.body as {
     workflow_id: string
     input: Record<string, unknown>
-    course_name?: string
   }
+  // The project the access check authorized, never a separate copy (#312).
+  const course_name = req.courseName!
 
   if (!workflow_id || input === undefined) {
     return res.status(400).json({ error: 'workflow_id and input are required' })
@@ -47,19 +51,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   // but a plain object would turn a malformed request into a 500.
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     return res.status(400).json({ error: 'input must be a JSON object' })
-  }
-
-  if (!course_name) {
-    return res.status(400).json({ error: 'course_name is required' })
-  }
-
-  const courseMetadata = await getCourseMetadata(course_name)
-  if (!courseMetadata) {
-    return res.status(404).json({ error: 'Project not found' })
-  }
-
-  if (!req.user || !hasCourseAccess(req.user, courseMetadata)) {
-    return res.status(403).json({ error: 'Access denied' })
   }
 
   const resolved = await resolveSimCredentials(course_name)
@@ -185,4 +176,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler)
+export default withCourseAccessFromRequest('any')(handler)
