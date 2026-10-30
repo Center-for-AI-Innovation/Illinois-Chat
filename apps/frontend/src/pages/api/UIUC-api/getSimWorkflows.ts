@@ -5,36 +5,27 @@ import {
   simConfigErrorResponse,
 } from '~/utils/simConfig'
 import { simUpstreamErrorResponse } from '~/utils/simDiscovery'
-import { getCourseMetadata, hasCourseAccess } from '~/server/authorization'
-import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { withCourseAccessFromRequest } from '~/server/authorization'
+import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 
 /**
  * GET /api/UIUC-api/getSimWorkflows?course_name=X
  *
  * Discovers deployed workflows from SimAI. Credentials come from the project's
  * stored configuration and never from the caller — see `resolveSimCredentials`.
+ *
+ * Access follows the chat page: anyone may list a public project's tools,
+ * including visitors who are not logged in, while a private project requires
+ * membership. The chat page asks on every load, so a stricter check here
+ * shows an error toast on public chatbots that have no tools at all.
  */
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { course_name } = req.query as {
-    course_name?: string
-  }
-
-  if (!course_name) {
-    return res.status(400).json({ error: 'course_name is required' })
-  }
-
-  const courseMetadata = await getCourseMetadata(course_name)
-  if (!courseMetadata) {
-    return res.status(404).json({ error: 'Project not found' })
-  }
-
-  if (!req.user || !hasCourseAccess(req.user, courseMetadata)) {
-    return res.status(403).json({ error: 'Access denied' })
-  }
+  // The project the access check authorized, never a separate copy (#312).
+  const course_name = req.courseName!
 
   const resolved = await resolveSimCredentials(course_name)
 
@@ -95,4 +86,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   return res.status(200).json({ workflows, failed })
 }
 
-export default withAuth(handler)
+export default withCourseAccessFromRequest('any')(handler)
