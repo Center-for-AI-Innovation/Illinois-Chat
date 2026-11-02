@@ -20,7 +20,7 @@ Report vulnerabilities privately through GitHub's private vulnerability reportin
 1. Go to the repository's [Security tab](https://github.com/Center-for-AI-Innovation/Illinois-Chat/security).
 2. Click **Report a vulnerability** and fill in the advisory form.
 
-If you cannot use GitHub, contact the Center for AI Innovation at the University of Illinois through the channels listed at [docs.chat.illinois.edu](https://docs.chat.illinois.edu/) and ask for a private channel to share details.
+If you cannot use GitHub, please send an email to [genaisupport@mx.uillinois.edu](mailto:genaisupport@mx.uillinois.edu) or contact the dev team through the channels listed at [docs.chat.illinois.edu](https://docs.chat.illinois.edu/) and ask for a private channel to share details.
 
 Please include as much of the following as you can:
 
@@ -47,7 +47,6 @@ Out of scope:
 
 - Vulnerabilities in third-party dependencies that have no demonstrated impact on Illinois Chat. Please report those upstream; we track dependency updates with Dependabot.
 - Issues that require a compromised administrator account, physical access, or social engineering.
-- Denial-of-service testing, automated scanning that degrades the service, or spam.
 - Self-hosted deployments that are misconfigured or run with the shipped development defaults (for example the local-only `postgres`/`password` credentials described in the development setup docs).
 
 ## Security practices for self-hosters
