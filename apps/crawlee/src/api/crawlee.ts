@@ -1,18 +1,30 @@
 // For more information, see https://crawlee.dev/
-import { Configuration, PlaywrightCrawler, downloadListOfUrls } from "crawlee";
+import {
+  Configuration,
+  Log,
+  PlaywrightCrawler,
+  downloadListOfUrls,
+  log as rootLog,
+} from "crawlee";
 import { Page } from "playwright";
 
+import { oneLine } from "../logSetup.js";
 import { Config, configSchema } from "./configValidation.js";
 import { ingestPdf, uploadPdfToS3 } from "./uploadToS3.js";
 
-export async function crawl(rawConfig: Config) {
+// clog carries the "rid=<id> course=<name>" prefix for this crawl. requestId is forwarded
+// to the backend /ingest as X-Request-ID so the ingest job logs the same id.
+export async function crawl(
+  rawConfig: Config,
+  clog: Log = rootLog,
+  requestId?: string,
+) {
   const config = configSchema.parse(removeUndefinedFromObject(rawConfig));
-  console.log("PARSED, final config:", config);
 
   let pageCounter = 0;
 
   if (config.url) {
-    console.log(`Crawling URL: ${config.url}`);
+    clog.debug(`Crawling URL: ${config.url}`);
     if (process.env.NO_CRAWL !== "true") {
       // PlaywrightCrawler crawls the web using a headless
       // browser controlled by the Playwright library.
@@ -25,6 +37,8 @@ export async function crawl(rawConfig: Config) {
             // TODO: add these back...
             maxConcurrency: config.maxConcurrency,
             maxRequestsPerMinute: config.maxRequestsPerMinute,
+            // The crawler and its handlers log through clog, so every line has rid and course.
+            log: clog,
             launchContext: {
               launchOptions: {
                 executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
@@ -34,7 +48,7 @@ export async function crawl(rawConfig: Config) {
             // Use the requestHandler to process each of the crawled pages.
             // removed , pushData from params... weird try catch behavior
             async requestHandler({ request, response, page, enqueueLinks, log }) {
-              console.log(`Crawling: ${request.loadedUrl}...`);
+              log.debug(`Crawling: ${request.loadedUrl}...`);
               const title = await page.title();
               pageCounter++;
               log.info(
@@ -57,7 +71,7 @@ export async function crawl(rawConfig: Config) {
               }
               // page.on('console', message => console.log(`Page log: ${message.text()}`)); // refactored for memory leaks
               const consoleListener = (message: { text: () => any }) =>
-                console.log(`Page log: ${message.text()}`);
+                log.debug(`Page log: ${oneLine(message.text())}`);
               page.on("console", consoleListener);
               const html = await getPageHtml(page, config.selector);
 
@@ -69,7 +83,7 @@ export async function crawl(rawConfig: Config) {
                 // greppable SKIP-INGEST prefix to keep the pipeline monitorable from the logs.
                 const skipReason = shouldSkipIngest(title, html, response?.status());
                 if (skipReason) {
-                  console.warn(
+                  log.warning(
                     `SKIP-INGEST (${skipReason}): status=${response?.status() ?? "n/a"} ` +
                       `base_url=${config.url} url=${request.loadedUrl} title=${JSON.stringify(title)}`,
                   );
@@ -77,18 +91,20 @@ export async function crawl(rawConfig: Config) {
                   const ingestUrl = process.env.INGEST_URL;
 
                   if (!ingestUrl) {
-                    console.error(
-                      "Error: INGEST_URL environment variable is not defined.",
+                    log.error(
+                      "INGEST_URL is not set, so the page cannot be sent to ingest.",
                     );
                     return;
                   }
 
+                  const pageUrl = request.loadedUrl;
                   fetch(ingestUrl, {
                     method: "POST",
                     headers: {
                       Accept: "*/*",
                       "Accept-Encoding": "gzip, deflate",
                       "Content-Type": "application/json",
+                      ...(requestId ? { "X-Request-ID": requestId } : {}),
                     },
                     body: JSON.stringify({
                       base_url: config.url,
@@ -99,8 +115,21 @@ export async function crawl(rawConfig: Config) {
                       groups: config.documentGroups,
                     }),
                   })
-                    .then((response) => response.text())
-                    .catch((err) => console.error(err));
+                    .then(async (response) => {
+                      const text = await response.text();
+                      if (!response.ok) {
+                        log.error(
+                          `Ingest request failed url=${pageUrl} status=${response.status} ` +
+                            `body=${oneLine(text.slice(0, 500))}`,
+                        );
+                      }
+                    })
+                    .catch((err) =>
+                      log.error(
+                        `Ingest request failed url=${pageUrl}: ${oneLine(err)}` +
+                          (err?.cause ? ` (cause: ${oneLine(err.cause)})` : ""),
+                      ),
+                    );
                 }
               }
 
@@ -127,12 +156,14 @@ export async function crawl(rawConfig: Config) {
                   transformRequestFunction(req) {
                     if (req.url.endsWith(".pdf")) {
                       // Download PDFs specially
-                      console.log(`Downloading PDF: ${req.url}`);
+                      log.debug(`Downloading PDF: ${req.url}`);
                       handlePdf(
                         config.courseName,
                         config.url,
                         req.url,
                         config.documentGroups,
+                        log,
+                        requestId,
                       );
                       return false;
                     } else {
@@ -157,12 +188,14 @@ export async function crawl(rawConfig: Config) {
                   transformRequestFunction(req) {
                     if (req.url.endsWith(".pdf")) {
                       // Download PDFs specially
-                      console.log(`Downloading PDF: ${req.url}`);
+                      log.debug(`Downloading PDF: ${req.url}`);
                       handlePdf(
                         config.courseName,
                         config.url,
                         req.url,
                         config.documentGroups,
+                        log,
+                        requestId,
                       );
                       return false;
                     } else {
@@ -207,6 +240,13 @@ export async function crawl(rawConfig: Config) {
                 );
               },
             ],
+            // Called once a page has failed every retry. The crawl goes on with the other pages.
+            failedRequestHandler({ request, log }, error) {
+              log.warning(
+                `Page failed after all retries url=${request.url}: ` +
+                  `${error.name}: ${oneLine(error.message.split("\n")[0])}`,
+              );
+            },
           },
           new Configuration({
             persistStorage: false,
@@ -231,7 +271,8 @@ export async function crawl(rawConfig: Config) {
           // await store.drop();
         }
       } catch (error) {
-        console.error(`Error when instantiating crawler: ${error}`);
+        // Do not swallow: /crawl in main.ts logs it once and returns 500.
+        throw error;
       }
     }
   }
@@ -302,14 +343,16 @@ async function handlePdf(
   base_url: string,
   url: string,
   documentGroups: string[],
+  clog: Log,
+  requestId?: string,
 ) {
   try {
-    const s3Key = await uploadPdfToS3(url, courseName);
+    const s3Key = await uploadPdfToS3(url, courseName, clog);
     if (!s3Key) return; // URL didn't serve a real PDF (redirected to HTML) — skip ingest
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    await ingestPdf(s3Key, courseName, base_url, url, documentGroups);
+    await ingestPdf(s3Key, courseName, base_url, url, documentGroups, clog, requestId);
   } catch (error) {
-    console.error(`Error in handlePDF: ${error}`);
+    clog.error(`PDF upload failed url=${url}: ${oneLine(error)}`);
   }
 }
 function getPageHtml(page: Page, selector = "body") {

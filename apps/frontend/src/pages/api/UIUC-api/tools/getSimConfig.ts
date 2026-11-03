@@ -9,6 +9,9 @@ import {
   type ToolRouterStatus,
 } from '~/utils/server/toolRouting'
 import { resolveStoredSimApiKey } from '~/utils/simConfig'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.tools.getSimConfig')
 
 /**
  * What this route tells the browser about a project's Sim configuration. The
@@ -72,7 +75,11 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     tool_routing = await getToolRouterStatus(courseName)
   } catch (error) {
-    console.error('Failed to compute tool-routing status:', error)
+    log.warn(
+      'could not compute tool-routing status, reporting offline',
+      undefined,
+      error,
+    )
     tool_routing = {
       status: 'offline',
       reason: 'Could not determine tool-routing status.',
@@ -91,7 +98,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         sim_api_key_masked: key ? maskKey(key) : null,
       }
     } catch (error) {
-      console.error('[getSimConfig] could not read stored Sim API key', error)
+      log.error('could not read the stored Sim API key', undefined, error)
       keyFields = {
         has_api_key: true,
         sim_api_key_masked: null,

@@ -5,6 +5,9 @@ import { connectionManager } from '~/utils/connectionManager'
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { parseIngestStatusFilters } from '~/utils/ingestStatusFilters'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.materialsTable.successDocs')
 // This is for "Documents" table, completed docs. POST-only: callers must send
 // the filenames/base_urls they are tracking so we never return the whole table.
 
@@ -61,7 +64,7 @@ async function successDocs(
       })),
     })
   } catch (error) {
-    console.error('Failed to fetch documents:', error)
+    log.error('failed to fetch ingested documents', undefined, error)
     return res.status(500).json({
       error: (error as Error).message,
     })

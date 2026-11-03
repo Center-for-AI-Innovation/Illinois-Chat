@@ -31,6 +31,9 @@ import {
   extractRequestMeta,
   formatZodError,
 } from '~/utils/projectConnections/handlerShared'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.projectConnections')
 
 // Exported for unit tests — the route default export wraps this in
 // withSuperAdminOnly. Tests can invoke `handler` directly with a pre-set
@@ -52,7 +55,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return res.status(405).json({ error: 'Method not allowed' })
     }
   } catch (err) {
-    console.error('[projectConnections] handler error:', err)
+    log.error('project connections handler error', { method: req.method }, err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -178,7 +181,11 @@ async function handlePost(
       ...(warning ? { warning } : {}),
     })
   } catch (e) {
-    console.error('[projectConnections] upsert failed:', e)
+    log.error(
+      'project connection upsert failed',
+      { course: projectName, kind },
+      e,
+    )
     await writeAuditEntry({
       actor_email: actorEmail,
       action: 'upsert',
@@ -245,7 +252,11 @@ async function handleDelete(
       cleared: result.cleared,
     })
   } catch (e) {
-    console.error('[projectConnections] delete failed:', e)
+    log.error(
+      'project connection delete failed',
+      { course: project_name, kind },
+      e,
+    )
     await writeAuditEntry({
       actor_email: actorEmail,
       action: 'delete',

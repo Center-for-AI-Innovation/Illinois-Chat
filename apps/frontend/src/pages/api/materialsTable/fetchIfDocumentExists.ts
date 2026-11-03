@@ -4,6 +4,9 @@ import { eq } from 'drizzle-orm'
 import { documents } from '~/db/schema'
 import { connectionManager } from '~/utils/connectionManager'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.materialsTable.fetchIfDocumentExists')
 
 type FetchIfDocumentExistsResponse = {
   total_count?: number
@@ -46,7 +49,7 @@ async function fetchIfDocumentExists(
 
     return res.status(200).json({ total_count })
   } catch (error) {
-    console.error('Failed to check document existence:', error)
+    log.error('failed to check document existence', undefined, error)
     return res.status(500).json({ error: (error as any).message })
   }
 }

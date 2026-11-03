@@ -7,6 +7,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { apiKeys, db } from '~/db/dbClient'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import type { AuthenticatedRequest } from '~/utils/authMiddleware'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.keys.generate')
 type ApiResponse = {
   message?: string
   apiKey?: string
@@ -26,10 +29,10 @@ async function handler(
   req: AuthenticatedRequest,
   res: NextApiResponse<ApiResponse>,
 ) {
-  console.log('Received request to generate API key')
+  log.debug('received request to generate an API key')
 
   if (req.method !== 'POST') {
-    console.log('Invalid method:', req.method)
+    log.debug('invalid method', { method: req.method })
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
@@ -43,7 +46,7 @@ async function handler(
       return res.status(400).json({ error: 'User id missing' })
     }
 
-    console.log('Generating API key for user email:', email)
+    log.debug('generating API key', { user: userId })
 
     // Check if the user already has an API key (active or inactive).
     const keys = await db
@@ -52,39 +55,39 @@ async function handler(
       .where(eq(apiKeys.email, email))
 
     if (!keys) {
-      console.error('Error retrieving API keys from DB')
+      log.error('could not read API keys from the database', { user: userId })
       throw new Error('Failed to fetch API keys')
     }
 
-    console.log('Existing keys found:', keys.length)
+    log.debug('existing keys found', { count: keys.length })
 
     if (keys.some((k) => k.is_active)) {
-      console.log('User already has an active API key')
+      log.debug('user already has an active API key', { user: userId })
       return res.status(409).json({ error: 'User already has an API key' })
     }
 
     // Generate new API key
     const rawApiKey = uuidv4()
     const apiKey = `uc_${rawApiKey.replace(/-/g, '')}`
-    console.log('Generated new API key')
+    log.debug('generated new API key')
 
     if (keys.length === 0) {
-      console.log('Inserting new API key record')
+      log.debug('inserting new API key record')
       try {
-        const result = await db.insert(apiKeys).values({
+        await db.insert(apiKeys).values({
           email: email,
           user_id: userId,
           key: apiKey,
           is_active: true,
         })
 
-        console.log('Successfully inserted new API key record:', result)
+        log.debug('inserted new API key record')
       } catch (error) {
-        console.error('Failed to insert API key record:', error)
+        log.warn('could not insert the API key record', { user: userId })
         throw error
       }
     } else {
-      console.log('Updating existing API key record')
+      log.debug('updating existing API key record')
       try {
         await db
           .update(apiKeys)
@@ -95,9 +98,9 @@ async function handler(
           })
           .where(eq(apiKeys.email, email))
 
-        console.log('Successfully updated API key record')
+        log.debug('updated API key record')
       } catch (error) {
-        console.error('Failed to update API key record:', error)
+        log.warn('could not update the API key record', { user: userId })
         throw error
       }
     }
@@ -106,13 +109,13 @@ async function handler(
       email,
       apiKey,
     })
-    console.log('API key generation successful')
+    log.debug('API key generation successful', { user: userId })
     return res.status(200).json({
       message: 'API key generated successfully',
       apiKey,
     })
   } catch (error) {
-    console.error('Error generating API key:', error)
+    log.error('could not generate an API key', { user: req.user?.sub }, error)
     posthog.capture('api_key_generation_failed', {
       error: (error as Error).message,
     })

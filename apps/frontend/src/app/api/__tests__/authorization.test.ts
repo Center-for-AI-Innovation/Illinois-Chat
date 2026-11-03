@@ -7,6 +7,7 @@ import {
   getCourseMetadata,
   hasCourseAccess,
   withCourseAccessFromRequest,
+  MetadataUnavailableError,
 } from '../authorization'
 import type { AuthenticatedUser } from '~/proxy'
 import type { AuthenticatedRequest } from '~/utils/appRouterAuth'
@@ -121,8 +122,38 @@ describe('app/api authorization helpers', () => {
     hoisted.hGet.mockResolvedValueOnce(null)
     await expect(getCourseMetadata('CS101')).resolves.toBeNull()
 
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     hoisted.hGet.mockResolvedValueOnce('not-json')
     await expect(getCourseMetadata('CS101')).resolves.toBeNull()
+  })
+
+  it('getCourseMetadata throws MetadataUnavailableError when redis access throws', async () => {
+    hoisted.hGet.mockRejectedValueOnce(new Error('socket closed'))
+    await expect(getCourseMetadata('CS101')).rejects.toBeInstanceOf(
+      MetadataUnavailableError,
+    )
+  })
+
+  it('withCourseAccessFromRequest answers 503 with the request id when redis is down', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    hoisted.hGet.mockRejectedValueOnce(new Error('ECONNREFUSED'))
+    const handler = vi.fn()
+    const wrapped = withCourseAccessFromRequest('any')(handler as any)
+    const req = new NextRequest('http://localhost/api/chat?courseName=CS101', {
+      method: 'GET',
+      headers: { 'x-request-id': 'abc123' },
+    }) as unknown as TestRequest
+
+    const res = await wrapped(req)
+    expect(handler).not.toHaveBeenCalled()
+    expect(res.status).toBe(503)
+    expect(res.headers.get('X-Request-ID')).toBe('abc123')
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'Project metadata store unavailable',
+    })
+    expect(error.mock.calls[0]![0]).toMatch(
+      / ERROR   api rid=abc123 path=\/api\/chat course=CS101 project metadata store unavailable\n/,
+    )
   })
 
   it('getCourseMetadata returns parsed JSON when present', async () => {

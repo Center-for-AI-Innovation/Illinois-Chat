@@ -4,6 +4,9 @@ import { eq, sql, and, gte, InferSelectModel } from 'drizzle-orm'
 import type { NextApiResponse, NextApiRequest } from 'next'
 import { AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.materialsTable.fetchFailedDocuments')
 
 // export const runtime = 'edge'
 
@@ -31,16 +34,16 @@ async function fetchFailedDocuments(
   const search_value = url.searchParams.get('filter_value') as string
   let sort_column = url.searchParams.get('sort_column') as string
   let sort_direction = url.searchParams.get('sort_direction') === 'asc'
-  if (fromStr === null || toStr === null) {
-    throw new Error('Missing required query parameters: from and to')
-  }
-  if (sort_column == null || sort_direction == null) {
-    sort_column = 'created_at'
-    sort_direction = false // 'desc' equivalent
-  }
-  const from = parseInt(fromStr as string)
-  const to = parseInt(toStr as string)
   try {
+    if (fromStr === null || toStr === null) {
+      throw new Error('Missing required query parameters: from and to')
+    }
+    if (sort_column == null || sort_direction == null) {
+      sort_column = 'created_at'
+      sort_direction = false // 'desc' equivalent
+    }
+    const from = parseInt(fromStr as string)
+    const to = parseInt(toStr as string)
     const db = await connectionManager.getDocumentsDb(course_name as string)
 
     let failedDocs
@@ -180,6 +183,7 @@ async function fetchFailedDocuments(
       recent_fail_count: recentFailCount,
     })
   } catch (error) {
+    log.error('failed to fetch failed documents', undefined, error)
     return res.status(500).json({ error: (error as Error).message })
   }
 }

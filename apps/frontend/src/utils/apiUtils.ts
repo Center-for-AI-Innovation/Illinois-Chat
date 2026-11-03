@@ -210,10 +210,6 @@ export function convertConversatonToVercelAISDKv3(
     (msg) => msg.latestSystemMessage !== undefined,
   )
   if (systemMessage) {
-    console.log(
-      'Found system message, latestSystemMessage: ',
-      systemMessage.latestSystemMessage,
-    )
     coreMessages.push({
       role: 'system',
       content: systemMessage.latestSystemMessage || '',
@@ -292,7 +288,7 @@ export function convertConversationToCoreMessagesWithoutSystem(
     .map((message, index) => {
       const isLastUserMessage =
         index === conversation.messages.length - 1 && message.role === 'user'
-      console.log(
+      console.debug(
         'Processing message:',
         message.role,
         isLastUserMessage ? '(last user message)' : '',

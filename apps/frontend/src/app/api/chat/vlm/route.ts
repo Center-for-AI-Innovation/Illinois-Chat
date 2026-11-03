@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server'
 import { convertConversationToCoreMessagesWithoutSystem } from '~/utils/apiUtils'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.chat.vlm')
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,7 +17,6 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
   try {
     const { conversation, stream } = await req.json()
 
-    console.log('In POST handler for VLM', conversation.messages[0].content)
 
     const openai = createOpenAI({
       baseURL: process.env.NCSA_HOSTED_VLM_BASE_URL,
@@ -25,7 +27,6 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     const messages =
       convertConversationToCoreMessagesWithoutSystem(conversation)
     // const messages = convertToCoreMessages(conversation)
-    console.log('⭐️ messages', JSON.stringify(messages, null, 2))
 
     if (stream) {
       const result = await streamText({
@@ -48,7 +49,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       return NextResponse.json({ choices })
     }
   } catch (error) {
-    console.error('Error in POST request:', error)
+    log.error('NCSA hosted VLM chat request failed', undefined, error)
 
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

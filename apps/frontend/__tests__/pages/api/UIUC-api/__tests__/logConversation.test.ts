@@ -127,6 +127,102 @@ describe('UIUC-api/logConversation', () => {
     fetchSpy.mockRestore()
   })
 
+  const fullConversationBody = {
+    course_name: 'CS101',
+    conversation: {
+      id: 'c1',
+      name: 'n',
+      model: { id: 'gpt-4o', name: 'GPT-4o' },
+      prompt: 'p',
+      temperature: 0.2,
+      userEmail: 'u@example.com',
+      projectName: 'CS101',
+      messages: [
+        { id: 'm1', role: 'user', content: [{ type: 'text', text: 'hi' }] },
+        {
+          id: 'm2',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'ok' }],
+        },
+      ],
+    },
+  }
+
+  it('returns 500 and logs when the database write fails', async () => {
+    hoisted.insertOnConflictDoUpdate.mockRejectedValueOnce(new Error('db down'))
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({ method: 'POST', body: fullConversationBody }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: 'Conversation logging failed at step: database',
+    })
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*could not save the conversation to the database conversation=c1\nError: db down/,
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+  })
+
+  it('returns 500 and logs status and body when the monitor call fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('monitor broke', { status: 503 }))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({ method: 'POST', body: fullConversationBody }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: 'Conversation logging failed at step: llm-monitor',
+    })
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*backend llm-monitor-message failed conversation=c1 status=503 body=monitor broke/,
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+  })
+
+  it('returns 500 and logs when the monitor call throws', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({ method: 'POST', body: fullConversationBody }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'could not reach the backend llm-monitor-message conversation=c1',
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+  })
+
   it('merges delta with existing conversation (including edit truncation)', async () => {
     hoisted.selectLimit.mockResolvedValueOnce([
       {
@@ -188,5 +284,46 @@ describe('UIUC-api/logConversation', () => {
       'd',
     ])
     fetchSpy.mockRestore()
+  })
+
+  it('saves the delta alone and warns when the existing conversation cannot be read', async () => {
+    hoisted.selectLimit.mockRejectedValueOnce(new Error('select failed'))
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }))
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          course_name: 'CS101',
+          delta: {
+            conversation: {
+              id: 'c2',
+              name: 'n',
+              modelId: 'gpt-4o',
+              prompt: 'p',
+              temperature: 0.2,
+              userEmail: 'u@example.com',
+              projectName: 'CS101',
+              folderId: null,
+            },
+            messagesDelta: [{ id: 'x', role: 'user', content: 'hi' }],
+          },
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /WARNING api\.logConversation .*could not fetch the existing conversation to merge.* conversation=c2\nError: select failed/,
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleWarn.mockRestore()
   })
 })

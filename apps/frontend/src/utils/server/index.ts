@@ -244,7 +244,7 @@ export const OpenAIStream = async (
     })
     return apiStream
   } else {
-    console.log('Non Streaming response from OpenAI')
+    console.debug('Non Streaming response from OpenAI')
     const json = await res.json()
     return json
   }

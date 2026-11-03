@@ -7,6 +7,9 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { vectorSearchWithDrizzle } from '~/db/vectorSearch'
 import { getDocGroupsForVectorSearch } from '~/db/dbHelpers'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getContextsDrizzle')
 
 export default withCourseAccessFromRequest('any')(handler)
 
@@ -54,7 +57,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error in getContextsDrizzle:', error)
+    log.error('could not fetch contexts via Drizzle', undefined, error)
     return res.status(500).json({
       error: 'Internal server error while fetching contexts via Drizzle',
       data: [],

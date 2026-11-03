@@ -4,6 +4,9 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { decrypt } from '~/utils/crypto'
 import { SambaNovaModels } from '~/utils/modelProviders/types/SambaNova'
 import { type CoreMessage, generateText, streamText } from 'ai'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('llm.sambanova')
 
 export async function runSambaNovaChat(
   conversation: Conversation,
@@ -42,10 +45,7 @@ export async function runSambaNovaChat(
     }
 
     const model = openai(conversation.model.id)
-    console.log('Using SambaNova model:', conversation.model.id)
-
     const messages = convertConversationToVercelAISDKv3(conversation)
-    console.log('Converted messages:', JSON.stringify(messages, null, 2))
 
     // Get model's token limit
     const modelConfig = Object.values(SambaNovaModels).find(
@@ -64,27 +64,19 @@ export async function runSambaNovaChat(
       max_tokens: 4096,
     }
 
-    console.log(
-      'Request params:',
-      JSON.stringify(
-        {
-          modelId: conversation.model.id,
-          temperature: commonParams.temperature,
-          max_tokens: commonParams.max_tokens,
-          messageCount: messages.length,
-        },
-        null,
-        2,
-      ),
-    )
+    log.debug('SambaNova request', {
+      model: conversation.model.id,
+      temperature: commonParams.temperature,
+      max_tokens: commonParams.max_tokens,
+      messages: messages.length,
+    })
 
     if (stream) {
       try {
         const result = await streamText(commonParams)
         return result.toTextStreamResponse()
       } catch (error) {
-        console.log('SambaNova streaming error:', error)
-        console.error('SambaNova streaming error:', error)
+        // Logged once by the outer catch.
         throw error
       }
     } else {
@@ -93,13 +85,21 @@ export async function runSambaNovaChat(
         const choices = [{ message: { content: result.text } }]
         return { choices }
       } catch (error) {
-        console.log('SambaNova generation error:', error)
-        console.error('SambaNova generation error:', error)
+        // Logged once by the outer catch.
         throw error
       }
     }
   } catch (error) {
-    console.error('SambaNova API error:', error)
+    log.error(
+      'SambaNova chat request failed',
+      {
+        provider: 'SambaNova',
+        model: conversation.model.id,
+        stream,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     throw error
   }
 }

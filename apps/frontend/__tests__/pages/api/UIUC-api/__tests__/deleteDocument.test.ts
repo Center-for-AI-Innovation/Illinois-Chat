@@ -68,4 +68,28 @@ describe('UIUC-api/deleteDocument', () => {
 
     fetchSpy.mockRestore()
   })
+
+  it('returns 500 and logs the path when the backend cannot be reached', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'DELETE',
+        query: { course_name: 'CS101', s3_path: 'courses/CS101/a.pdf' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*error deleting document s3_path=courses\/CS101\/a\.pdf\nError: connect ECONNREFUSED/,
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+  })
 })

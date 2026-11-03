@@ -5,6 +5,9 @@ import { getCourseMetadata } from './getCourseMetadata'
 import { getKeycloakBaseUrl } from '~/utils/authHelpers'
 import { initializeKeycloakAdmin } from '~/utils/keycloakClient'
 import type { MaintainerProfile } from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getMaintainerProfiles')
 
 export default withCourseAccessFromRequest('any')(handler)
 
@@ -63,7 +66,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
     res.status(200).json({ success: true, profiles: maintainerProfiles })
   } catch (error) {
-    console.log('Error occurred while fetching maintainer profiles', error)
+    log.error('error fetching maintainer profiles', undefined, error)
     res.status(500).json({ success: false, error: error })
   }
 }

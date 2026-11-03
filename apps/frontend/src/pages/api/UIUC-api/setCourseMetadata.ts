@@ -5,6 +5,9 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { superAdmins } from '~/utils/superAdmins'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.setCourseMetadata')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -86,7 +89,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.log(error)
+    log.error('failed to save course metadata', undefined, error)
     return res.status(500).json({ success: false })
   }
 }

@@ -12,6 +12,9 @@ import {
   type NewProjectConnectionAuditLog,
 } from '~/db/schema'
 import type { ConnectionKind } from '~/utils/projectConnections/validation'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('db.projectConnections')
 
 // Look up a project's primary-key id by its `course_name`. Returns null if
 // the project does not exist — the route handler turns that into a 404.
@@ -138,10 +141,11 @@ export async function writeAuditEntry(
   } catch (e) {
     // Audit failures should never break the user-visible response, but they
     // are important to surface. Log and move on.
-    console.error('[projectConnections] audit-log write failed:', e, {
-      action: entry.action,
-      project_name: entry.project_name,
-    })
+    log.error(
+      'audit-log write failed',
+      { op: 'writeAuditEntry', action: entry.action, course: entry.project_name },
+      e,
+    )
   }
 }
 

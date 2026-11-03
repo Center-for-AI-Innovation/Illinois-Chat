@@ -1,6 +1,9 @@
 import { withAuth } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getWeeklyTrends')
 
 async function handler(req: any, res: any) {
   const { project_name } = req.body
@@ -17,6 +20,9 @@ async function handler(req: any, res: any) {
     )
 
     if (!response.ok) {
+      log.error('backend weekly trends request failed', {
+        status: response.status,
+      })
       return res.status(response.status).json({
         error: `Failed to fetch data: ${response.statusText}`,
       })
@@ -25,7 +31,7 @@ async function handler(req: any, res: any) {
     const data = await response.json()
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error fetching weekly trends:', error)
+    log.error('error fetching weekly trends', undefined, error)
     return res.status(500).json({
       error: 'Failed to fetch weekly trends',
       details: (error as Error).message,
@@ -61,7 +67,7 @@ export async function getWeeklyTrends(project_name: string) {
       data: data,
     }
   } catch (error) {
-    console.error('Error in getWeeklyTrends:', error)
+    log.error('error in getWeeklyTrends', undefined, error)
     return {
       status: 500,
       data: [] as WeeklyTrend[],

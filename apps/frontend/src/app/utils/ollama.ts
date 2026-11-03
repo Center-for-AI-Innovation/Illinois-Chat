@@ -8,6 +8,9 @@ import {
 import { OllamaModelIDs } from '~/utils/modelProviders/ollama'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { NextResponse } from 'next/server'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('llm.ollama')
 
 /**
  * Handle Ollama reasoning models with streaming
@@ -207,7 +210,11 @@ export async function runOllamaChat(
         })
       }
     } catch (apiError) {
-      console.error('Ollama API error:', apiError)
+      log.warn('Ollama API error', {
+        provider: ollamaProvider?.provider,
+        model: conversation?.model?.id,
+        status: (apiError as { statusCode?: number })?.statusCode,
+      })
 
       // Handle specific API errors
       if (apiError instanceof Error) {
@@ -234,7 +241,15 @@ export async function runOllamaChat(
       }
     }
   } catch (error) {
-    console.error('Error in runOllamaChat:', error)
+    log.error(
+      'Ollama chat request failed',
+      {
+        provider: ollamaProvider?.provider,
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     // return error
     return new Response(
       JSON.stringify({

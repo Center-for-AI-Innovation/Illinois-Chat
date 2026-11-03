@@ -60,6 +60,9 @@ describe('app/api/chat/vlm POST', () => {
   })
 
   it('returns 500 on handler errors', async () => {
+    // The handler used to crash on an empty messages array only because of a
+    // debug line that read messages[0]; that line is gone, so fail the model call.
+    hoisted.generateText.mockRejectedValueOnce(new Error('vlm down'))
     const req = new Request('http://localhost', {
       method: 'POST',
       body: JSON.stringify({

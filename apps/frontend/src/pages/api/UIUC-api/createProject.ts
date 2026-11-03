@@ -6,6 +6,9 @@ import { checkCourseExists } from './getCourseExists'
 import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import type { CourseMetadata } from '~/types/courseMetadata'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.createProject')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -42,7 +45,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     }
   } catch (error) {
-    console.error('Error checking project name availability:', error)
+    log.error(
+      'could not check whether the project name is free',
+      { course: project_name },
+      error,
+    )
     // If Redis check fails, we must fail the request to prevent data inconsistency
     // Allowing project creation when Redis is down would lead to out-of-sync data
     return res.status(503).json({
@@ -68,10 +75,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
 
     if (!response.ok) {
-      console.error(
-        'Failed to create the project. Err status:',
-        response.status,
-      )
+      log.error('backend failed to create the project', {
+        course: project_name,
+        status: response.status,
+      })
       // Forward the backend's JSON error body when it has one; Flask abort()
       // responses are HTML, so parse defensively and keep the status either way.
       const backendBody = (await response.json().catch(() => null)) as {
@@ -95,20 +102,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (seeded) {
         await writeCourseMetadata(project_name, seeded)
       } else {
-        console.warn(
-          `createProject: Redis metadata missing for ${project_name} after backend create; Postgres not mirrored`,
+        log.warn(
+          'Redis metadata missing after backend create; Postgres not mirrored',
+          { course: project_name },
         )
       }
     } catch (pgErr) {
-      console.error(
-        `createProject: failed to mirror ${project_name} to Postgres; search index may lag until backfill runs`,
+      log.error(
+        'failed to mirror the project to Postgres; search index may lag until backfill runs',
+        { course: project_name },
         pgErr,
       )
     }
 
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error creating project:', error)
+    log.error('error creating project', { course: project_name }, error)
     return res.status(500).json({
       error: 'Internal server error while creating project',
     })

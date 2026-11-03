@@ -35,6 +35,47 @@ const config = {
         tsconfigRootDir: projectRoot,
       },
     },
+    {
+      // Server code logs through getLogger() (src/utils/server/log.ts) so
+      // every line has a timestamp, level and request id.
+      files: [
+        'src/pages/api/**/*.ts',
+        'src/app/api/**/*.ts',
+        'src/server/**/*.ts',
+        'src/app/utils/**/*.ts',
+        'src/utils/server/**/*.ts',
+      ],
+      excludedFiles: ['**/__tests__/**', '**/*.test.ts'],
+      rules: {
+        'no-console': 'warn',
+      },
+    },
+    {
+      // Browser code must not import API route modules: a value import pulls
+      // server-only code (auth, Redis, the server logger) into the client
+      // bundle. Type-only imports are fine; call the route over HTTP instead.
+      files: [
+        'src/components/**/*.{ts,tsx}',
+        'src/hooks/**/*.{ts,tsx}',
+        'src/utils/modelProviders/**/*.{ts,tsx}',
+      ],
+      excludedFiles: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
+      rules: {
+        '@typescript-eslint/no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['~/pages/api/*', '@/pages/api/*', '**/pages/api/*'],
+                allowTypeImports: true,
+                message:
+                  'Browser code must not import API route modules; call the route with fetch.',
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {

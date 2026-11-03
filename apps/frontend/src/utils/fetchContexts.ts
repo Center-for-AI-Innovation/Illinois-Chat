@@ -127,7 +127,10 @@ export const fetchContexts = async (
       )
 
       if (!response.ok) {
-        console.error('Failed to fetch contexts. Err status:', response.status)
+        // The chat goes on without documents, so say which project and why.
+        console.error(
+          `Failed to fetch contexts for project ${course_name}; answering without documents. status=${response.status}`,
+        )
         return []
       }
 
@@ -145,7 +148,10 @@ export const fetchContexts = async (
       )
     }
   } catch (error) {
-    console.error('Error fetching contexts:', error)
+    console.error(
+      `Error fetching contexts for project ${course_name}; answering without documents:`,
+      error,
+    )
     return []
   }
 }

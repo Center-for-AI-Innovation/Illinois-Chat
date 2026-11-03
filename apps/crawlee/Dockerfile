@@ -30,6 +30,9 @@ FROM apify/actor-node-playwright-chrome:20
 # the base image already carries chromium's system libraries).
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/myuser/pw-browsers
 
+# Plain log lines: no ANSI colour codes in docker / CloudWatch logs.
+ENV FORCE_COLOR=0
+
 # Copy only built JS files from builder image
 COPY --from=builder --chown=myuser /home/myuser/dist ./dist
 
@@ -60,4 +63,5 @@ COPY --chown=myuser . ./
 
 # Run the image. If you know you won't need headful browsers,
 # you can remove the XVFB start script for a micro perf gain.
-CMD ./start_xvfb_and_run_cmd.sh && npm run start:prod --silent
+# No --silent, so npm prints the reason if the server crashes.
+CMD ./start_xvfb_and_run_cmd.sh && npm run start:prod

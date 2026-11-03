@@ -8,6 +8,9 @@ import { type NewFolders } from '~/db/schema'
 import { eq, desc, and, or, ilike, inArray } from 'drizzle-orm'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getUserIdentifier } from '~/server/userIdentifier'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.folder')
 
 /**
  * Resolve a course name to its `projects.id`, which is what folders are keyed
@@ -92,9 +95,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           // Folders carry a foreign key to projects, so there is nothing to
           // point at. Name the missing row rather than claiming the project
           // itself is gone: its Redis metadata may well exist.
-          console.error(
-            `Cannot save folder: no projects row for '${courseName}'`,
-          )
+          log.error('cannot save folder: the project has no projects row')
           return res.status(404).json({
             error: `Project '${courseName}' has no database record, so folders cannot be saved for it`,
           })
@@ -132,7 +133,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         res.status(200).json({ message: 'Folder saved successfully' })
       } catch (error) {
-        console.error('Error saving folder:', error)
+        log.error('could not save the folder', undefined, error)
         res.status(500).json({
           error: `Failed to save folder: ${
             error instanceof Error ? error.message : String(error)
@@ -159,9 +160,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           // error here would take down the whole folder sidebar for courses
           // whose metadata was written straight to Redis, so report the empty
           // list that is actually true.
-          console.warn(
-            `No projects row for '${courseName}'; returning an empty folder list`,
-          )
+          log.warn('project has no projects row; returning an empty folder list')
           return res.status(200).json([])
         }
 
@@ -302,7 +301,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         res.status(200).json(formattedFolders)
       } catch (error) {
         res.status(500).json({ error: 'Error fetching folders' })
-        console.error('Error fetching folders:', error)
+        log.error('could not fetch folders', undefined, error)
       }
       break
     case 'DELETE':
@@ -336,7 +335,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
       } catch (error) {
         res.status(500).json({ error: 'Error deleting folder' })
-        console.error('Error deleting folder:', error)
+        log.error('could not delete the folder', undefined, error)
       }
       break
 

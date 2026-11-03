@@ -8,6 +8,9 @@ import { getProjectTimestamps } from '~/utils/projectTimestamps'
 import { db } from '~/db/dbClient'
 import { conversations } from '~/db/schema'
 import { and, eq, max } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getCourseMetadata')
 
 export const getCourseMetadata = async (
   course_name: string,
@@ -29,7 +32,7 @@ export const getCourseMetadata = async (
       last_updated_at: timestamps.last_updated_at ?? null,
     }
   } catch (error) {
-    console.error('Error occurred while fetching courseMetadata', error)
+    log.error('error fetching course metadata', { course: course_name }, error)
     return null
   }
 }
@@ -51,7 +54,7 @@ export const getUserLastAccessForCourse = async (
 
     return result[0]?.lastAccessedAt?.toISOString() ?? null
   } catch (error) {
-    console.error('Error fetching user last access:', error)
+    log.error('error fetching user last access', { course: courseName }, error)
     return null
   }
 }
@@ -76,7 +79,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     res.status(200).json({ course_metadata: course_metadata, last_accessed_at })
   } catch (error) {
-    console.log('Error occurred while fetching courseMetadata', error)
+    log.error('error fetching course metadata', undefined, error)
     res.status(500).json({ success: false, error: error })
   }
 }

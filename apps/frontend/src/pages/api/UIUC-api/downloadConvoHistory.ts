@@ -3,6 +3,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.downloadConvoHistory')
 
 export default withCourseOwnerOrAdminAccess()(handler)
 
@@ -58,13 +61,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(200).send(Buffer.from(response.data))
     } else {
       // Handle unexpected content types
-      console.log('Unexpected content type:', contentType)
+      log.error('unexpected content type from backend export', {
+        content_type: contentType,
+      })
       return res.status(500).json({
         message: `Unexpected response format from backend: ${contentType}`,
       })
     }
   } catch (error) {
-    console.error('Error exporting conversation history:', error)
+    log.error('error exporting conversation history', undefined, error)
     return res
       .status(500)
       .json({ message: 'Error exporting conversation history.' })

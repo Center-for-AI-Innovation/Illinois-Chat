@@ -32,6 +32,8 @@ const config = {
       net: { browser: './empty-module.js' },
       tls: { browser: './empty-module.js' },
       perf_hooks: { browser: './empty-module.js' },
+      // Bare `async_hooks` import in src/utils/server/requestContext.ts.
+      async_hooks: { browser: './empty-module.js' },
       // package.json's `browser` field stubs these for webpack; Turbopack
       // doesn't honor it, so they're restated here.
       fs: { browser: './empty-module.js' },
@@ -62,6 +64,9 @@ const config = {
         tls: false,
         net: false,
         perf_hooks: false,
+        // src/utils/server/requestContext.ts (AsyncLocalStorage); it falls
+        // back to no request context when the stub is empty.
+        async_hooks: false,
       }
 
       // mathjax-full falls back to eval('require') for its version unless this is defined.

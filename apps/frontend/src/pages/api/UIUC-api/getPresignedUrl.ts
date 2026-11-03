@@ -6,6 +6,9 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { connectionManager } from '~/utils/connectionManager'
 import { getPresignedUrlClient, normalizeS3Key } from '~/utils/s3Client'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getPresignedUrl')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -40,7 +43,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
     res.status(200).json({ presignedUrl })
   } catch (error) {
-    console.error('Error generating presigned URL:', error)
+    log.error('error generating presigned download URL', { s3_path }, error)
     res.status(500).json({ error: 'Error generating presigned URL' })
   }
 }

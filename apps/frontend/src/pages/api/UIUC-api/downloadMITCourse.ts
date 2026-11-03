@@ -2,6 +2,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.downloadMITCourse')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -33,10 +36,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
 
     if (!response.ok) {
-      console.error(
-        'Failed to download MIT course. Err status:',
-        response.status,
-      )
+      log.error('backend failed to download the MIT course', {
+        status: response.status,
+        url: urlParam,
+      })
       return res.status(response.status).json({
         error: `Failed to download MIT course. Status: ${response.status}`,
       })
@@ -45,7 +48,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const data = await response.json()
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error downloading MIT course:', error)
+    log.error('error downloading MIT course', { url: urlParam }, error)
     return res.status(500).json({
       error: 'Internal server error while downloading MIT course',
     })

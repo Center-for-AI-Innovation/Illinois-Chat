@@ -34,6 +34,9 @@ import { type ChatBody } from '~/types/chat'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type AllLLMProviders } from '~/utils/modelProviders/LLMProvider'
 import { type ResolvedToolRouter } from '~/utils/server/toolRouting'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('server.agent')
 
 export interface RunAgentParams {
   conversation: Conversation
@@ -156,8 +159,9 @@ export async function runAgentConversation(
       (tool) => !disabled.has(tool.id),
     )
   } catch (error) {
-    console.error(
-      `[Agent] Error fetching tools for course ${courseName}:`,
+    log.warn(
+      'could not fetch tools; running the agent without them',
+      { course: courseName },
       error,
     )
   }
@@ -245,7 +249,7 @@ export async function runAgentConversation(
         userIdentifier,
       })
     } catch (error) {
-      console.error(`Error persisting message ${phase}:`, error)
+      log.error('could not persist the message', { phase }, error)
     }
   }
 
@@ -680,7 +684,11 @@ export async function runAgentConversation(
           userIdentifier,
         })
       } catch (error) {
-        console.error('Error persisting message after prompt build:', error)
+        log.error(
+          'could not persist the message',
+          { phase: 'after prompt build' },
+          error,
+        )
       }
     }
 
@@ -700,14 +708,9 @@ export async function runAgentConversation(
       const citationLinkCache = new Map<number, string>()
 
       // Debug: Log context count for citation processing
-      console.log(
-        '[Agent] Starting final response streaming. Message contexts:',
-        {
-          hasContexts: !!message.contexts,
-          contextCount: message.contexts?.length ?? 0,
-          firstContextFilename: message.contexts?.[0]?.readable_filename,
-        },
-      )
+      log.debug('starting final response streaming', {
+        contexts: message.contexts?.length ?? 0,
+      })
 
       try {
         while (true) {
@@ -784,7 +787,11 @@ export async function runAgentConversation(
           userIdentifier,
         })
       } catch (error) {
-        console.error('Error persisting assistant message:', error)
+        log.error(
+          'could not persist the message',
+          { phase: 'assistant' },
+          error,
+        )
       }
 
       // Emit done event
@@ -817,7 +824,7 @@ export async function runAgentConversation(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error in agent run'
-    console.error('Error in runAgentConversation:', error)
+    log.error('agent run failed', undefined, error)
     emit({ type: 'error', message: errorMessage, recoverable: false })
     return {
       success: false,

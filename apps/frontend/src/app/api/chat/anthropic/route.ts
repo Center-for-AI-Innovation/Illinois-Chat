@@ -12,6 +12,9 @@ export const revalidate = 0
 
 import { NextResponse } from 'next/server'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.chat.anthropic')
 
 function getAnthropicRequestConfig(conversation: Conversation) {
   const isThinking =
@@ -85,7 +88,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       })
 
       if (isThinking) {
-        console.log('Using Claude with reasoning enabled')
+        log.debug('using Claude with reasoning enabled', { model: modelId })
         const response = result.toDataStreamResponse({
           sendReasoning: true,
           getErrorMessage: () => {
@@ -122,9 +125,17 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       typeof error.data === 'object' &&
       'error' in error.data
     ) {
-      console.error('error.data.error', error.data.error)
       const errValue: unknown = (error as { data: { error: unknown } }).data
         .error
+      log.error(
+        'Anthropic chat request failed',
+        {
+          provider: 'Anthropic',
+          status: (error as { statusCode?: number }).statusCode,
+          reason: errValue,
+        },
+        error,
+      )
       const message = typeof errValue === 'string' ? errValue : 'Unknown error'
       return NextResponse.json(
         { error: message },
@@ -133,6 +144,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
         },
       )
     } else {
+      log.error('Anthropic chat request failed', { provider: 'Anthropic' }, error)
       return NextResponse.json(
         {
           error: 'An error occurred while processing the chat request',

@@ -7,6 +7,9 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { type AnthropicModel } from '~/utils/modelProviders/types/anthropic'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('llm.anthropic')
 export const dynamic = 'force-dynamic'
 
 /**
@@ -251,7 +254,15 @@ async function handleStreamingResponse(
             }
           }
         } catch (error) {
-          console.error('Error processing stream:', error)
+          log.error(
+            'Anthropic stream failed',
+            {
+              provider: 'Anthropic',
+              model: commonParams.model?.modelId,
+              status: (error as { statusCode?: number })?.statusCode,
+            },
+            error,
+          )
           controller.error(error)
         }
       },

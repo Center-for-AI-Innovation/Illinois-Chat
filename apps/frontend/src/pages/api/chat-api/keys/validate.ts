@@ -5,6 +5,9 @@ import { keycloakUsers } from '~/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import posthog from 'posthog-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.keys.validate')
 
 /**
  * Validates the provided API key and retrieves the associated user data.
@@ -26,7 +29,6 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     .from(apiKeys)
     .where(and(eq(apiKeys.key, apiKey), eq(apiKeys.is_active, true)))
 
-  console.log('validateApiKeyAndRetrieveData data', data)
 
   // Determine if the API key is valid based on the absence of errors and presence of data.
   const isValidApiKey = data.length > 0
@@ -34,7 +36,7 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     return { isValidApiKey, authContext }
   }
 
-  console.log('isValidApiKey', isValidApiKey)
+  log.debug('API key is valid; looking up its user')
   try {
     const email = data[0]?.email
     if (!email) {
@@ -47,9 +49,7 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     if (
       process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
     ) {
-      console.log(
-        'Using Illinois Chat config: connect to keycloakDB to fetch user data.',
-      )
+      log.debug('reading the API key user from keycloakDB (Illinois Chat config)')
       const mod = await import('~/db/dbClient')
       keycloakDB = mod.keycloakDB
       const rows = await keycloakDB
@@ -59,9 +59,7 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
         .limit(1)
       userData = rows.length > 0 ? rows[0] : null
     } else {
-      console.log(
-        'Using UIUC Chat config: use raw SQL to fetch user data from keycloak.user_entity.',
-      )
+      log.debug('reading the API key user from keycloak.user_entity (UIUC config)')
       // raw SQL to avoid schema issues
       const result = await client`
         SELECT *
@@ -104,7 +102,7 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     return { isValidApiKey, authContext }
   } catch (userError) {
     // Log the error if there's an issue retrieving the user object.
-    console.error('Error retrieving user object:', userError)
+    log.error('could not load the user for a valid API key', undefined, userError)
     posthog.capture('api_key_validation_failed', {
       error: (userError as Error).message,
     })
@@ -119,7 +117,6 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
  */
 export default async function handler(req: NextRequest) {
   try {
-    console.log('req: ', req)
     // Extract the API key and course name from the request body.
     const { api_key, course_name } = (await req.json()) as {
       api_key: string
@@ -138,7 +135,7 @@ export default async function handler(req: NextRequest) {
     return NextResponse.json({ authContext }, { status: 200 })
   } catch (error) {
     // Respond with a 500 Internal Server Error status if an exception occurs.
-    console.error('Error in handler:', error)
+    log.error('API key validation failed', undefined, error)
     return NextResponse.json(
       { error: 'An error occurred while validating the API key' },
       { status: 500 },
