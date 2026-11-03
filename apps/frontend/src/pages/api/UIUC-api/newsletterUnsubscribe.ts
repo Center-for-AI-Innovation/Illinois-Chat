@@ -2,6 +2,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, AuthenticatedRequest } from '~/utils/authMiddleware'
 import { db } from '~/db/dbClient'
 import { emailNewsletter } from '~/db/schema'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.newsletterUnsubscribe')
 
 const newsletterUnsubscribe = async (
   req: AuthenticatedRequest,
@@ -23,7 +26,7 @@ const newsletterUnsubscribe = async (
         },
       })
   } catch (error: any) {
-    console.error('error:', error)
+    log.error('failed to save the newsletter unsubscribe', undefined, error)
     return res.status(500).json({ success: false, error: error })
   }
   return res.status(200).json({ success: true })

@@ -4,6 +4,9 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { connectionManager } from '~/utils/connectionManager'
 import { documents } from '~/db/schema'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getDocsForMaterials')
 
 // export const runtime = 'edge'
 
@@ -44,7 +47,7 @@ export const getCourseDocuments = async (
   course_name: string,
 ): Promise<CourseDocuments[] | null> => {
   if (!course_name) {
-    console.error('Course name is missing')
+    log.warn('course name is missing')
     return null
   }
   try {
@@ -61,7 +64,7 @@ export const getCourseDocuments = async (
       .where(eq(documents.course_name, course_name))
 
     if (data.length === 0) {
-      console.error('No documents found for course:', course_name)
+      log.warn('no documents found for the project')
       return null
     }
 
@@ -73,8 +76,9 @@ export const getCourseDocuments = async (
       base_url: doc.base_url || '',
     }))
   } catch (error) {
-    console.error(
-      'Unexpected error occurred while fetching course documents:',
+    log.error(
+      'unexpected error while fetching course documents',
+      undefined,
       error,
     )
     return null

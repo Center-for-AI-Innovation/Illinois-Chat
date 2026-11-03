@@ -12,6 +12,9 @@ import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { upsertChatbotTags } from '~/utils/chatbotTagsRegistry'
 import { superAdmins } from '~/utils/superAdmins'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.upsertCourseMetadata')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { courseName, courseMetadata } = req.body as {
@@ -21,7 +24,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   // Check if courseName is not null or undefined
   if (!courseName) {
-    console.error('Error: courseName is null or undefined')
+    log.warn('missing courseName')
     return res.status(400).json({ success: false, error: 'Missing courseName' })
   }
 
@@ -53,13 +56,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       combined_metadata.course_admins.length === 0
     ) {
       combined_metadata.course_admins = superAdmins
-      console.log('course_admins field was empty. Added default admin emails.')
+      log.info('course_admins field was empty, added the default admins')
     }
 
     // Check if combined_metadata doesn't have anything in the field is_private
     if (!combined_metadata.is_private) {
       combined_metadata.is_private = false
-      console.log('is_private field was empty. Set to false.')
+      log.debug('is_private field was empty, set to false')
     }
 
     // Check if openai_api_key is present and if it is a plain string
@@ -68,7 +71,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       !isEncrypted(combined_metadata.openai_api_key)
     ) {
       // Encrypt the openai_api_key
-      console.log('Encrypting api key')
+      log.debug('encrypting api key')
       combined_metadata.openai_api_key = await encrypt(
         combined_metadata.openai_api_key,
         process.env.NEXT_PUBLIC_SIGNING_KEY as string,
@@ -87,7 +90,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error setting course metadata:', error)
+    log.error('error setting course metadata', undefined, error)
     return res.status(500).json({ success: false, error: error })
   }
 }

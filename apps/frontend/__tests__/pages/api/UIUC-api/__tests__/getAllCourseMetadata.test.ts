@@ -104,6 +104,66 @@ describe('UIUC-api/getAllCourseMetadata', () => {
     expect(out[0]).toHaveProperty('CS101')
   })
 
+  it('logs the project name, never the stored value, for invalid JSON', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    hoisted.ensureRedisConnected.mockResolvedValueOnce({
+      hGetAll: hoisted.hGetAll.mockResolvedValueOnce({
+        BAD: '{"openai_api_key":"sk-secret"',
+      }),
+    })
+    await getCoursesByOwnerOrAdmin('admin@example.com')
+    const lines = consoleError.mock.calls.map((c) => String(c[0]))
+    expect(lines.some((l) => l.includes('invalid course metadata'))).toBe(true)
+    expect(lines.some((l) => l.includes('course=BAD'))).toBe(true)
+    expect(lines.join('\n')).not.toContain('sk-secret')
+    consoleError.mockRestore()
+  })
+
+  it('returns [] and logs without dumping metadata when Redis fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    hoisted.ensureRedisConnected.mockRejectedValueOnce(new Error('redis down'))
+    await expect(getCoursesByOwnerOrAdmin('a@example.com')).resolves.toEqual([])
+    hoisted.ensureRedisConnected.mockRejectedValueOnce(new Error('redis down'))
+    await expect(getAllCourseMetadata()).resolves.toEqual([])
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*error fetching the projects of a user\nError: redis down/,
+      ),
+    )
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*error fetching all course metadata\nError: redis down/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
+
+  it('still returns projects when the last-access lookup fails', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const originalThen = hoisted.db.then
+    hoisted.db.then = (_ok: any, onRejected?: any) =>
+      Promise.reject(new Error('pg down')).then(undefined, onRejected)
+    hoisted.ensureRedisConnected.mockResolvedValueOnce({
+      hGetAll: hoisted.hGetAll.mockResolvedValueOnce({
+        CS101: JSON.stringify({
+          course_owner: 'owner@example.com',
+          course_admins: [],
+        }),
+      }),
+    })
+    try {
+      const out = await getCoursesByOwnerOrAdmin('owner@example.com')
+      expect(out.length).toBe(1)
+      expect(consoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('could not fetch last access timestamps'),
+      )
+    } finally {
+      hoisted.db.then = originalThen
+      consoleWarn.mockRestore()
+    }
+  })
+
   it('handler returns 400 without email and 200 with data', async () => {
     const res1 = createMockRes()
     await handler(

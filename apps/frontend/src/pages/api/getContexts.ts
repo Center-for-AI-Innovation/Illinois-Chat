@@ -2,6 +2,9 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { fetchContextsByVectorEngine } from '~/utils/fetchContexts'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getContexts')
 
 export default withCourseAccessFromRequest('any')(handler)
 
@@ -39,7 +42,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error fetching contexts:', error)
+    log.error('could not fetch contexts', undefined, error)
     return res.status(500).json({
       error: 'Internal server error while fetching contexts',
       data: [],

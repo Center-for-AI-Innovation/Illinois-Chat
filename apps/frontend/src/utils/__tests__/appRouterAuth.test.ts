@@ -62,7 +62,7 @@ describe('withAppRouterAuth', () => {
   })
 
   it('returns 401 TokenExpiredError when token is expired', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     const verifyTokenAsync = vi
       .fn()
       .mockRejectedValue(
@@ -88,7 +88,7 @@ describe('withAppRouterAuth', () => {
   })
 
   it('returns 401 JsonWebTokenError when token is invalid', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     const verifyTokenAsync = vi
       .fn()
       .mockRejectedValue(new (jwt as any).JsonWebTokenError('bad token'))
@@ -133,6 +133,102 @@ describe('withAppRouterAuth', () => {
     await expect(res.json()).resolves.toMatchObject({
       error: 'Authentication failed',
     })
+  })
+})
+
+describe('withAppRouterAuth request context', () => {
+  function mockVerifiedAuth(user: unknown = { sub: 'u1' }) {
+    vi.doMock('../keycloakClient', () => ({
+      verifyTokenAsync: vi.fn().mockResolvedValue(user),
+    }))
+    vi.doMock('~/utils/authHelpers', () => ({
+      getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+    }))
+    vi.resetModules()
+  }
+
+  function authedReq(extra: Record<string, string> = {}): any {
+    return {
+      headers: new Headers({ cookie: 'access_token=t', ...extra }),
+      nextUrl: { pathname: '/api/chat/openai' },
+    }
+  }
+
+  it('a throwing handler returns 500, not 401', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockVerifiedAuth()
+    const { withAppRouterAuth } = await import('../appRouterAuth')
+
+    const wrapped = withAppRouterAuth(async () => {
+      throw new Error('handler bug')
+    })
+    const res = await wrapped(authedReq())
+    expect(res.status).toBe(500)
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'Internal server error',
+    })
+    expect(error).toHaveBeenCalledTimes(1)
+    const line = error.mock.calls[0]![0] as string
+    expect(line).toMatch(
+      / ERROR   api rid=\S+ path=\/api\/chat\/openai unhandled error in API route\nError: handler bug\n/,
+    )
+    expect(line).not.toContain('JWT')
+  })
+
+  it('MetadataUnavailableError from the handler returns 503', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockVerifiedAuth()
+    const { withAppRouterAuth } = await import('../appRouterAuth')
+    const { MetadataUnavailableError } =
+      await import('~/utils/server/requestContext')
+    const res = await withAppRouterAuth(async () => {
+      throw new MetadataUnavailableError('ece120', new Error('down'))
+    })(authedReq())
+    expect(res.status).toBe(503)
+    await expect(res.json()).resolves.toMatchObject({
+      error: 'Project metadata store unavailable',
+    })
+  })
+
+  it('echoes an incoming X-Request-ID on the response', async () => {
+    mockVerifiedAuth()
+    const { withAppRouterAuth } = await import('../appRouterAuth')
+    const res = await withAppRouterAuth(() => NextResponse.json({ ok: true }))(
+      authedReq({ 'x-request-id': 'abc123' }),
+    )
+    expect(res.headers.get('X-Request-ID')).toBe('abc123')
+  })
+
+  it('writes a minted id back onto the request headers, also on a 401', async () => {
+    mockVerifiedAuth()
+    const { withAppRouterAuth } = await import('../appRouterAuth')
+    const req: any = { headers: new Headers() }
+    const res = await withAppRouterAuth(() => NextResponse.json({}))(req)
+    expect(res.status).toBe(401)
+    const rid = req.headers.get('x-request-id')
+    expect(rid).toMatch(/^[0-9a-f]{12}$/)
+    expect(res.headers.get('X-Request-ID')).toBe(rid)
+  })
+
+  it('reuses an existing log context and keeps its course', async () => {
+    mockVerifiedAuth()
+    const { withAppRouterAuth } = await import('../appRouterAuth')
+    const { getLogContext, runWithLogContext } =
+      await import('~/utils/server/requestContext')
+    const req = authedReq()
+    let seen: unknown
+    const res = await runWithLogContext(
+      { rid: 'outer1', course: 'ece120' },
+      () =>
+        withAppRouterAuth(() => {
+          seen = getLogContext()
+          return NextResponse.json({})
+        })(req),
+    )
+    expect(seen).toEqual({ rid: 'outer1', course: 'ece120' })
+    expect(res.headers.get('X-Request-ID')).toBe('outer1')
+    expect(req.headers.get('x-request-id')).toBeNull()
   })
 })
 

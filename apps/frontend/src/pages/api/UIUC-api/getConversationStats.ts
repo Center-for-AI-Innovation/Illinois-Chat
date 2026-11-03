@@ -3,6 +3,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getConversationStats')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { course_name, from_date, to_date } = req.body
@@ -29,7 +32,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error fetching questions per day:', error)
+    log.error('error fetching conversation stats', undefined, error)
     return res.status(500).json({ error: 'Failed to fetch questions per day' })
   }
 }
@@ -59,7 +62,11 @@ export async function getConversationStats(
       data: await response.json(),
     }
   } catch (error) {
-    console.error('Error fetching conversation stats:', error)
+    log.error(
+      'error fetching conversation stats',
+      { course: course_name },
+      error,
+    )
     throw error
   }
 }

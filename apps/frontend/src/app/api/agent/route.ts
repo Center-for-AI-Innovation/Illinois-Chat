@@ -38,6 +38,9 @@ import {
 } from '~/pages/api/conversation'
 import { getModels } from '~/pages/api/models'
 import { resolveToolRouter } from '~/utils/server/toolRouting'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.agent')
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -100,7 +103,11 @@ async function getOrCreateConversation(
         )
       }
     } catch (error) {
-      console.error('Error fetching conversation:', error)
+      log.error(
+        'could not fetch the conversation; starting a new one',
+        { conversation: conversationId },
+        error,
+      )
     }
   }
 
@@ -109,7 +116,7 @@ async function getOrCreateConversation(
     (m) => m.id === modelId,
   ) as GenericSupportedModel
   if (!model) {
-    console.error(`Model ${modelId} not found`)
+    log.warn('model not found', { model: modelId })
     return null
   }
 
@@ -226,7 +233,7 @@ async function handler(req: AuthenticatedRequest) {
               abort()
               return
             }
-            console.error('Error emitting event:', error)
+            log.error('could not emit an agent stream event', undefined, error)
           }
         }
 
@@ -238,26 +245,19 @@ async function handler(req: AuthenticatedRequest) {
         })
 
         try {
-          console.log('[Agent Route] Fetching metadata for course:', courseName)
+          log.debug('fetching project metadata and models')
           const [llmProviders, courseMetadata] = await Promise.all([
             getModels(courseName),
             getCourseMetadata(courseName),
           ])
 
-          console.log(
-            '[Agent Route] Course metadata result:',
-            courseMetadata ? 'found' : 'not found',
-          )
-          console.log(
-            '[Agent Route] LLM providers result:',
-            llmProviders ? 'found' : 'not found',
-          )
+          log.debug('project metadata and models loaded', {
+            metadata: courseMetadata ? 'found' : 'not found',
+            providers: llmProviders ? 'found' : 'not found',
+          })
 
           if (!courseMetadata) {
-            console.error(
-              '[Agent Route] Course metadata not found for:',
-              courseName,
-            )
+            log.error('project metadata not found; cannot run the agent')
             emit({
               type: 'error',
               message: 'Could not fetch course metadata',
@@ -369,7 +369,7 @@ async function handler(req: AuthenticatedRequest) {
             signal: abortController.signal,
           })
         } catch (error) {
-          console.error('Error in agent conversation:', error)
+          log.error('agent conversation failed', undefined, error)
           emit({
             type: 'error',
             message: error instanceof Error ? error.message : 'Unknown error',
@@ -397,7 +397,7 @@ async function handler(req: AuthenticatedRequest) {
       },
     })
   } catch (error) {
-    console.error('Error in agent route handler:', error)
+    log.error('agent route failed', undefined, error)
     return NextResponse.json(
       {
         error:

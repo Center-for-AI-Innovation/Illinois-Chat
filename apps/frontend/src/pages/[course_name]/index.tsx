@@ -9,7 +9,11 @@ import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
-import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import {
+  PermissionGate,
+  getPermissionGateError,
+  type PermissionGateErrorType,
+} from '~/components/UIUC-Components/PermissionGate'
 
 const AUTH_ROUTES = ['sign-in', 'sign-up']
 
@@ -23,7 +27,10 @@ const IfCourseExists: NextPage = () => {
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
-  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+  const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
+    null,
+  )
+  const [errorRequestId, setErrorRequestId] = useState<string>()
 
   const getCurrentPageName = () => {
     return router.query.course_name as string
@@ -54,11 +61,10 @@ const IfCourseExists: NextPage = () => {
       } catch (error) {
         console.error('Error fetching course metadata:', error)
         // Check if error has a status code (401, 403, or 404)
-        const errorWithStatus = error as Error & { status?: number }
-        const status = errorWithStatus.status
-
-        if (status === 401 || status === 403 || status === 404) {
-          setErrorType(status as 401 | 403 | 404)
+        const gateError = getPermissionGateError(error)
+        if (gateError) {
+          setErrorType(gateError.errorType)
+          setErrorRequestId(gateError.requestId)
         }
       }
     }
@@ -103,6 +109,7 @@ const IfCourseExists: NextPage = () => {
       <PermissionGate
         course_name={course_name ? (course_name as string) : 'new'}
         errorType={errorType}
+        requestId={errorRequestId}
       />
     )
   }

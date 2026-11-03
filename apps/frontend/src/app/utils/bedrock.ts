@@ -4,6 +4,9 @@ import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { type CoreMessage, generateText, streamText } from 'ai'
 import { NextResponse } from 'next/server'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('llm.bedrock')
 
 export async function runBedrockChat(
   conversation: Conversation,
@@ -66,7 +69,15 @@ export async function runBedrockChat(
       return NextResponse.json({ choices })
     }
   } catch (error) {
-    console.error('Error in runBedrockChat:', error)
+    log.error(
+      'Bedrock chat request failed',
+      {
+        provider: 'Bedrock',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     throw error
   }
 }

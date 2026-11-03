@@ -281,3 +281,97 @@ describe('projectConnections handler — DELETE', () => {
     expect(auditEntries[0]).toMatchObject({ kind: 's3' })
   })
 })
+
+describe('projectConnections handler — failures', () => {
+  function mockFailingRepo() {
+    vi.doMock('~/db/projectConnectionsRepo', () => ({
+      getProjectIdByName: vi.fn(async () => 42),
+      getConnectionByProject: vi.fn(async () => {
+        throw new Error('select failed')
+      }),
+      upsertConnectionField: vi.fn(async () => {
+        throw new Error('upsert failed')
+      }),
+      deleteConnection: vi.fn(async () => {
+        throw new Error('delete failed')
+      }),
+      writeAuditEntry: vi.fn(async (e: any) => {
+        auditEntries.push(e)
+      }),
+    }))
+  }
+
+  it('logs, audits and returns 500 when the upsert throws', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockFailingRepo()
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: {
+          project_name: 'demo',
+          kind: 's3',
+          config: { aws_access_key_id: 'AKIA', aws_secret_access_key: 'x' },
+        },
+        user: { email: 'admin@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(500)
+    expect(auditEntries[0]).toMatchObject({ outcome: 'failure' })
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*project connection upsert failed course=demo kind=s3\nError: upsert failed/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
+
+  it('logs, audits and returns 500 when the delete throws', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockFailingRepo()
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'DELETE',
+        query: { project_name: 'demo' },
+        headers: {},
+        user: { email: 'admin@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*project connection delete failed course=demo\nError: delete failed/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
+
+  it('logs and returns 500 when a handler throws', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockFailingRepo()
+    const { handler } = await import('~/pages/api/UIUC-api/projectConnections')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'GET',
+        query: { project_name: 'demo' },
+        headers: {},
+        user: { email: 'admin@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*project connections handler error method=GET\nError: select failed/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
+})

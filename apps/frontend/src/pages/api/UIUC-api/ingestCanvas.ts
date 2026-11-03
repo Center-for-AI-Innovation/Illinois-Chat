@@ -2,32 +2,37 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { backendFetch } from '~/utils/server/backendFetch'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.ingestCanvas')
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   try {
     if (req.method !== 'POST') {
-      console.error('Request method not allowed')
+      log.warn('request method not allowed', { method: req.method })
       return res.status(405).json({ error: '❌❌ Request method not allowed' })
     }
 
     const { courseName, canvas_url, selectedCanvasOptions } = req.body
 
-    console.log(
-      '👉 Submitting to Canvas ingest queue:',
+    log.debug('submitting to Canvas ingest queue', {
       canvas_url,
-      courseName,
-      selectedCanvasOptions,
-    )
+      options: selectedCanvasOptions,
+    })
 
     if (!courseName || !canvas_url) {
-      console.error('Missing body parameters')
+      log.warn('missing body parameters', {
+        has_course: Boolean(courseName),
+        has_canvas_url: Boolean(canvas_url),
+      })
       return res.status(400).json({ error: '❌❌ Missing body parameters' })
     }
 
-    console.log('About to send transactional email')
+    log.debug('sending Canvas approval email')
 
     // Send email to kastan alerting that he needs to approve a canvas course
-    const sendEmailResponse = await fetch(
+    const sendEmailResponse = await backendFetch(
       `${getBackendUrl()}/send-transactional-email`,
       {
         method: 'POST',
@@ -48,15 +53,16 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
       },
     )
     // const emailResponseBody = await sendEmailResponse.json()
-    // Add error checking for the response
+    // A failed email does not stop the ingest; backendFetch already logged
+    // the status and body.
     if (!sendEmailResponse.ok) {
-      console.error(
-        `Email API responded with status: ${sendEmailResponse.status}`,
-      )
+      log.warn('Canvas approval email not sent, continuing with the ingest', {
+        status: sendEmailResponse.status,
+      })
     }
     // console.debug("Sent email to Kastan to alert him of new Canvas ingest")
 
-    const response = await fetch(
+    const response = await backendFetch(
       `${process.env.INGEST_URL}`.replace('/ingest', '/canvas_ingest'),
       {
         method: 'POST',
@@ -85,13 +91,20 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
     )
 
     const responseBody = await response.json()
-    console.log(
-      `📤 Submitted to ingest queue: ${canvas_url}. Response status: ${response.status}`,
-      responseBody,
-    )
+    // A failure status was already logged by backendFetch with its body.
+    if (response.ok) {
+      log.info('submitted to Canvas ingest queue', {
+        canvas_url,
+        status: response.status,
+      })
+    }
     return res.status(response.status).json(responseBody)
   } catch (error) {
-    console.error(error)
+    log.error(
+      'Canvas ingest submission failed',
+      { canvas_url: req.body?.canvas_url },
+      error,
+    )
     return res.status(500).json({
       error: `❌❌ -- Bottom of /ingest -- Internal Server Error during ingest submission to Beam: ${error}`,
     })

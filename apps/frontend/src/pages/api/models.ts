@@ -29,6 +29,9 @@ import { getBedrockModels } from '~/utils/modelProviders/routes/bedrock'
 import { getGeminiModels } from '~/utils/modelProviders/routes/gemini'
 import { getSambaNovaModels } from '~/utils/modelProviders/routes/sambanova'
 import { getOpenAICompatibleModels } from '~/utils/modelProviders/routes/openaiCompatible'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.models')
 
 export async function getModels(
   projectName: string,
@@ -126,7 +129,9 @@ export async function getModels(
         )
         break
       default:
-        console.warn(`Unhandled provider: ${providerName}`)
+        log.warn('unhandled LLM provider in project settings', {
+          provider: providerName,
+        })
     }
   }
 
@@ -149,7 +154,7 @@ async function handler(
 
     return res.status(200).json(allLLMProviders as AllLLMProviders)
   } catch (error) {
-    console.error(error)
+    log.error('could not load the project models', undefined, error)
     return res.status(500).json({ error: JSON.stringify(error) })
   }
 }

@@ -15,6 +15,9 @@ import {
 } from '~/utils/simDiscovery'
 import { getCourseMetadata, hasCourseAccess } from '~/server/authorization'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.runSimWorkflow')
 
 const TIMEOUT_MS = 300_000 // 5 minutes
 
@@ -93,8 +96,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       workflowId: workflow_id,
     })
     if (!allowed) {
-      console.warn('[runSimWorkflow] workflow outside project workspace', {
-        course_name,
+      log.warn('workflow outside project workspace', {
+        course: course_name,
         workflow_id,
       })
       return res.status(403).json({
@@ -106,7 +109,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const mapped = simUpstreamErrorResponse(error.status)
       return res.status(mapped.status).json({ error: mapped.error })
     }
-    console.error('[runSimWorkflow] workspace check failed', error)
+    log.error(
+      'Sim workspace check failed',
+      { course: course_name, workflow_id },
+      error,
+    )
     return res
       .status(502)
       .json({ error: 'Could not verify the workflow against Sim' })
@@ -122,7 +129,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   // keys that collide with those before adding our own `stream`.
   const { input: safeInput, stripped } = sanitizeSimWorkflowInput(input)
   if (stripped.length > 0) {
-    console.warn('[runSimWorkflow] dropped reserved Sim control fields', {
+    log.warn('dropped reserved Sim control fields', {
+      course: course_name,
       workflow_id,
       stripped,
     })
@@ -147,10 +155,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         errText,
         `Sim API returned ${simResponse.status}: ${simResponse.statusText}`,
       )
-      console.error('[runSimWorkflow] Sim API error', {
+      log.error('Sim API error', {
+        course: course_name,
         workflow_id,
         status: simResponse.status,
-        message: errMessage,
+        message: errMessage.slice(0, 500),
       })
       // Sim's own 401/403 mean the project's key was rejected, not that this
       // caller failed to authenticate here — forwarding them verbatim reads
@@ -163,7 +172,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const result = (await simResponse.json()) as SimExecutionResult
-    console.debug('[runSimWorkflow] success', {
+    log.debug('Sim workflow finished', {
+      course: course_name,
       workflow_id,
       success: result.success,
     })
@@ -175,10 +185,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .status(408)
         .json({ error: 'Sim workflow timed out after 5 minutes' })
     }
-    console.error('[runSimWorkflow] unexpected error', {
-      workflow_id,
-      error: error instanceof Error ? error.message : String(error),
-    })
+    log.error(
+      'unexpected error running Sim workflow',
+      { course: course_name, workflow_id },
+      error,
+    )
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error',
     })

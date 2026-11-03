@@ -9,6 +9,10 @@ import { v4 as uuidv4 } from 'uuid'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { eq } from 'drizzle-orm'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { backendFetch } from '~/utils/server/backendFetch'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.chat-file-upload')
 
 type ChatFileUploadResponse = {
   success?: boolean
@@ -25,7 +29,7 @@ const handler = async (
 ) => {
   try {
     if (req.method !== 'POST') {
-      console.error('Request method not allowed')
+      log.warn('request method not allowed', { method: req.method })
       return res.status(405).json({
         error: ' Request method not allowed',
       })
@@ -43,7 +47,7 @@ const handler = async (
 
     // Validate required parameters
     if (!conversationId || !courseName || !user_id || !s3Key || !fileName) {
-      console.error('Missing required parameters')
+      log.warn('missing required parameters')
       return res.status(400).json({
         error:
           ' Missing required parameters: conversationId, courseName, user_id s3Key, fileName',
@@ -75,9 +79,9 @@ const handler = async (
           updated_at: new Date(),
         })
       } catch (convError) {
-        console.error(
-          'Failed to create conversation:',
-          conversationId,
+        log.error(
+          'failed to create conversation',
+          { conversation: conversationId },
           convError,
         )
         return res.status(500).json({
@@ -103,7 +107,11 @@ const handler = async (
         created_at: new Date(),
       })
     } catch (uploadError) {
-      console.error(' Failed to create file_uploads record:', uploadError)
+      log.error(
+        'failed to create file_uploads record',
+        { conversation: conversationId, file: fileName },
+        uploadError,
+      )
       return res.status(500).json({
         error: ' Failed to create file upload record',
       })
@@ -116,7 +124,7 @@ const handler = async (
 
     const backendUrl = getBackendUrl()
 
-    const response = await fetch(`${backendUrl}/process-chat-file`, {
+    const response = await backendFetch(`${backendUrl}/process-chat-file`, {
       method: 'POST',
       headers: {
         Accept: '*/*',
@@ -132,13 +140,8 @@ const handler = async (
       }),
     })
 
+    // backendFetch already logged the status and body of a failure.
     if (!response.ok) {
-      console.error(
-        `Flask backend error: ${response.status} ${response.statusText}`,
-      )
-      const errorText = await response.text()
-      console.error('Backend response:', errorText.substring(0, 500))
-
       return res.status(500).json({
         error: `Backend processing failed: ${response.status}`,
         details: response.statusText,
@@ -149,7 +152,11 @@ const handler = async (
     try {
       responseBody = await response.json()
     } catch (parseError) {
-      console.error('JSON parse error:', parseError)
+      log.error(
+        'could not parse the backend response',
+        { file: fileName },
+        parseError,
+      )
       return res.status(500).json({
         error: 'Failed to parse backend response',
         details:
@@ -170,7 +177,11 @@ const handler = async (
         })
         .where(eq(fileUploads.id, fileUploadId))
     } catch (updateError) {
-      console.error('Failed to update file upload status:', updateError)
+      log.warn(
+        'failed to update file upload status',
+        { file_upload: fileUploadId },
+        updateError,
+      )
       // Continue anyway since the main processing was successful
     }
 
@@ -183,10 +194,7 @@ const handler = async (
     })
   } catch (error) {
     // Fix: Avoid string interpolation with potentially unsafe content
-    console.error(
-      'Bottom of /chat-file-upload -- Internal Server Error:',
-      error,
-    )
+    log.error('chat file upload failed', undefined, error)
 
     return res.status(500).json({
       error: 'Internal Server Error occurred in chat file upload',

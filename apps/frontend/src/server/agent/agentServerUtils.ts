@@ -37,6 +37,9 @@ import {
   sanitizeSimWorkflowInput,
 } from '~/utils/simDiscovery'
 import { type SimExecutionResult } from '~/types/sim'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('server.agent')
 
 /**
  * Convert conversation to OpenAI message format for agent mode.
@@ -173,9 +176,9 @@ export async function selectToolsServer(
       )
 
       if (!baseTool) {
-        console.error(
-          `Tool ${openaiTool.function.name} not found in available tools.`,
-        )
+        log.warn('tool router picked a tool that is not available', {
+          tool: openaiTool.function.name,
+        })
         return null
       }
 
@@ -194,7 +197,7 @@ export async function selectToolsServer(
 
     return { selectedTools }
   } catch (error) {
-    console.error('Error in selectToolsServer:', error)
+    log.error('tool selection failed', undefined, error)
     return {
       selectedTools: [],
       error:
@@ -256,15 +259,19 @@ export async function executeToolServer(
       signal,
     })
     if (!allowed) {
-      console.warn('[executeToolServer] workflow outside project workspace', {
-        projectName,
-        workflowId: tool.id,
+      log.warn('workflow is outside the project Sim workspace', {
+        course: projectName,
+        workflow: tool.id,
       })
       toolCopy.error = 'This workflow is not available for this project'
       return toolCopy
     }
   } catch (error) {
-    console.error('[executeToolServer] workspace check failed', error)
+    log.error(
+      'Sim workspace check failed',
+      { course: projectName, workflow: tool.id },
+      error,
+    )
     toolCopy.error = 'Could not verify the workflow against Sim'
     return toolCopy
   }
@@ -287,8 +294,8 @@ export async function executeToolServer(
     tool.aiGeneratedArgumentValues ?? {},
   )
   if (stripped.length > 0) {
-    console.warn('[executeToolServer] dropped reserved Sim control fields', {
-      workflowId: tool.id,
+    log.warn('dropped reserved Sim control fields', {
+      workflow: tool.id,
       stripped,
     })
   }
@@ -307,7 +314,10 @@ export async function executeToolServer(
     clearTimeout(timeoutId)
 
     const secondsToRun = (Date.now() - timeStart) / 1000
-    console.debug('Time taken for Sim workflow call:', secondsToRun, 'seconds')
+    log.debug('Sim workflow call finished', {
+      workflow: tool.id,
+      ms: Math.round(secondsToRun * 1000),
+    })
 
     if (!simResponse.ok) {
       const errText = await simResponse.text()
@@ -315,7 +325,12 @@ export async function executeToolServer(
         errText,
         `Sim API returned ${simResponse.status}: ${simResponse.statusText}`,
       )
-      console.error('[executeToolServer] Sim API error', errMessage)
+      log.error('Sim workflow call failed', {
+        course: projectName,
+        workflow: tool.id,
+        status: simResponse.status,
+        reason: errMessage,
+      })
       toolCopy.error = errMessage
       return toolCopy
     }
@@ -335,7 +350,11 @@ export async function executeToolServer(
       toolCopy.error = 'Sim workflow timed out after 5 minutes'
       return toolCopy
     }
-    console.error(`Error running tool ${tool.readableName}:`, error)
+    log.error(
+      'could not run the tool',
+      { course: projectName, tool: tool.readableName },
+      error,
+    )
     toolCopy.error =
       error instanceof Error ? error.message : 'Unknown error running tool'
     return toolCopy
@@ -418,14 +437,14 @@ export async function fetchContextsServer(
       if (!Array.isArray(contexts)) {
         lastError = `Expected array, got ${typeof contexts}`
         if (attempt < delaysMs.length - 1) {
-          console.warn(
-            `[fetchContextsServer] retry ${attempt + 1}/${delaysMs.length} failed (${lastError})`,
-          )
+          log.warn('context fetch attempt failed; retrying', {
+            course: courseName,
+            attempt: `${attempt + 1}/${delaysMs.length}`,
+            reason: lastError,
+          })
           continue
         }
-        console.error(
-          `[fetchContextsServer] failed after ${delaysMs.length} attempts (${lastError})`,
-        )
+        // The catch below logs the final failure once.
         throw new Error(lastError)
       }
 
@@ -437,14 +456,18 @@ export async function fetchContextsServer(
 
       lastError = error instanceof Error ? error.message : 'Unknown error'
       if (attempt < delaysMs.length - 1) {
-        console.warn(
-          `[fetchContextsServer] retry ${attempt + 1}/${delaysMs.length} failed (${lastError})`,
-        )
+        log.warn('context fetch attempt failed; retrying', {
+          course: courseName,
+          attempt: `${attempt + 1}/${delaysMs.length}`,
+          reason: lastError,
+        })
         continue
       }
-      console.error(
-        `[fetchContextsServer] failed after ${delaysMs.length} attempts (${lastError})`,
-      )
+      log.error('context fetch failed after all attempts', {
+        course: courseName,
+        attempts: delaysMs.length,
+        reason: lastError,
+      })
       throw new Error(lastError)
     }
   }
@@ -464,10 +487,10 @@ export async function fetchToolsServer(
 
   if (!resolved.ok) {
     if (resolved.reason !== 'not_configured') {
-      console.error(
-        `[Agent] Sim credentials unavailable for ${courseName}:`,
-        resolved.reason,
-      )
+      log.error('Sim credentials unavailable', {
+        course: courseName,
+        reason: resolved.reason,
+      })
     }
     return []
   }
@@ -475,12 +498,12 @@ export async function fetchToolsServer(
   const result = await discoverWithCredentials(resolved.creds, signal)
   if (!result.ok) {
     if (result.reason === 'missing_workspace_id') {
-      console.error(`[Agent] Sim workspace ID is not set for ${courseName}`)
+      log.error('Sim workspace ID is not set', { course: courseName })
     } else if (result.reason !== 'invalid_base_url') {
-      console.error(
-        `[Agent] Error fetching Sim tools for course ${courseName}:`,
-        result,
-      )
+      log.error('could not fetch Sim tools', {
+        course: courseName,
+        reason: result,
+      })
     }
     return []
   }
@@ -488,10 +511,11 @@ export async function fetchToolsServer(
   // Omitted rather than offered with a fabricated signature — see
   // discoverSimWorkflows. Log so a partially-degraded tool list is visible.
   if (result.failed.length > 0) {
-    console.error(
-      `[Agent] Omitted ${result.failed.length} Sim workflow(s) that could not be described for ${courseName}:`,
-      result.failed,
-    )
+    log.error('omitted Sim workflows that could not be described', {
+      course: courseName,
+      count: result.failed.length,
+      failed: result.failed,
+    })
   }
 
   return getUIUCToolFromSim(result.workflows)
@@ -508,7 +532,11 @@ export async function generatePresignedUrlServer(
   try {
     return await generatePresignedUrl(filePath, courseName)
   } catch (error) {
-    console.error('Error generating presigned URL:', error)
+    log.error(
+      'could not generate a presigned URL',
+      { course: courseName, file: filePath },
+      error,
+    )
     return null
   }
 }

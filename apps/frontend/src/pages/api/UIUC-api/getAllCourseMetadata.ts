@@ -7,6 +7,9 @@ import { getBatchProjectTimestamps } from '~/utils/projectTimestamps'
 import { db } from '~/db/dbClient'
 import { conversations } from '~/db/schema'
 import { eq, max } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getAllCourseMetadata')
 
 export type CourseMetadataWithLastAccess = CourseMetadata & {
   last_accessed_at?: string | null
@@ -20,7 +23,7 @@ export const getCoursesByOwnerOrAdmin = async (
     const redisClient = await ensureRedisConnected()
     all_course_metadata_raw = await redisClient.hGetAll('course_metadatas')
     if (!all_course_metadata_raw) {
-      console.error('No course metadata found for ANY course!')
+      log.error('no course metadata found for any project')
       return []
     }
 
@@ -42,8 +45,12 @@ export const getCoursesByOwnerOrAdmin = async (
             acc.push({ [key]: courseMetadata })
           }
         } catch (parseError) {
-          console.error('Invalid course metadata:', courseMetadata, key, value)
-          console.error('Parse error:', parseError)
+          // The stored value can hold encrypted keys: log the project only.
+          log.error(
+            'invalid course metadata, skipping project',
+            { course: key, length: value?.length },
+            parseError,
+          )
         }
         return acc
       },
@@ -81,7 +88,11 @@ export const getCoursesByOwnerOrAdmin = async (
         }
       }
     } catch (error) {
-      console.error('Error fetching last access timestamps:', error)
+      log.warn(
+        'could not fetch last access timestamps, returning metadata without them',
+        undefined,
+        error,
+      )
       // Non-fatal: return metadata without last_accessed_at
     }
 
@@ -104,10 +115,14 @@ export const getCoursesByOwnerOrAdmin = async (
       }
     })
   } catch (error) {
-    console.error(
-      'Error occurred while fetching courseMetadata',
+    log.error(
+      'error fetching the projects of a user',
+      {
+        projects: all_course_metadata_raw
+          ? Object.keys(all_course_metadata_raw).length
+          : undefined,
+      },
       error,
-      all_course_metadata_raw,
     )
     return []
   }
@@ -123,7 +138,7 @@ export const getAllCourseMetadata = async (): Promise<
     const redisClient = await ensureRedisConnected()
     all_course_metadata_raw = await redisClient.hGetAll('course_metadatas')
     if (!all_course_metadata_raw) {
-      console.error('No course metadata found for ANY course!')
+      log.error('no course metadata found for any project')
       return []
     }
 
@@ -159,10 +174,14 @@ export const getAllCourseMetadata = async (): Promise<
       }
     })
   } catch (error) {
-    console.error(
-      'Error occurred while fetching courseMetadata',
+    log.error(
+      'error fetching all course metadata',
+      {
+        projects: all_course_metadata_raw
+          ? Object.keys(all_course_metadata_raw).length
+          : undefined,
+      },
       error,
-      all_course_metadata_raw,
     )
     return []
   }
@@ -172,13 +191,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     const currUserEmail = req.user?.email
     if (!currUserEmail) {
-      console.error('No email found in token')
+      log.warn('no email found in token')
       return res.status(400).json({ error: 'No email found in token' })
     }
     const all_course_metadata = await getCoursesByOwnerOrAdmin(currUserEmail)
     return res.status(200).json(all_course_metadata)
   } catch (error) {
-    console.log('Error occurred while fetching courseMetadata', error)
+    log.error('error fetching course metadata', undefined, error)
     return res.status(500).json({ success: false, error: error })
   }
 }

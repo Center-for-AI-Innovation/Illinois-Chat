@@ -168,8 +168,9 @@ export async function fetchCourseMetadata(course_name: string): Promise<any> {
     if (!response.ok) {
       const error = new Error(
         `Error fetching course metadata: ${response.statusText || response.status}`,
-      ) as Error & { status?: number }
+      ) as Error & { status?: number; requestId?: string }
       error.status = response.status
+      error.requestId = response.headers.get('x-request-id') ?? undefined
       throw error
     }
 
@@ -210,10 +211,6 @@ export function convertConversatonToVercelAISDKv3(
     (msg) => msg.latestSystemMessage !== undefined,
   )
   if (systemMessage) {
-    console.log(
-      'Found system message, latestSystemMessage: ',
-      systemMessage.latestSystemMessage,
-    )
     coreMessages.push({
       role: 'system',
       content: systemMessage.latestSystemMessage || '',
@@ -292,7 +289,7 @@ export function convertConversationToCoreMessagesWithoutSystem(
     .map((message, index) => {
       const isLastUserMessage =
         index === conversation.messages.length - 1 && message.role === 'user'
-      console.log(
+      console.debug(
         'Processing message:',
         message.role,
         isLastUserMessage ? '(last user message)' : '',

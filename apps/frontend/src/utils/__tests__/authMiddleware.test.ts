@@ -13,7 +13,20 @@ function makeRes() {
     res.body = body
     return res
   })
+  res.setHeader = vi.fn()
+  res.end = vi.fn()
   return res
+}
+
+function mockVerifiedAuth(user: unknown = { sub: 'u1' }) {
+  vi.doMock('../keycloakClient', () => ({
+    verifyTokenAsync: vi.fn().mockResolvedValue(user),
+  }))
+  vi.doMock('~/utils/authHelpers', () => ({
+    getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
+    getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+  }))
+  vi.resetModules()
 }
 
 describe('authMiddleware', () => {
@@ -74,7 +87,7 @@ describe('authMiddleware', () => {
   })
 
   it('withAuth returns TokenExpiredError as 401 token expired', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     const verifyTokenAsync = vi
       .fn()
       .mockRejectedValue(
@@ -99,7 +112,7 @@ describe('authMiddleware', () => {
   })
 
   it('withAuth returns JsonWebTokenError as 401 invalid token', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     const verifyTokenAsync = vi
       .fn()
       .mockRejectedValue(new (jwt as any).JsonWebTokenError('bad token'))
@@ -285,6 +298,124 @@ describe('authMiddleware', () => {
     expect(res.statusCode).toBe(403)
     expect(res.body).toMatchObject({ error: 'Insufficient permissions' })
     expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('withAuth: a throwing handler returns 500, not 401', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockVerifiedAuth()
+    const { withAuth } = await import('../authMiddleware')
+
+    const wrapped = withAuth(async () => {
+      throw new Error('handler bug')
+    })
+    const req: any = {
+      url: '/api/UIUC-api/thing?course_name=x',
+      cookies: { access_token: 't' },
+      headers: {},
+    }
+    const res = makeRes()
+
+    await wrapped(req, res)
+    expect(res.statusCode).toBe(500)
+    expect(res.body).toMatchObject({ error: 'Internal server error' })
+    expect(error).toHaveBeenCalledTimes(1)
+    const line = error.mock.calls[0]![0] as string
+    expect(line).toMatch(
+      / ERROR   api rid=\S+ path=\/api\/UIUC-api\/thing unhandled error in API route\nError: handler bug\n\s+at /,
+    )
+    expect(line).not.toContain('JWT')
+  })
+
+  it('withAuth: MetadataUnavailableError from a nested course check returns 503', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockVerifiedAuth()
+    const { withAuth } = await import('../authMiddleware')
+    const { MetadataUnavailableError } =
+      await import('~/utils/server/requestContext')
+
+    const wrapped = withAuth(async () => {
+      throw new MetadataUnavailableError('ece120', new Error('ECONNREFUSED'))
+    })
+    const res = makeRes()
+    await wrapped({ cookies: { access_token: 't' }, headers: {} } as any, res)
+    expect(res.statusCode).toBe(503)
+    expect(res.body).toMatchObject({
+      error: 'Project metadata store unavailable',
+    })
+  })
+
+  it('withAuth: echoes an incoming X-Request-ID before the handler runs', async () => {
+    mockVerifiedAuth()
+    const { withAuth } = await import('../authMiddleware')
+    const res = makeRes()
+    const handler = vi.fn(() => {
+      expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'abc123')
+    })
+    await withAuth(handler)(
+      {
+        cookies: { access_token: 't' },
+        headers: { 'x-request-id': 'abc123' },
+      } as any,
+      res,
+    )
+    expect(handler).toHaveBeenCalled()
+  })
+
+  it('withAuth: writes a minted id back onto the request headers', async () => {
+    mockVerifiedAuth()
+    const { withAuth } = await import('../authMiddleware')
+    const res = makeRes()
+    const req: any = { cookies: {}, headers: {} }
+    await withAuth(vi.fn())(req, res)
+    const rid = req.headers['x-request-id']
+    expect(rid).toMatch(/^[0-9a-f]{12}$/)
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', rid)
+  })
+
+  it('withAuth: reuses an existing log context and keeps its course', async () => {
+    mockVerifiedAuth()
+    const { withAuth } = await import('../authMiddleware')
+    const { getLogContext, runWithLogContext } =
+      await import('~/utils/server/requestContext')
+    const res = makeRes()
+    const req: any = { cookies: { access_token: 't' }, headers: {} }
+    let seen: unknown
+    await runWithLogContext({ rid: 'outer1', course: 'ece120' }, () =>
+      withAuth(() => {
+        seen = getLogContext()
+      })(req, res),
+    )
+    expect(seen).toEqual({ rid: 'outer1', course: 'ece120' })
+    expect(res.setHeader).not.toHaveBeenCalled()
+    expect(req.headers['x-request-id']).toBeUndefined()
+  })
+
+  it('withAuth: an expired token logs one WARNING without a stack', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.doMock('../keycloakClient', () => ({
+      verifyTokenAsync: vi
+        .fn()
+        .mockRejectedValue(
+          new (jwt as any).TokenExpiredError('jwt expired', new Date()),
+        ),
+    }))
+    vi.doMock('~/utils/authHelpers', () => ({
+      getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+    }))
+    vi.resetModules()
+    const { withAuth } = await import('../authMiddleware')
+    const res = makeRes()
+    await withAuth(vi.fn())(
+      { cookies: { access_token: 't' }, headers: {} } as any,
+      res,
+    )
+    expect(error).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toMatch(
+      / WARNING api\.auth rid=\S+ access token rejected: TokenExpiredError: jwt expired$/,
+    )
   })
 
   it('isPublicEndpoint matches known prefixes', async () => {

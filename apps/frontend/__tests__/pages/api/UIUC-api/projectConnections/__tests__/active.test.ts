@@ -123,4 +123,31 @@ describe('projectConnections/active handler', () => {
       source_ip: '203.0.113.7',
     })
   })
+
+  it('returns 500, logs and audits failure when the update throws', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockRepoAndManager(() => {
+      throw new Error('db down')
+    })
+    const { handler } =
+      await import('~/pages/api/UIUC-api/projectConnections/active')
+    const res = makeRes()
+    await handler(
+      {
+        method: 'PATCH',
+        headers: {},
+        body: { project_name: 'demo', is_active: true },
+        user: { email: 'admin@example.com' },
+      } as any,
+      res,
+    )
+    expect(res.statusCode).toBe(500)
+    expect(auditEntries[0]).toMatchObject({ outcome: 'failure' })
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*setting the active project connection failed course=demo\nError: db down/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
 })

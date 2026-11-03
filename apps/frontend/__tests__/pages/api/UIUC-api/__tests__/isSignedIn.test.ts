@@ -24,4 +24,13 @@ describe('UIUC-api/isSignedIn', () => {
     )
     expect(res.status).toHaveBeenCalledWith(200)
   })
+
+  it('echoes the X-Request-ID header', async () => {
+    const res = createMockRes()
+    await handler(
+      createMockReq({ headers: { 'x-request-id': 'signed1' } }) as any,
+      res as any,
+    )
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'signed1')
+  })
 })

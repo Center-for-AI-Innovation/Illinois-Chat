@@ -2,6 +2,10 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import axios from 'axios'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+import { getLogContext } from '~/utils/server/requestContext'
+
+const log = getLogger('api.scrapeWeb')
 
 interface ScrapeRequestBody {
   url: string | null
@@ -66,17 +70,40 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const crawleeApiUrl = process.env.CRAWLEE_API_URL
     if (!crawleeApiUrl) {
-      return res.status(500).json({ error: 'CRAWLEE_API_URL is not set' })
+      // The course wrapper has put course= on every line of this request.
+      log.error('CRAWLEE_API_URL is not set; cannot start the web scrape')
+      return res.status(500).json({
+        error: 'CRAWLEE_API_URL is not set',
+        message:
+          'The web scraper is not configured on this server. Contact support.',
+      })
     }
-    const response = await axios.post(crawleeApiUrl, { params: postParams })
+    // Forward the request id so the crawlee and backend lines carry the same rid.
+    const rid = getLogContext()?.rid
+    const response = await axios.post(
+      crawleeApiUrl,
+      { params: postParams },
+      { headers: rid ? { 'X-Request-ID': rid } : {} },
+    )
 
     return res.status(200).json(response.data)
   } catch (error: any) {
-    console.error('Web scraping error:', error)
+    // crawlee answers a failed crawl with { error, errorTitle, errorMessage }.
+    const message: string =
+      error.response?.data?.errorMessage ?? error.message
+    log.error(
+      'web scrape failed',
+      {
+        url,
+        status: error.response?.status,
+        reason: message,
+      },
+      error,
+    )
 
     return res.status(500).json({
       error: 'Web scraping failed. Please try again later.',
-      message: error.message,
+      message,
     })
   }
 }

@@ -5,6 +5,9 @@ import {
 } from 'eventsource-parser'
 import { type CoreMessage } from 'ai'
 import { type Conversation } from '~/types/chat'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('llm.vllm')
 
 export const dynamic = 'force-dynamic'
 
@@ -218,7 +221,11 @@ export async function runVLLM(conversation: Conversation, stream: boolean) {
         },
       )
     } catch (error) {
-      console.error('VLLM API error:', error)
+      log.warn('VLLM API error', {
+        provider: 'NCSAHostedVLM',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      })
       if (error instanceof Error && error.message.includes('timeout')) {
         throw new Error(`VLLM request timed out: ${error.message}`)
       } else if (error instanceof Error && error.message.includes('apiKey')) {
@@ -230,7 +237,15 @@ export async function runVLLM(conversation: Conversation, stream: boolean) {
       }
     }
   } catch (error) {
-    console.error('Error in runVLLM:', error)
+    log.error(
+      'VLLM chat request failed',
+      {
+        provider: 'NCSAHostedVLM',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     return new Response(
       JSON.stringify({
         error:

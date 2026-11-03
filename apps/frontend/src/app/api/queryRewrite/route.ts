@@ -4,6 +4,9 @@ import { routeModelRequest } from '~/utils/streamProcessing'
 import { type ChatBody } from '@/types/chat'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.queryRewrite')
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,7 +19,7 @@ async function handler(req: AuthenticatedRequest) {
     const response = await routeModelRequest(body as ChatBody)
     return response
   } catch (error) {
-    console.error('Error in query rewrite route:', error)
+    log.error('query rewrite failed', undefined, error)
     return new Response(
       JSON.stringify({
         error: 'Failed to process query rewrite request',

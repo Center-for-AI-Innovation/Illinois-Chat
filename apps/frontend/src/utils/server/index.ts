@@ -27,6 +27,9 @@ import {
   ReasoningCapableModels,
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '../crypto'
+import { getLogger } from './log'
+
+const log = getLogger('openai')
 
 export class OpenAIError extends Error {
   constructor(
@@ -244,7 +247,7 @@ export const OpenAIStream = async (
     })
     return apiStream
   } else {
-    console.log('Non Streaming response from OpenAI')
+    log.debug('non-streaming response from OpenAI')
     const json = await res.json()
     return json
   }

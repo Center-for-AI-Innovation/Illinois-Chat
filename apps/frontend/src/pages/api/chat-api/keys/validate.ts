@@ -4,7 +4,12 @@ import { db, apiKeys, client } from '~/db/dbClient'
 import { keycloakUsers } from '~/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import posthog from 'posthog-js'
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { NextRequest, NextResponse } from 'next/server'
+import { getLogger } from '~/utils/server/log'
+import { runPagesRoute } from '~/utils/server/routeContext'
+
+const log = getLogger('api.keys.validate')
 
 /**
  * Validates the provided API key and retrieves the associated user data.
@@ -26,15 +31,13 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     .from(apiKeys)
     .where(and(eq(apiKeys.key, apiKey), eq(apiKeys.is_active, true)))
 
-  console.log('validateApiKeyAndRetrieveData data', data)
-
   // Determine if the API key is valid based on the absence of errors and presence of data.
   const isValidApiKey = data.length > 0
   if (!isValidApiKey) {
     return { isValidApiKey, authContext }
   }
 
-  console.log('isValidApiKey', isValidApiKey)
+  log.debug('API key is valid; looking up its user')
   try {
     const email = data[0]?.email
     if (!email) {
@@ -47,8 +50,8 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     if (
       process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
     ) {
-      console.log(
-        'Using Illinois Chat config: connect to keycloakDB to fetch user data.',
+      log.debug(
+        'reading the API key user from keycloakDB (Illinois Chat config)',
       )
       const mod = await import('~/db/dbClient')
       keycloakDB = mod.keycloakDB
@@ -59,8 +62,8 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
         .limit(1)
       userData = rows.length > 0 ? rows[0] : null
     } else {
-      console.log(
-        'Using UIUC Chat config: use raw SQL to fetch user data from keycloak.user_entity.',
+      log.debug(
+        'reading the API key user from keycloak.user_entity (UIUC config)',
       )
       // raw SQL to avoid schema issues
       const result = await client`
@@ -104,7 +107,11 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     return { isValidApiKey, authContext }
   } catch (userError) {
     // Log the error if there's an issue retrieving the user object.
-    console.error('Error retrieving user object:', userError)
+    log.error(
+      'could not load the user for a valid API key',
+      undefined,
+      userError,
+    )
     posthog.capture('api_key_validation_failed', {
       error: (userError as Error).message,
     })
@@ -117,9 +124,8 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
  *
  * @param {NextRequest} req - The incoming HTTP request.
  */
-export default async function handler(req: NextRequest) {
+export async function handler(req: NextRequest) {
   try {
-    console.log('req: ', req)
     // Extract the API key and course name from the request body.
     const { api_key, course_name } = (await req.json()) as {
       api_key: string
@@ -138,10 +144,26 @@ export default async function handler(req: NextRequest) {
     return NextResponse.json({ authContext }, { status: 200 })
   } catch (error) {
     // Respond with a 500 Internal Server Error status if an exception occurs.
-    console.error('Error in handler:', error)
+    log.error('API key validation failed', undefined, error)
     return NextResponse.json(
       { error: 'An error occurred while validating the API key' },
       { status: 500 },
     )
   }
+}
+
+// Next calls this file as a Pages route, so open the request context with the
+// Pages wrapper: the lines carry rid= and path= and X-Request-ID is set.
+// A Pages request has a parsed body and no json(), and the handler's
+// NextResponse is not sent on its own, so adapt both ways here.
+export default async function validateRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, async () => {
+    const response = await handler({
+      json: async () => req.body,
+    } as unknown as NextRequest)
+    res.status(response.status).json(await response.json())
+  })
 }

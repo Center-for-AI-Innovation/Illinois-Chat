@@ -5,13 +5,46 @@ import { useAuth } from 'react-oidc-context'
 import { Button } from '@/components/shadcn/ui/button'
 import { montserrat_heading } from 'fonts'
 import { initiateSignIn } from '~/utils/authHelpers'
+import { withRequestRef } from '~/utils/requestRef'
+
+/** 'unavailable': the project settings could not be loaded (a 5xx or no response at all). */
+export type PermissionGateErrorType = 401 | 403 | 404 | 'unavailable'
+
+/**
+ * Picks the gate screen for a failed project metadata load, or null to keep
+ * the page as it is. Takes the error thrown by fetchCourseMetadata, or a plain
+ * { status, requestId } built from a fetch response.
+ */
+export function getPermissionGateError(
+  error: unknown,
+): { errorType: PermissionGateErrorType; requestId?: string } | null {
+  const { status, requestId, cancelled } = (error ?? {}) as {
+    status?: unknown
+    requestId?: unknown
+    cancelled?: unknown
+  }
+  // A cancelled Next.js route change (router.replace interrupted by another
+  // navigation) is not a failed load: keep the page as it is.
+  if (cancelled === true) return null
+  const ref = typeof requestId === 'string' ? requestId : undefined
+  if (status === 401 || status === 403 || status === 404) {
+    return { errorType: status, requestId: ref }
+  }
+  // No status means no answer from the server (for example a network error).
+  if (typeof status !== 'number' || status >= 500) {
+    return { errorType: 'unavailable', requestId: ref }
+  }
+  return null
+}
 
 export const PermissionGate = ({
   course_name,
   errorType,
+  requestId,
 }: {
   course_name: string
-  errorType?: 401 | 403 | 404 | null
+  errorType?: PermissionGateErrorType | null
+  requestId?: string | null
 }) => {
   const auth = useAuth()
 
@@ -30,6 +63,11 @@ export const PermissionGate = ({
         return "You don't have sufficient permissions to access this chatbot."
       case 404:
         return 'This chatbot does not exist.'
+      case 'unavailable':
+        return withRequestRef(
+          'The project settings could not be loaded. Try again in a minute.',
+          requestId,
+        )
       default:
         return 'You must sign in to access this chatbot.'
     }
@@ -43,10 +81,15 @@ export const PermissionGate = ({
         return "You don't have sufficient permissions"
       case 404:
         return 'Chatbot not found'
+      case 'unavailable':
+        return 'This chatbot cannot be loaded right now'
       default:
         return 'Sign in required'
     }
   }
+
+  const showSignIn =
+    errorType !== 404 && errorType !== 403 && errorType !== 'unavailable'
 
   return (
     <>
@@ -112,7 +155,16 @@ export const PermissionGate = ({
                 </Button>
               </Link>
             )}
-            {errorType !== 404 && errorType !== 403 && (
+            {errorType === 'unavailable' && (
+              <Button
+                className="login-btn h-auto min-h-12 bg-(--button) text-white hover:bg-(--button-hover)"
+                style={{ fontSize: '24px' }}
+                onClick={() => window.location.reload()}
+              >
+                Try again
+              </Button>
+            )}
+            {showSignIn && (
               <Link href="/sign-in">
                 <Button
                   className="login-btn h-auto min-h-12 bg-(--button) text-white hover:bg-(--button-hover)"

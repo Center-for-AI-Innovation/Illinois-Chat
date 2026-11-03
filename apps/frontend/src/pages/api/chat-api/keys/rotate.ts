@@ -6,6 +6,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { apiKeys, db } from '~/db/dbClient'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import type { AuthenticatedRequest } from '~/utils/authMiddleware'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.keys.rotate')
 
 type ApiResponse = {
   message?: string
@@ -34,7 +37,7 @@ async function handler(
       return res.status(400).json({ error: 'User email missing' })
     }
 
-    console.log('Rotating API key for email:', email)
+    log.info('rotating API key', { user: req.user?.sub })
 
     // Retrieve existing API key
     const existingKey = await db
@@ -59,18 +62,18 @@ async function handler(
         .set({ key: newApiKey, is_active: true, modified_at: new Date() })
         .where(eq(apiKeys.email, email))
 
-      console.log('Successfully updated API key for user:', email)
+      log.info('rotated API key', { user: req.user?.sub })
 
       return res.status(200).json({
         message: 'API key rotated successfully',
         newApiKey,
       })
     } catch (error) {
-      console.error('Error updating API key:', error)
+      log.error('could not update the API key', { user: req.user?.sub }, error)
       return res.status(500).json({ error: 'Error updating API key' })
     }
   } catch (error) {
-    console.error('Failed to rotate API key:', error)
+    log.error('could not rotate the API key', { user: req.user?.sub }, error)
     return res.status(500).json({
       error: (error as Error).message,
     })

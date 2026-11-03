@@ -254,8 +254,9 @@ describe('runSimWorkflow handler', () => {
       stream: false,
     })
     expect(console.warn).toHaveBeenCalledWith(
-      '[runSimWorkflow] dropped reserved Sim control fields',
-      expect.objectContaining({ stripped: ['stream', 'useDraftState'] }),
+      expect.stringMatching(
+        /WARNING api\.runSimWorkflow .*dropped reserved Sim control fields .*stripped=\["stream","useDraftState"\]/,
+      ),
     )
   })
 
@@ -435,8 +436,9 @@ describe('getSimWorkflows handler', () => {
       workspaceId: 'ws-1',
     })
     expect(console.error).toHaveBeenCalledWith(
-      '[getSimWorkflows] could not describe workflows',
-      failed,
+      expect.stringContaining(
+        `could not describe Sim workflows course=cs101 failed=${JSON.stringify(failed)}`,
+      ),
     )
   })
 

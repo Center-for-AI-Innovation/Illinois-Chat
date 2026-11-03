@@ -4,6 +4,9 @@ import { type ImageBody, type OpenAIChatMessage } from '~/types/chat'
 
 import { OpenAIError, OpenAIStream } from '@/utils/server'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.imageDescription')
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
@@ -27,7 +30,6 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
       messages,
       false,
     )
-    console.log('Response from OpenAIStream:', response)
 
     // Guard: ensure it's an object or string you can safely return
     if (!response || typeof response !== 'object') {
@@ -38,16 +40,20 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 
     return res.status(200).json(response)
   } catch (error) {
+    const modelId = (req.body as Partial<ImageBody> | undefined)?.model?.id
     if (error instanceof OpenAIError) {
       const { name, message } = error
-      console.error('OpenAI Completion Error', message)
+      log.error('image description failed at the model provider', {
+        model: modelId,
+        reason: message,
+      })
       return res.status(400).json({
         statusCode: 400,
         name: name,
         message: message,
       })
     } else {
-      console.error('Unexpected Error', error)
+      log.error('image description failed', { model: modelId }, error)
       return res.status(500).json({ name: 'Error' })
     }
   }

@@ -2,6 +2,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { type ChatBody } from '@/types/chat'
 import { buildPrompt } from '~/app/utils/buildPromptUtils'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.buildPrompt')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
@@ -11,7 +14,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // **Add a nullish check for 'conversation'**
     if (!conversation) {
-      console.error('Conversation is undefined.')
+      log.warn('conversation is missing from the request body', {
+        course: course_name,
+      })
       return res.status(400).json({ error: 'Conversation is required.' })
     }
 
@@ -24,7 +29,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json(updatedConversation)
   } catch (error) {
-    console.error('Error in buildPromptAPI:', error)
+    log.error('buildPrompt failed', undefined, error)
 
     return res.status(500).json({
       error: 'An error occurred in buildPromptAPI',

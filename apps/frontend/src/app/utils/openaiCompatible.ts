@@ -7,6 +7,9 @@ import {
   ReasoningCapableModels,
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('llm.openaiCompatible')
 export const dynamic = 'force-dynamic'
 
 const PROVIDER_NAME = 'openai-compatible'
@@ -143,7 +146,15 @@ export async function runOpenAICompatibleChat(
       )
     }
   } catch (error) {
-    console.error('OpenAI-compatible error:', error)
+    log.error(
+      'OpenAI-compatible chat request failed',
+      {
+        provider: 'OpenAICompatible',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',

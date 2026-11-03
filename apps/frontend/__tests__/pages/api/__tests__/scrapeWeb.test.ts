@@ -16,6 +16,7 @@ vi.mock('axios', () => ({
 }))
 
 import handler from '~/pages/api/scrapeWeb'
+import { runWithLogContext } from '~/utils/server/requestContext'
 
 describe('scrapeWeb API', () => {
   it('returns 405 for non-POST methods', async () => {
@@ -54,6 +55,9 @@ describe('scrapeWeb API', () => {
       res as any,
     )
     expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('scraper') }),
+    )
 
     process.env.CRAWLEE_API_URL = old
   })
@@ -63,11 +67,39 @@ describe('scrapeWeb API', () => {
     hoisted.axiosPost.mockResolvedValueOnce({ data: { ok: true } })
 
     const res = createMockRes()
+    await runWithLogContext({ rid: 'scr1' }, () =>
+      handler(
+        createMockReq({
+          method: 'POST',
+          body: {
+            url: 'example.com/path',
+            courseName: 'CS101',
+            maxUrls: 2,
+            scrapeStrategy: 'default',
+          },
+        }) as any,
+        res as any,
+      ),
+    )
+
+    expect(hoisted.axiosPost).toHaveBeenCalledWith(
+      'http://crawlee',
+      expect.any(Object),
+      { headers: { 'X-Request-ID': 'scr1' } },
+    )
+    expect(res.status).toHaveBeenCalledWith(200)
+  })
+
+  it('sends no X-Request-ID header when no request context is open', async () => {
+    process.env.CRAWLEE_API_URL = 'http://crawlee'
+    hoisted.axiosPost.mockResolvedValueOnce({ data: { ok: true } })
+
+    const res = createMockRes()
     await handler(
       createMockReq({
         method: 'POST',
         body: {
-          url: 'example.com/path',
+          url: 'example.com',
           courseName: 'CS101',
           maxUrls: 2,
           scrapeStrategy: 'default',
@@ -79,8 +111,41 @@ describe('scrapeWeb API', () => {
     expect(hoisted.axiosPost).toHaveBeenCalledWith(
       'http://crawlee',
       expect.any(Object),
+      { headers: {} },
     )
-    expect(res.status).toHaveBeenCalledWith(200)
+  })
+
+  it("returns crawlee's errorMessage when the crawl fails", async () => {
+    process.env.CRAWLEE_API_URL = 'http://crawlee'
+    hoisted.axiosPost.mockRejectedValueOnce(
+      Object.assign(new Error('Request failed with status code 500'), {
+        response: {
+          status: 500,
+          data: {
+            error: 'An error occurred during the upload',
+            errorTitle: 'ZodError',
+            errorMessage: 'url is required',
+          },
+        },
+      }),
+    )
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          url: 'example.com',
+          courseName: 'CS101',
+          maxUrls: 2,
+          scrapeStrategy: 'default',
+        },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'url is required' }),
+    )
   })
 
   it('returns 500 when axios throws', async () => {

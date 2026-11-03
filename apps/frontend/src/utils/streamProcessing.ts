@@ -317,7 +317,9 @@ export async function determineAndValidateModel(
   ) as GenericSupportedModel
 
   if (!activeModel) {
-    console.error(`Model with ID ${modelId} not found in available models.`)
+    console.warn(
+      `Model with ID ${modelId} is not enabled in project ${projectName}.`,
+    )
     throw new Error(
       `The requested model '${modelId}' is not available in this project. It has likely been restricted by the project's admins. You can enable this model on the admin page here: https://uiuc.chat/${projectName}/dashboard. These models are available to use: ${Array.from(
         availableModels,
@@ -677,7 +679,11 @@ export async function updateConversationInDatabase(
       })
     }
   } catch (error) {
-    console.error('Error setting course data:', error)
+    console.error(
+      'Error logging the conversation for project',
+      course_name,
+      error,
+    )
     // return false
   }
 
@@ -746,7 +752,6 @@ export async function handleImageContent(
     console.error('Error in chat.tsx running handleImageContent():', error)
     controller.abort()
   }
-  console.log('Returning search query with image description: ', searchQuery)
   return { searchQuery, imgDesc }
 }
 
@@ -781,7 +786,9 @@ export const routeModelRequest = async (
   const selectedConversation = chatBody.conversation!
   // console.debug('Selected conversation:', selectedConversation)
   if (!selectedConversation.model || !selectedConversation.model.id) {
-    console.debug('Invalid conversation:', selectedConversation)
+    console.debug('Invalid conversation: model id missing', {
+      conversation_id: selectedConversation.id,
+    })
     throw new Error('Conversation model is undefined or missing "id" property.')
   }
 

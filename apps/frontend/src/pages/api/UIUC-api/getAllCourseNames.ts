@@ -3,12 +3,15 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { getCoursesByOwnerOrAdmin } from './getAllCourseMetadata'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getAllCourseNames')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     const currUserEmail = req.user?.email
     if (!currUserEmail) {
-      console.error('No email found in token')
+      log.warn('no email found in token')
       return res.status(400).json({ error: 'No email found in token' })
     }
     const all_course_metadata_raw =
@@ -21,7 +24,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
     return res.status(200).json({ all_course_names })
   } catch (error) {
-    console.log(error)
+    log.error('failed to list the projects of a user', undefined, error)
     return res.status(500).json({ success: false })
   }
 }

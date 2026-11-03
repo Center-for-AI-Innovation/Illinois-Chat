@@ -5,6 +5,9 @@ import { createPresignedPost } from '@aws-sdk/s3-presigned-post'
 import { connectionManager } from '~/utils/connectionManager'
 import { getPresignedUrlClient } from '~/utils/s3Client'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.uploadToS3')
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   try {
@@ -52,7 +55,11 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
       .status(200)
       .json({ message: 'Presigned URL generated successfully', post })
   } catch (error) {
-    console.error('Error generating presigned URL:', error)
+    log.error(
+      'error generating presigned upload URL',
+      { file: req.body?.uniqueFileName, upload_type: req.body?.uploadType },
+      error,
+    )
     res
       .status(500)
       .json({ message: 'Error generating presigned URL', error: error })

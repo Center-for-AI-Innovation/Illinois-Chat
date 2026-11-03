@@ -49,4 +49,79 @@ describe('UIUC-api/ingest', () => {
     expect(fetchSpy).toHaveBeenCalled()
     fetchSpy.mockRestore()
   })
+
+  it('passes a backend error status through with an error field and logs it once', async () => {
+    process.env.INGEST_URL = 'http://ingest/ingest'
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response('<html>Bad Gateway</html>', { status: 502 }),
+      )
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          uniqueFileName: 'u.pdf',
+          courseName: 'CS101',
+          readableFilename: 'r.pdf',
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(502)
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Ingest backend answered with status 502',
+    })
+    // One ERROR from backendFetch with the status, path and body.
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*backend 502 POST \/ingest .*body=<html>Bad Gateway<\/html>/,
+      ),
+    )
+    // The route adds the file it could not queue.
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /WARNING api\.ingest .*ingest not queued status=502 file=courses\/CS101\/u\.pdf/,
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+    consoleWarn.mockRestore()
+  })
+
+  it('returns 500 and logs when the ingest call throws', async () => {
+    process.env.INGEST_URL = 'http://ingest/ingest'
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          uniqueFileName: 'u.pdf',
+          courseName: 'CS101',
+          readableFilename: 'r.pdf',
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*ingest submission failed file=u\.pdf\nError: connect ECONNREFUSED/,
+      ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+  })
 })

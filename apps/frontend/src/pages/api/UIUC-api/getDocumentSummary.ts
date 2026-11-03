@@ -5,6 +5,9 @@ import type { DocumentSummary } from '~/components/UIUC-Components/chatbots-hub/
 import { db } from '~/db/dbClient'
 import { documents } from '~/db/schema'
 import { count, eq, sql } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getDocumentSummary')
 
 const fileTypeCase = sql<string>`
     CASE
@@ -76,7 +79,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     res.status(200).json({ success: true, documentSummary })
   } catch (error) {
-    console.log('Error occurred while fetching document summary', error)
+    log.error('error fetching document summary', undefined, error)
     res.status(500).json({ success: false, error: error })
   }
 }

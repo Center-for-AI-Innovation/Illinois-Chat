@@ -19,6 +19,7 @@ import {
 import NextLink from 'next/link'
 import { useRouter } from 'next/router'
 import { type FileUpload } from './UploadNotification'
+import { fetchErrorText, withRequestRef } from '~/utils/requestRef'
 import { type QueryClient } from '@tanstack/react-query'
 import Image from 'next/image'
 
@@ -89,6 +90,7 @@ export default function CanvasIngestForm({
         ),
       )
 
+      let failureText: string | undefined
       try {
         const response = await fetch('/api/UIUC-api/ingestCanvas', {
           method: 'POST',
@@ -101,13 +103,20 @@ export default function CanvasIngestForm({
             selectedCanvasOptions: selectedOptions,
           }),
         })
-        const data = await response.json()
-
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+          failureText = await fetchErrorText(
+            response,
+            'Error ingesting Canvas content. Please try again.',
+          )
+          throw new Error(failureText)
         }
+        const data = await response.json()
         if (data && data.error) {
-          throw new Error(data.error)
+          failureText = withRequestRef(
+            String(data.error),
+            response.headers.get('x-request-id'),
+          )
+          throw new Error(failureText)
         }
 
         setUploadFiles((prevFiles) =>
@@ -125,14 +134,22 @@ export default function CanvasIngestForm({
       } catch (error) {
         setUploadFiles((prevFiles) =>
           prevFiles.map((file) =>
-            file.name === url ? { ...file, status: 'error' } : file,
+            file.name === url
+              ? {
+                  ...file,
+                  status: 'error',
+                  ...(failureText ? { error: failureText } : {}),
+                }
+              : file,
           ),
         )
         void queryClient.invalidateQueries({
           queryKey: ['failedDocuments', project_name],
         })
         console.error('Error ingesting Canvas content:', error)
-        alert('Error ingesting Canvas content. Please try again.')
+        alert(
+          failureText ?? 'Error ingesting Canvas content. Please try again.',
+        )
       }
     } else {
       alert('Invalid URL (please include https://)')

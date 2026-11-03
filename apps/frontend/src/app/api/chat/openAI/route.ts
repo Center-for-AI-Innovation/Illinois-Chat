@@ -5,6 +5,9 @@ import OpenAI from 'openai'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { decrypt } from '~/utils/crypto'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.chat.openAI')
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -58,7 +61,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
           )
         }
       } catch (error) {
-        console.error('Error decrypting OpenAI key:', error)
+        log.error('could not decrypt the OpenAI key', undefined, error)
         return NextResponse.json(
           {
             error:

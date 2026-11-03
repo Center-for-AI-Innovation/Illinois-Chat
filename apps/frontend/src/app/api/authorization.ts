@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAppRouterAuth } from '~/utils/appRouterAuth'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { AuthenticatedUser } from '~/proxy'
+import { getLogger } from '~/utils/server/log'
+import {
+  MetadataUnavailableError,
+  setLogCourse,
+} from '~/utils/server/requestContext'
+import { runAppRoute } from '~/utils/server/routeContext'
 import {
   COURSE_NAME_HEADER_KEYS,
   COURSE_NAME_KEYS,
@@ -11,21 +17,33 @@ import {
   type ExtractedCourseName,
 } from '~/server/courseNameExtraction'
 
-// Helper function to get course metadata from Redis
+export { MetadataUnavailableError }
+
+const log = getLogger('api.authorization')
+
+// Helper function to get course metadata from Redis. Returns null when the
+// project does not exist; throws MetadataUnavailableError when Redis cannot be
+// read, so the wrapper answers 503 instead of a misleading 404.
 export async function getCourseMetadata(
   courseName: string,
 ): Promise<CourseMetadata | null> {
+  let rawMetadata: string | null | undefined
   try {
     const redisClient = await ensureRedisConnected()
-    const rawMetadata = await redisClient.hGet('course_metadatas', courseName)
-    const course_metadata: CourseMetadata | null = rawMetadata
-      ? JSON.parse(rawMetadata)
-      : null
-
-    // Use value as-is; Redis-stored JSON should already have correct boolean
-    return course_metadata
+    rawMetadata = await redisClient.hGet('course_metadatas', courseName)
   } catch (error) {
-    console.error('Error occurred while fetching courseMetadata', error)
+    throw new MetadataUnavailableError(courseName, error)
+  }
+  if (!rawMetadata) return null
+  try {
+    // Use value as-is; Redis-stored JSON should already have correct boolean
+    return JSON.parse(rawMetadata) as CourseMetadata
+  } catch (error) {
+    log.warn(
+      'project metadata is not valid JSON; treating the project as missing',
+      { course: courseName },
+      error,
+    )
     return null
   }
 }
@@ -114,126 +132,130 @@ export function withCourseAccessFromRequest(
       req: AuthenticatedRequest,
     ) => Promise<NextResponse> | NextResponse,
   ) {
-    return async (req: AuthenticatedRequest) => {
-      const { courseName, conflict } = await extractCourseName(req)
-      if (conflict) {
-        return new NextResponse(
-          JSON.stringify({
-            error: 'Conflicting project names',
-            message:
-              'The request specifies more than one project name; they must match',
-          }),
-          { status: 400 },
-        )
-      }
-      if (!courseName) {
-        return new NextResponse(
-          JSON.stringify({
-            error: 'Course name required',
-            message:
-              'Course name must be provided in query params, body, or headers',
-          }),
-          { status: 400 },
-        )
-      }
-
-      // Get course metadata
-      const courseMetadata = await getCourseMetadata(courseName)
-      if (!courseMetadata) {
-        return NextResponse.json(
-          {
-            error: 'Project not found',
-            message: `Project '${courseName}' does not exist`,
-          },
-          { status: 404 },
-        )
-      }
-
-      // Check if course is frozen/archived
-      if (courseMetadata.is_frozen === true) {
-        return NextResponse.json(
-          {
-            error: 'Project is temporarily frozen by the administrator',
-            message: `Project '${courseName}' has been temporarily frozen by the administrator`,
-          },
-          { status: 403 },
-        )
-      }
-
-      // Determine required access level for this request
-      const method = req.method as
-        | 'GET'
-        | 'POST'
-        | 'PUT'
-        | 'PATCH'
-        | 'DELETE'
-        | 'HEAD'
-        | 'OPTIONS'
-      const requiredAccess =
-        typeof access === 'string' ? access : access[method] || 'any'
-
-      // For public courses, allow unauthenticated access if access level is 'any'
-      if (!courseMetadata.is_private && requiredAccess === 'any') {
-        // Add course context to request
-        req.courseName = courseName
-        return await handler(req)
-      }
-
-      // For private courses or higher access levels, require authentication
-      return withAppRouterAuth(async (req: AuthenticatedRequest) => {
-        if (!req.user) {
+    // Outermost wrapper here (withAppRouterAuth runs inside it), so it opens
+    // the log context and owns the catch-all itself.
+    return (req: AuthenticatedRequest) =>
+      runAppRoute(req, async () => {
+        const { courseName, conflict } = await extractCourseName(req)
+        if (conflict) {
           return new NextResponse(
-            JSON.stringify({ error: 'User not authenticated' }),
-            { status: 401 },
+            JSON.stringify({
+              error: 'Conflicting project names',
+              message:
+                'The request specifies more than one project name; they must match',
+            }),
+            { status: 400 },
+          )
+        }
+        if (!courseName) {
+          return new NextResponse(
+            JSON.stringify({
+              error: 'Course name required',
+              message:
+                'Course name must be provided in query params, body, or headers',
+            }),
+            { status: 400 },
           )
         }
 
-        // Check course access for private courses
-        if (
-          courseMetadata.is_private &&
-          !hasCourseAccess(req.user, courseMetadata)
-        ) {
-          return new NextResponse(
-            JSON.stringify({
-              error: 'Access denied',
-              message: `You don't have access to course '${courseName}'`,
-            }),
+        // Get course metadata
+        setLogCourse(courseName)
+        const courseMetadata = await getCourseMetadata(courseName)
+        if (!courseMetadata) {
+          return NextResponse.json(
+            {
+              error: 'Project not found',
+              message: `Project '${courseName}' does not exist`,
+            },
+            { status: 404 },
+          )
+        }
+
+        // Check if course is frozen/archived
+        if (courseMetadata.is_frozen === true) {
+          return NextResponse.json(
+            {
+              error: 'Project is temporarily frozen by the administrator',
+              message: `Project '${courseName}' has been temporarily frozen by the administrator`,
+            },
             { status: 403 },
           )
         }
 
-        // Check specific access level
-        if (
-          requiredAccess === 'admin' &&
-          !courseMetadata.course_admins?.includes(req.user.email)
-        ) {
-          return new NextResponse(
-            JSON.stringify({
-              error: 'Access denied',
-              message: 'This action requires admin access',
-            }),
-            { status: 403 },
-          )
+        // Determine required access level for this request
+        const method = req.method as
+          | 'GET'
+          | 'POST'
+          | 'PUT'
+          | 'PATCH'
+          | 'DELETE'
+          | 'HEAD'
+          | 'OPTIONS'
+        const requiredAccess =
+          typeof access === 'string' ? access : access[method] || 'any'
+
+        // For public courses, allow unauthenticated access if access level is 'any'
+        if (!courseMetadata.is_private && requiredAccess === 'any') {
+          // Add course context to request
+          req.courseName = courseName
+          return await handler(req)
         }
 
-        if (
-          requiredAccess === 'owner' &&
-          req.user.email !== courseMetadata.course_owner
-        ) {
-          return new NextResponse(
-            JSON.stringify({
-              error: 'Access denied',
-              message: 'This action requires course owner access',
-            }),
-            { status: 403 },
-          )
-        }
+        // For private courses or higher access levels, require authentication
+        return withAppRouterAuth(async (req: AuthenticatedRequest) => {
+          if (!req.user) {
+            return new NextResponse(
+              JSON.stringify({ error: 'User not authenticated' }),
+              { status: 401 },
+            )
+          }
 
-        // Add course context to request
-        req.courseName = courseName
+          // Check course access for private courses
+          if (
+            courseMetadata.is_private &&
+            !hasCourseAccess(req.user, courseMetadata)
+          ) {
+            return new NextResponse(
+              JSON.stringify({
+                error: 'Access denied',
+                message: `You don't have access to course '${courseName}'`,
+              }),
+              { status: 403 },
+            )
+          }
 
-        return await handler(req)
-      })(req)
-    }
+          // Check specific access level
+          if (
+            requiredAccess === 'admin' &&
+            !courseMetadata.course_admins?.includes(req.user.email)
+          ) {
+            return new NextResponse(
+              JSON.stringify({
+                error: 'Access denied',
+                message: 'This action requires admin access',
+              }),
+              { status: 403 },
+            )
+          }
+
+          if (
+            requiredAccess === 'owner' &&
+            req.user.email !== courseMetadata.course_owner
+          ) {
+            return new NextResponse(
+              JSON.stringify({
+                error: 'Access denied',
+                message: 'This action requires course owner access',
+              }),
+              { status: 403 },
+            )
+          }
+
+          // Add course context to request
+          req.courseName = courseName
+
+          return await handler(req)
+        })(req)
+      })
   }
 }

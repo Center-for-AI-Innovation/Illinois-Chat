@@ -199,4 +199,80 @@ describe('UIUC-api chat-file-upload', () => {
       }),
     )
   })
+
+  const body = {
+    conversationId: 'c1',
+    courseName: 'CS101',
+    user_id: 'u@example.com',
+    s3Key: 'courses/CS101/file.txt',
+    fileName: 'file.txt',
+  }
+  const existingConversation = () =>
+    hoisted.select.mockImplementationOnce(() => ({
+      from: () => ({
+        where: () => ({
+          limit: vi
+            .fn()
+            .mockResolvedValueOnce([{ id: 'c1', user_email: 'u@example.com' }]),
+        }),
+      }),
+    }))
+
+  it('returns 500 and logs when the file_uploads insert fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    existingConversation()
+    hoisted.insert.mockReturnValueOnce({
+      values: vi.fn().mockRejectedValueOnce(new Error('insert failed')),
+    })
+    const res = createMockRes()
+    await handler(createMockReq({ method: 'POST', body }) as any, res as any)
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*failed to create file_uploads record conversation=c1 file=file\.txt\nError: insert failed/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
+
+  it('returns 500 and logs when the backend answer is not JSON', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    existingConversation()
+    hoisted.insert.mockReturnValueOnce({
+      values: vi.fn().mockResolvedValueOnce(undefined),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: vi.fn(async () => {
+          throw new SyntaxError('Unexpected token <')
+        }),
+      })) as any,
+    )
+    const res = createMockRes()
+    await handler(createMockReq({ method: 'POST', body }) as any, res as any)
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('could not parse the backend response'),
+    )
+    consoleError.mockRestore()
+  })
+
+  it('returns 500 and logs when an unexpected error is thrown', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    hoisted.select.mockImplementationOnce(() => {
+      throw new Error('db unavailable')
+    })
+    const res = createMockRes()
+    await handler(createMockReq({ method: 'POST', body }) as any, res as any)
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*chat file upload failed\nError: db unavailable/,
+      ),
+    )
+    consoleError.mockRestore()
+  })
 })

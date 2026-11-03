@@ -1,6 +1,9 @@
 import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getUserLastAccessForCourse } from '~/pages/api/UIUC-api/getCourseMetadata'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getUserLastAccess')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -30,7 +33,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       last_accessed_at: lastAccessedAt,
     })
   } catch (error) {
-    console.error('Error fetching user last access:', error)
+    log.error('error fetching user last access', { course: courseName }, error)
     return res.status(500).json({ error: 'Failed to fetch user last access' })
   }
 }

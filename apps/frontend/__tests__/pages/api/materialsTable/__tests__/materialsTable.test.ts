@@ -440,16 +440,26 @@ describe('materialsTable API handlers', () => {
     })
   })
 
-  it('fetchFailedDocuments rejects when from/to are missing in the URL', async () => {
+  it('fetchFailedDocuments returns 400 and warns when from/to are missing in the URL', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const req = createMockReq({
       method: 'GET',
       url: '/api/materialsTable/fetchFailedDocuments?course_name=CS101',
       headers: { host: 'localhost' },
     })
     const res = createMockRes()
-    await expect(
-      fetchFailedDocumentsHandler(req as any, res as any),
-    ).rejects.toThrow('Missing required query parameters: from and to')
+    await fetchFailedDocumentsHandler(req as any, res as any)
+    expect(res.status).toHaveBeenCalledWith(400)
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Missing required query parameters: from and to',
+    })
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining('missing required query parameters'),
+    )
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleWarn.mockRestore()
+    consoleError.mockRestore()
   })
 
   it('fetchFailedDocuments returns 405 for non-GET', async () => {
@@ -763,7 +773,8 @@ describe('materialsTable API handlers', () => {
     })
   })
 
-  it('fetchProjectMaterials returns 500 and captures posthog when db throws', async () => {
+  it('fetchProjectMaterials returns 500 and logs the error when db throws', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     hoisted.select.mockImplementationOnce(() => ({
       from: () => ({
         leftJoin: () => ({
@@ -791,11 +802,14 @@ describe('materialsTable API handlers', () => {
       res as any,
     )
 
-    expect(hoisted.posthogCapture).toHaveBeenCalledWith(
-      'fetch_materials_failed',
-      expect.objectContaining({ course_name: 'CS101', error: 'boom' }),
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR .*failed to fetch project materials\n.*boom/,
+      ),
     )
+    expect(hoisted.posthogCapture).not.toHaveBeenCalled()
     expect(res.status).toHaveBeenCalledWith(500)
     expect(res.json).toHaveBeenCalledWith({ error: 'boom' })
+    consoleError.mockRestore()
   })
 })
