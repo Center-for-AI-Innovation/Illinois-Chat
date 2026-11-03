@@ -31,6 +31,12 @@ def _strip_query(text: str) -> str:
     return _QUERY_STRING.sub('?***', text)
 
 
+def _request_error(e: Exception) -> str:
+    """`ConnectionError: ...` for a requests failure, without URL query strings.
+    Log this instead of the traceback: the urllib3 chain repeats the full URL."""
+    return _strip_query(f"{type(e).__name__}: {e}")
+
+
 def _failed(e: Exception) -> str:
     """The failure string a section returns, without URL query strings."""
     return "Failed! Error: " + _strip_query(str(e))
@@ -110,7 +116,7 @@ class IngestCanvas:
             body = e.response.text[:500] if e.response is not None else None
             raise CanvasError("Canvas request failed", status, body, path) from e
         except requests.RequestException as e:
-            raise CanvasError("Canvas unreachable", None, _strip_query(f"{type(e).__name__}: {e}"), path) from e
+            raise CanvasError("Canvas unreachable", None, _request_error(e), path) from e
 
     def auto_accept_enrollments(self, target_course_id):
         """Accept the pending Canvas invitation of the token's user for the course.
@@ -441,6 +447,7 @@ class IngestCanvas:
         Modules may contain: assignments, quizzes, files, pages, discussions, external tools and external urls.
         Rest of the things are covered in other functions.
         """
+        external_url = None
         try:
             module_request = self._canvas_request('GET', f"{api_path}/modules?include=items&per_page=50")
             modules = module_request.json()
@@ -455,7 +462,8 @@ class IngestCanvas:
                 for item in module['items']:
 
                     if item['type'] == 'ExternalUrl':
-                        response = requests.get(item['external_url'], timeout=30)
+                        external_url = item['external_url']
+                        response = requests.get(external_url, timeout=30)
                         if response.status_code == 200:
                             title_fmt = item['title'].replace(' ', '_')
                             html_file_name = f"Module_{module_number}_external_link_{title_fmt}.html"
@@ -510,6 +518,11 @@ class IngestCanvas:
         except CanvasError as e:
             logger.warning("section=modules skipped: %s", e.describe())
             return "Failed! " + e.describe()
+        except requests.RequestException as e:
+            logger.error("section=modules failed for %s url=%s: %s", urlsplit(api_path).path,
+                         urlsplit(external_url).path if external_url else None, _request_error(e))
+            sentry_sdk.capture_exception(e)
+            return _failed(e)
         except Exception as e:
             logger.exception("section=modules failed for %s", urlsplit(api_path).path)
             sentry_sdk.capture_exception(e)
@@ -647,6 +660,11 @@ class IngestCanvas:
                             f.write(chunk)
                     logger.debug("downloaded linked file %s", filename)
             return "Success"
+        except requests.RequestException as e:
+            logger.error("downloading linked Canvas files failed canvas_course_id=%s url=%s: %s", course_id,
+                         urlsplit(url).path if url else None, _request_error(e))
+            sentry_sdk.capture_exception(e)
+            return _failed(e)
         except Exception as e:
             logger.exception("downloading linked Canvas files failed canvas_course_id=%s url=%s", course_id,
                              urlsplit(url).path if url else None)
@@ -674,6 +692,11 @@ class IngestCanvas:
                         filename = f"{course_id}_video_{count}.{ext}"
                     logger.debug("downloaded video %s", filename)
             return "Success"
+        except requests.RequestException as e:
+            logger.error("downloading Canvas videos failed canvas_course_id=%s url=%s: %s", course_id,
+                         urlsplit(url).path if url else None, _request_error(e))
+            sentry_sdk.capture_exception(e)
+            return _failed(e)
         except Exception as e:
             logger.exception("downloading Canvas videos failed canvas_course_id=%s url=%s", course_id,
                              urlsplit(url).path if url else None)

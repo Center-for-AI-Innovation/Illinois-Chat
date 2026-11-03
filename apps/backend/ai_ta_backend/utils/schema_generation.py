@@ -126,7 +126,8 @@ def generate_schema_from_project_description(project_name: str, project_descript
     else:
       json_schema = json.loads(json_schema_string)
     logger.debug("Final JSON schema: %s", json_schema)
-    logger.info("generated metadata schema course=%s fields=%d", project_name, len(json_schema))
+    fields = len(json_schema) if isinstance(json_schema, (dict, list)) else 0
+    logger.info("generated metadata schema course=%s fields=%d", project_name, fields)
     return json_schema
 
   except Exception as e:

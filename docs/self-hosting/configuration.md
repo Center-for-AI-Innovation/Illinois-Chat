@@ -151,7 +151,8 @@ The backend emails a download link when an export of more than 500 items finishe
 | Variable | Read by | Required or default | In template |
 | --- | --- | --- | --- |
 | `EMAIL_SENDER` | backend | no default | none |
-| `SES_HOST`, `SES_PORT` | backend | no default | none |
+| `SES_HOST` | backend | no default | none |
+| `SES_PORT` | backend | `465` | none |
 | `USERNAME_SMTP`, `PASSWORD_SMTP` | backend | no default | none |
 
 ## Tools platform (Sim AI)

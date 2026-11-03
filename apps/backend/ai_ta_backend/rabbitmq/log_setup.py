@@ -186,7 +186,8 @@ def install_request_logging(app) -> None:
         rid = current_rid()
         if rid:
             response.headers['X-Request-ID'] = rid
-        if request.path not in _SKIP_PATHS:
+        # Skip health checks and CORS preflights: they say nothing about the work.
+        if request.path not in _SKIP_PATHS and request.method != 'OPTIONS':
             start = g.get('log_start')
             ms = int((time.monotonic() - start) * 1000) if start is not None else -1
             request_logger.info('request method=%s route=%s status=%d ms=%d', request.method, request.path,
@@ -202,13 +203,17 @@ def install_request_logging(app) -> None:
 # Background tasks
 # ---------------------------------------------------------------------------
 
-def run_with_context(ctx, name, fn, *args, **kwargs):
-    """Run fn in a pool thread or process with the submitter's log context."""
+def run_with_context(ctx, name, fn, *args, log_failure=True, **kwargs):
+    """Run fn in a pool thread or process with the submitter's log context.
+
+    log_failure=False leaves the failure line to the caller (the process pool
+    logs it once in the parent, see process_pool_executor.py)."""
     _context.set(dict(ctx or {}))
     try:
         return fn(*args, **kwargs)
     except Exception:
-        logger.exception('background task %s failed', name)
+        if log_failure:
+            logger.exception('background task %s failed', name)
         raise
     finally:
         clear()

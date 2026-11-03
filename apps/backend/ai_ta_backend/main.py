@@ -250,7 +250,7 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
   start_time = time.monotonic()
   # background execution of tasks!!
   flaskExecutor.submit(service.delete_data, course_name, s3_path, source_url)
-  logger.info("From %s, deleted file: %s", course_name, s3_path)
+  logger.info("delete requested course=%s file=%s (runs in the background)", course_name, s3_path or source_url)
   logger.debug("⏰ Runtime of FULL delete func: %.2f seconds", time.monotonic() - start_time)
   # we need instant return. Delets are "best effort" assume always successful... sigh :(
   response = jsonify({"outcome": 'success'})
@@ -699,8 +699,9 @@ def get_conversation_stats(service: RetrievalService) -> Response:
 def ingest() -> Response:
   active_queue = Queue()
   data = request.get_json()
-  logger.info("ingest request course=%s file=%s s3_paths=%s", data.get('course_name'), data.get('readable_filename'),
-              data.get('s3_paths'))
+  # Name only the fields that are set: web-text jobs from crawlee carry `url`, file jobs carry `s3_paths`.
+  fields = ' '.join('%s=%s' % (key, data[key]) for key in ('url', 's3_paths') if data.get(key))
+  logger.info("ingest request course=%s file=%s %s", data.get('course_name'), data.get('readable_filename'), fields)
 
   # TODO: Authentication?
 

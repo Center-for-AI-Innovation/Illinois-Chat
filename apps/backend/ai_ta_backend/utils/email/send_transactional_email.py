@@ -6,7 +6,8 @@ from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
-_SMTP_VARS = ('SES_HOST', 'SES_PORT', 'USERNAME_SMTP', 'PASSWORD_SMTP')
+# SES_PORT is optional: unset or empty means smtplib's default SSL port, 465.
+_SMTP_VARS = ('SES_HOST', 'USERNAME_SMTP', 'PASSWORD_SMTP')
 
 
 def send_email(subject: str, body_text: str, sender: str, recipients: list, bcc_recipients: list):
@@ -43,7 +44,7 @@ def send_email(subject: str, body_text: str, sender: str, recipients: list, bcc_
 
   # Connect to SMTP server
   try:
-    server = smtplib.SMTP_SSL(os.getenv('SES_HOST'), os.getenv('SES_PORT'))  # type: ignore
+    server = smtplib.SMTP_SSL(os.getenv('SES_HOST'), os.getenv('SES_PORT') or None)  # type: ignore
   except OSError as e:
     raise RuntimeError(f"SMTP unreachable at {os.getenv('SES_HOST')}: {e}") from e
   with server:

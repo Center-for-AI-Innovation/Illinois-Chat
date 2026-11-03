@@ -39,7 +39,7 @@ The format lives in `apps/backend/ai_ta_backend/rabbitmq/log_setup.py`. `main.py
 
 ## Rules
 
-- Every module gets its own logger: `logger = logging.getLogger(__name__)`. No calls on the root logger (`logging.info(...)`), and no `print`: neither has a level, a time or the ids. `worker.py` is the one exception and uses `logging.getLogger('worker')`, because the spawned ingest process imports it as `__mp_main__`.
+- Every module gets its own logger: `logger = logging.getLogger(__name__)`. No calls on the root logger (`logging.info(...)`), and no `print`: neither has a level, a time or the ids. Two scripts are the exception and name their logger: `worker.py` uses `logging.getLogger('worker')`, because the spawned ingest process imports it as `__mp_main__`, and `bridge.py` uses `logging.getLogger('bridge')`, because it runs as `python bridge.py` and its `__name__` is `__main__`.
 - Pass values as arguments: `logger.info("queued %d jobs for course=%s", count, course)`, never an f-string.
 - Inside an `except` block, use `logger.exception("<what failed> course=%s", course)`. It adds the traceback.
 - Log an error once, at the layer that handles it. Lower layers raise or return the error; they do not log it as well.
@@ -54,11 +54,11 @@ One id follows an upload from the browser to the worker, so one search for `rid=
 
 1. The upload area in the browser makes an id for each file and sends it in the `X-Request-ID` header of the call to the Next.js API.
 2. The Next.js API route reads that header, or makes an id, and forwards it to the backend.
-3. Flask (`install_request_logging` in `log_setup.py`, used by `main.py` and `bridge.py`) takes the `X-Request-ID` header when it is 1 to 64 letters, digits, `-` or `_`, and otherwise makes a 12-character id. It writes one `INFO` request line per request (not for `/health` and `/api/healthcheck`) and sends the id back in the `X-Request-ID` response header.
+3. Flask (`install_request_logging` in `log_setup.py`, used by `main.py` and `bridge.py`) takes the `X-Request-ID` header when it is 1 to 64 letters, digits, `-` or `_`, and otherwise makes a 12-character id. It writes one `INFO` request line per request (not for `/health`, `/api/healthcheck` and `OPTIONS` preflight requests) and sends the id back in the `X-Request-ID` response header.
 4. `rmqueue.addJobToIngestQueue` puts the id into the queue message as `request_id`. A job that is re-queued keeps it.
 5. The worker binds `rid`, `job` and `course` for the whole job. The spawned ingest process receives the id as an argument and binds it again, because the context does not cross into a new process.
 
-Background tasks started from a request (Flask-Executor threads and the process pool) get the request's context when they are submitted, so their lines carry the same `rid=`. A background task that raises is logged as `background task <name> failed`.
+Background tasks started from a request (Flask-Executor threads and the process pool) get the request's context when they are submitted, so their lines carry the same `rid=`. A background task that raises is logged once, as `background task <name> failed` with its traceback.
 
 ## Repeats and gaps that are expected
 

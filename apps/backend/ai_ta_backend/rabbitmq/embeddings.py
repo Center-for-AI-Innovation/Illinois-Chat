@@ -255,7 +255,7 @@ class OpenAIAPIProcessor:
                        time.ctime(status_tracker.time_of_last_rate_limit_error + seconds_to_pause_after_rate_limit_error))
 
     # after finishing, log final status
-    logger.info("Parallel processing complete. About to return.")
+    logger.debug("Parallel processing complete. About to return.")
     if status_tracker.num_tasks_failed > 0:
       logger.warning("%d / %d requests failed.", status_tracker.num_tasks_failed, status_tracker.num_tasks_started)
     if status_tracker.num_rate_limit_errors > 0:

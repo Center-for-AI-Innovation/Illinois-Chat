@@ -67,7 +67,7 @@ class Queue:
         This adds a job to the queue, then eventually the queue worker uses ingest.py to ingest the document.
         """
         s3_paths = inputs.get('s3_paths')
-        logger.info("queueing ingest course=%s file=%s s3_path=%s", inputs.get('course_name'),
+        logger.debug("queueing ingest course=%s file=%s s3_path=%s", inputs.get('course_name'),
                     inputs.get('readable_filename'), s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths)
 
         if not self.is_connected():
