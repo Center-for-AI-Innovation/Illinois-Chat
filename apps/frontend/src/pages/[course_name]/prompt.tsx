@@ -7,7 +7,11 @@ import React, { useEffect, useState } from 'react'
 
 import { Card } from '@/components/shadcn/ui/card'
 import { useAuth } from 'react-oidc-context'
-import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import {
+  PermissionGate,
+  getPermissionGateError,
+  type PermissionGateErrorType,
+} from '~/components/UIUC-Components/PermissionGate'
 import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import {
@@ -53,7 +57,10 @@ const CourseMain: NextPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState(),
   )
-  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+  const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
+    null,
+  )
+  const [errorRequestId, setErrorRequestId] = useState<string>()
 
   const cardWidthClasses = useResponsiveCardWidth(sidebarCollapsed)
 
@@ -77,10 +84,10 @@ const CourseMain: NextPage = () => {
       } catch (error) {
         console.error(error)
 
-        const errorWithStatus = error as Error & { status?: number }
-        const status = errorWithStatus.status
-        if (status === 401 || status === 403 || status === 404) {
-          setErrorType(status as 401 | 403 | 404)
+        const gateError = getPermissionGateError(error)
+        if (gateError) {
+          setErrorType(gateError.errorType)
+          setErrorRequestId(gateError.requestId)
         }
       } finally {
         setIsLoading(false)
@@ -139,6 +146,7 @@ const CourseMain: NextPage = () => {
       <PermissionGate
         course_name={courseName ? (courseName as string) : 'new'}
         errorType={errorType}
+        requestId={errorRequestId}
       />
     )
   }

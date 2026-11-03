@@ -168,8 +168,9 @@ export async function fetchCourseMetadata(course_name: string): Promise<any> {
     if (!response.ok) {
       const error = new Error(
         `Error fetching course metadata: ${response.statusText || response.status}`,
-      ) as Error & { status?: number }
+      ) as Error & { status?: number; requestId?: string }
       error.status = response.status
+      error.requestId = response.headers.get('x-request-id') ?? undefined
       throw error
     }
 

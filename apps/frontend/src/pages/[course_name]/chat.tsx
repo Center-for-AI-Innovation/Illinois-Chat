@@ -12,7 +12,11 @@ import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { montserrat_heading } from 'fonts'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
-import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import {
+  PermissionGate,
+  getPermissionGateError,
+  type PermissionGateErrorType,
+} from '~/components/UIUC-Components/PermissionGate'
 import { getOrCreateAnonymousUserId } from '~/utils/anonymousUserId'
 
 const ChatPage: NextPage = () => {
@@ -38,7 +42,10 @@ const ChatPage: NextPage = () => {
   const [urlSystemPromptOnly, setUrlSystemPromptOnly] = useState(false)
   const [documentExists, setDocumentExists] = useState<boolean | null>(null)
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
-  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+  const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
+    null,
+  )
+  const [errorRequestId, setErrorRequestId] = useState<string>()
   const { course_name } = router.query
 
   // UseEffect to check URL parameters
@@ -197,17 +204,12 @@ const ChatPage: NextPage = () => {
           setIsAuthorized(true)
         } catch (error) {
           console.error('Authorization check failed:', error)
-          // Check if error has a status code (401, 403, or 404)
-          const errorWithStatus = error as Error & { status?: number }
-          const status = errorWithStatus.status
-
-          if (status === 401 || status === 403 || status === 404) {
-            // Set error state to show PermissionGate with error message
-            setIsAuthorized(false)
-            // Store error type in state to pass to PermissionGate
-            setErrorType(status as 401 | 403 | 404)
-          } else {
-            setIsAuthorized(false)
+          setIsAuthorized(false)
+          // 401, 403, 404, a 5xx or no response: show the PermissionGate screen
+          const gateError = getPermissionGateError(error)
+          if (gateError) {
+            setErrorType(gateError.errorType)
+            setErrorRequestId(gateError.requestId)
           }
         }
       }
@@ -229,6 +231,7 @@ const ChatPage: NextPage = () => {
       <PermissionGate
         course_name={course_name ? (course_name as string) : 'new'}
         errorType={errorType}
+        requestId={errorRequestId}
       />
     )
   }
