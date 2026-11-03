@@ -11,11 +11,15 @@ Coverage:
     secret to the log (the requests/urllib3 traceback repeats the full URL).
   - A video yt-dlp cannot fetch gives exactly one ERROR line (ours) and nothing
     on stderr: yt-dlp's own messages go to DEBUG through ``_YtDlpLogger``.
+  - A page yt-dlp does not support (``UnsupportedError``) gives one ERROR line
+    with no traceback and no verifier: yt-dlp's text repeats the full URL.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 
 import pytest
@@ -166,3 +170,54 @@ def test_failed_video_logs_one_error_and_nothing_on_stderr(monkeypatch, tmp_path
     # yt-dlp's own messages are kept, at DEBUG, without the query string.
     assert any(" DEBUG   " in line and "yt-dlp: " in line for line in collector.lines)
     assert SECRET not in "\n".join(collector.lines)
+
+
+class _NoMediaPage(BaseHTTPRequestHandler):
+    """An HTML page with no video on it: yt-dlp's generic extractor raises UnsupportedError."""
+
+    def do_GET(self):
+        body = b"<html><body><p>no media here</p></body></html>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def test_unsupported_video_page_logs_no_traceback_and_no_verifier(monkeypatch, tmp_path):
+    secret = "SuperSecretVerifier123"
+    server = HTTPServer(("127.0.0.1", 0), _NoMediaPage)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = "http://127.0.0.1:%d/page.html?verifier=%s" % (server.server_address[1], secret)
+    monkeypatch.setattr(ingest_canvas.requests, "get", lambda *a, **k: _FakeResponse())
+    captured = []
+    monkeypatch.setattr(ingest_canvas.sentry_sdk, "capture_exception", captured.append)
+    collector = LineCollector()
+    root = logging.getLogger()
+    old_level = root.level
+    root.addHandler(collector)
+    root.setLevel(logging.DEBUG)
+    try:
+        result = IngestCanvas().download_videos_from_urls([url], 1, str(tmp_path))
+    finally:
+        root.removeHandler(collector)
+        root.setLevel(old_level)
+        server.shutdown()
+        server.server_close()
+
+    # The reproduction is real: yt-dlp's exception text carries the secret.
+    assert len(captured) == 1 and isinstance(captured[0], ingest_canvas.yt_dlp.utils.DownloadError)
+    assert secret in str(captured[0])
+    errors = [line for line in collector.lines if " ERROR   " in line.splitlines()[0]]
+    assert len(errors) == 1, collector.lines
+    assert "downloading Canvas videos failed canvas_course_id=1 url=/page.html: DownloadError: " in errors[0]
+    assert "Unsupported URL: " in errors[0]
+    output = "\n".join(collector.lines)
+    assert "Traceback" not in output
+    assert secret not in output
+    # yt-dlp's own text is kept at DEBUG, without the query string.
+    assert any(" DEBUG   " in line and "yt-dlp: " in line and "Unsupported URL" in line for line in collector.lines)
+    assert result.startswith("Failed! Error: ") and secret not in result

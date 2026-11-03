@@ -714,6 +714,12 @@ class IngestCanvas:
                          urlsplit(url).path if url else None, _request_error(e))
             sentry_sdk.capture_exception(e)
             return _failed(e)
+        except yt_dlp.utils.YoutubeDLError as e:
+            # No traceback: yt-dlp's error text and its chained cause repeat the full URL with the verifier.
+            logger.error("downloading Canvas videos failed canvas_course_id=%s url=%s: %s", course_id,
+                         urlsplit(url).path if url else None, _strip_query(f"{type(e).__name__}: {e}"))
+            sentry_sdk.capture_exception(e)
+            return _failed(e)
         except Exception as e:
             logger.exception("downloading Canvas videos failed canvas_course_id=%s url=%s", course_id,
                              urlsplit(url).path if url else None)
