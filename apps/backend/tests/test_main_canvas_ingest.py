@@ -56,6 +56,23 @@ def test_no_jobs_and_no_failed_section_is_200(client, caplog):
     assert "canvas ingest found no documents course=ece120 canvas_course_id=123" in caplog.text
 
 
+def test_unexpected_error_names_only_the_exception_type(client, monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+
+    class Boom(FakeIngester):
+
+        def ingest_course_content(self, canvas_course_id, course_name, content_ingest_dict):
+            raise RuntimeError("db host db-internal.example.edu refused")
+
+    monkeypatch.setattr(main, "IngestCanvas", Boom)
+    response = client.post("/canvas_ingest", json=BODY)
+    assert response.status_code == 500
+    assert response.get_json() == {"error": "Canvas ingest failed: RuntimeError",
+                                   "message": "Internal Server Error: RuntimeError"}
+    assert "db-internal" not in response.get_data(as_text=True)
+    assert "db-internal.example.edu refused" in caplog.text
+
+
 @pytest.mark.parametrize("results, expected", [
     ({"files": "Success", "pages": "Failed! TimeoutError"}, {"pages": "Failed! TimeoutError"}),
     ({"files": "skipped", "file_links": "none found"}, {}),

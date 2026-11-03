@@ -60,7 +60,8 @@ const handler = async (
 
     const responseBody = await response.json()
     console.log(
-      `📤 Submitted to ingest queue rid=${requestId}: ${s3_filepath}. Response status: ${response.status}`,
+      '📤 Submitted to ingest queue',
+      { rid: requestId, s3_filepath, status: response.status },
       responseBody,
     )
 

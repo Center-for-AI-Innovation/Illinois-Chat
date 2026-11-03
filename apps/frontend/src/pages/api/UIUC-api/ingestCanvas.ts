@@ -92,7 +92,8 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
 
     const responseBody = await response.json()
     console.log(
-      `📤 Submitted to ingest queue rid=${requestId}: ${canvas_url}. Response status: ${response.status}`,
+      '📤 Submitted to ingest queue',
+      { rid: requestId, canvas_url, status: response.status },
       responseBody,
     )
     return res.status(response.status).json(responseBody)

@@ -810,7 +810,9 @@ def canvas_ingest() -> Response:
       return response
   except Exception as e:
       logger.exception("canvas ingest failed course=%s", course_name)
-      response = jsonify(error=str(e), message=f"Internal Server Error {e}")
+      # The log has the detail; the body names only the exception type.
+      response = jsonify(error=f"Canvas ingest failed: {type(e).__name__}",
+                         message=f"Internal Server Error: {type(e).__name__}")
       response.status_code = 500
       response.headers.add('Access-Control-Allow-Origin', '*')
       return response
