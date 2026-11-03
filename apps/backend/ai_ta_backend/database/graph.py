@@ -1,11 +1,49 @@
+import logging
 import os
 import re
+from urllib.parse import urlsplit
 
 from langchain_neo4j import GraphCypherQAChain, Neo4jGraph
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
 from flask import current_app
+
+logger = logging.getLogger(__name__)
+
+
+def _require_env(name: str, dependency: str = "Neo4j") -> str:
+    """Read a required env var; raise a plain error naming it when unset."""
+    value = os.environ.get(name)
+    if value is None:
+        raise RuntimeError(f"{dependency} not configured: {name} is unset")
+    return value
+
+
+def _host_of(uri: str) -> str:
+    """Host and port of a Neo4j URI, without credentials."""
+    try:
+        parts = urlsplit(uri)
+        return f"{parts.hostname}:{parts.port}" if parts.port else str(parts.hostname)
+    except ValueError:
+        return "<unparseable uri>"
+
+
+def _connect_neo4j(url: str, username: str, password: str, database: str) -> Neo4jGraph:
+    try:
+        return Neo4jGraph(
+            url=url,
+            username=username,
+            password=password,
+            database=database,
+            refresh_schema=True,
+        )
+    except ValueError as e:
+        # Neo4jGraph turns driver connectivity and auth errors into
+        # "Could not connect to Neo4j database. ..."; other errors pass through.
+        if "Could not connect" not in str(e):
+            raise
+        raise RuntimeError(f"Neo4j unreachable at {_host_of(url)}: {e}") from e
 
 
 # Unified state for both PrimeKG and Clinical KG
@@ -111,28 +149,30 @@ def run_primekg_chain(chain, cypher_query: str):
             return result["results"]
         return result
     except Exception as e:
+        logger.exception("PrimeKG chain call failed")
         return []
 
 class GraphDatabase:
 
   def __init__(self):
     # Load environment variables once
-    self.ckg_neo4j_uri = os.environ['CKG_NEO4J_URI']
-    self.ckg_neo4j_username = os.environ['CKG_NEO4J_USERNAME']
-    self.ckg_neo4j_password = os.environ['CKG_NEO4J_PASSWORD']
-    self.ckg_neo4j_database = os.environ['CKG_NEO4J_DATABASE']
-    self.prime_kg_neo4j_uri = os.environ['PRIME_KG_NEO4J_URI']
-    self.prime_kg_neo4j_username = os.environ['PRIME_KG_NEO4J_USERNAME']
-    self.prime_kg_neo4j_password = os.environ['PRIME_KG_NEO4J_PASSWORD']
-    self.prime_kg_neo4j_database = os.environ['PRIME_KG_NEO4J_DATABASE']
-    self.vlads_openai_key = os.environ['VLADS_OPENAI_KEY']
+    # A missing variable or an unreachable server raises one RuntimeError that
+    # names it; Flask logs it once for the request that needed the graph.
+    self.ckg_neo4j_uri = _require_env('CKG_NEO4J_URI')
+    self.ckg_neo4j_username = _require_env('CKG_NEO4J_USERNAME')
+    self.ckg_neo4j_password = _require_env('CKG_NEO4J_PASSWORD')
+    self.ckg_neo4j_database = _require_env('CKG_NEO4J_DATABASE')
+    self.prime_kg_neo4j_uri = _require_env('PRIME_KG_NEO4J_URI')
+    self.prime_kg_neo4j_username = _require_env('PRIME_KG_NEO4J_USERNAME')
+    self.prime_kg_neo4j_password = _require_env('PRIME_KG_NEO4J_PASSWORD')
+    self.prime_kg_neo4j_database = _require_env('PRIME_KG_NEO4J_DATABASE')
+    self.vlads_openai_key = _require_env('VLADS_OPENAI_KEY', dependency="Knowledge graph OpenAI")
 
-    self.clinical_kg_graph = Neo4jGraph(
-        url=self.ckg_neo4j_uri,
-        username=self.ckg_neo4j_username,
-        password=self.ckg_neo4j_password,
-        database=self.ckg_neo4j_database,
-        refresh_schema=True,
+    self.clinical_kg_graph = _connect_neo4j(
+        self.ckg_neo4j_uri,
+        self.ckg_neo4j_username,
+        self.ckg_neo4j_password,
+        self.ckg_neo4j_database,
     )
 
     try:
@@ -140,14 +180,13 @@ class GraphDatabase:
       # print(f"[DEBUG][GraphDatabase] Connected to Clinical KG Neo4j. Node count: {count[0]['node_count']}")
     except Exception as e:
       # print(f"[ERROR][GraphDatabase] Could not connect to Clinical KG Neo4j: {e}")
-      pass
+      logger.exception("Neo4j unreachable at %s: %s", _host_of(self.ckg_neo4j_uri), e)
 
-    self.prime_kg_graph = Neo4jGraph(
-        url=self.prime_kg_neo4j_uri,
-        username=self.prime_kg_neo4j_username,
-        password=self.prime_kg_neo4j_password,
-        database=self.prime_kg_neo4j_database,
-        refresh_schema=True,
+    self.prime_kg_graph = _connect_neo4j(
+        self.prime_kg_neo4j_uri,
+        self.prime_kg_neo4j_username,
+        self.prime_kg_neo4j_password,
+        self.prime_kg_neo4j_database,
     )
 
     try:
@@ -155,7 +194,7 @@ class GraphDatabase:
       # print(f"[DEBUG][GraphDatabase] Connected to Prime KG Neo4j. Node count: {count[0]['node_count']}")
     except Exception as e:
       # print(f"[ERROR][GraphDatabase] Could not connect to Prime KG Neo4j: {e}")
-      pass
+      logger.exception("Neo4j unreachable at %s: %s", _host_of(self.prime_kg_neo4j_uri), e)
 
     # Get schema information for the system prompt
     self.ckg_schema_info = self._get_schema_info(self.clinical_kg_graph)
@@ -169,16 +208,14 @@ class GraphDatabase:
       # print("[DEBUG][GraphDatabase] Clinical KG chain created successfully.")
     except Exception as e:
       # print(f"[ERROR][GraphDatabase] Failed to create Clinical KG chain: {e}")
-      import traceback
-      traceback.print_exc()
+      logger.exception("Creating the Clinical KG chain failed")
       self.ckg_chain = None
     try:
       self.prime_kg_chain = self._create_prime_kg_chain()
       # print("[DEBUG][GraphDatabase] Prime KG chain created successfully.")
     except Exception as e:
       # print(f"[ERROR][GraphDatabase] Failed to create Prime KG chain: {e}")
-      import traceback
-      traceback.print_exc()
+      logger.exception("Creating the Prime KG chain failed")
       self.prime_kg_chain = None
 
   def refresh_schema(self, graph):
@@ -192,8 +229,9 @@ class GraphDatabase:
     try:
       # This will get the schema without refreshing it (faster)
       return graph.schema
-    except:
+    except Exception:
       # If schema isn't available yet, return a placeholder
+      logger.warning("Neo4j schema not available, using a placeholder", exc_info=True)
       return "Schema information not available. Please refresh schema first."
 
   def _create_chain(self, schema_info, system_prompt, graph, return_direct=True, return_intermediate_steps=False, verbose=True):
@@ -304,7 +342,7 @@ class GraphDatabase:
       Always explain the alternative approaches being tried.
       """
     if current_app and current_app.debug:
-        print("SYSTEM PROMPT: ", system_prompt)
+        logger.debug("KG system prompt: %s", system_prompt)
     return self._create_chain(schema_info, system_prompt, self.clinical_kg_graph)
 
   def _create_prime_kg_chain(self):
@@ -445,7 +483,7 @@ class GraphDatabase:
     If no results, try alternative terms related to the query and explain your reasoning.
     """
     if current_app and current_app.debug:
-        print("SYSTEM PROMPT: ", system_prompt)
+        logger.debug("KG system prompt: %s", system_prompt)
     return self._create_chain(schema_info, system_prompt, self.prime_kg_graph, return_direct=True, return_intermediate_steps=True, verbose=True)
 
   def create_chain_with_custom_prompt(self, additional_instructions=""):
@@ -488,7 +526,7 @@ class GraphDatabase:
         {additional_instructions}
         """
     if current_app and current_app.debug:
-        print("SYSTEM PROMPT: ", system_prompt)
+        logger.debug("KG system prompt: %s", system_prompt)
     return self._create_chain(self.ckg_schema_info, system_prompt, self.clinical_kg_graph, verbose=False)
 
   def _extract_kg_result(self, response):
@@ -519,11 +557,11 @@ class GraphDatabase:
     def query_node(state: KGQueryState):
         cypher_query_prompt = cypher_generator(state["user_query"], state["attempt"])
         if current_app and current_app.debug:
-            print(f"[DEBUG][KG] Attempt {state['attempt']} - Generated Cypher Query Prompt: {cypher_query_prompt}")
+            logger.debug("KG attempt %s, generated Cypher query prompt: %s", state['attempt'], cypher_query_prompt)
         try:
             result = chain.invoke({"query": cypher_query_prompt})
             if current_app and current_app.debug:
-                print(f"[DEBUG][KG] Chain result (type: {type(result)}): {result}")
+                logger.debug("KG chain result (type: %s): %s", type(result), result)
             cypher_query_actual = cypher_query_prompt  # fallback
             if isinstance(result, dict):
                 steps = result.get("intermediate_steps")
@@ -536,10 +574,7 @@ class GraphDatabase:
                                 cypher_query_actual = cypher_query_actual.split("\n", 1)[-1].strip()
                             break
         except Exception as e:
-            if current_app and current_app.debug:
-                print(f"[ERROR][KG] Exception in chain.invoke: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.warning("%s chain call failed attempt=%s", readable_filename, state["attempt"], exc_info=True)
             result = {}
             cypher_query_actual = cypher_query_prompt
 
@@ -552,19 +587,19 @@ class GraphDatabase:
     def should_retry(state: KGQueryState):
         results = state["results"]
         if current_app and current_app.debug:
-            print(f"[DEBUG][KG] should_retry called. Attempt: {state['attempt']}, Results: {results}")
+            logger.debug("KG should_retry called. attempt=%s results=%s", state['attempt'], results)
         # Only return success if the 'result' field in the results dict is non-empty
         if isinstance(results, dict) and results.get("result"):
             if current_app and current_app.debug:
-                print("[DEBUG][KG] should_retry: Success condition met.")
+                logger.debug("KG should_retry: success condition met")
             return "success"
         elif state["attempt"] < state["max_attempts"]:
             if current_app and current_app.debug:
-                print("[DEBUG][KG] should_retry: Retrying...")
+                logger.debug("KG should_retry: retrying")
             return "query_node"
         else:
             if current_app and current_app.debug:
-                print("[DEBUG][KG] should_retry: Max attempts reached. Failing.")
+                logger.debug("KG should_retry: max attempts reached, failing")
             return "fail"
 
     builder = StateGraph(KGQueryState)
@@ -671,8 +706,7 @@ class GraphDatabase:
         else:
             return {"kg_result": None, "text": ""}
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("PrimeKG query failed query_len=%s", len(user_query))
         return {"kg_result": None, "text": ""}
 
   def getClinicalKGContexts(self, user_query: str) -> dict:
@@ -685,6 +719,5 @@ class GraphDatabase:
         else:
             return {"kg_result": None, "text": ""}
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Clinical KG query failed query_len=%s", len(user_query))
         return {"kg_result": None, "text": ""}

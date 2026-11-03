@@ -20,11 +20,19 @@ import os
 from flask import Flask, jsonify, request
 
 try:
+    from ai_ta_backend.rabbitmq.log_setup import configure_logging, install_request_logging
+except ModuleNotFoundError:  # standalone container: rabbitmq dir is the workdir
+    from log_setup import configure_logging, install_request_logging
+
+# Before the rmqueue import, so import-time log calls use the shared format.
+configure_logging()
+# Explicit name: run as `python bridge.py`, __name__ is '__main__'.
+logger = logging.getLogger('bridge')
+
+try:
     from ai_ta_backend.rabbitmq.rmqueue import Queue
 except ModuleNotFoundError:  # standalone container: rabbitmq dir is the workdir
     from rmqueue import Queue
-
-logging.basicConfig(level=logging.INFO)
 
 # Optional bearer-token auth. When INGEST_API_KEY is set (recommended for a
 # public/internet-facing deployment), callers must send
@@ -33,6 +41,7 @@ logging.basicConfig(level=logging.INFO)
 INGEST_API_KEY = os.getenv("INGEST_API_KEY")
 
 app = Flask(__name__)
+install_request_logging(app, logger_name='bridge')
 
 
 @app.route('/api/healthcheck', methods=['GET'])
@@ -62,7 +71,7 @@ def ingest():
             task_id = queue.addJobToIngestQueue(data)
         return jsonify({"outcome": "Queued Ingest task", "task_id": task_id}), 200
     except Exception as exc:  # noqa: BLE001 - surface any failure to the caller
-        logging.exception("Failed to queue ingest job")
+        logger.exception("Failed to queue ingest job")
         return jsonify({"error": str(exc)}), 500
 
 

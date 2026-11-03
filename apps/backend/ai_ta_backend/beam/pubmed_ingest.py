@@ -309,7 +309,7 @@ def fech_articles_by_pmc_id(pmci_id, course_name, s3_client, cropwizard_s3_clien
         print("Ingest Payload: ", payload)
 
         beam_url = 'https://app.beam.cloud/taskqueue/ingest_task_queue/latest'
-        print("Beam API key: ", os.getenv('BEAM_API_KEY'))
+        print("Beam API key set: ", bool(os.getenv('BEAM_API_KEY')))
         headers = {
             'Accept': '*/*',
             'Accept-Encoding': 'gzip, deflate',

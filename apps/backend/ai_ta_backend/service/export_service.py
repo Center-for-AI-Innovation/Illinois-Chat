@@ -1,9 +1,11 @@
 import base64
 import json
+import logging
 import os
 import tempfile
 import uuid
 import zipfile
+from urllib.parse import urlparse
 
 import pandas as pd
 import redis
@@ -24,9 +26,11 @@ from ai_ta_backend.utils.export_utils import (
   _process_conversation_for_user_convo_export,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _task_method(index):
-  print(f"Task {index} is running in process {os.getpid()}", flush=True)
+  logger.info("test task %s running in process %s", index, os.getpid())
   return index
 
 
@@ -45,7 +49,7 @@ class ExportService:
         """
     futures = [self.executor.submit(_task_method, i) for i in range(5)]
     results = [future.result() for future in futures]
-    print(results)
+    logger.info("test_process results=%s", results)
     return {"response": "Test process successful.", "results": results}
 
   def _documents_db(self, project_name: str):
@@ -100,9 +104,8 @@ class ExportService:
         first_id = response["data"][0]['id']
         last_id = response["data"][-1]['id']
 
-        print("total_doc_count: ", total_doc_count)
-        print("first_id: ", first_id)
-        print("last_id: ", last_id)
+        logger.debug("exporting documents course=%s count=%d first_id=%s last_id=%s", course_name, total_doc_count,
+                     first_id, last_id)
 
         curr_doc_count = 0
         # create a temporary directory
@@ -112,7 +115,7 @@ class ExportService:
         file_path = os.path.join(temp_dir, filename)
 
         while curr_doc_count < total_doc_count:
-          print("Fetching data from id: ", first_id)
+          logger.debug("fetching documents from id=%s course=%s", first_id, course_name)
 
           response = self._documents_db(course_name).getDocsForIdsGte(course_name, first_id)
           df = pd.DataFrame(response["data"])
@@ -137,9 +140,10 @@ class ExportService:
             zipf.write(file_path, filename)
 
           os.remove(file_path)
+          logger.info("exported documents course=%s count=%d", course_name, curr_doc_count)
           return {"response": zip_file_path}
         except Exception as e:
-          print(e)
+          logger.exception("zipping documents export failed course=%s", course_name)
           self.sentry.capture_exception(e)
           return {"response": "Error downloading file."}
       else:
@@ -153,7 +157,7 @@ class ExportService:
 				from_date (str, optional): The start date for the data export. Defaults to ''.
 				to_date (str, optional): The end date for the data export. Defaults to ''.
 		"""
-    print("Exporting conversation history to json file...")
+    logger.debug("exporting conversation history to json course=%s", course_name)
 
     response = self._main_db().getConversationsBetweenDates(course_name, from_date, to_date)
 
@@ -169,7 +173,7 @@ class ExportService:
 
     # Fetch data
     if count > 0:
-      print("id count greater than zero")
+      logger.debug("conversations to export course=%s count=%d", course_name, count)
 
       if not "data" in response and len(response["data"]) <= 0:
         return {"response": "No data found between the given dates."}
@@ -186,7 +190,7 @@ class ExportService:
       curr_count = 0
       # Fetch data in batches of 25 from first_id to last_id
       while curr_count < total_count:
-        print("Fetching data from id: ", first_id)
+        logger.debug("fetching conversations from id=%s course=%s", first_id, course_name)
         response = self._main_db().getAllConversationsBetweenIds(course_name, first_id, last_id)
         # Convert to pandas dataframe
         df = pd.DataFrame(response["data"])
@@ -201,7 +205,6 @@ class ExportService:
         # Update first_id
         if len(response["data"]) > 0:
           first_id = response["data"][-1]['id'] + 1
-          print("updated first_id: ", first_id)
 
       # Download file
       try:
@@ -213,9 +216,10 @@ class ExportService:
           zipf.write(file_path, filename)
         os.remove(file_path)
 
+        logger.info("exported conversations course=%s count=%d", course_name, curr_count)
         return {"response": zip_file_path}
       except Exception as e:
-        print(e)
+        logger.exception("zipping conversation export failed course=%s", course_name)
         self.sentry.capture_exception(e)
         return {"response": "Error downloading file!"}
     else:
@@ -225,7 +229,7 @@ class ExportService:
     """
     Another function for exporting convos, emails are passed as a string.
     """
-    print("Exporting conversation history to json file...")
+    logger.debug("exporting conversation history to json course=%s", course_name)
 
     response = self._main_db().getConversationsBetweenDates(course_name, from_date, to_date)
 
@@ -242,7 +246,7 @@ class ExportService:
 
     # Fetch data
     if count > 0:
-      print("id count greater than zero")
+      logger.debug("conversations to export course=%s count=%d", course_name, count)
 
       if not "data" in response and len(response["data"]) <= 0:
         return {"response": "No data found between the given dates."}
@@ -258,7 +262,7 @@ class ExportService:
       curr_count = 0
       # Fetch data in batches of 25 from first_id to last_id
       while curr_count < total_count:
-        print("Fetching data from id: ", first_id)
+        logger.debug("fetching conversations from id=%s course=%s", first_id, course_name)
         response = self._main_db().getAllConversationsBetweenIds(course_name, first_id, last_id)
         # Convert to pandas dataframe
         df = pd.DataFrame(response["data"])
@@ -273,7 +277,6 @@ class ExportService:
         # Update first_id
         if len(response["data"]) > 0:
           first_id = response["data"][-1]['id'] + 1
-          print("updated first_id: ", first_id)
 
       # Download file
       try:
@@ -285,9 +288,10 @@ class ExportService:
           zipf.write(file_path, filename)
         os.remove(file_path)
 
+        logger.info("exported conversations course=%s count=%d", course_name, curr_count)
         return {"response": zip_file_path}
       except Exception as e:
-        print(e)
+        logger.exception("zipping conversation export failed course=%s", course_name)
         self.sentry.capture_exception(e)
         return {"response": "Error downloading file!"}
     else:
@@ -301,19 +305,18 @@ class ExportService:
         from_date (str, optional): The start date for the data export. Defaults to ''.
         to_date (str, optional): The end date for the data export. Defaults to ''.
     """
-    print(
-        f"Exporting extended conversation history for course: {course_name}, from_date: {from_date}, to_date: {to_date}"
-    )
+    logger.debug("exporting extended conversation history course=%s from_date=%s to_date=%s", course_name, from_date,
+                 to_date)
     error_log = []
 
     try:
       response = self._main_db().getConversationsBetweenDates(course_name, from_date, to_date)
 
       response_count = response.get("count", 0)
-      print(f"Received request to export: {response_count} conversations")
+      logger.debug("conversations to export course=%s count=%d", course_name, response_count)
     except Exception as e:
       error_log.append(f"Error fetching documents: {str(e)}")
-      print(f"Error fetching documents: {str(e)}")
+      logger.exception("fetching conversations for export failed course=%s", course_name)
       return {"response": "Error fetching documents!"}
 
     s3, bucket_name = self.conn_manager.get_s3_client(course_name)
@@ -321,9 +324,8 @@ class ExportService:
     if response_count > 500:
       filename = course_name[0:10] + '-' + str(generate_short_id()) + '_convos_extended.zip'
       s3_filepath = f"courses/{course_name}/{filename}"
-      print(
-          f"Response count greater than 500, processing in background. Filename: {filename}, S3 filepath: {s3_filepath}"
-      )
+      logger.info("exporting %d conversations in the background course=%s s3_path=%s", response_count, course_name,
+                  s3_filepath)
       self.executor.submit(export_data_in_bg_extended, s3, response, "conversations", course_name, s3_filepath,
                            bucket_name)
       return {"response": 'Download from S3', "s3_path": s3_filepath}
@@ -336,14 +338,14 @@ class ExportService:
 
         first_id = response["data"][0]['id']
         last_id = response["data"][-1]['id']
-        print(f"Processing conversations. First ID: {first_id}, Last ID: {last_id}, Total count: {response_count}")
+        logger.debug("processing conversations first_id=%s last_id=%s count=%d", first_id, last_id, response_count)
 
         file_paths = _initialize_file_paths(course_name)
         # print(f"Initialized file paths: {file_paths}")
         workbook, worksheet, wrap_format = _initialize_excel(file_paths['excel'])
       except Exception as e:
         error_log.append(f"Error initializing file paths or Excel: {str(e)}")
-        print(f"Error initializing file paths or Excel: {str(e)}")
+        logger.exception("initializing export files failed course=%s", course_name)
         return {"response": "Error initializing file paths or Excel!"}
 
       curr_count = 0
@@ -351,7 +353,7 @@ class ExportService:
 
       while curr_count < response_count:
         try:
-          print(f"Fetching conversations from ID: {first_id} to {last_id}")
+          logger.debug("fetching conversations from id=%s to id=%s", first_id, last_id)
           response = self._main_db().getAllConversationsBetweenIds(course_name, first_id, last_id)
           curr_count += len(response["data"])
 
@@ -366,26 +368,26 @@ class ExportService:
             # print(f"Updated first ID to: {first_id}")
         except Exception as e:
           error_log.append(f"Error processing conversations: {str(e)}")
-          print(f"Error processing conversations: {str(e)}")
+          logger.exception("processing conversations for export failed course=%s", course_name)
           break
 
-      print(f"Processed {curr_count} conversations, ready to finalize export.")
+      logger.debug("processed %d conversations, finalizing export", curr_count)
 
       try:
         workbook.close()
-        print(f"Closed Excel workbook.")
         zip_file_path = _create_zip(file_paths, error_log)
         # print(f"Created zip file at path: {zip_file_path}")
         _cleanup(file_paths)
         # print(f"Cleaned up temporary files.")
       except Exception as e:
         error_log.append(f"Error finalizing export: {str(e)}")
-        print(f"Error finalizing export: {str(e)}")
+        logger.exception("finalizing conversation export failed course=%s", course_name)
         return {"response": "Error finalizing export!"}
 
+      logger.info("exported conversations course=%s count=%d errors=%d", course_name, curr_count, len(error_log))
       return {"response": zip_file_path}
     else:
-      print("No data found between the given dates.")
+      logger.info("no conversations to export course=%s from_date=%s to_date=%s", course_name, from_date, to_date)
       return {"response": "No data found between the given dates."}
 
   def export_convo_history_user(self, user_email: str, project_name: str):
@@ -396,14 +398,14 @@ class ExportService:
         project_name (str): The name of the project.
     """
     error_log = []
-    print(f"Exporting conversation history for user: {user_email}, project: {project_name}")
+    logger.debug("exporting user conversation history course=%s", project_name)
     try:
       response = self._main_db().getAllConversationsForUserAndProject(user_email, project_name)
       count = response.get("count", 0)
-      print(f"Received request to export: {count} conversations")
+      logger.debug("user conversations to export course=%s count=%d", project_name, count)
     except Exception as e:
       error_log.append(f"Error fetching documents: {str(e)}")
-      print(f"Error fetching documents: {str(e)}")
+      logger.exception("fetching user conversations for export failed course=%s", project_name)
       return {"response": "Error fetching documents!"}
 
     s3, bucket_name = self.conn_manager.get_s3_client(project_name)
@@ -417,7 +419,6 @@ class ExportService:
 
     if count > 0:
       try:
-        print(f"Processing {count} conversations for user: {user_email}, project: {project_name}")
         with tempfile.TemporaryDirectory() as temp_dir:
           markdown_dir = os.path.join(temp_dir, "markdown")
           media_dir = os.path.join(temp_dir, "media")
@@ -425,7 +426,7 @@ class ExportService:
           os.makedirs(media_dir, exist_ok=True)
 
           if not response or 'data' not in response:
-            print("No data found in the response.")
+            logger.info("no user conversations in the response course=%s", project_name)
             return {"response": "No data found for the given user and project."}
 
           for convo in response['data']:
@@ -435,13 +436,14 @@ class ExportService:
           # Create zip file
           zip_file_path = _create_zip_for_user_convo_export(markdown_dir, media_dir, error_log)
 
+          logger.info("exported user conversations course=%s count=%d errors=%d", project_name, count, len(error_log))
           return {"response": zip_file_path}
       except Exception as e:
         error_log.append(f"Error creating markdown directory: {str(e)}")
-        print(f"Error creating markdown directory: {str(e)}")
+        logger.exception("user conversation export failed course=%s", project_name)
         return {"response": "Error creating markdown directory!"}
     else:
-      print("No data found for the given user and project.")
+      logger.info("no user conversations to export course=%s", project_name)
       return {"response": "No data found for the given user and project."}
 
 
@@ -477,7 +479,7 @@ def export_convo_history_user_bg(s3, conversations, count, user_email, s3_path, 
 
         except Exception as e:
           error_log.append(f"Error fetching conversations: {str(e)}")
-          print(f"Error fetching conversations: {str(e)}")
+          logger.exception("fetching user conversations for background export failed course=%s", project_name)
           return {"response": "Error fetching conversations!"}
 
       # create zip file
@@ -492,12 +494,13 @@ def export_convo_history_user_bg(s3, conversations, count, user_email, s3_path, 
       subject = f"UIUC.chat Conversation History Export Complete for {user_email}"
       body_text = f"The data export for {user_email} is complete.\n\nYou can download the file from the following link: \n\n{s3_url}\n\nThis link will expire in 48 hours."
       email_status = send_email(subject, body_text, os.environ['EMAIL_SENDER'], [user_email], [])
-      print(f"Email sent to {user_email}: {email_status}")
+      logger.info("user conversation export emailed course=%s count=%d status=%s", project_name, curr_count,
+                  email_status)
 
       return "File uploaded to S3. Email sent to user."
     except Exception as e:
       error_log.append(f"Error finalizing export: {str(e)}")
-      print(f"Error finalizing export: {str(e)}")
+      logger.exception("finalizing background user conversation export failed course=%s", project_name)
       return {"response": "Error finalizing export!"}
 
 
@@ -510,7 +513,7 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
       course_name (str): The name of the course.
       s3_path (str): The S3 path where the file will be uploaded.
   """
-  print(f"Starting export in background for course: {course_name}, download_type: {download_type}, s3_path: {s3_path}")
+  logger.info("background export started course=%s download_type=%s s3_path=%s", course_name, download_type, s3_path)
   sql = SQLDatabase()
 
   total_doc_count = response.get("count", 0)
@@ -519,7 +522,6 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
 
   file_paths = _initialize_file_paths(course_name)
   workbook, worksheet, wrap_format = _initialize_excel(file_paths['excel'])
-  print(f"Initialized Excel workbook at path: {file_paths['excel']}")
 
   row_num = 1
   error_log = []
@@ -530,7 +532,6 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
       curr_doc_count += len(response["data"])
 
       for convo in response["data"]:
-        print(f"Processing conversation ID: {convo['convo_id']}")
         _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num, error_log, wrap_format,
                               bucket_name)
         row_num += len(convo['convo']['messages'])
@@ -541,18 +542,15 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
         # print(f"Updated first ID to: {first_id}")
     except Exception as e:
       error_log.append(f"Error processing conversations: {str(e)}")
-      print(f"Error processing conversations: {str(e)}")
+      logger.exception("processing conversations for background export failed course=%s", course_name)
       break
 
-  print(f"Processed {curr_doc_count} conversations, ready to finalize export.")
+  logger.debug("processed %d conversations, finalizing export", curr_doc_count)
 
   try:
     workbook.close()
-    print(f"Closed Excel workbook.")
     zip_file_path = _create_zip(file_paths, error_log)
-    print(f"Created zip file at path: {zip_file_path}")
     _cleanup(file_paths)
-    print(f"Cleaned up temporary files.")
 
     # Upload the zip file to S3
     s3.upload_file(zip_file_path, bucket_name, s3_path)
@@ -560,7 +558,7 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
     s3_url = s3.generatePresignedUrl('get_object', bucket_name, s3_path, 172800)
 
     # get admin email IDs from Redis
-    print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
+    logger.debug("Redis configured host=%s", urlparse(os.environ['REDIS_URL']).hostname)
     redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
     course_metadata_json = redis_client.hget('course_metadatas', key=course_name)
     if not course_metadata_json:
@@ -585,13 +583,14 @@ def export_data_in_bg_extended(s3, response, download_type, course_name, s3_path
     subject = "UIUC.chat Conversation History Export Complete for " + course_name
     body_text = "The data export for " + course_name + " is complete.\n\nYou can download the file from the following link: \n\n" + s3_url + "\n\nThis link will expire in 48 hours."
     email_status = send_email(subject, body_text, os.environ['EMAIL_SENDER'], admin_emails, bcc_emails)
-    print("email_status: ", email_status)
+    logger.info("background export done course=%s conversations=%d errors=%d recipients=%d bcc=%d status=%s",
+                course_name, curr_doc_count, len(error_log), len(admin_emails), len(bcc_emails), email_status)
 
     return "File uploaded to S3. Email sent to admins."
 
   except Exception as e:
     error_log.append(f"Error finalizing export: {str(e)}")
-    print(f"Error finalizing export: {str(e)}")
+    logger.exception("finalizing background export failed course=%s", course_name)
     return {"response": "Error finalizing export!"}
     # Encountered pickling error while running the background task. So, moved the function outside the class.
 
@@ -613,8 +612,8 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
 
   total_doc_count = response.get("count", 0)
   first_id = response["data"][0]['id']
-  print("total_doc_count: ", total_doc_count)
-  print("pre-defined s3_path: ", s3_path)
+  logger.info("background export started course=%s download_type=%s count=%d s3_path=%s", course_name,
+              download_type, total_doc_count, s3_path)
 
   curr_doc_count = 0
   temp_dir = tempfile.mkdtemp(prefix="export_", dir=tempfile.gettempdir())
@@ -624,7 +623,7 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
 
   # download data in batches of 100
   while curr_doc_count < total_doc_count:
-    print("Fetching data from id: ", first_id)
+    logger.debug("fetching %s from id=%s course=%s", download_type, first_id, course_name)
     response = sql.getAllFromTableForDownloadType(course_name, download_type, first_id)
     df = pd.DataFrame(response["data"])
     curr_doc_count += len(response["data"])
@@ -645,7 +644,7 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
   with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
     zipf.write(file_path, filename)
 
-  print("zip file created: ", zip_file_path)
+  logger.debug("zip file created file=%s", os.path.basename(zip_file_path))
 
   try:
     # upload to S3
@@ -658,13 +657,13 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
     os.remove(file_path)
     os.remove(zip_file_path)
 
-    print("file uploaded to s3: ", s3_file)
+    logger.debug("export uploaded to S3 key=%s", s3_file)
 
     # generate presigned URL
     s3_url = s3.generatePresignedUrl('get_object', bucket_name, s3_path, 172800)
 
     # get admin email IDs from Redis
-    print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
+    logger.debug("Redis configured host=%s", urlparse(os.environ['REDIS_URL']).hostname)
     redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
     course_metadata_json = redis_client.hget('course_metadatas', key=course_name)
     if not course_metadata_json:
@@ -682,8 +681,6 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
     # add course owner email to admin_emails
     admin_emails.append(course_metadata['course_owner'])
     admin_emails = list(set(admin_emails))
-    print("admin_emails: ", admin_emails)
-    print("bcc_emails: ", bcc_emails)
 
     # add a check for emails, don't send email if no admin emails
     if len(admin_emails) == 0:
@@ -698,12 +695,13 @@ def export_data_in_bg(s3, response, download_type, course_name, s3_path, bucket_
       subject = "UIUC.chat Export Complete for " + course_name
     body_text = "The data export for " + course_name + " is complete.\n\nYou can download the file from the following link: \n\n" + s3_url + "\n\nThis link will expire in 48 hours."
     email_status = send_email(subject, body_text, os.environ['EMAIL_SENDER'], admin_emails, bcc_emails)
-    print("email_status: ", email_status)
+    logger.info("background export done course=%s download_type=%s count=%d recipients=%d bcc=%d status=%s",
+                course_name, download_type, curr_doc_count, len(admin_emails), len(bcc_emails), email_status)
 
     return "File uploaded to S3. Email sent to admins."
 
   except Exception as e:
-    print(e)
+    logger.exception("background export failed course=%s download_type=%s", course_name, download_type)
     return "Error: " + str(e)
 
 
@@ -724,8 +722,8 @@ def export_data_in_bg_emails(s3, response, download_type, course_name, s3_path, 
 
   total_doc_count = response.get("count", 0)
   first_id = response["data"][0]['id']
-  print("total_doc_count: ", total_doc_count)
-  print("pre-defined s3_path: ", s3_path)
+  logger.info("background export started course=%s download_type=%s count=%d s3_path=%s", course_name,
+              download_type, total_doc_count, s3_path)
 
   curr_doc_count = 0
 
@@ -736,7 +734,7 @@ def export_data_in_bg_emails(s3, response, download_type, course_name, s3_path, 
 
   # download data in batches of 100
   while curr_doc_count < total_doc_count:
-    print("Fetching data from id: ", first_id)
+    logger.debug("fetching %s from id=%s course=%s", download_type, first_id, course_name)
     response = sql.getAllFromTableForDownloadType(course_name, download_type, first_id)
     df = pd.DataFrame(response["data"])
     curr_doc_count += len(response["data"])
@@ -757,7 +755,7 @@ def export_data_in_bg_emails(s3, response, download_type, course_name, s3_path, 
   with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
     zipf.write(file_path, filename)
 
-  print("zip file created: ", zip_file_path)
+  logger.debug("zip file created file=%s", os.path.basename(zip_file_path))
 
   try:
     # upload to S3
@@ -770,16 +768,13 @@ def export_data_in_bg_emails(s3, response, download_type, course_name, s3_path, 
     os.remove(file_path)
     os.remove(zip_file_path)
 
-    print("file uploaded to s3: ", s3_file)
+    logger.debug("export uploaded to S3 key=%s", s3_file)
 
     # generate presigned URL
     s3_url = s3.generatePresignedUrl('get_object', bucket_name, s3_path, 172800)
 
     admin_emails = emails
     bcc_emails = []
-
-    print("admin_emails: ", admin_emails)
-    print("bcc_emails: ", bcc_emails)
 
     # add a check for emails, don't send email if no admin emails
     if len(admin_emails) == 0:
@@ -794,12 +789,13 @@ def export_data_in_bg_emails(s3, response, download_type, course_name, s3_path, 
       subject = "UIUC.chat Export Complete for " + course_name
     body_text = "The data export for " + course_name + " is complete.\n\nYou can download the file from the following link: \n\n" + s3_url + "\n\nThis link will expire in 48 hours."
     email_status = send_email(subject, body_text, os.environ['EMAIL_SENDER'], admin_emails, bcc_emails)
-    print("email_status: ", email_status)
+    logger.info("background export done course=%s download_type=%s count=%d recipients=%d bcc=%d status=%s",
+                course_name, download_type, curr_doc_count, len(admin_emails), len(bcc_emails), email_status)
 
     return "File uploaded to S3. Email sent to admins."
 
   except Exception as e:
-    print(e)
+    logger.exception("background export failed course=%s download_type=%s", course_name, download_type)
     return "Error: " + str(e)
 
 

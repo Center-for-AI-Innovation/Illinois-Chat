@@ -13,6 +13,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from ..utils.datetime_utils import to_utc_datetime
 
+logger = logging.getLogger(__name__)
+
 
 def _host_only(method):
     """Decorator: refuse to run a method when the SQLDatabase is bound to a
@@ -140,10 +142,10 @@ class SQLDatabase:
         else:
             db_uri = f"postgresql://{os.getenv('POSTGRES_USERNAME')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_ENDPOINT')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DATABASE')}"
 
-        logging.info("About to connect to DB from IngestSQL.py.")
         self.engine = create_engine(db_uri, poolclass=NullPool)
         self.Session = sessionmaker(bind=self.engine)
-        logging.info("Successfully connected to DB from IngestSQL.py")
+        # create_engine does not connect; the first query does.
+        logger.debug("SQL engine created for %s (connects on first query)", db_type)
 
     @contextmanager
     def get_session(self):
@@ -385,7 +387,7 @@ class SQLDatabase:
                 session.execute(insert_stmt)
                 return True  # Insertion successful
             except SQLAlchemyError as e:
-                logging.error(f"Insertion failed: {e}")
+                logger.exception("Inserting project failed")
                 return False  # Insertion failed
 
     @_host_only
@@ -634,13 +636,13 @@ class SQLDatabase:
                 response = DatabaseResponse(data=results, count=len(results)).to_dict()
 
             if response["count"] <= 0:
-                logging.error(f"No conversations found for course: {course_name} for duration {from_date} to {to_date}")
+                logger.debug("No conversations found course=%s from=%s to=%s", course_name, from_date, to_date)
                 return [], 0
 
             return response["data"], response["count"]
 
         except Exception as e:
-            logging.error(f"Error in getConversationsCreatedAtByCourse for {course_name}: {e}")
+            logger.exception("getConversationsCreatedAtByCourse failed course=%s", course_name)
             return [], 0
 
 
@@ -689,7 +691,7 @@ class SQLDatabase:
             return ProjectStats(**stats_typed)
 
         except Exception as e:
-            logging.error(f"Error fetching project stats for {project_name}: {str(e)}")
+            logger.exception("Fetching project stats failed course=%s", project_name)
             return ProjectStats(total_messages=0,
                                 total_conversations=0,
                                 unique_users=0,

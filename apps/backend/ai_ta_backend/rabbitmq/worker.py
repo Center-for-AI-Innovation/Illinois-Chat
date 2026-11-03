@@ -1,6 +1,6 @@
 import os
 import ssl
-import traceback
+import time
 from typing import List, Optional
 
 import pika
@@ -9,6 +9,17 @@ import json
 import sys
 import threading
 import multiprocessing as mp
+
+try:
+    from ai_ta_backend.rabbitmq.log_setup import bind, clear, configure_logging
+except ModuleNotFoundError:
+    from log_setup import bind, clear, configure_logging
+
+# At module level, so the spawned ingest child (which re-imports this file as
+# __mp_main__) is configured too. Must run before the rmsql import.
+configure_logging()
+# Explicit name: this module is '__main__' in the parent and '__mp_main__' in the child.
+logger = logging.getLogger('worker')
 
 from rmsql import SQLAlchemyIngestDB
 from connection_resolver import WorkerConnectionResolver
@@ -23,19 +34,18 @@ MAX_JOB_RETRIES = int(os.getenv('MAX_JOB_RETRIES', '10'))  # messages
 worker_thread: threading.Thread | None = None
 worker_running = threading.Event()
 
-
-logging.getLogger('pika').setLevel(logging.WARNING)
-
 INGEST_TIMEOUT = int(os.getenv('INGEST_SUBPROCESS_TIMEOUT', '300'))  # seconds; per-doc OCR watchdog cap
 
 
-def _ingest_child(job_id, inputs):
+def _ingest_child(job_id, rid, inputs):
     """Runs in a spawned subprocess: fresh Ingest() (no inherited fds/threads), do the work.
 
     Connections are re-resolved here rather than passed in: a ResolvedConnections holds
     live SQLAlchemy engines / Qdrant / boto3 clients, none of which survive pickling
     across the spawn boundary.
     """
+    # Context does not cross the spawn boundary, so bind it again here.
+    bind(rid=rid, job=job_id, course=inputs.get('course_name'))
     try:
         from ingest import Ingest as _Ingest
         from rmsql import SQLAlchemyIngestDB as _SQLAlchemyIngestDB
@@ -45,16 +55,16 @@ def _ingest_child(job_id, inputs):
         _Ingest().main_ingest(job_id=job_id, _resolved_connections=resolved, **inputs)
         sys.exit(0)
     except Exception:
-        logging.error("Ingest child exception:\n%s", traceback.format_exc())
+        logger.exception("ingest child failed")
         sys.exit(3)
 
 
-def run_ingest_isolated(job_id, inputs):
+def run_ingest_isolated(job_id, rid, inputs):
     """Run main_ingest in a spawned child with a hard timeout so a hung/huge OCR can't block the
     consumer thread (RabbitMQ heartbeats) or the Flask ALB health check, and a native segfault in
     the OCR libs kills only the child. Returns None on clean completion, else an error string."""
     ctx = mp.get_context('spawn')  # spawn, NOT fork: worker is multithreaded (Flask) -> fork can deadlock
-    p = ctx.Process(target=_ingest_child, args=(job_id, inputs))
+    p = ctx.Process(target=_ingest_child, args=(job_id, rid, inputs))
     p.start()
     p.join(INGEST_TIMEOUT)
     if p.is_alive():
@@ -114,12 +124,12 @@ class Worker:
                 self.channel.stop_consuming(self.consumer)
                 self.channel.close()
         except Exception:
-            pass
+            logger.debug("closing the RabbitMQ channel failed", exc_info=True)
         try:
             if self.connection and self.connection.is_open:
                 self.connection.close()
         except Exception:
-            pass
+            logger.debug("closing the RabbitMQ connection failed", exc_info=True)
 
         self.channel = None
         self.connection = None
@@ -133,16 +143,35 @@ class Worker:
         )
 
     def process_job(self, channel, method, header, body):
-        content = json.loads(body.decode())
-        job_id = content['job_id']
-        logging.info("----------------------------------------")
-        logging.info("--------------Incoming job--------------")
-        logging.info("----------------------------------------")
-        inputs = content['inputs']
-        logging.info(inputs)
-
+        started = time.monotonic()
+        content = None
+        try:
+            content = json.loads(body.decode())
+            job_id = content['job_id']
+            inputs = content['inputs']
+            course = inputs.get('course_name')
+        except Exception as e:  # pylint: disable=broad-except
+            # Ack it: a message we cannot read would otherwise kill the consumer.
+            # Log the shape, not the bytes: a job's inputs can hold a whole document.
+            shape = ('keys=%s' % sorted(content) if isinstance(content, dict) else 'bytes=%d' % len(body))
+            logger.error("discarding unparseable message (%s: %s) %s", type(e).__name__, e, shape)
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+            return
+        bind(rid=content.get('request_id'), job=job_id, course=course)
         retry_count = content['retry_count'] if 'retry_count' in content else 0
+        # Retries come back at once; keep their lines out of INFO.
+        level = logging.INFO if retry_count == 0 else logging.DEBUG
+        s3_path = inputs.get('s3_paths')
+        if isinstance(s3_path, list):
+            s3_path = s3_path[0] if s3_path else None
+        if s3_path or not inputs.get('url'):
+            logger.log(level, "job received file=%s s3_path=%s retry=%s", inputs.get('readable_filename'), s3_path,
+                       retry_count)
+        else:
+            logger.log(level, "job received file=%s url=%s retry=%s", inputs.get('readable_filename'),
+                       inputs.get('url'), retry_count)
 
+        status_db = None
         try:
             # Resolve the project's connections once. Ingest status tables live
             # on the project documents DB (external when configured, else host) --
@@ -160,10 +189,12 @@ class Worker:
 
             prog_doc = status_db.fetch_document_in_progress(job_id)
             if not prog_doc:
-                logging.error(f"Job ID {job_id} not found in DocumentsInProgress table.")
+                logger.error("job failed: job id %s not found in documents_in_progress", job_id)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
             else:
                 if "error" in prog_doc and prog_doc["error"] == 'Attempting ingest':
+                    crash_error = "Ingest could not resolve successfully, worker crashed (e.g. ran out of memory)"
+                    logger.error("job failed: %s", crash_error)
                     status_db.insert_failed_document({
                         "s3_path": str(prog_doc["s3_path"]),
                         "readable_filename": prog_doc["readable_filename"],
@@ -171,7 +202,7 @@ class Worker:
                         "url": prog_doc["url"],
                         "base_url": prog_doc["base_url"],
                         "doc_groups": prog_doc["doc_groups"],
-                        "error": "Ingest could not resolve successfully, worker crashed (e.g. ran out of memory)",
+                        "error": crash_error,
                     })
                     status_db.delete_document_in_progress(job_id)
                     channel.basic_ack(delivery_tag=method.delivery_tag)
@@ -183,8 +214,9 @@ class Worker:
                     # OCR can't block RabbitMQ heartbeats or the ALB health check, and a native
                     # segfault kills only the child. On timeout/crash: record a clear failure and
                     # ack (no requeue -> no redelivery-guard mislabel).
-                    failure = run_ingest_isolated(job_id, inputs)
+                    failure = run_ingest_isolated(job_id, content.get('request_id'), inputs)
                     if failure is not None:
+                        logger.error("job failed: %s", failure[:500])
                         status_db.insert_failed_document({
                             "s3_path": str(prog_doc["s3_path"]),
                             "readable_filename": prog_doc["readable_filename"],
@@ -196,27 +228,66 @@ class Worker:
                         })
                         status_db.delete_document_in_progress(job_id)
                     channel.basic_ack(delivery_tag=method.delivery_tag)
-        except Exception as e:
+                    if failure is None:
+                        logger.info("job done ms=%d", int((time.monotonic() - started) * 1000))
+        except Exception as e:  # pylint: disable=broad-except
+            # Only resolver and DB errors get here: run_ingest_isolated never raises.
+            # One first try plus MAX_JOB_RETRIES retries.
+            attempt, attempts = retry_count + 1, MAX_JOB_RETRIES + 1
             if retry_count < MAX_JOB_RETRIES:
-                logging.info(f"Resubmitting {job_id} to queue (retry #{retry_count+1})")
+                if attempt == 1:
+                    logger.exception("job failed before ingest (DB or connection resolve), attempt %d/%d",
+                                     attempt, attempts)
+                else:
+                    logger.debug("job failed before ingest (DB or connection resolve), attempt %d/%d: %s: %s",
+                                 attempt, attempts, type(e).__name__, e)
                 content["retry_count"] = retry_count + 1
                 properties = pika.BasicProperties(delivery_mode=2, reply_to=header.reply_to)
-                # TODO: Channel is likely broken here
-                self.connect()
-                self.channel.basic_publish(exchange='',
+                # Republish on the same channel. If the channel is dead this raises
+                # into listen_for_jobs, which logs it and stops.
+                channel.basic_publish(exchange='',
                                       routing_key=self.rabbitmq_queue,
                                       properties=properties,
                                       body=json.dumps(content))
+                channel.basic_ack(delivery_tag=method.delivery_tag)
             else:
-                logging.info(f"Job {job_id} failed after {MAX_JOB_RETRIES} retries. Discarding job.")
+                logger.exception("job failed before ingest (DB or connection resolve), discarded after %d attempts",
+                                 attempt)
+                self._record_discarded_job(status_db or self.sql_session, job_id, inputs,
+                                           "%s: %s" % (type(e).__name__, e), attempt)
+                channel.basic_ack(delivery_tag=method.delivery_tag)
+        finally:
+            clear()
+
+    @staticmethod
+    def _record_discarded_job(status_db, job_id, inputs, error, attempts):
+        """Best effort: move a discarded job from documents_in_progress to documents_failed,
+        so the dashboard stops showing the file as ingesting. The database may be the thing
+        that failed, so this can fail as well; then it only logs."""
+        if status_db is None:
+            return
+        s3_paths = inputs.get('s3_paths', '')
+        try:
+            status_db.insert_failed_document({
+                "s3_path": s3_paths[0] if isinstance(s3_paths, list) and s3_paths else str(s3_paths or ''),
+                "readable_filename": inputs.get('readable_filename', ''),
+                "course_name": inputs.get('course_name', ''),
+                "url": inputs.get('url'),
+                "base_url": inputs.get('base_url'),
+                "doc_groups": inputs.get('groups', ''),
+                "error": "Job discarded after %d attempts: %s" % (attempts, error),
+            })
+            status_db.delete_document_in_progress(job_id)
+        except Exception:  # pylint: disable=broad-except
+            logger.warning("could not record the discarded job in the database", exc_info=True)
 
     def listen_for_jobs(self):
-        logging.info("Worker connecting to RabbitMQ...")
+        logger.info("Worker connecting to RabbitMQ...")
         if not self.is_connected():
-            logging.error("RabbitMQ is offline")
+            logger.error("RabbitMQ is offline")
             return
 
-        logging.info("Worker connected to RabbitMQ")
+        logger.info("Worker connected to RabbitMQ queue=%s", self.rabbitmq_queue)
         self.consumer = self.channel.basic_consume(
             queue=self.rabbitmq_queue,
             on_message_callback=self.process_job,
@@ -224,30 +295,29 @@ class Worker:
         )
 
         # start listening
-        logging.info("Waiting for messages. To exit press CTRL+C")
+        logger.info("Waiting for messages. To exit press CTRL+C")
         worker_running.set()  # mark healthy
 
+        reason = "the channel closed or the consumer was cancelled"
         try:
             # pylint: disable=protected-access
             while self.channel and self.channel.is_open and self.channel._consumer_infos:
                 self.channel.connection.process_data_events(time_limit=1)  # 1 second
-        except SystemExit:
+        except (SystemExit, KeyboardInterrupt, GeneratorExit) as e:
+            reason = type(e).__name__
             raise
-        except KeyboardInterrupt:
-            raise
-        except GeneratorExit:
-            raise
-        except Exception:  # pylint: disable=broad-except
-            logging.error("Worker crashed/disconnected:\n%s", traceback.format_exc())
+        except Exception as e:  # pylint: disable=broad-except
+            reason = "%s: %s" % (type(e).__name__, e)
+            logger.exception("Worker crashed/disconnected")
         finally:
-            logging.info("Stopped listening for messages.")
+            logger.warning("Stopped listening for messages: %s", reason)
             self.close()
             self.connection = None
 
         # final cleanup
         worker_running.clear()
         self.close()
-        logging.info("Worker exiting")
+        logger.info("Worker exiting")
 
 
 @app.route('/api/healthcheck', methods=['GET'])
@@ -261,14 +331,12 @@ def return_health():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-
     worker = Worker()
     worker_thread = threading.Thread(target=worker.listen_for_jobs)
     worker_thread.start()
     worker_thread.join(0)
 
-    logging.info("Running healthcheck endpoint")
+    logger.info("Running healthcheck endpoint")
     try:
         # threaded=True lets Flask serve multiple requests while worker runs
         app.run(host='0.0.0.0', port=8001, threaded=True)

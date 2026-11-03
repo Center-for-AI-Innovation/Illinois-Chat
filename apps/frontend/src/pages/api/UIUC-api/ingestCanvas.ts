@@ -2,8 +2,12 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { REQUEST_ID_HEADER, requestIdFromHeaders } from '~/utils/requestId'
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
+  // One id for the browser, this route, the backend and the worker.
+  const requestId = requestIdFromHeaders(req.headers)
+  res.setHeader(REQUEST_ID_HEADER, requestId)
   try {
     if (req.method !== 'POST') {
       console.error('Request method not allowed')
@@ -13,7 +17,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
     const { courseName, canvas_url, selectedCanvasOptions } = req.body
 
     console.log(
-      '👉 Submitting to Canvas ingest queue:',
+      `👉 Submitting to Canvas ingest queue rid=${requestId}:`,
       canvas_url,
       courseName,
       selectedCanvasOptions,
@@ -33,6 +37,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          [REQUEST_ID_HEADER]: requestId,
         },
         body: JSON.stringify({
           to_recipients_list: ['rohan13@illinois.edu'],
@@ -64,6 +69,7 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
           Accept: '*/*',
           'Accept-Encoding': 'gzip, deflate',
           'Content-Type': 'application/json',
+          [REQUEST_ID_HEADER]: requestId,
         },
         body: JSON.stringify({
           canvas_url: canvas_url,
@@ -86,14 +92,15 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
 
     const responseBody = await response.json()
     console.log(
-      `📤 Submitted to ingest queue: ${canvas_url}. Response status: ${response.status}`,
+      '📤 Submitted to ingest queue',
+      { rid: requestId, canvas_url, status: response.status },
       responseBody,
     )
     return res.status(response.status).json(responseBody)
   } catch (error) {
     console.error(error)
     return res.status(500).json({
-      error: `❌❌ -- Bottom of /ingest -- Internal Server Error during ingest submission to Beam: ${error}`,
+      error: `❌❌ -- Bottom of /ingest rid=${requestId} -- Internal Server Error during ingest submission to Beam: ${error}`,
     })
   }
 }

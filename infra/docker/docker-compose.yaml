@@ -333,6 +333,8 @@ services:
       NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY}
       # other
       POSTHOG_API_KEY: ${POSTHOG_API_KEY:-not_a_key}
+      CANVAS_ACCESS_TOKEN: ${CANVAS_ACCESS_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
   worker:
     build:
@@ -371,6 +373,7 @@ services:
       EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-http://host.docker.internal:11434/v1}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-8B}
       NCSA_HOSTED_API_KEY: ${NCSA_HOSTED_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       rabbitmq:
         condition: service_healthy

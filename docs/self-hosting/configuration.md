@@ -121,6 +121,14 @@ If you switch to a model with a different dimension, set `QDRANT_VECTOR_SIZE` to
 
 On the dev stack, `start-dev.sh` writes both keys **empty** into `apps/backend/.env` and `apps/frontend/.env` and does not copy the root `.env` values; set them in those files (see [Development setup](../contributing/dev-setup.md)).
 
+## Backend API
+
+The Flask backend reads this from its process environment. On the full stack Compose passes it on from `.env`.
+
+| Variable | Read by | Required or default | In template |
+| --- | --- | --- | --- |
+| `CANVAS_ACCESS_TOKEN` | full, dev | empty; required by `/canvas_ingest`, which returns 500 without it and 502 when Canvas rejects it (see [Troubleshooting](troubleshooting.md)) | root, worker |
+
 ## Ingest worker
 
 The worker reads these from its process environment. None is in the root template; the worker template names four of them in a comment as supplied by the deployment.
@@ -131,11 +139,10 @@ The worker reads these from its process environment. None is in the root templat
 | `RABBITMQ_SSL` | full, dev | unset | none |
 | `RABBITMQ_QUEUE` | full, dev | `uiuc-chat` | none |
 | `RABBITMQ_PREFETCH_COUNT` | full, dev | `1` | none |
-| `MAX_JOB_RETRIES` | full, dev | `10`; a failed job is re-queued immediately until this many attempts | none |
+| `MAX_JOB_RETRIES` | full, dev | `10`; only a job that fails before ingest starts (the database lookup or the connection resolve) is re-queued, right away, up to this many times. With the default that is 11 attempts in all (the first try plus 10 retries); the worker log counts them as `attempt n/11` and ends with `discarded after 11 attempts`. A file that fails during ingest is not re-queued: the worker tries it up to 3 times in the same job, then records the failure | none |
 | `INGEST_SUBPROCESS_TIMEOUT` | full, dev | `300` seconds | none |
 | `QDRANT_UPSERT_BATCH_SIZE` | full, dev | `100` | none |
 | `EMBEDDING_MAX_ATTEMPTS` | full, dev | `10` | none |
-| `CANVAS_ACCESS_TOKEN` | full, dev | empty; required by `/canvas_ingest`, which returns 500 without it. Not passed by Compose | worker |
 
 ## Email (SMTP)
 
@@ -144,7 +151,8 @@ The backend emails a download link when an export of more than 500 items finishe
 | Variable | Read by | Required or default | In template |
 | --- | --- | --- | --- |
 | `EMAIL_SENDER` | backend | no default | none |
-| `SES_HOST`, `SES_PORT` | backend | no default | none |
+| `SES_HOST` | backend | no default | none |
+| `SES_PORT` | backend | `465` | none |
 | `USERNAME_SMTP`, `PASSWORD_SMTP` | backend | no default | none |
 
 ## Tools platform (Sim AI)
@@ -182,6 +190,7 @@ Read by `docker-compose.sim.yaml`, which both start scripts load unless `--no-si
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | dev | empty; not passed by Compose | root |
 | `NOMIC_API_KEY` | dev | empty; not passed by Compose | root |
 | `SENTRY_DSN` | dev | empty; not passed by Compose | root |
+| `LOG_LEVEL` | full (backend, worker), dev | `INFO`; one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. An unknown value falls back to `INFO` with one warning line. `start-dev.sh` does not write it; add it to `apps/backend/.env` | root, worker |
 
 ## Vector database (Qdrant, optional)
 

@@ -224,6 +224,10 @@ Linting is enforced with [Trunk](https://trunk.io) (`npm exec trunk check` in th
 - Re-run `bash infra/scripts/start-dev.sh` to create or append missing local env keys.
 - Fill hosted model/API values in the app-local `.env` files when you need non-local services.
 
+**Reading the logs**
+
+- How to read a log line, follow one request id across the backend and the worker, and turn on `DEBUG` for one service: "Reading the logs" on [Troubleshooting](../self-hosting/troubleshooting.md#reading-the-logs). What each level means: [Logging](logging.md).
+
 Stack-level symptoms (`Database is empty`, the `SIM_APPROVAL_ADMIN_EMAIL` exit, an old Postgres volume) are on [Troubleshooting](../self-hosting/troubleshooting.md).
 
 ## Stopping everything

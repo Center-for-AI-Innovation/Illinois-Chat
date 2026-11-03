@@ -219,7 +219,7 @@ class WorkerConnectionResolver:
             self._resolve_embedding(result, project_name, emb_cfg)
 
         if result.has_overrides:
-            logger.info(
+            logger.debug(
                 "Resolved external connections for project: %s (engine=%s)",
                 project_name, result.engine_kind,
             )
@@ -265,7 +265,7 @@ class WorkerConnectionResolver:
 
     @staticmethod
     def _create_qdrant(project_name: str, qdrant_config: dict) -> QdrantClient:
-        logger.info("Creating external Qdrant client for project: %s", project_name)
+        logger.debug("Creating external Qdrant client for project: %s", project_name)
         return QdrantClient(
             url=qdrant_config["url"],
             api_key=qdrant_config["api_key"],
@@ -285,14 +285,14 @@ class WorkerConnectionResolver:
         database pooler's job (the documented setup is a Supabase transaction
         pooler), and this matches the worker's host engine in rmsql.py.
         """
-        logger.info("Creating external SQL engine for project: %s", project_name)
+        logger.debug("Creating external SQL engine for project: %s", project_name)
         return create_engine(db_config["connection_uri"], poolclass=NullPool)
 
     # ── S3 ──
 
     @staticmethod
     def _create_s3(project_name: str, s3_config: dict):
-        logger.info("Creating external S3 client for project: %s", project_name)
+        logger.debug("Creating external S3 client for project: %s", project_name)
         endpoint_url = s3_config.get("endpoint_url")
         region = s3_config.get("region")
         client_kwargs = dict(

@@ -1,3 +1,4 @@
+import logging
 import os
 from concurrent.futures import as_completed
 
@@ -9,6 +10,8 @@ from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapt
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 
 def send_request(webcrawl_url, payload):
   response = requests.post(webcrawl_url, json=payload)
@@ -16,7 +19,7 @@ def send_request(webcrawl_url, payload):
 
 
 def webscrape_documents(project_name: str):
-  print(f"Scraping documents for project: {project_name}")
+  logger.info("re-crawling documents course=%s", project_name)
 
   # create Supabase client
   supabase_url = os.getenv("SUPABASE_URL")
@@ -27,7 +30,7 @@ def webscrape_documents(project_name: str):
   # TODO: Replace with call to function in SQLDatabase
   response = supabase_client.rpc("get_base_url_with_doc_groups", {"p_course_name": project_name}).execute()
   base_urls = response.data
-  print(f"Total base_urls: {len(base_urls)}")
+  logger.info("re-crawl base urls course=%s count=%d", project_name, len(base_urls))
 
   webcrawl_url = "https://crawlee-production.up.railway.app/crawl"
 
@@ -49,7 +52,7 @@ def webscrape_documents(project_name: str):
   if not os.path.exists(processed_file_name):
     open(processed_file_name, 'w').close()
 
-  print(f"Processed file name: {processed_file_name}")
+  logger.debug("processed-urls file: %s", processed_file_name)
 
   with ThreadPoolExecutorAdapter(max_workers=batch_size) as executor:
     for base_url in base_urls:
@@ -63,11 +66,11 @@ def webscrape_documents(project_name: str):
         skip_urls = set(line.strip() for line in file)
 
       if base_url in skip_urls:
-        print(f"Skipping URL: {base_url}")
+        logger.debug("skipping already processed url=%s", base_url)
         continue
 
       payload["params"]["documentGroups"] = base_urls[base_url]
-      print("Payload: ", payload)
+      logger.debug("crawl payload: %s", payload)
 
       with open(processed_file_name, 'a') as file:
         file.write(base_url + '\n')
@@ -78,14 +81,14 @@ def webscrape_documents(project_name: str):
       if count % batch_size == 0:
         for future in as_completed(tasks):
           response = future.result()
-          print("Response from crawl: ", response)
+          logger.debug("crawl response: %s", str(response)[:500])
         tasks = []
         #return "Webscrape done."
 
     # Process remaining tasks
     for future in as_completed(tasks):
       response = future.result()
-      print("Response from crawl: ", response)
+      logger.debug("crawl response: %s", str(response)[:500])
 
   # if os.path.exists(processed_file_name):
   #     os.remove(processed_file_name)

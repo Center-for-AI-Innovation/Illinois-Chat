@@ -51,7 +51,7 @@ def _process_pubmed_results(results, course_name):
             result.payload["course_name"] = course_name
             processed.append(result)
         except Exception as e:
-            logger.warning("Error processing pubmed result: %s", e)
+            logger.warning("Error processing pubmed result: %s", e, exc_info=True)
     return processed
 
 
@@ -68,7 +68,7 @@ def _process_patents_results(results, course_name):
             result.payload["s3_path"] = s3_path
             processed.append(result)
         except Exception as e:
-            logger.warning("Error processing patents result: %s", e)
+            logger.warning("Error processing patents result: %s", e, exc_info=True)
     return processed
 
 
@@ -87,7 +87,7 @@ def _process_ncbi_books_results(results, course_name):
             result.payload["url"] = result.payload.get("url", None)
             processed.append(result)
         except Exception as e:
-            logger.warning("Error processing NCBI books result: %s", e)
+            logger.warning("Error processing NCBI books result: %s", e, exc_info=True)
     return processed
 
 
@@ -106,7 +106,7 @@ def _process_clinical_trials_results(results, course_name):
             result.payload["course_name"] = course_name
             processed.append(result)
         except Exception as e:
-            logger.warning("Error processing clinical trials result: %s", e)
+            logger.warning("Error processing clinical trials result: %s", e, exc_info=True)
     return processed
 
 
@@ -349,7 +349,7 @@ class VectorDatabase:
                     results = RESULT_PROCESSORS[processor_key](results, course_name)
                 return results
             except Exception as e:
-                logger.warning("Error searching collection %s: %s", col_name, e)
+                logger.warning("Error searching collection %s: %s", col_name, e, exc_info=True)
                 return []
 
         if self.qdrant_config.get("parallel", True) and len(collections) > 1:
@@ -360,7 +360,7 @@ class VectorDatabase:
                     try:
                         all_results.extend(future.result())
                     except Exception as e:
-                        logger.warning("Unexpected error searching %s: %s", col_name, e)
+                        logger.warning("Unexpected error searching %s: %s", col_name, e, exc_info=True)
         else:
             for cfg in collections:
                 all_results.extend(_search_one(cfg))
@@ -477,7 +477,7 @@ class VectorDatabase:
             must_not=must_not_conditions or None,
         )
 
-        print(f"Vector search filter: {vector_search_filter}")
+        logger.debug("Vector search filter: %s", vector_search_filter)
         return vector_search_filter
 
     def _create_conversation_search_filter(self, conversation_id: str) -> models.Filter:

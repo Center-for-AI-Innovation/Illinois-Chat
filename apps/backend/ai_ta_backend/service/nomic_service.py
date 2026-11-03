@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 import re
 import time
@@ -15,12 +16,27 @@ from ai_ta_backend.service.sentry_service import SentryService
 
 from ollama import Client
 
+logger = logging.getLogger(__name__)
+_init_error_logged = False  # a failed singleton is rebuilt on every request; log the cause once
+
 
 class NomicService():
 
   @inject
   def __init__(self, sentry: SentryService, sql: SQLDatabase):
-    nomic.cli.login(os.environ['NOMIC_API_KEY'])
+    global _init_error_logged
+    log_now = not _init_error_logged
+    for dependency, var in (("Nomic", "NOMIC_API_KEY"), ("Ollama", "OLLAMA_SERVER_URL")):
+      if log_now and not os.environ.get(var):
+        logger.error("%s not configured: %s is unset", dependency, var)
+        _init_error_logged = True
+    try:
+      nomic.cli.login(os.environ['NOMIC_API_KEY'])
+    except Exception as e:
+      if log_now and not isinstance(e, KeyError):
+        logger.error("Nomic login failed: %s", e)
+        _init_error_logged = True
+      raise
     self.ollama_client = Client(host=os.environ['OLLAMA_SERVER_URL'])
     self.sentry = sentry
     self.sql = sql
@@ -53,17 +69,16 @@ class NomicService():
         project = AtlasDataset(project_name)
         map = project.get_map(map_name[field])
 
-      print(f"⏰ Nomic Full Map Retrieval: {(time.monotonic() - start_time):.2f} seconds")
+      logger.debug("Nomic map retrieval course=%s ms=%d", course_name, (time.monotonic() - start_time) * 1000)
       return {"map_id": f"iframe{map.id}", "map_link": map.map_link}
 
     except Exception as e:
       # Error: ValueError: You must specify a unique_id_field when creating a new project.
       if str(e) == 'You must specify a unique_id_field when creating a new project.':  # type: ignore
-        print(
-            "Nomic map does not exist yet, probably because you have less than 20 queries/documents on your project: ",
-            e)
+        logger.info("Nomic map does not exist yet course=%s type=%s (fewer than 20 queries or documents)",
+                    course_name, type)
       else:
-        print("ERROR in get_nomic_map():", e)
+        logger.exception("get_nomic_map failed course=%s type=%s", course_name, type)
         self.sentry.capture_exception(e)
       return {"map_id": None, "map_link": None}
 
@@ -76,27 +91,26 @@ class NomicService():
     try:
 
       projects = self.sql.getConvoMapDetails().data
-      print("Number of projects: ", len(projects))
+      logger.debug("updating conversation maps projects=%d", len(projects))
 
       for project in projects:
         course_name = project['course_name']
-        print(f"Processing course: {course_name}")
 
         if not project['convo_map_id'] or project['convo_map_id'] == 'N/A':
-          print(f"Creating new conversation map for {course_name}")
+          logger.debug("creating new conversation map course=%s", course_name)
           self.create_conversation_map(course_name)
           continue
 
-        print(f"Updating existing conversation map for {course_name}")
+        logger.debug("updating existing conversation map course=%s", course_name)
         last_uploaded_id = project['last_uploaded_convo_id']
         total_convo_count = self.sql.getCountFromLLMConvoMonitor(course_name, last_id=last_uploaded_id).count
 
         if total_convo_count == 0:
-          print("No new conversations to log.")
+          logger.debug("no new conversations for the map course=%s", course_name)
           # self.create_map_index(course_name, index_field="first_query", map_type="conversation")
           continue
 
-        print(f"Found {total_convo_count} unlogged conversations")
+        logger.debug("unlogged conversations course=%s count=%d", course_name, total_convo_count)
         combined_dfs = []
         current_count = 0
 
@@ -112,7 +126,6 @@ class NomicService():
             final_df = pd.concat(combined_dfs, ignore_index=True)
             embeddings, metadata = self.data_prep_for_convo_map(final_df)
 
-            print("Appending data to existing map...")
             map_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
                               f"Conversation Map for {course_name}".replace("_", "-")).replace(" ", "-").lower()
 
@@ -123,23 +136,22 @@ class NomicService():
               self.sql.updateProjects(course_name, {'last_uploaded_convo_id': last_uploaded_id})
 
             else:
-              print(f"Error in updating conversation map: {result}")
+              logger.error("updating conversation map failed course=%s: %s", course_name, result)
               break
 
             combined_dfs = []
         
         self.create_map_index(course_name, index_field="first_query", map_type="conversation")
 
-        print(f"Successfully processed all conversations for {course_name}")
-        print(f"------------------------------------------------------------------------")
+        logger.debug("processed all conversations for the map course=%s", course_name)
         time.sleep(10)
 
-      print("Finished updating all conversation maps.")
+      logger.info("finished updating conversation maps projects=%d", len(projects))
       return "success"
 
     except Exception as e:
       error_msg = f"Error in updating conversation maps: {e}"
-      print(error_msg)
+      logger.exception("updating conversation maps failed")
       self.sentry.capture_exception(e)
       return error_msg
 
@@ -157,18 +169,16 @@ class NomicService():
     try:
       # Fetch all projects
       projects = self.sql.getDocMapDetails().data
-      print("Number of projects: ", len(projects))
+      logger.debug("updating document maps projects=%d", len(projects))
 
       for project in projects:
         try:
           course_name = project['course_name']
-          print(f"Processing course: {project}")
 
           # Determine whether to create or update map
           if not project.get('doc_map_id') or project.get('doc_map_id') == 'N/A':
-            print(f"Creating new document map for course: {course_name}")
             status = self.create_document_map(course_name)
-            print(f"Status of document map creation: {status}")
+            logger.debug("created new document map course=%s status=%s", course_name, status)
             continue
 
           # Check for new documents
@@ -176,13 +186,12 @@ class NomicService():
           response = self.sql.getCountFromDocuments(course_name, last_id=last_uploaded_doc_id)
 
           if not response.count:
-            print("No new documents to log.")
-            print("---------------------------------------------------------")
+            logger.debug("no new documents for the map course=%s", course_name)
             continue
 
           # Prepare update process
           total_doc_count = response.count
-          print(f"Total unlogged documents in Database: {total_doc_count}")
+          logger.debug("unlogged documents course=%s count=%d", course_name, total_doc_count)
 
           project_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
                                 f"{DOCUMENT_MAP_PREFIX}{course_name}".replace(" ", "-").replace("_", "-").lower())
@@ -210,13 +219,13 @@ class NomicService():
 
             if should_process:
               batch_number += 1
-              print(f"\nProcessing batch #{batch_number}")
+              logger.debug("processing document map batch=%d course=%s", batch_number, course_name)
 
               final_df = pd.concat(combined_dfs, ignore_index=True)
               embeddings, metadata = self.data_prep_for_doc_map(final_df)
 
               if not embeddings.size:
-                print("No embeddings found. Skipping batch.")
+                logger.debug("no embeddings found, skipping batch course=%s", course_name)
                 continue
 
               # Upload to map
@@ -227,10 +236,9 @@ class NomicService():
                 project_info = {'last_uploaded_doc_id': last_id}
                 self.sql.updateProjects(course_name, project_info)
 
-                print(f"Completed batch #{batch_number}. "
-                      f"Documents processed: {current_doc_count}/{total_doc_count}")
+                logger.debug("completed document map batch=%d course=%s documents=%d/%d", batch_number, course_name,
+                             current_doc_count, total_doc_count)
               else:
-                print(f"Error in uploading batch for {course_name}: {result}")
                 raise Exception(f"Batch upload failed: {result}")
 
               # Reset for next batch
@@ -247,20 +255,19 @@ class NomicService():
           # Rebuild map after all documents are processed
           self.create_map_index(course_name, index_field="text", map_type="document")
 
-          print(f"\nSuccessfully processed all documents for {course_name}")
-          print(f"Total batches processed: {batch_number}")
-          print(f"------------------------------------------------------------------------")
+          logger.debug("processed all documents for the map course=%s batches=%d", course_name, batch_number)
           time.sleep(10)
 
         except Exception as e:
-          print(f"Error in updating document map for {course_name}: {e}")
+          logger.exception("updating document map failed course=%s", course_name)
           self.sentry.capture_exception(e)
           continue
 
+      logger.info("finished updating document maps projects=%d", len(projects))
       return "success"
 
     except Exception as e:
-      print(f"Error in update_document_maps: {e}")
+      logger.exception("updating document maps failed")
       self.sentry.capture_exception(e)
       return f"Error in update_document_maps: {e}"
 
@@ -285,15 +292,14 @@ class NomicService():
 
       # Validate conversation count
       response = self.sql.getCountFromLLMConvoMonitor(course_name, last_id=0)
-      print(f"Response from Database: {response.count}")
-
       if not response.count or response.count < MIN_CONVERSATIONS:
-        print(f"Cannot create map: {'No new convos present' if not response.count else 'Less than 20 conversations'}")
+        logger.info("cannot create conversation map course=%s conversations=%s (need %d)", course_name, response.count,
+                    MIN_CONVERSATIONS)
         return f"Cannot create map: {'No new convos present' if not response.count else 'Less than 20 conversations'}"
 
       # Prepare map creation
       total_convo_count = response.count
-      print(f"Total conversations in Database: {total_convo_count}")
+      logger.debug("creating conversation map course=%s conversations=%d", course_name, total_convo_count)
 
       project_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
                             (NOMIC_MAP_NAME_PREFIX + course_name).replace(" ", "-").replace("_", "-").lower())
@@ -314,23 +320,20 @@ class NomicService():
         combined_dfs.append(df)
         current_convo_count += len(response.data)
         convo_count += len(response.data)
-        print(f"Conversations processed: {convo_count}")
-        print(f"Current conversation count: {current_convo_count}")
+        logger.debug("fetched conversations course=%s batch=%d total=%d", course_name, convo_count, current_convo_count)
 
         # Process and upload batches when threshold is reached
         if convo_count >= UPLOAD_THRESHOLD or current_convo_count >= total_convo_count:
-          print("Processing batch...")
           final_df = pd.concat(combined_dfs, ignore_index=True)
-          print(f"length of final_df: {len(final_df)}")
+          logger.debug("processing conversation map batch course=%s rows=%d", course_name, len(final_df))
           embeddings, metadata = self.data_prep_for_convo_map(final_df)
 
           if not embeddings.size:
-            print("No embeddings found. Skipping batch.")
+            logger.debug("no embeddings found, skipping batch course=%s", course_name)
             continue
 
           # Create or append to map
           if first_batch:
-            print("in first batch")
             index_name = f"{course_name}_convo_index"
             map_title = f"{NOMIC_MAP_NAME_PREFIX}{course_name}"
             result = self.create_map(embeddings=embeddings, metadata=metadata, map_name=map_title, index_name=
@@ -342,7 +345,7 @@ class NomicService():
             project = AtlasDataset(project_name)
             last_id = int(final_df['id'].iloc[-1])
             project_info = {'course_name': course_name, 'convo_map_id': project.id, 'last_uploaded_convo_id': last_id}
-            print("project_info", project_info)
+            logger.debug("conversation map project_info=%s", project_info)
             # Update or insert project info
             if existing_map.data:
               self.sql.updateProjects(course_name, project_info)
@@ -350,7 +353,7 @@ class NomicService():
               self.sql.insertProject(project_info)
 
           else:
-            print(f"Did not append additional data to new map: {result}")
+            logger.error("adding data to new conversation map failed course=%s: %s", course_name, result)
             return f"Did not append additional data to new map: {result}"
 
           # Reset for next batch
@@ -366,7 +369,7 @@ class NomicService():
       return "success"
 
     except Exception as e:
-      print(e)
+      logger.exception("creating conversation map failed course=%s", course_name)
       self.sentry.capture_exception(e)
       return f"Error in creating conversation map: {str(e)}"
 
@@ -399,7 +402,7 @@ class NomicService():
 
       # Prepare map creation
       total_doc_count = response.count
-      print(f"Total documents in Database: {total_doc_count}")
+      logger.debug("creating document map course=%s documents=%d", course_name, total_doc_count)
 
       project_name = re.sub(r'[^a-zA-Z0-9\s-]', '', project_name.replace(" ", "-").replace("_", "-").lower())
       first_id = response.data[0]['id'] - 1
@@ -413,7 +416,7 @@ class NomicService():
         # Fetch documents in batches
         response = self.sql.getDocsForIdsGte(course_name=course_name, first_id=first_id, limit=BATCH_SIZE)
         if not response.data:
-          print("No data found.")
+          logger.debug("no more documents found course=%s", course_name)
           break
 
         df = pd.DataFrame(response.data)
@@ -426,12 +429,12 @@ class NomicService():
                           current_doc_count == total_doc_count)
 
         if should_process:
-          print("Processing batch...")
           final_df = pd.concat(combined_dfs, ignore_index=True)
+          logger.debug("processing document map batch course=%s rows=%d", course_name, len(final_df))
           embeddings, metadata = self.data_prep_for_doc_map(final_df)
 
           if not embeddings.size:
-            print("No embeddings found. Skipping batch.")
+            logger.info("no embeddings found, skipping document map course=%s", course_name)
             return "No embeddings found. Skipping project."
 
           # Create or append to map
@@ -445,7 +448,7 @@ class NomicService():
           if result == "success":
             project = AtlasDataset(project_name)
             last_id = int(final_df['id'].iloc[-1])
-            print("last_id", last_id) 
+            logger.debug("document map last_id=%s course=%s", last_id, course_name)
             project_info = {'course_name': course_name, 'doc_map_id': project.id, 'last_uploaded_doc_id': last_id}
 
             # Update or insert project info
@@ -455,7 +458,7 @@ class NomicService():
               self.sql.insertProject(project_info)
 
           else:
-            print(f"Error in uploading batch for {course_name}: {result}")
+            logger.error("uploading document map batch failed course=%s: %s", course_name, result)
             return f"Error in uploading batch for {course_name}: {result}"
 
           # Reset for next batch
@@ -465,10 +468,9 @@ class NomicService():
 
         # Prepare for next iteration
         first_id = response.data[-1]['id'] + 1
-        print(f"Current document count: {current_doc_count}")
+        logger.debug("document map progress course=%s documents=%d", course_name, current_doc_count)
         # Exit condition to prevent infinite loop
         if current_doc_count >= total_doc_count:
-          print("Exiting loop")
           break
 
       # Rebuild the map
@@ -476,7 +478,7 @@ class NomicService():
       return "success"
 
     except Exception as e:
-      print(e)
+      logger.exception("creating document map failed course=%s", course_name)
       self.sentry.capture_exception(e)
       return f"Error in creating document map: {str(e)}"
 
@@ -488,7 +490,7 @@ class NomicService():
     try:
       # step 1: get all conversation maps from SQL
       data = self.sql.getProjectsWithConvoMaps().data
-      print("Length of projects: ", len(data))
+      logger.debug("cleaning up conversation maps projects=%d", len(data))
       # step 2: delete all conversation maps from Nomic
       for project in data:
         try:
@@ -496,7 +498,7 @@ class NomicService():
                                 (f"Conversation Map for {project['course_name']}").replace(" ",
                                                                                            "-").replace("_",
                                                                                                         "-").lower())
-          print(f"Deleting conversation map: {project_name}")
+          logger.debug("deleting conversation map %s", project_name)
           dataset = AtlasDataset(project_name)
           dataset.delete()
 
@@ -508,18 +510,18 @@ class NomicService():
           })
 
         except Exception as e:
-          print(f"Error in deleting conversation map: {e}")
+          logger.exception("deleting conversation map failed course=%s", project['course_name'])
           self.sentry.capture_exception(e)
           continue
-      print("Deleted all conversation maps.")
+      logger.info("deleted conversation maps projects=%d", len(data))
 
       # step 4: re-create conversation maps by calling update function
       status = self.update_conversation_maps()  # this function will create new maps if not already present!
-      print("Map re-creation status: ", status)
+      logger.info("conversation map re-creation status=%s", status)
 
       return "success"
     except Exception as e:
-      print(e)
+      logger.exception("cleaning up conversation maps failed")
       self.sentry.capture_exception(e)
       return f"Error in cleaning up conversation maps: {str(e)}"
 
@@ -531,14 +533,14 @@ class NomicService():
     try:
       # step 1: get all document maps from SQL
       data = self.sql.getProjectsWithDocMaps().data
-      print("Length of projects: ", len(data))
+      logger.debug("cleaning up document maps projects=%d", len(data))
       # step 2: delete all document maps from Nomic
       for project in data:
         try:
           project_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
                                 (f"Document Map for {project['course_name']}").replace(" ", "-").replace("_",
                                                                                                          "-").lower())
-          print(f"Deleting document map: {project_name}")
+          logger.debug("deleting document map %s", project_name)
           dataset = AtlasDataset(project_name)
           dataset.delete()
 
@@ -550,17 +552,17 @@ class NomicService():
           })
 
         except Exception as e:
-          print(f"Error in deleting document map: {e}")
+          logger.exception("deleting document map failed course=%s", project['course_name'])
           self.sentry.capture_exception(e)
           continue
 
       # step 4: re-create conversation maps by calling update function
       status = self.update_document_maps()  # this function will create new maps if not already present!
-      print("Map re-creation status: ", status)
+      logger.info("document map re-creation projects=%d status=%s", len(data), status)
 
       return "success"
     except Exception as e:
-      print(e)
+      logger.exception("cleaning up document maps failed")
       self.sentry.capture_exception(e)
       return f"Error in cleaning up document maps: {str(e)}"
 
@@ -583,7 +585,7 @@ class NomicService():
                             (MAP_PREFIXES.get(map_type.lower(), '') + course_name).replace(" ",
                                                                                            "-").replace("_",
                                                                                                         "-").lower())
-      print(f"Rebuilding map: {project_name}")
+      logger.debug("rebuilding map %s", project_name)
       project = AtlasDataset(project_name)
 
       if project.is_accepting_data:
@@ -592,7 +594,7 @@ class NomicService():
       return "success"
 
     except Exception as e:
-      print(e)
+      logger.exception("rebuilding map failed course=%s map_type=%s", course_name, map_type)
       self.sentry.capture_exception(e)
       return f"Error in rebuilding map: {e}"
 
@@ -606,7 +608,7 @@ class NomicService():
       # create index
       project_name = re.sub(r'[^a-zA-Z0-9\s-]', '',
                             (MAP_PREFIXES.get(map_type, '') + course_name).replace(" ", "-").replace("_", "-").lower())
-      print(f"Creating index for map: {project_name}")
+      logger.debug("creating index for map %s", project_name)
 
       project = AtlasDataset(project_name)
 
@@ -620,7 +622,7 @@ class NomicService():
 
       return "success"
     except Exception as e:
-      print(e)
+      logger.exception("creating map index failed course=%s map_type=%s", course_name, map_type)
       self.sentry.capture_exception(e)
       return f"Error in creating index: {e}"
 
@@ -638,7 +640,7 @@ class NomicService():
     Returns:
         str: 'success' or error message
     """
-    print(f"Creating map: {map_name}")
+    logger.debug("creating map %s", map_name)
 
     try:
         project = AtlasDataset(
@@ -652,7 +654,7 @@ class NomicService():
         return "success"
 
     except Exception as e:
-        print(e)
+        logger.exception("creating Nomic map failed map=%s", map_name)
         return f"Error in creating map: {e}"
 
   @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=10, max=600))
@@ -668,7 +670,7 @@ class NomicService():
         str: 'success' or error message
     """
     try:
-        print(f"Appending to map: {map_name}")
+        logger.debug("appending to map %s", map_name)
         project = AtlasDataset(map_name)
 
         start_time = time.monotonic()
@@ -678,13 +680,13 @@ class NomicService():
                     project.add_data(data=metadata, embeddings=embeddings)
                 return "success"
             
-            print("Project is currently indexing. Waiting for 10 seconds...")
+            logger.debug("map %s is indexing, waiting 10 s", map_name)
             time.sleep(10)
 
         return "Project busy"
 
     except Exception as e:
-        print(e)
+        logger.exception("appending to Nomic map failed map=%s", map_name)
         return f"Error in appending to map: {e}"
 
   def data_prep_for_convo_map(self, df: pd.DataFrame) -> list:
@@ -695,7 +697,7 @@ class NomicService():
     Returns:
         pd.DataFrame: Processed metadata for map creation, or None if error occurs
     """
-    print("Preparing conversation data for map")
+    logger.debug("preparing conversation data for map rows=%d", len(df))
 
     try:
       metadata = []
@@ -734,14 +736,12 @@ class NomicService():
       
       embeddings = response['embeddings']
       embeddings = np.array(embeddings)
-      print("Shape of embeddings: ", embeddings.shape)
-      
       result = pd.DataFrame(metadata)
-      print(f"Metadata shape: {result.shape}")
+      logger.debug("conversation map data embeddings=%s metadata=%s", embeddings.shape, result.shape)
       return [embeddings, result]
 
     except Exception as e:
-      print(f"Error in data preparation: {e}")
+      logger.exception("preparing conversation data for map failed")
       self.sentry.capture_exception(e)
       return [np.array([]), pd.DataFrame()]
 
@@ -780,13 +780,13 @@ class NomicService():
         # Convert to numpy array only if we have valid embeddings
         if embeddings and len(embeddings) > 20:
             embeddings = np.array(embeddings)
-            print(f"Embeddings shape: {embeddings.shape}")
+            logger.debug("document map data embeddings=%s", embeddings.shape)
             return [embeddings, pd.DataFrame(metadata)]
         else:
-            print("No valid embeddings found")
+            logger.debug("no valid embeddings found for document map")
             return [np.array([]), pd.DataFrame()]
 
     except Exception as e:
-        print(f"Error in document data preparation: {e}")
+        logger.exception("preparing document data for map failed")
         self.sentry.capture_exception(e)
         return [np.array([]), pd.DataFrame()]

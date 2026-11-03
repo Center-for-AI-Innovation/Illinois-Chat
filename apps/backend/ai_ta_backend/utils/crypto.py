@@ -1,17 +1,21 @@
 import base64
 import hashlib
 import json
+import logging
 import os
 import re
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+logger = logging.getLogger(__name__)
+
 
 def encrypt(text: str, key: str) -> str:
   if not text or not key:
-    print('Error encrypting because text or key is not available', text, key)
-    raise ValueError(f'Invalid input: Error encrypting because text or key is not available. Text: {text}, Key: {key}')
+    # Never put the text or the key in the message: they are secrets.
+    raise ValueError('Invalid input: Error encrypting because text or key is not available '
+                     f'(text empty: {not text}, key empty: {not key})')
 
   pw_utf8 = key.encode('utf-8')
   pw_hash = hashlib.sha256(pw_utf8).digest()
@@ -27,10 +31,9 @@ def encrypt(text: str, key: str) -> str:
 
 def decrypt(encrypted_text: str, key: str) -> str:
   if not encrypted_text or not key:
-    print('Error decrypting because encryptedText or key is not available', encrypted_text, key)
-    raise ValueError(
-        f'Invalid input: Error decrypting because encryptedText or key is not available. Encrypted text: {encrypted_text}, Key: {key}'
-    )
+    # Never put the text or the key in the message: they are secrets.
+    raise ValueError('Invalid input: Error decrypting because encryptedText or key is not available '
+                     f'(encrypted text empty: {not encrypted_text}, key empty: {not key})')
 
   try:
     version, encrypted_base64, iv_base64 = encrypted_text.split('.')
@@ -73,7 +76,7 @@ def decrypt_if_needed(key: str) -> str:
       decrypted_text = decrypt(key, os.environ.get('NEXT_PUBLIC_SIGNING_KEY', ''))
       return decrypted_text
     except Exception as error:
-      print('Failed to decrypt key:', error)
+      logger.debug('Failed to decrypt key: %s', error)
       raise
   return key
 
@@ -84,7 +87,7 @@ def encrypt_if_needed(key: str) -> str:
       encrypted_text = encrypt(key, os.environ.get('NEXT_PUBLIC_SIGNING_KEY', ''))
       return encrypted_text
     except Exception as error:
-      print('Failed to encrypt key:', error)
+      logger.debug('Failed to encrypt key: %s', error)
       raise
   return key
 

@@ -85,6 +85,7 @@ import {
 } from '~/components/UIUC-Components/CountryOfConcern'
 import posthog from 'posthog-js'
 import { deriveAgentModeEnabled } from '~/utils/app/agentMode'
+import { REQUEST_ID_HEADER, newRequestId } from '~/utils/requestId'
 
 const montserrat_med = Montserrat({
   weight: '500',
@@ -795,7 +796,10 @@ export const ChatInput = ({
           // For non-image files, use the regular file processing
           const response = await fetch('/api/UIUC-api/chat-file-upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              [REQUEST_ID_HEADER]: newRequestId(),
+            },
             body: JSON.stringify({
               conversationId: conversation.id,
               courseName: courseName,

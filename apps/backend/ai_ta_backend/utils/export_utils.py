@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import tempfile
 import zipfile
@@ -6,6 +7,8 @@ from urllib.parse import urlparse
 
 import xlsxwriter
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def _initialize_base_name(course_name):
@@ -29,7 +32,7 @@ def _initialize_file_paths(course_name: str):
     os.makedirs(file_paths["markdown_dir"], exist_ok=True)
     os.makedirs(file_paths["media_dir"], exist_ok=True)
 
-    print(f"Initialized directories: {file_paths['markdown_dir']}, {file_paths['media_dir']}")
+    logger.debug("initialized export directories %s, %s", file_paths['markdown_dir'], file_paths['media_dir'])
     return file_paths
 
 
@@ -50,7 +53,6 @@ def _initialize_excel(excel_file_path):
   ]
   for col_num, header in enumerate(headers):
     worksheet.write(0, col_num, header)
-  print(f"Initialized Excel headers: {headers}")
   return workbook, worksheet, wrap_format
 
 
@@ -65,7 +67,6 @@ def _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num
       convo_name = messages[0]['content'][0]['text'][:15]
     else:
       convo_name = messages[0]['content'][:15]
-    print(f"Processing conversation ID: {convo_id}, User email: {user_email}")
 
     _create_markdown(s3, convo_id, messages, file_paths['markdown_dir'], file_paths['media_dir'], user_email, error_log,
                      timestamp, convo_name, bucket_name)
@@ -74,9 +75,9 @@ def _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num
     # print(f"Wrote to Excel for conversation ID: {convo_id}")
     _append_to_jsonl(convo_data, file_paths['jsonl'], error_log)
     # print(f"Appended to JSONL for conversation ID: {convo_id}")
-    print(f"Processed conversation ID: {convo_id}")
+    logger.debug("processed conversation convo_id=%s messages=%d", convo_id, len(messages))
   except Exception as e:
-    print(f"Error processing conversation ID {convo['convo_id']}: {str(e)}")
+    logger.warning("processing conversation failed convo_id=%s: %s", convo.get('convo_id'), e)
     error_log.append(f"Error processing conversation ID {convo['convo_id']}: {str(e)}")
 
 
@@ -118,16 +119,14 @@ def _create_markdown(s3, convo_id, messages, markdown_dir, media_dir, user_email
         md_file.write(f"{content}\n\n")
         md_file.write("---\n\n")  # Separator for each message for better readability
 
-    print(f"Created markdown file at path: {markdown_file_path}")
   except Exception as e:
-    print(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
+    logger.warning("creating markdown failed convo_id=%s: %s", convo_id, e)
     error_log.append(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
 
 
 def _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir, media_dir, user_email, error_log,
                                            timestamp, name, project_name, bucket_name):
   try:
-    print(f"Creating markdown file for conversation ID {convo_id}")
     if isinstance(timestamp, datetime):
       timestamp = timestamp.isoformat()
     markdown_filename = f"{name}-{timestamp}.md"
@@ -154,9 +153,9 @@ def _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir,
           md_file.write(f"{img_desc}\n\n")
         md_file.write("---\n\n")  # Separator for each message for better readability
 
-    print(f"Created markdown file at path: {markdown_file_path}")
+    logger.debug("created markdown convo_id=%s", convo_id)
   except Exception as e:
-    print(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
+    logger.warning("creating markdown failed convo_id=%s: %s", convo_id, e)
     error_log.append(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
 
 
@@ -177,12 +176,11 @@ def _process_message_content(s3, content, convo_id, media_dir, error_log, bucket
           # Adjust the path to be relative from the markdown file's perspective
           relative_image_path = os.path.join('..', media_dir.split('/')[-1], image_filename)
           flattened_content.append(f"![Image]({relative_image_path})")
-      print(f"Processed message content for conversation ID: {convo_id}")
       return ' '.join(flattened_content)
     else:
       return content
   except Exception as e:
-    print(f"Error processing message content for conversation ID {convo_id}: {str(e)}")
+    logger.warning("processing message content failed convo_id=%s: %s", convo_id, e)
     error_log.append(f"Error processing message content for conversation ID {convo_id}: {str(e)}")
     return content
 
@@ -201,7 +199,7 @@ def _process_message_content_for_user_convo_export(s3, content_text: str, conten
       content += f"\n![Image]({relative_image_path})"
     return content
   except Exception as e:
-    print(f"Error processing message content for conversation ID {convo_id}: {str(e)}")
+    logger.warning("processing message content failed convo_id=%s: %s", convo_id, e)
     error_log.append(f"Error processing message content for conversation ID {convo_id}: {str(e)}")
     return content_text
 
@@ -245,9 +243,8 @@ def _write_to_excel(convo_id, course_name, messages, worksheet, row_num, user_em
     if row_num > start_row + 1:
       worksheet.merge_range(start_row, 0, row_num - 1, 0, convo_id, wrap_format)
 
-    print(f"Wrote messages to Excel for conversation ID: {convo_id}")
   except Exception as e:
-    print(f"Error writing to Excel for conversation ID {convo_id}: {str(e)}")
+    logger.warning("writing to Excel failed convo_id=%s: %s", convo_id, e)
     error_log.append(f"Error writing to Excel for conversation ID {convo_id}: {str(e)}")
 
 
@@ -255,9 +252,8 @@ def _append_to_jsonl(convo_data, jsonl_file_path, error_log):
   try:
     with open(jsonl_file_path, 'a') as jsonl_file:
       jsonl_file.write(json.dumps(convo_data) + '\n')
-    print(f"Appended conversation data to JSONL file at path: {jsonl_file_path}")
   except Exception as e:
-    print(f"Error appending to JSONL for conversation ID {convo_data['convo_id']}: {str(e)}")
+    logger.warning("appending to JSONL failed convo_id=%s: %s", convo_data.get('convo_id'), e)
     error_log.append(f"Error appending to JSONL for conversation ID {convo_data['convo_id']}: {str(e)}")
 
 
@@ -283,7 +279,7 @@ def _create_zip(file_paths, error_log):
     zipf.write(file_paths['excel'], os.path.basename(file_paths['excel']))
     zipf.write(file_paths['jsonl'], os.path.basename(file_paths['jsonl']))
     zipf.write(error_log_path, 'error.log')
-  print(f"Created zip file at path: {zip_file_path}")
+  logger.debug("created conversation export zip file=%s errors=%d", os.path.basename(zip_file_path), len(error_log))
   os.remove(error_log_path)
 
   return zip_file_path
@@ -307,7 +303,8 @@ def _create_zip_for_user_convo_export(markdown_dir, media_dir, error_log):
         zipf.write(os.path.join(root, file),
                    os.path.join(media_dir.split('/')[-1], os.path.relpath(os.path.join(root, file), media_dir)))
     zipf.write(error_log_path, 'error.log')
-  print(f"Created zip file at path: {zip_file_path}")
+  logger.debug("created user conversation export zip file=%s errors=%d", os.path.basename(zip_file_path),
+               len(error_log))
   os.remove(error_log_path)
   return zip_file_path
 
@@ -332,4 +329,4 @@ def _cleanup(file_paths):
   import shutil
   shutil.rmtree(file_paths['markdown_dir'])
   shutil.rmtree(file_paths['media_dir'])
-  print(f"Cleaned up files: {file_paths}")
+  logger.debug("cleaned up export files in %s", os.path.dirname(file_paths['excel']))

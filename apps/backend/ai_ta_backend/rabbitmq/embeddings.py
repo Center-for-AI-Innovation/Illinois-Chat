@@ -106,6 +106,7 @@ import time
 # for storing API inputs, outputs, and metadata
 from dataclasses import dataclass, field
 from typing import Any, List
+from urllib.parse import urlparse
 from wsgiref.util import request_uri
 
 import aiohttp  # for making API calls concurrently
@@ -114,6 +115,8 @@ import tiktoken  # for counting tokens
 # from langchain.embeddings.openai import OpenAIEmbeddings
 # from langchain.vectorstores import Qdrant
 # from qdrant_client import QdrantClient, models
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIAPIProcessor:
@@ -136,7 +139,7 @@ class OpenAIAPIProcessor:
     """Processes API requests in parallel, throttling to stay under rate limits."""
     # Early exit when no requests (e.g. image OCR returned empty)
     if not self.input_prompts_list:
-      logging.debug("No API requests to process. Returning.")
+      logger.debug("No API requests to process. Returning.")
       return
 
     # constants
@@ -144,11 +147,8 @@ class OpenAIAPIProcessor:
     # seconds_to_sleep_each_loop = 0.001  # 1 ms limits max throughput to 1,000 requests per second
     seconds_to_sleep_each_loop = 0.01
 
-    # initialize logging
-    logging.basicConfig(level=self.logging_level)
-    logging.debug(f"Logging initialized at level {self.logging_level}")
-
-    logging.debug(f"OpenAI API Processor initialized with model {self.model}, request_url {self.request_url}, api_endpoint {self.request_url}")
+    logger.debug("OpenAI API Processor initialized with model %s, endpoint %s", self.model,
+                 urlparse(self.request_url).path)
 
     # infer API endpoint and construct request header
     api_endpoint = api_endpoint_from_url(self.request_url, self.model)
@@ -167,11 +167,11 @@ class OpenAIAPIProcessor:
 
     # initialize flags
     file_not_finished = True  # after file is empty, we'll skip reading it
-    logging.debug("Initialization complete.")
+    logger.debug("Initialization complete.")
 
     requests = self.input_prompts_list.__iter__()
 
-    logging.debug("File opened. Entering main loop")
+    logger.debug("File opened. Entering main loop")
 
     task_list = []
 
@@ -180,7 +180,7 @@ class OpenAIAPIProcessor:
       if next_request is None:
         if not queue_of_requests_to_retry.empty():
           next_request = queue_of_requests_to_retry.get_nowait()
-          logging.debug(f"Retrying request {next_request.task_id}")
+          logger.debug("Retrying request %s", next_request.task_id)
         elif file_not_finished:
           try:
             # get new request
@@ -195,10 +195,10 @@ class OpenAIAPIProcessor:
                                       metadata=request_json.pop("metadata", None))
             status_tracker.num_tasks_started += 1
             status_tracker.num_tasks_in_progress += 1
-            logging.debug(f"Reading request {next_request.task_id}")
+            logger.debug("Reading request %s", next_request.task_id)
           except StopIteration:
             # if file runs out, set flag to stop reading it
-            logging.debug("Read file exhausted")
+            logger.debug("Read file exhausted")
             file_not_finished = False
 
       # update available capacity
@@ -251,17 +251,16 @@ class OpenAIAPIProcessor:
         remaining_seconds_to_pause = (seconds_to_pause_after_rate_limit_error - seconds_since_rate_limit_error)
         await asyncio.sleep(remaining_seconds_to_pause)
         # ^e.g., if pause is 15 seconds and final limit was hit 5 seconds ago
-        logging.warn(
-            f"Pausing to cool down until {time.ctime(status_tracker.time_of_last_rate_limit_error + seconds_to_pause_after_rate_limit_error)}"
-        )
+        logger.warning("Pausing to cool down until %s",
+                       time.ctime(status_tracker.time_of_last_rate_limit_error + seconds_to_pause_after_rate_limit_error))
 
     # after finishing, log final status
-    logging.info("""Parallel processing complete. About to return.""")
+    logger.debug("Parallel processing complete. About to return.")
     if status_tracker.num_tasks_failed > 0:
-      logging.warning(f"{status_tracker.num_tasks_failed} / {status_tracker.num_tasks_started} requests failed.")
+      logger.warning("%d / %d requests failed.", status_tracker.num_tasks_failed, status_tracker.num_tasks_started)
     if status_tracker.num_rate_limit_errors > 0:
-      logging.warning(
-          f"{status_tracker.num_rate_limit_errors} rate limit errors received. Consider running at a lower rate.")
+      logger.warning("%d rate limit errors received. Consider running at a lower rate.",
+                     status_tracker.num_rate_limit_errors)
 
     # asyncio wait for task_list (skip when empty - e.g. image OCR with no text)
     if task_list:
@@ -328,21 +327,33 @@ class APIRequest:
     """Calls the OpenAI API and saves results."""
     # logging.info(f"Starting request #{self.task_id}")
     error = None
+    status = None
+    text = ''
     try:
       async with aiohttp.ClientSession() as session:
         async with session.post(url=request_url, headers=request_header, json=self.request_json) as response:
-          response = await response.json()
-      if "error" in response:
-        logging.warning(f"Request {self.task_id} failed with error {response['error']}")
+          # Read status and body first: `response` is rebound to the parsed JSON below.
+          status = response.status
+          text = await response.text()
+      try:
+        response = json.loads(text)
+      except ValueError:
+        response = None
+      if status >= 400 or not isinstance(response, dict) or 'data' not in response:
         status_tracker.num_api_errors += 1
-        error = response
-        if "Rate limit" in response["error"].get("message", ""):
+        api_error = response.get('error') if isinstance(response, dict) else None
+        error = response if api_error else 'HTTP %s: %s' % (status, text[:500])
+        logger.debug("embedding request %s failed status=%s attempts_left=%d", self.task_id, status,
+                     self.attempts_left)
+        message = api_error.get('message', '') if isinstance(api_error, dict) else str(api_error or '')
+        if "Rate limit" in message:
           status_tracker.time_of_last_rate_limit_error = time.time()
           status_tracker.num_rate_limit_errors += 1
           status_tracker.num_api_errors -= 1  # rate limit errors are counted separately
 
     except Exception as e:  # catching naked exceptions is bad practice, but in this case we'll log & save them
-      logging.warning(f"Request {self.task_id} failed with Exception {e}")
+      logger.debug("embedding request %s failed: %s: %s attempts_left=%d", self.task_id, type(e).__name__, e,
+                   self.attempts_left)
       status_tracker.num_other_errors += 1
       error = e
     if error:
@@ -350,7 +361,12 @@ class APIRequest:
       if self.attempts_left:
         retry_queue.put_nowait(self)
       else:
-        logging.error(f"Request {self.task_id} failed after all attempts. Saving errors: {self.result}")
+        if isinstance(error, Exception):
+          logger.error("embedding request %s failed after all attempts endpoint=%s: %s: %s", self.task_id,
+                       urlparse(request_url).path, type(error).__name__, error)
+        else:
+          logger.error("embedding request %s failed after all attempts status=%s endpoint=%s body=%s",
+                       self.task_id, status, urlparse(request_url).path, text[:500])
         data = ([self.request_json, [str(e) for e in self.result], self.metadata]
                 if self.metadata else [self.request_json, [str(e) for e in self.result]])
         #append_to_jsonl(data, save_filepath)
