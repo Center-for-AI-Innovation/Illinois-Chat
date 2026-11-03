@@ -103,3 +103,19 @@ def test_connection_error_body_hides_the_database_host():
 
     assert result == "ERROR: In /getTopContexts. Course: demo. OperationalError: database connection failed"
     assert "rds.amazonaws.com" not in result
+
+
+def test_raw_psycopg2_connection_error_body_hides_the_database_host():
+    import psycopg2
+
+    exc = psycopg2.OperationalError(
+        'connection to server at "db-internal.example.rds.amazonaws.com" (10.0.1.5), port 5432 failed: Connection refused'
+    )
+    svc = _build_failing_service(exc)
+
+    result = asyncio.run(
+        svc.getTopContexts(search_query="q", course_name="demo", conversation_id="c")
+    )
+
+    assert result == "ERROR: In /getTopContexts. Course: demo. OperationalError: database connection failed"
+    assert "rds.amazonaws.com" not in result

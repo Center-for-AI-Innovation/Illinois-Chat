@@ -32,6 +32,7 @@ from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapt
 # from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
 from ai_ta_backend.service.sentry_service import SentryService
+import psycopg2
 import sqlalchemy.exc
 
 logger = logging.getLogger(__name__)
@@ -275,7 +276,7 @@ class RetrievalService:
             # characters. Later lines can hold SQL and bound parameters. A
             # connection error names the database host on its first line, so
             # it gets a fixed text. The full traceback goes to the log.
-            if isinstance(e, sqlalchemy.exc.OperationalError):
+            if isinstance(e, (sqlalchemy.exc.OperationalError, psycopg2.OperationalError)):
                 first_line = "database connection failed"
             else:
                 first_line = (str(e).splitlines() or [""])[0][:300]
