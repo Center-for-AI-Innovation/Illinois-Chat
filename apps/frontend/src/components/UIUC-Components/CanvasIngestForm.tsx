@@ -21,6 +21,7 @@ import { useRouter } from 'next/router'
 import { type FileUpload } from './UploadNotification'
 import { type QueryClient } from '@tanstack/react-query'
 import Image from 'next/image'
+import { REQUEST_ID_HEADER, newRequestId } from '~/utils/requestId'
 
 export default function CanvasIngestForm({
   project_name,
@@ -94,6 +95,7 @@ export default function CanvasIngestForm({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            [REQUEST_ID_HEADER]: newRequestId(),
           },
           body: JSON.stringify({
             courseName: courseName,

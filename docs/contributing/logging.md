@@ -52,8 +52,8 @@ The format lives in `apps/backend/ai_ta_backend/rabbitmq/log_setup.py`. `main.py
 
 One id follows an upload from the browser to the worker, so one search for `rid=<id>` across the containers shows the whole story.
 
-1. The upload area in the browser makes an id for each file and sends it in the `X-Request-ID` header of the call to the Next.js API.
-2. The Next.js API route reads that header, or makes an id, and forwards it to the backend.
+1. The browser makes an id with `newRequestId()` from `apps/frontend/src/utils/requestId.ts` (12 hex characters, the backend's shape) and sends it in the `X-Request-ID` header of the call to the Next.js API route. The upload area (`LargeDropzone`) makes one id per file; the Canvas form, the web scrape form and the chat file upload make one per request.
+2. The Next.js API routes that start an upload (`ingest.ts`, `ingestCanvas.ts` and `chat-file-upload.ts` under `pages/api/UIUC-api/`) call `requestIdFromHeaders(req.headers)`, which keeps the browser's id when it is valid and otherwise makes one. The route forwards it to the backend in `X-Request-ID`, writes `rid=` in its own console lines and returns it in the `X-Request-ID` response header. The other Next.js routes that call the backend (stats, exports, delete) do not forward an id yet; the backend makes one for them.
 3. Flask (`install_request_logging` in `log_setup.py`, used by `main.py` and `bridge.py`) takes the `X-Request-ID` header when it is 1 to 64 letters, digits, `-` or `_`, and otherwise makes a 12-character id. It writes one `INFO` request line per request (not for `/health`, `/api/healthcheck` and `OPTIONS` preflight requests) and sends the id back in the `X-Request-ID` response header.
 4. `rmqueue.addJobToIngestQueue` puts the id into the queue message as `request_id`. A job that is re-queued keeps it.
 5. The worker binds `rid`, `job` and `course` for the whole job. The spawned ingest process receives the id as an argument and binds it again, because the context does not cross into a new process.
@@ -71,4 +71,4 @@ Background tasks started from a request (Flask-Executor threads and the process 
 
 ## Node
 
-PR 2 of the logging work adds the frontend and crawler details here.
+PR 2 of the logging work adds the crawler details here, and the `rid=` for the rest of the Next.js routes.
