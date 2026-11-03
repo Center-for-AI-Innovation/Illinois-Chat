@@ -386,8 +386,7 @@ class IngestCanvas:
             for f in files:
                 try:
                     logger.debug("downloading Canvas file %s", f['filename'])
-                    full_path = os.path.join(dest_folder, f['filename'])
-                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                    full_path = _safe_join(dest_folder, f['filename'])
                     try:
                         response = self._canvas_request('GET', f['url'])
                     except CanvasError as e:

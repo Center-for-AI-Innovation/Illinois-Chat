@@ -133,7 +133,7 @@ def test_failed_download_does_not_log_the_verifier(download, monkeypatch, tmp_pa
     assert "url=/courses/1/files/2/download: ConnectionError: " in output
     assert MARKER not in output
     assert "Traceback" not in output
-    assert result.startswith("Failed! ") and MARKER not in result
+    assert result == "Failed! ConnectionError"
 
 
 class _FakeResponse:
@@ -163,7 +163,7 @@ def test_failed_video_logs_one_error_and_nothing_on_stderr(monkeypatch, tmp_path
         root.setLevel(old_level)
 
     assert len(captured) == 1 and isinstance(captured[0], ingest_canvas.yt_dlp.utils.DownloadError)
-    assert result.startswith("Failed! ")
+    assert result == "Failed! DownloadError"
     assert capfd.readouterr().err == ""
     errors = [line for line in collector.lines if " ERROR   " in line.splitlines()[0]]
     assert len(errors) == 1, collector.lines
@@ -221,7 +221,7 @@ def test_unsupported_video_page_logs_no_traceback_and_no_verifier(monkeypatch, t
     assert marker not in output
     # yt-dlp's own text is kept at DEBUG, without the query string.
     assert any(" DEBUG   " in line and "yt-dlp: " in line and "Unsupported URL" in line for line in collector.lines)
-    assert result.startswith("Failed! ") and marker not in result
+    assert result == "Failed! DownloadError"
 
 
 def test_safe_join_keeps_files_inside_the_download_folder(tmp_path):
