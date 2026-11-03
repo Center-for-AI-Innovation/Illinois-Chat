@@ -38,8 +38,20 @@ def _request_error(e: Exception) -> str:
 
 
 def _failed(e: Exception) -> str:
-    """The failure string a section returns, without URL query strings."""
-    return "Failed! Error: " + _strip_query(str(e))
+    """The failure string a section returns. It names only the exception type:
+    the text can carry URLs, paths or server replies, and it reaches the API
+    response through `section_results`. The log line has the details."""
+    return "Failed! " + type(e).__name__
+
+
+def _safe_join(dir_path: str, name: str) -> str:
+    """Join a Canvas-provided file name onto the download folder and refuse
+    anything that would leave the folder."""
+    root = os.path.normpath(dir_path)
+    full = os.path.normpath(os.path.join(root, os.path.basename(name)))
+    if not full.startswith(root + os.sep):
+        raise ValueError("file name leaves the download folder")
+    return full
 
 
 class _YtDlpLogger:
@@ -669,7 +681,7 @@ class IngestCanvas:
                     else:
                         continue
 
-                    file_path = os.path.join(dir_path, filename)
+                    file_path = _safe_join(dir_path, filename)
                     with open(file_path, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
@@ -747,7 +759,7 @@ class IngestCanvas:
                         except CanvasError as e:
                             logger.debug("item skipped: %s", e.describe())
                             continue
-                        with open(os.path.join(dir_path, file_data['filename']), 'wb') as f:
+                        with open(_safe_join(dir_path, file_data['filename']), 'wb') as f:
                             f.write(file_download.content)
                         logger.debug("downloaded file %s", file_data['filename'])
                 except Exception as e:

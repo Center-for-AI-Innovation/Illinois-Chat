@@ -7,8 +7,8 @@ Coverage:
     timeout to "Canvas unreachable".
   - ``auto_accept_enrollments`` turns a 401 on /users/self into "Canvas rejected
     the configured access token", with one ERROR line.
-  - A failed download of a link with ``?verifier=<secret>`` never writes the
-    secret to the log (the requests/urllib3 traceback repeats the full URL).
+  - A failed download of a link with ``?verifier=<marker>`` never writes the
+    marker to the log (the requests/urllib3 traceback repeats the full URL).
   - A video yt-dlp cannot fetch gives exactly one ERROR line (ours) and nothing
     on stderr: yt-dlp's own messages go to DEBUG through ``_YtDlpLogger``.
   - A page yt-dlp does not support (``UnsupportedError``) gives one ERROR line
@@ -18,6 +18,7 @@ Coverage:
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
@@ -29,9 +30,9 @@ from ai_ta_backend.rabbitmq import ingest_canvas
 from ai_ta_backend.rabbitmq.ingest_canvas import CanvasError, IngestCanvas
 from ai_ta_backend.rabbitmq.log_setup import LineFormatter
 
-SECRET = "SECRET0123456789"
+MARKER = "SECRET0123456789"
 # Port 9 on localhost refuses at once: a real requests failure without network.
-UNREACHABLE = "http://127.0.0.1:9/courses/1/files/2/download?verifier=" + SECRET
+UNREACHABLE = "http://127.0.0.1:9/courses/1/files/2/download?verifier=" + MARKER
 
 
 def http_response(status, body, url):
@@ -44,7 +45,7 @@ def http_response(status, body, url):
 
 
 def test_http_error_maps_to_status_body_and_path(monkeypatch):
-    url = "https://canvas.illinois.edu/api/v1/users/self?verifier=" + SECRET
+    url = "https://canvas.illinois.edu/api/v1/users/self?verifier=" + MARKER
     monkeypatch.setattr(requests, "request", lambda *a, **k: http_response(401, "x" * 900, url))
     with pytest.raises(CanvasError) as info:
         IngestCanvas()._canvas_request("GET", url)
@@ -56,10 +57,10 @@ def test_http_error_maps_to_status_body_and_path(monkeypatch):
 
 
 def test_timeout_maps_to_canvas_unreachable(monkeypatch):
-    url = "https://canvas.illinois.edu/api/v1/courses/1/files?verifier=" + SECRET
+    url = "https://canvas.illinois.edu/api/v1/courses/1/files?verifier=" + MARKER
 
     def timeout(*args, **kwargs):
-        raise requests.Timeout("Read timed out for url: /api/v1/courses/1/files?verifier=" + SECRET)
+        raise requests.Timeout("Read timed out for url: /api/v1/courses/1/files?verifier=" + MARKER)
 
     monkeypatch.setattr(requests, "request", timeout)
     with pytest.raises(CanvasError) as info:
@@ -69,7 +70,7 @@ def test_timeout_maps_to_canvas_unreachable(monkeypatch):
     assert error.upstream_status is None
     assert error.path == "/api/v1/courses/1/files"
     assert error.upstream_message.startswith("Timeout: ")
-    assert SECRET not in error.upstream_message
+    assert MARKER not in error.upstream_message
 
 
 def test_401_on_users_self_means_rejected_token(monkeypatch, caplog):
@@ -124,15 +125,15 @@ def test_failed_download_does_not_log_the_verifier(download, monkeypatch, tmp_pa
         root.removeHandler(collector)
         root.setLevel(old_level)
 
-    # The reproduction is real: the exception text carries the secret.
+    # The reproduction is real: the exception text carries the marker.
     assert len(captured) == 1 and isinstance(captured[0], requests.ConnectionError)
-    assert SECRET in str(captured[0])
+    assert MARKER in str(captured[0])
     # The log and the returned result do not.
     output = "\n".join(collector.lines)
     assert "url=/courses/1/files/2/download: ConnectionError: " in output
-    assert SECRET not in output
+    assert MARKER not in output
     assert "Traceback" not in output
-    assert result.startswith("Failed! Error: ") and SECRET not in result
+    assert result.startswith("Failed! ") and MARKER not in result
 
 
 class _FakeResponse:
@@ -156,20 +157,20 @@ def test_failed_video_logs_one_error_and_nothing_on_stderr(monkeypatch, tmp_path
     root.addHandler(collector)
     root.setLevel(logging.DEBUG)
     try:
-        result = IngestCanvas().download_videos_from_urls(["http://127.0.0.1:9/x?verifier=" + SECRET], 1, str(tmp_path))
+        result = IngestCanvas().download_videos_from_urls(["http://127.0.0.1:9/x?verifier=" + MARKER], 1, str(tmp_path))
     finally:
         root.removeHandler(collector)
         root.setLevel(old_level)
 
     assert len(captured) == 1 and isinstance(captured[0], ingest_canvas.yt_dlp.utils.DownloadError)
-    assert result.startswith("Failed! Error: ")
+    assert result.startswith("Failed! ")
     assert capfd.readouterr().err == ""
     errors = [line for line in collector.lines if " ERROR   " in line.splitlines()[0]]
     assert len(errors) == 1, collector.lines
     assert "downloading Canvas videos failed canvas_course_id=1 url=/x" in errors[0]
     # yt-dlp's own messages are kept, at DEBUG, without the query string.
     assert any(" DEBUG   " in line and "yt-dlp: " in line for line in collector.lines)
-    assert SECRET not in "\n".join(collector.lines)
+    assert MARKER not in "\n".join(collector.lines)
 
 
 class _NoMediaPage(BaseHTTPRequestHandler):
@@ -188,10 +189,10 @@ class _NoMediaPage(BaseHTTPRequestHandler):
 
 
 def test_unsupported_video_page_logs_no_traceback_and_no_verifier(monkeypatch, tmp_path):
-    secret = "SuperSecretVerifier123"
+    marker = "SuperSecretVerifier123"
     server = HTTPServer(("127.0.0.1", 0), _NoMediaPage)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    url = "http://127.0.0.1:%d/page.html?verifier=%s" % (server.server_address[1], secret)
+    url = "http://127.0.0.1:%d/page.html?verifier=%s" % (server.server_address[1], marker)
     monkeypatch.setattr(ingest_canvas.requests, "get", lambda *a, **k: _FakeResponse())
     captured = []
     monkeypatch.setattr(ingest_canvas.sentry_sdk, "capture_exception", captured.append)
@@ -208,16 +209,24 @@ def test_unsupported_video_page_logs_no_traceback_and_no_verifier(monkeypatch, t
         server.shutdown()
         server.server_close()
 
-    # The reproduction is real: yt-dlp's exception text carries the secret.
+    # The reproduction is real: yt-dlp's exception text carries the marker.
     assert len(captured) == 1 and isinstance(captured[0], ingest_canvas.yt_dlp.utils.DownloadError)
-    assert secret in str(captured[0])
+    assert marker in str(captured[0])
     errors = [line for line in collector.lines if " ERROR   " in line.splitlines()[0]]
     assert len(errors) == 1, collector.lines
     assert "downloading Canvas videos failed canvas_course_id=1 url=/page.html: DownloadError: " in errors[0]
     assert "Unsupported URL: " in errors[0]
     output = "\n".join(collector.lines)
     assert "Traceback" not in output
-    assert secret not in output
+    assert marker not in output
     # yt-dlp's own text is kept at DEBUG, without the query string.
     assert any(" DEBUG   " in line and "yt-dlp: " in line and "Unsupported URL" in line for line in collector.lines)
-    assert result.startswith("Failed! Error: ") and secret not in result
+    assert result.startswith("Failed! ") and marker not in result
+
+
+def test_safe_join_keeps_files_inside_the_download_folder(tmp_path):
+    root = str(tmp_path)
+    assert ingest_canvas._safe_join(root, "notes.pdf") == os.path.join(root, "notes.pdf")
+    assert ingest_canvas._safe_join(root, "../escape.pdf") == os.path.join(root, "escape.pdf")
+    with pytest.raises(ValueError):
+        ingest_canvas._safe_join(root, "..")
