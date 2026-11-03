@@ -167,7 +167,7 @@ class RetrievalService:
         Returns
         JSON: A json response with TBD fields. See main.py:getTopContexts docs.
         or
-        String: An error message with traceback.
+        String: An error message with the exception type and the first line of its text (no traceback).
         """
         if doc_groups is None:
             doc_groups = []
@@ -269,8 +269,12 @@ class RetrievalService:
 
             return self.format_for_json(valid_docs)
         except Exception as e:
-            # return full traceback to front end
-            err: str = f"ERROR: In /getTopContexts. Course: {course_name} ||| search_query: {search_query}\nTraceback: {traceback.format_exc()} \n{e}"  # type: ignore
+            # Keep the 200-with-error-string contract, but send the client only
+            # the exception type and the first line of its text, cut to 300
+            # characters. Later lines can hold SQL, bound parameters or database
+            # host names. The full traceback goes to the log.
+            first_line = (str(e).splitlines() or [""])[0][:300]
+            err: str = f"ERROR: In /getTopContexts. Course: {course_name}. {type(e).__name__}: {first_line}"
             logger.exception("getTopContexts failed course=%s conversation_id=%s", course_name, conversation_id)
             self.sentry.capture_exception(e)
             return err
