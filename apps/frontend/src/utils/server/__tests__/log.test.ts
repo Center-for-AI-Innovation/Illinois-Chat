@@ -187,6 +187,22 @@ describe('getLogger', () => {
     expect(line).not.toContain('a@b.edu')
   })
 
+  it('writes an Error inside a field value as name: message', () => {
+    const c = spies()
+    getLogger('tools').warn('discovery failed', {
+      reason: { ok: false, error: new TypeError('fetch failed') },
+      db: new Error('Failed query: select 1\nparams: a@b.edu'),
+    })
+    const line = c.warn.mock.calls[0]![0] as string
+    expect(line).toContain(
+      'reason={"ok":false,"error":"TypeError: fetch failed"}',
+    )
+    expect(line).toContain(
+      'db="Error: Failed query: select 1\\nparams: <omitted>"',
+    )
+    expect(line).not.toContain('a@b.edu')
+  })
+
   it('prints non-Error throwables as text', () => {
     const c = spies()
     getLogger('s').error('x', undefined, 'plain string')
