@@ -149,7 +149,8 @@ export const fetchContexts = async (
     }
   } catch (error) {
     console.error(
-      `Error fetching contexts for project ${course_name}; answering without documents:`,
+      'Error fetching contexts for project; answering without documents:',
+      course_name,
       error,
     )
     return []

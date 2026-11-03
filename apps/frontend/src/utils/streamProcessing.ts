@@ -680,7 +680,8 @@ export async function updateConversationInDatabase(
     }
   } catch (error) {
     console.error(
-      `Error logging the conversation for project ${course_name}:`,
+      'Error logging the conversation for project',
+      course_name,
       error,
     )
     // return false
