@@ -31,7 +31,6 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     .from(apiKeys)
     .where(and(eq(apiKeys.key, apiKey), eq(apiKeys.is_active, true)))
 
-
   // Determine if the API key is valid based on the absence of errors and presence of data.
   const isValidApiKey = data.length > 0
   if (!isValidApiKey) {
@@ -51,7 +50,9 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     if (
       process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
     ) {
-      log.debug('reading the API key user from keycloakDB (Illinois Chat config)')
+      log.debug(
+        'reading the API key user from keycloakDB (Illinois Chat config)',
+      )
       const mod = await import('~/db/dbClient')
       keycloakDB = mod.keycloakDB
       const rows = await keycloakDB
@@ -61,7 +62,9 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
         .limit(1)
       userData = rows.length > 0 ? rows[0] : null
     } else {
-      log.debug('reading the API key user from keycloak.user_entity (UIUC config)')
+      log.debug(
+        'reading the API key user from keycloak.user_entity (UIUC config)',
+      )
       // raw SQL to avoid schema issues
       const result = await client`
         SELECT *
@@ -104,7 +107,11 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
     return { isValidApiKey, authContext }
   } catch (userError) {
     // Log the error if there's an issue retrieving the user object.
-    log.error('could not load the user for a valid API key', undefined, userError)
+    log.error(
+      'could not load the user for a valid API key',
+      undefined,
+      userError,
+    )
     posthog.capture('api_key_validation_failed', {
       error: (userError as Error).message,
     })
@@ -147,9 +154,16 @@ export async function handler(req: NextRequest) {
 
 // Next calls this file as a Pages route, so open the request context with the
 // Pages wrapper: the lines carry rid= and path= and X-Request-ID is set.
+// A Pages request has a parsed body and no json(), and the handler's
+// NextResponse is not sent on its own, so adapt both ways here.
 export default async function validateRoute(
   req: NextApiRequest,
   res: NextApiResponse,
 ): Promise<void> {
-  return runPagesRoute(req, res, () => handler(req as unknown as NextRequest))
+  return runPagesRoute(req, res, async () => {
+    const response = await handler({
+      json: async () => req.body,
+    } as unknown as NextRequest)
+    res.status(response.status).json(await response.json())
+  })
 }

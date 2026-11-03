@@ -18,10 +18,14 @@ export type PermissionGateErrorType = 401 | 403 | 404 | 'unavailable'
 export function getPermissionGateError(
   error: unknown,
 ): { errorType: PermissionGateErrorType; requestId?: string } | null {
-  const { status, requestId } = (error ?? {}) as {
+  const { status, requestId, cancelled } = (error ?? {}) as {
     status?: unknown
     requestId?: unknown
+    cancelled?: unknown
   }
+  // A cancelled Next.js route change (router.replace interrupted by another
+  // navigation) is not a failed load: keep the page as it is.
+  if (cancelled === true) return null
   const ref = typeof requestId === 'string' ? requestId : undefined
   if (status === 401 || status === 403 || status === 404) {
     return { errorType: status, requestId: ref }

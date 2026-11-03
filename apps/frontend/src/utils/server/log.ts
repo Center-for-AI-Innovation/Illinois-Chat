@@ -58,10 +58,18 @@ function escapeNewlines(text: string): string {
   return text.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
 }
 
+// JSON.stringify turns an Error into {}, so an Error anywhere in a field value
+// is written as "Name: message" instead.
+function errorReplacer(_key: string, value: unknown): unknown {
+  return value instanceof Error
+    ? `${value.name}: ${errorMessage(value)}`
+    : value
+}
+
 function stringify(value: unknown): string {
   if (typeof value === 'string') return value
   try {
-    return JSON.stringify(value) ?? String(value)
+    return JSON.stringify(value, errorReplacer) ?? String(value)
   } catch {
     return String(value)
   }
