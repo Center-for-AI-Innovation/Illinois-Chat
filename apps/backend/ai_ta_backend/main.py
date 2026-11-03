@@ -717,6 +717,14 @@ def ingest() -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
+def _failed_canvas_sections(section_results) -> dict:
+  """The sections whose download failed: IngestCanvas reports them as "Failed! ..."."""
+  if not isinstance(section_results, dict):
+    return {}
+  return {section: result for section, result in section_results.items()
+          if isinstance(result, str) and result.startswith('Failed')}
+
+
 @app.route('/canvas_ingest', methods=['POST'])
 def canvas_ingest() -> Response:
   data = request.get_json()
@@ -766,17 +774,25 @@ def canvas_ingest() -> Response:
                                                                 course_name=course_name,
                                                                 content_ingest_dict=options)
 
-      if not job_ids:
-        logger.error("canvas ingest queued no documents course=%s canvas_course_id=%s", course_name, canvas_course_id)
+      # Nothing queued is a Canvas failure only when a section failed to download.
+      # A course with no content in the selected sections is simply empty.
+      failed_sections = _failed_canvas_sections(section_results)
+      if not job_ids and failed_sections:
+        logger.error("canvas ingest queued no documents course=%s canvas_course_id=%s failed=%s", course_name,
+                     canvas_course_id, failed_sections)
         response = jsonify({"error": "Canvas ingest queued no documents", "section_results": section_results})
         response.status_code = 502
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
+      if not job_ids:
+        logger.warning("canvas ingest found no documents course=%s canvas_course_id=%s", course_name,
+                       canvas_course_id)
 
       response = jsonify(
         {
           "outcome": f'Queued Canvas Ingest task',
-          "ingest_task_ids": job_ids
+          "ingest_task_ids": job_ids,
+          "section_results": section_results,
         }
       )
       response.headers.add('Access-Control-Allow-Origin', '*')

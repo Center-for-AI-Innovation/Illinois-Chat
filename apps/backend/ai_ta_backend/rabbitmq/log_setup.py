@@ -148,10 +148,15 @@ def configure_logging() -> int:
     logging.basicConfig(level=level, handlers=[handler], force=True)
     for name in LIBRARY_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
-    # Send warnings.warn() through logging and drop them below ERROR. LangChain
-    # prints about 100 lines of DeprecationWarning in every ingest child otherwise.
+    # Send warnings.warn() through logging so they get the format and the ids.
+    # LangChain forces its ~100 LangChainDeprecationWarning lines past any
+    # warnings filter (it sets "always" around each warn), so drop those by
+    # name and keep every other warning (RuntimeWarning, ResourceWarning,
+    # urllib3's InsecureRequestWarning ...) at WARNING.
     logging.captureWarnings(True)
-    logging.getLogger('py.warnings').setLevel(logging.ERROR)
+    py_warnings = logging.getLogger('py.warnings')
+    py_warnings.setLevel(logging.WARNING)
+    py_warnings.addFilter(_drop_langchain_deprecations)
     # transformers writes its advice ("None of PyTorch, TensorFlow ... found") through its own
     # handler, without our time stamp. We use no models, so turn that advice off.
     os.environ.setdefault('TRANSFORMERS_NO_ADVISORY_WARNINGS', '1')
@@ -168,12 +173,20 @@ def configure_logging() -> int:
 _SKIP_PATHS = ('/health', '/api/healthcheck')
 
 
-def install_request_logging(app) -> None:
+def _drop_langchain_deprecations(record) -> bool:
+    """Logging filter: False for a captured LangChainDeprecationWarning, True for any other warning."""
+    return 'LangChainDeprecationWarning' not in record.getMessage()
+
+
+def install_request_logging(app, logger_name=None) -> None:
     """Bind a request id per request, log one line per request, return the id
-    in the X-Request-ID response header."""
+    in the X-Request-ID response header.
+
+    The request line is written under `logger_name`, default the Flask app's name
+    (`__main__` for a script run as `python bridge.py`, so the bridge passes its own)."""
     from flask import g, request  # pylint: disable=import-outside-toplevel
 
-    request_logger = logging.getLogger(app.name)
+    request_logger = logging.getLogger(logger_name or app.name)
 
     @app.before_request
     def _start_request_log():
@@ -203,9 +216,11 @@ def install_request_logging(app) -> None:
 # Background tasks
 # ---------------------------------------------------------------------------
 
-def run_with_context(ctx, name, fn, *args, log_failure=True, **kwargs):
+def run_with_context(ctx, name, fn, /, *args, log_failure=True, **kwargs):
     """Run fn in a pool thread or process with the submitter's log context.
 
+    ctx, name and fn are positional-only so that fn's own keyword arguments
+    (for example a `name=`) are passed through instead of clashing with them.
     log_failure=False leaves the failure line to the caller (the process pool
     logs it once in the parent, see process_pool_executor.py)."""
     _context.set(dict(ctx or {}))

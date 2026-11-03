@@ -187,8 +187,11 @@ def test_configure_logging_unknown_level_falls_back_to_info(monkeypatch, capsys,
 
 
 
-def test_configure_logging_sends_python_warnings_to_logging_at_error(restore_root_logging):
+def test_configure_logging_keeps_python_warnings_but_drops_langchain_deprecations(restore_root_logging):
     import warnings
+
+    class LangChainDeprecationWarning(DeprecationWarning):
+        """Same name as langchain_core's class: the filter looks at the name in the message."""
 
     seen = []
 
@@ -204,16 +207,19 @@ def test_configure_logging_sends_python_warnings_to_logging_at_error(restore_roo
     logging.captureWarnings(False)
     try:
         configure_logging()
-        assert py_warnings.level == logging.ERROR
+        assert py_warnings.level == logging.WARNING
         py_warnings.addHandler(handler)
         with warnings.catch_warnings():
             warnings.simplefilter("always")
-            warnings.warn("old API", DeprecationWarning)
-            assert seen == []  # captured, but below ERROR
-            py_warnings.setLevel(logging.WARNING)
-            warnings.warn("old API", DeprecationWarning)
-        assert any("old API" in m for m in seen)
+            warnings.warn("old API", LangChainDeprecationWarning)
+            assert seen == []  # captured, then dropped by name
+            warnings.warn("unclosed socket", ResourceWarning)
+            warnings.warn("coroutine was never awaited", RuntimeWarning)
+        assert [m for m in seen if "unclosed socket" in m]
+        assert [m for m in seen if "never awaited" in m]
+        assert not [m for m in seen if "old API" in m]
     finally:
         py_warnings.removeHandler(handler)
+        py_warnings.removeFilter(log_setup._drop_langchain_deprecations)
         py_warnings.setLevel(logging.NOTSET)
         logging.captureWarnings(False)

@@ -25,7 +25,7 @@ A newline inside the message is written as `\n`, so a value cannot fake a new lo
 
 The format lives in `apps/backend/ai_ta_backend/rabbitmq/log_setup.py`. `main.py`, `bridge.py` and `worker.py` call its `configure_logging()` once at start, which also sets noisy libraries (`urllib3`, `botocore`, `pika`, `pdfminer`, `openai` and others) to `WARNING`. `apps/backend/gunicorn.conf.py` gives gunicorn's own lines the same format; only gunicorn's first "Starting gunicorn" line comes before that and looks different. The module sits in `rabbitmq/` because the worker image contains only that folder. Import it the way `rmqueue.py` imports its neighbours (`try: from ai_ta_backend.rabbitmq.log_setup import ...` / `except ModuleNotFoundError: from log_setup import ...`): a second import name would load a second copy, and the request id would go missing.
 
-`configure_logging()` also sends Python `warnings` (such as LangChain's `DeprecationWarning`s) through logging under the name `py.warnings` and drops them below `ERROR`, so they do not flood the worker log. It also turns off the `transformers` library's advice lines, which bypass this format.
+`configure_logging()` also sends Python `warnings` through logging under the name `py.warnings` at `WARNING`, so an unclosed socket or an unverified TLS request shows up in the log. The one exception is LangChain's `LangChainDeprecationWarning`, about 100 lines in every ingest child, which a filter on that logger drops by name. It also turns off the `transformers` library's advice lines, which bypass this format.
 
 `LOG_LEVEL` sets the lowest level a service writes. The default is `INFO`, which is also what production runs. An unknown value falls back to `INFO` with one warning line.
 

@@ -41,7 +41,7 @@ except ModuleNotFoundError:  # standalone container: rabbitmq dir is the workdir
 INGEST_API_KEY = os.getenv("INGEST_API_KEY")
 
 app = Flask(__name__)
-install_request_logging(app)
+install_request_logging(app, logger_name='bridge')
 
 
 @app.route('/api/healthcheck', methods=['GET'])

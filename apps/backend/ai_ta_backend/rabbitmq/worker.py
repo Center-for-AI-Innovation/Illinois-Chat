@@ -144,6 +144,7 @@ class Worker:
 
     def process_job(self, channel, method, header, body):
         started = time.monotonic()
+        content = None
         try:
             content = json.loads(body.decode())
             job_id = content['job_id']
@@ -151,7 +152,9 @@ class Worker:
             course = inputs.get('course_name')
         except Exception as e:  # pylint: disable=broad-except
             # Ack it: a message we cannot read would otherwise kill the consumer.
-            logger.error("discarding unparseable message: %s (%s: %s)", body[:500], type(e).__name__, e)
+            # Log the shape, not the bytes: a job's inputs can hold a whole document.
+            shape = ('keys=%s' % sorted(content) if isinstance(content, dict) else 'bytes=%d' % len(body))
+            logger.error("discarding unparseable message (%s: %s) %s", type(e).__name__, e, shape)
             channel.basic_ack(delivery_tag=method.delivery_tag)
             return
         bind(rid=content.get('request_id'), job=job_id, course=course)
@@ -168,6 +171,7 @@ class Worker:
             logger.log(level, "job received file=%s url=%s retry=%s", inputs.get('readable_filename'),
                        inputs.get('url'), retry_count)
 
+        status_db = None
         try:
             # Resolve the project's connections once. Ingest status tables live
             # on the project documents DB (external when configured, else host) --
@@ -249,9 +253,33 @@ class Worker:
             else:
                 logger.exception("job failed before ingest (DB or connection resolve), discarded after %d attempts",
                                  attempt)
+                self._record_discarded_job(status_db or self.sql_session, job_id, inputs,
+                                           "%s: %s" % (type(e).__name__, e), attempt)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:
             clear()
+
+    @staticmethod
+    def _record_discarded_job(status_db, job_id, inputs, error, attempts):
+        """Best effort: move a discarded job from documents_in_progress to documents_failed,
+        so the dashboard stops showing the file as ingesting. The database may be the thing
+        that failed, so this can fail as well; then it only logs."""
+        if status_db is None:
+            return
+        s3_paths = inputs.get('s3_paths', '')
+        try:
+            status_db.insert_failed_document({
+                "s3_path": s3_paths[0] if isinstance(s3_paths, list) and s3_paths else str(s3_paths or ''),
+                "readable_filename": inputs.get('readable_filename', ''),
+                "course_name": inputs.get('course_name', ''),
+                "url": inputs.get('url'),
+                "base_url": inputs.get('base_url'),
+                "doc_groups": inputs.get('groups', ''),
+                "error": "Job discarded after %d attempts: %s" % (attempts, error),
+            })
+            status_db.delete_document_in_progress(job_id)
+        except Exception:  # pylint: disable=broad-except
+            logger.warning("could not record the discarded job in the database", exc_info=True)
 
     def listen_for_jobs(self):
         logger.info("Worker connecting to RabbitMQ...")

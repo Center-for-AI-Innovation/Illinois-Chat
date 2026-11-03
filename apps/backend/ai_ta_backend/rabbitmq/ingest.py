@@ -279,9 +279,9 @@ class Ingest:
 
             for retry_num in range(1, 3):
                 if isinstance(success_fail_dict, str):  # TODO: What does this indicate?
+                    time.sleep(13 * retry_num)  # back off before the retry: 13 s, then 26 s
                     success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content,
                                                         doc_groups, force_embeddings)
-                    time.sleep(13 * retry_num)  # max is 65
                 elif success_fail_dict.get('failure_ingest') and not is_no_text_error:
                     retry_failure = success_fail_dict['failure_ingest']
                     if isinstance(retry_failure, dict):
@@ -290,9 +290,9 @@ class Ingest:
                     else:
                         retry_file, retry_err = s3_paths, str(retry_failure)
                     logger.warning("ingest attempt %d/3 failed file=%s err=%s", retry_num, retry_file, retry_err[:500])
+                    time.sleep(13 * retry_num)  # back off before the retry: 13 s, then 26 s
                     success_fail_dict = self.run_ingest(course_name, s3_paths, base_url, url, readable_filename, content,
                                                         doc_groups, force_embeddings)
-                    time.sleep(13 * retry_num)  # max is 65
                 else:
                     break
             if success_fail_dict['failure_ingest']:
@@ -302,15 +302,7 @@ class Ingest:
                     if isinstance(failure, dict)
                     else str(failure)
                 )
-                self.sql_session.insert_failed_document({
-                    "s3_path": str(s3_paths),
-                    "readable_filename": readable_filename,
-                    "course_name": course_name,
-                    "url": url,
-                    "base_url": base_url,
-                    "doc_groups": doc_groups,
-                    "error": error_msg,
-                })
+                self.sql_session.insert_failed_document(self._failed_document_payload(inputs, error_msg))
                 logger.info("recorded failure for file=%s",
                             (s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths) or url)
 
@@ -327,15 +319,7 @@ class Ingest:
             # Record the failure like the normal failure path does, so the row does not stay "Attempting ingest".
             if self.sql_session is not None:
                 try:
-                    self.sql_session.insert_failed_document({
-                        "s3_path": str(inputs.get('s3_paths', '')),
-                        "readable_filename": inputs.get('readable_filename', ''),
-                        "course_name": inputs.get('course_name', ''),
-                        "url": inputs.get('url', None),
-                        "base_url": inputs.get('base_url', None),
-                        "doc_groups": inputs.get('groups', ''),
-                        "error": error_msg,
-                    })
+                    self.sql_session.insert_failed_document(self._failed_document_payload(inputs, error_msg))
                     self.sql_session.delete_document_in_progress(job_id)
                 except Exception:
                     logger.exception("could not record the main_ingest failure in the database")
@@ -343,6 +327,19 @@ class Ingest:
                 logger.error("could not record the main_ingest failure: no database session")
             success_fail_dict = {"failure_ingest": {'error': error_msg}}
             return json.dumps(success_fail_dict)
+
+    @staticmethod
+    def _failed_document_payload(inputs: dict, error: str) -> dict:
+        """The documents_failed row for a job, built from the job inputs."""
+        return {
+            "s3_path": str(inputs.get('s3_paths', '')),
+            "readable_filename": inputs.get('readable_filename', ''),
+            "course_name": inputs.get('course_name', ''),
+            "url": inputs.get('url', None),
+            "base_url": inputs.get('base_url', None),
+            "doc_groups": inputs.get('groups', ''),
+            "error": error,
+        }
 
     def run_ingest(self, course_name, s3_paths, base_url, url, readable_filename, content, document_groups,
                    force_embeddings=False):
@@ -808,7 +805,7 @@ class Ingest:
                     else:
                         self.pgvector_store.delete_by_filter("s3_path", s3_path)
                 except Exception as e:
-                    logger.exception("could not delete %s from the vector store", s3_path)
+                    # The outer except logs this once, with the traceback.
                     sentry_sdk.capture_exception(e)
                     raise e
                 try:
@@ -831,7 +828,7 @@ class Ingest:
                     else:
                         self.pgvector_store.delete_by_filter("url", source_url)
                 except Exception as e:
-                    logger.exception("could not delete %s from the vector store", source_url)
+                    # The outer except logs this once, with the traceback.
                     sentry_sdk.capture_exception(e)
                     raise e
                 try:
@@ -865,7 +862,7 @@ class Ingest:
                     else:
                         self.pgvector_store.delete_by_filter("s3_path", s3_path)
                 except Exception as e:
-                    logger.exception("could not delete %s from the vector store", s3_path)
+                    # The outer except logs this once, with the traceback.
                     sentry_sdk.capture_exception(e)
                     raise e
                 try:
@@ -888,7 +885,7 @@ class Ingest:
                     else:
                         self.pgvector_store.delete_by_filter("url", source_url)
                 except Exception as e:
-                    logger.exception("could not delete %s from the vector store", source_url)
+                    # The outer except logs this once, with the traceback.
                     sentry_sdk.capture_exception(e)
                     raise e
                 try:
@@ -1089,7 +1086,7 @@ class Ingest:
                     except subprocess.CalledProcessError as e:
                         # print(e.stdout.decode())
                         # print(e.stderr.decode())
-                        logger.exception("ffmpeg moov atom fix failed for %s", s3_path)
+                        # The handler's except logs this once, with the traceback.
                         raise e
 
                     # extract audio from video tmpfile

@@ -91,6 +91,21 @@ def test_unparseable_message_is_logged_and_acked(worker, caplog):
     worker.process_job(channel, METHOD, HEADER, b"not json")
     messages = [r.getMessage() for r in errors(caplog)]
     assert len(messages) == 1
-    assert messages[0].startswith("discarding unparseable message: b'not json' (JSONDecodeError: ")
+    assert messages[0].startswith("discarding unparseable message (JSONDecodeError: ")
+    assert messages[0].endswith(" bytes=8")
+    assert "not json" not in messages[0]
+    assert channel.published == []
+    assert channel.acked == [7]
+
+
+def test_message_without_job_id_logs_its_keys_not_its_content(worker, caplog):
+    caplog.set_level(logging.DEBUG)
+    channel = FakeChannel()
+    secret = "the whole crawled document text"
+    message = json.dumps({"inputs": {"course_name": "ece120", "content": secret}}).encode()
+    worker.process_job(channel, METHOD, HEADER, message)
+    messages = [r.getMessage() for r in errors(caplog)]
+    assert messages == ["discarding unparseable message (KeyError: 'job_id') keys=['inputs']"]
+    assert secret not in caplog.text
     assert channel.published == []
     assert channel.acked == [7]
