@@ -85,3 +85,21 @@ def test_get_top_contexts_failure_sends_only_first_line_capped():
     assert "[SQL:" not in result
     assert "secret-value" not in result
     assert len(result) == len(prefix) + 300
+
+
+def test_connection_error_body_hides_the_database_host():
+    import sqlalchemy.exc
+
+    exc = sqlalchemy.exc.OperationalError(
+        "SELECT 1",
+        {},
+        Exception('could not translate host name "db-internal.example.rds.amazonaws.com" to address'),
+    )
+    svc = _build_failing_service(exc)
+
+    result = asyncio.run(
+        svc.getTopContexts(search_query="q", course_name="demo", conversation_id="c")
+    )
+
+    assert result == "ERROR: In /getTopContexts. Course: demo. OperationalError: database connection failed"
+    assert "rds.amazonaws.com" not in result

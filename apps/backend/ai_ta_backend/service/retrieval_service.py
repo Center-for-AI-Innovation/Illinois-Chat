@@ -32,6 +32,7 @@ from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapt
 # from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
 from ai_ta_backend.service.sentry_service import SentryService
+import sqlalchemy.exc
 
 logger = logging.getLogger(__name__)
 
@@ -271,9 +272,13 @@ class RetrievalService:
         except Exception as e:
             # Keep the 200-with-error-string contract, but send the client only
             # the exception type and the first line of its text, cut to 300
-            # characters. Later lines can hold SQL, bound parameters or database
-            # host names. The full traceback goes to the log.
-            first_line = (str(e).splitlines() or [""])[0][:300]
+            # characters. Later lines can hold SQL and bound parameters. A
+            # connection error names the database host on its first line, so
+            # it gets a fixed text. The full traceback goes to the log.
+            if isinstance(e, sqlalchemy.exc.OperationalError):
+                first_line = "database connection failed"
+            else:
+                first_line = (str(e).splitlines() or [""])[0][:300]
             err: str = f"ERROR: In /getTopContexts. Course: {course_name}. {type(e).__name__}: {first_line}"
             logger.exception("getTopContexts failed course=%s conversation_id=%s", course_name, conversation_id)
             self.sentry.capture_exception(e)
