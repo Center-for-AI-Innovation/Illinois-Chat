@@ -48,7 +48,7 @@ export const getCoursesByOwnerOrAdmin = async (
           // The stored value can hold encrypted keys: log the project only.
           log.error(
             'invalid course metadata, skipping project',
-            { project: key, length: value?.length },
+            { course: key, length: value?.length },
             parseError,
           )
         }

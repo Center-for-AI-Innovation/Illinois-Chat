@@ -4,8 +4,10 @@ import { db, apiKeys, client } from '~/db/dbClient'
 import { keycloakUsers } from '~/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import posthog from 'posthog-js'
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { NextRequest, NextResponse } from 'next/server'
 import { getLogger } from '~/utils/server/log'
+import { runPagesRoute } from '~/utils/server/routeContext'
 
 const log = getLogger('api.keys.validate')
 
@@ -115,7 +117,7 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
  *
  * @param {NextRequest} req - The incoming HTTP request.
  */
-export default async function handler(req: NextRequest) {
+export async function handler(req: NextRequest) {
   try {
     // Extract the API key and course name from the request body.
     const { api_key, course_name } = (await req.json()) as {
@@ -141,4 +143,13 @@ export default async function handler(req: NextRequest) {
       { status: 500 },
     )
   }
+}
+
+// Next calls this file as a Pages route, so open the request context with the
+// Pages wrapper: the lines carry rid= and path= and X-Request-ID is set.
+export default async function validateRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => handler(req as unknown as NextRequest))
 }

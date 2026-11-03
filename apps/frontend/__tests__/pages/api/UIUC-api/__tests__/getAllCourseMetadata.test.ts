@@ -114,7 +114,7 @@ describe('UIUC-api/getAllCourseMetadata', () => {
     await getCoursesByOwnerOrAdmin('admin@example.com')
     const lines = consoleError.mock.calls.map((c) => String(c[0]))
     expect(lines.some((l) => l.includes('invalid course metadata'))).toBe(true)
-    expect(lines.some((l) => l.includes('project=BAD'))).toBe(true)
+    expect(lines.some((l) => l.includes('course=BAD'))).toBe(true)
     expect(lines.join('\n')).not.toContain('sk-secret')
     consoleError.mockRestore()
   })

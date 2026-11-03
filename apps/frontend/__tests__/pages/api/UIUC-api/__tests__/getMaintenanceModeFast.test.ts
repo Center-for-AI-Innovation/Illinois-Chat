@@ -10,6 +10,7 @@ function createRes() {
   const res: any = {}
   res.status = vi.fn().mockReturnValue(res)
   res.json = vi.fn().mockReturnValue(res)
+  res.setHeader = vi.fn().mockReturnValue(res)
   return res
 }
 
@@ -22,7 +23,7 @@ describe('getMaintenanceModeFast API', () => {
     })
 
     const res = createRes()
-    await handler({} as any, res)
+    await handler({ headers: {} } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.json).toHaveBeenCalledWith({ isMaintenanceMode: true })
@@ -36,7 +37,7 @@ describe('getMaintenanceModeFast API', () => {
     })
 
     const res = createRes()
-    await handler({} as any, res)
+    await handler({ headers: {} } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.json).toHaveBeenCalledWith({ isMaintenanceMode: false })
@@ -48,11 +49,24 @@ describe('getMaintenanceModeFast API', () => {
     ).mockRejectedValue(new Error('redis down'))
 
     const res = createRes()
-    await handler({} as any, res)
+    await handler({ headers: {} } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(500)
     expect(res.json).toHaveBeenCalledWith({
       error: 'Failed to check maintenance mode',
     })
+  })
+
+  it('echoes the X-Request-ID header', async () => {
+    ;(
+      ensureRedisConnected as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      get: vi.fn().mockResolvedValue('false'),
+    })
+
+    const res = createRes()
+    await handler({ headers: { 'x-request-id': 'maint1' } } as any, res)
+
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'maint1')
   })
 })

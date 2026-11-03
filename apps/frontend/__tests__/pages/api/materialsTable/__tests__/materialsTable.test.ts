@@ -440,7 +440,8 @@ describe('materialsTable API handlers', () => {
     })
   })
 
-  it('fetchFailedDocuments returns 500 and logs when from/to are missing in the URL', async () => {
+  it('fetchFailedDocuments returns 400 and warns when from/to are missing in the URL', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const req = createMockReq({
       method: 'GET',
@@ -449,13 +450,15 @@ describe('materialsTable API handlers', () => {
     })
     const res = createMockRes()
     await fetchFailedDocumentsHandler(req as any, res as any)
-    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.status).toHaveBeenCalledWith(400)
     expect(res.json).toHaveBeenCalledWith({
       error: 'Missing required query parameters: from and to',
     })
-    expect(consoleError).toHaveBeenCalledWith(
-      expect.stringContaining('failed to fetch failed documents'),
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringContaining('missing required query parameters'),
     )
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleWarn.mockRestore()
     consoleError.mockRestore()
   })
 

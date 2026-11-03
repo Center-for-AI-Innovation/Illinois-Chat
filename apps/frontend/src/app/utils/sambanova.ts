@@ -94,7 +94,7 @@ export async function runSambaNovaChat(
       'SambaNova chat request failed',
       {
         provider: 'SambaNova',
-        model: conversation.model.id,
+        model: conversation?.model?.id,
         stream,
         status: (error as { statusCode?: number })?.statusCode,
       },

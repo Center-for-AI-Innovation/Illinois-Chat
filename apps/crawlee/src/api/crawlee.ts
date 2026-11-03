@@ -51,7 +51,7 @@ export async function crawl(
               log.debug(`Crawling: ${request.loadedUrl}...`);
               const title = await page.title();
               pageCounter++;
-              log.info(
+              log.debug(
                 `Crawling: Page ${pageCounter} / ${config.maxPagesToCrawl} - URL: ${request.loadedUrl}...`,
               );
 
@@ -233,10 +233,12 @@ export async function crawl(
                 }
                 await page.route(
                   `**\/*.{${RESOURCE_EXCLUSTIONS.join()}}`,
-                  (route) => route.abort("aborted"),
-                );
-                log.info(
-                  `Aborting requests for as this is a resource excluded route`,
+                  (route) => {
+                    log.debug(
+                      `skipping excluded resource url=${route.request().url()}`,
+                    );
+                    return route.abort("aborted");
+                  },
                 );
               },
             ],

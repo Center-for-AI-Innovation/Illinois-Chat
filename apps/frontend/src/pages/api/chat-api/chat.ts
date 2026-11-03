@@ -43,6 +43,7 @@ import {
 import { buildPrompt } from '~/app/utils/buildPromptUtils'
 import { type AuthContextProps } from 'react-oidc-context'
 import { getLogger } from '~/utils/server/log'
+import { runPagesRoute } from '~/utils/server/routeContext'
 
 const log = getLogger('api.chat-api.chat')
 
@@ -71,7 +72,7 @@ async function executeToolFromApi(
  * @param {NextApiResponse} res - The Next.js API response object.
  * @returns {Promise<void>} A promise that resolves when the response is sent.
  */
-export default async function chat(
+async function chat(
   req: NextApiRequest,
   res: NextApiResponse,
 ): Promise<void> {
@@ -418,4 +419,14 @@ export default async function chat(
       course_name,
     )
   }
+}
+
+// Public API route with no auth wrapper: open the request context here so the
+// lines carry rid= and path=, the X-Request-ID header is sent, and a throw
+// becomes one ERROR line and a 500.
+export default async function chatRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => chat(req, res))
 }

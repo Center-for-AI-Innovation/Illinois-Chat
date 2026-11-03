@@ -34,10 +34,13 @@ async function fetchFailedDocuments(
   const search_value = url.searchParams.get('filter_value') as string
   let sort_column = url.searchParams.get('sort_column') as string
   let sort_direction = url.searchParams.get('sort_direction') === 'asc'
+  if (fromStr === null || toStr === null) {
+    log.warn('missing required query parameters: from and to')
+    return res
+      .status(400)
+      .json({ error: 'Missing required query parameters: from and to' })
+  }
   try {
-    if (fromStr === null || toStr === null) {
-      throw new Error('Missing required query parameters: from and to')
-    }
     if (sort_column == null || sort_direction == null) {
       sort_column = 'created_at'
       sort_direction = false // 'desc' equivalent

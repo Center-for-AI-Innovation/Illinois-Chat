@@ -104,6 +104,19 @@ describe('chat-api/chat', () => {
     expect(res.status).toHaveBeenCalledWith(405)
   })
 
+  it('echoes the X-Request-ID header', async () => {
+    const res = createMockRes()
+    await chat(
+      createMockReq({
+        method: 'GET',
+        headers: { 'x-request-id': 'chat1' },
+        socket: { remoteAddress: '127.0.0.1' } as unknown,
+      }) as Parameters<typeof chat>[0],
+      res as Parameters<typeof chat>[1],
+    )
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'chat1')
+  })
+
   it('returns 400 when validateRequestBody throws', async () => {
     hoisted.validateRequestBody.mockRejectedValueOnce(new Error('bad'))
     const res = createMockRes()
