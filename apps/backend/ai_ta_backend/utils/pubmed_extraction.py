@@ -3,6 +3,7 @@ import concurrent.futures
 import ftplib
 import gzip
 import json
+import logging
 import os
 import shutil
 import tarfile
@@ -18,6 +19,8 @@ import requests
 import supabase
 from minio import Minio
 from posthog import Posthog
+
+logger = logging.getLogger(__name__)
 
 # POSTHOG = Posthog(sync_mode=False, project_api_key=os.environ['POSTHOG_API_KEY'], host="https://app.posthog.com")
 
@@ -63,7 +66,7 @@ def extractPubmedData():
   #ftp_path = "pubmed/baseline"
   ftp_path = "pubmed/updatefiles"
   file_list = getFileList(ftp_address, ftp_path, ".gz")
-  print("Total files: ", len(file_list))
+  logger.info("PubMed extraction: %d files on the FTP server", len(file_list))
 
   # with concurrent.futures.ProcessPoolExecutor() as executor:
   #     futures = [executor.submit(processPubmedXML, file, ftp_address, ftp_path) for file in file_list[131:133]]
@@ -77,7 +80,7 @@ def extractPubmedData():
 
   for file in files_to_process:
     status = processPubmedXML(file, ftp_address, ftp_path)
-    print("Status: ", status)
+    logger.info("processed PubMed file=%s status=%s", file, status)
 
   end_time = time.monotonic()
 
@@ -95,7 +98,7 @@ def getFilesToProcess(file_list: list):
   last_processed_response = SUPABASE_CLIENT.table("pubmed_daily_update").select("*").order(
       "created_at", desc=True).limit(1).execute()  # type: ignore
   last_processed_file = last_processed_response.data[0]['last_xml_file']
-  print("Last processed file: ", last_processed_file)
+  logger.info("last processed PubMed file=%s", last_processed_file)
   files_to_process = []
 
   for file in file_list:
@@ -112,7 +115,7 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
     """
   start_time = time.monotonic()
   try:
-    print("Processing file: ", file)
+    logger.debug("processing PubMed file=%s", file)
     gz_filepath = downloadXML(ftp_address, ftp_path, file, "pubmed")
     gz_file_download_time = time.time()
 
@@ -135,12 +138,12 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
       # find PMC ID and DOI for all articles
       metadata_with_ids = getArticleIDs(metadata, error_log)
       metadata_update_time = time.time()
-      print("Time taken to get PMC ID and DOI for 100 articles: ",
-            round(metadata_update_time - metadata_extract_start_time, 2), "seconds")
+      logger.debug("time taken to get PMC ID and DOI for 100 articles: %s seconds",
+                   round(metadata_update_time - metadata_extract_start_time, 2))
 
       # download the articles
       complete_metadata = downloadArticles(metadata_with_ids, batch_dir, error_log)
-      print("Time taken to download 100 articles: ", round(time.time() - metadata_update_time, 2), "seconds")
+      logger.debug("time taken to download 100 articles: %s seconds", round(time.time() - metadata_update_time, 2))
 
       # store metadata in csv file
       df = pd.DataFrame(complete_metadata)
@@ -155,13 +158,13 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
 
       before_upload = time.time()
       # upload current batch to minio
-      print(f"Starting async upload for batch {i+1}...")
+      logger.debug("starting async upload for batch %d", i + 1)
       #asyncio.run(uploadToStorage(batch_dir, error_log))
       with concurrent.futures.ThreadPoolExecutor() as executor:
         future = executor.submit(uploadToStorage, batch_dir, error_log)
       after_upload = time.time()
 
-      print("Time elapsed between upload call: ", after_upload - before_upload)
+      logger.debug("time elapsed between upload call: %s", after_upload - before_upload)
       POSTHOG.capture(distinct_id="pubmed_extraction",
                       event="uploadToMinio",
                       properties={
@@ -169,7 +172,7 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
                           "total_runtime": after_upload - before_upload,
                       })
 
-      print("Time taken to download 100 articles: ", round(time.time() - metadata_extract_start_time, 2), "seconds")
+      logger.debug("time taken to process 100 articles: %s seconds", round(time.time() - metadata_extract_start_time, 2))
 
     post_download_time_1 = time.monotonic()
 
@@ -187,13 +190,13 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
       if item['pmid'] not in unique_pmids:
         final_metadata.append(item)
         unique_pmids.append(item['pmid'])
-    print("Final metadata: ", len(final_metadata))
+    logger.debug("final metadata rows: %d", len(final_metadata))
 
     try:
       response = SUPABASE_CLIENT.table("publications").upsert(final_metadata).execute()  # type: ignore
-      print("Uploaded metadata to SQL DB.")
+      logger.debug("uploaded metadata to SQL DB")
     except Exception as e:
-      print("Error in uploading to Supabase: ", e)
+      logger.exception("uploading PubMed metadata to Supabase failed file=%s", file)
       # log the supabase error
       with open(error_log, 'a') as f:
         f.write("Error in Supabase upsert: " + str(e) + "\n")
@@ -222,10 +225,10 @@ def processPubmedXML(file: str, ftp_address: str, ftp_path: str):
     # os.remove(csv_filepath)
     # os.remove(xml_filepath)
     # os.remove(gz_filepath)
-    print("Finished file: ", file)
+    logger.debug("finished PubMed file=%s", file)
 
   except Exception as e:
-    print("Error processing XML file: ", e)
+    logger.exception("processing PubMed XML file failed file=%s", file)
     with open("errors.txt", 'a') as f:
       f.write("Error in proccesing XML file: " + file + str(e) + "\n")
 
@@ -267,7 +270,7 @@ def downloadXML(ftp_address: str, ftp_path: str, file: str, local_dir: str):
     ftp.quit()
     return local_filepath
   except Exception as e:
-    print("Error downloading file: ", e)
+    logger.exception("downloading PubMed file failed file=%s", file)
     return None
 
 
@@ -297,11 +300,11 @@ def getFileList(ftp_address: str, ftp_path: str, extension: str = ".gz"):
     # Filter for files with the specified extension
     gz_files = [entry for entry in file_listing if entry.endswith(extension)]
     gz_files.sort(reverse=True)
-    print(f"Found {len(gz_files)} files on {ftp_address}/{ftp_path}")
+    logger.debug("found %d files on %s/%s", len(gz_files), ftp_address, ftp_path)
 
     return gz_files
   except Exception as e:
-    print("Error getting file list: ", e)
+    logger.exception("getting the file list failed from %s/%s", ftp_address, ftp_path)
     return []
 
 
@@ -329,7 +332,7 @@ def extractXMLFile(gz_filepath: str):
 
     return xml_filepath
   except Exception as e:
-    print("Error extracting XML file: ", e)
+    logger.exception("extracting XML file failed path=%s", gz_filepath)
     return None
 
 
@@ -343,7 +346,7 @@ def extractMetadataFromXML(xml_filepath: str, dir: str, error_file: str):
     Returns:
         metadata: List of dictionaries containing metadata for each article.
     """
-  print("inside extractMetadataFromXML()")
+  logger.debug("inside extractMetadataFromXML()")
   start_time = time.monotonic()
   try:
     # create a directory to store papers
@@ -512,7 +515,7 @@ def getArticleIDs(metadata: list, error_file: str):
             try:
               future.result()
             except Exception as exc:
-              print('%r generated an exception: %s' % (record, exc))
+              logger.warning('%r generated an exception: %s', record, exc)
               with open(error_file, 'a') as f:
                 f.write(f"Record: {record}\t")
                 f.write(f"Exception: {type(exc).__name__} - {exc}\n")
@@ -603,7 +606,7 @@ def downloadArticles(metadata: list, dir: str, error_file: str):
             updated_articles[updated_article['pmid']] = updated_article
           # print("Updated article: ", updated_article)
         except Exception as e:
-          print("Error downloading article:", e)
+          logger.warning("downloading PubMed article failed: %s", e)
           with open(error_file, 'a') as f:
             f.write("Error in downloadArticles(): " + str(e) + "\n")
 
@@ -689,7 +692,7 @@ def download_article(article, api_url, dir, error_file):
           os.remove(local_file)
 
       except concurrent.futures.TimeoutError:
-        print("Download timeout reached.")
+        logger.warning("PubMed article download timeout reached")
 
       ftp.quit()
 
@@ -785,7 +788,7 @@ def upload_file(client, bucket_name, file_path, object_name, error_file, upload_
     """
   try:
     client.fput_object(bucket_name, object_name, file_path)
-    print(f"Uploaded: {object_name}")
+    logger.debug("uploaded: %s", object_name)
     with open(upload_log, 'a') as f:
       f.write("uploaded: " + file_path + "\n")
     os.remove(file_path)
@@ -806,7 +809,7 @@ def uploadToStorage(filepath: str, error_file: str):
     found = MINIO_CLIENT.bucket_exists(bucket_name)
     if not found:
       MINIO_CLIENT.make_bucket(bucket_name)
-      print("Created bucket", bucket_name)
+      logger.info("created bucket %s", bucket_name)
     # else:
     #     print("Bucket", bucket_name, "already exists")
     #upload_log = error_file.split("_")[0] + ".txt"

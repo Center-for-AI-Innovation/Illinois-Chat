@@ -14,7 +14,12 @@ except ModuleNotFoundError:
     from connection_resolver import WorkerConnectionResolver
     import models
 
-logging.getLogger('pika').setLevel(logging.WARNING)
+try:
+    from ai_ta_backend.rabbitmq.log_setup import current_rid
+except ModuleNotFoundError:
+    from log_setup import current_rid
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Move into the class?
@@ -61,11 +66,12 @@ class Queue:
         """
         This adds a job to the queue, then eventually the queue worker uses ingest.py to ingest the document.
         """
-        logging.info(f"Queueing ingest task for {inputs['course_name']}")
-        logging.info(f"Inputs: {inputs}")
+        s3_paths = inputs.get('s3_paths')
+        logger.info("queueing ingest course=%s file=%s s3_path=%s", inputs.get('course_name'),
+                    inputs.get('readable_filename'), s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths)
 
         if not self.is_connected():
-            logging.error("RabbitMQ is offline")
+            logger.error("RabbitMQ is offline")
 
         # SQL record first
         # Handle s3_paths: convert string to list, or get first element from list
@@ -90,22 +96,32 @@ class Queue:
             if resolved.documents_sql_engine else sql_session
         )
         new_doc = status_db.insert_document_in_progress(doc_progress_payload)
-        logging.info("Inserted new in-progress job ID: " + new_doc.get("beam_task_id"))
+        logger.debug("inserted documents_in_progress row job=%s", new_doc.get("beam_task_id"))
         new_job_id = new_doc.get("beam_task_id")
 
         # RMQ message second
         message = {
             'job_id': new_job_id,
             'status': 'queued',
-            'inputs': inputs
+            'inputs': inputs,
+            # Lets the worker log the same request id as the API call that queued this.
+            'request_id': current_rid(),
         }
-        self.channel.basic_publish(
-            exchange='',
-            routing_key=self.rabbitmq_queue if queue_name is None else queue_name,
-            body=json.dumps(message),
-            properties=pika.BasicProperties(
-                delivery_mode=2
+        routing_key = self.rabbitmq_queue if queue_name is None else queue_name
+        try:
+            self.channel.basic_publish(
+                exchange='',
+                routing_key=routing_key,
+                body=json.dumps(message),
+                properties=pika.BasicProperties(
+                    delivery_mode=2
+                )
             )
-        )
-        logging.info(f"Job {new_job_id} enqueued")
+        except Exception as e:
+            # Without this the in-progress row stays forever and the UI shows the file as still ingesting.
+            logger.error("publish to RabbitMQ failed job=%s queue=%s, deleting its in-progress row: %s: %s",
+                         new_job_id, routing_key, type(e).__name__, e)
+            status_db.delete_document_in_progress(new_job_id)
+            raise
+        logger.info("job enqueued job=%s queue=%s", new_job_id, routing_key)
         return new_job_id

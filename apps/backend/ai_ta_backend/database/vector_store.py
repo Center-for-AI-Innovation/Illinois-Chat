@@ -3,12 +3,21 @@ Vector store abstraction for Illinois Chat.
 Main collection uses pgvector only (Qdrant removed).
 """
 import json
+import logging
 import os
 import uuid
 from typing import Any, Dict, List, Optional, Sequence
 
+logger = logging.getLogger(__name__)
+
+_warned_default_host = False
+
 
 def _get_pg_connection_params() -> Dict[str, str]:
+    global _warned_default_host
+    if os.getenv("POSTGRES_ENDPOINT") is None and os.getenv("POSTGRES_HOST") is None and not _warned_default_host:
+        _warned_default_host = True
+        logger.warning("pgvector not configured: POSTGRES_ENDPOINT is unset, using localhost")
     return {
         "host": os.getenv("POSTGRES_ENDPOINT", os.getenv("POSTGRES_HOST", "localhost")),
         "port": os.getenv("POSTGRES_PORT", "5432"),
@@ -87,6 +96,8 @@ class PgVectorStore:
     def _conn(self):
         if self._engine is not None:
             return self._engine.raw_connection()
+        # A failed connect raises psycopg2.OperationalError, whose text already
+        # names the host and port; the caller that handles it logs it.
         return self._psycopg2.connect(**self._conn_params)  # type: ignore[arg-type]
 
     def upsert_batch(

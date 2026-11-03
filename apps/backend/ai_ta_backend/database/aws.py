@@ -1,7 +1,11 @@
+import logging
 import os
+from urllib.parse import urlsplit
 
 import boto3
 from injector import inject
+
+logger = logging.getLogger(__name__)
 
 
 class AWSStorage:
@@ -17,6 +21,9 @@ class AWSStorage:
         # If running against local MinIO
         if os.environ.get("LOCAL_MINIO") == "true" and os.environ.get("MINIO_ENDPOINT"):
             s3_config["endpoint_url"] = os.environ["MINIO_ENDPOINT"]
+            logger.info("S3 client uses MinIO at %s", urlsplit(os.environ["MINIO_ENDPOINT"]).hostname)
+        elif os.environ.get("LOCAL_MINIO") == "true":
+            logger.warning("MinIO not configured: MINIO_ENDPOINT is unset, using AWS S3")
 
         # AWS credentials
         if os.environ.get("AWS_ACCESS_KEY_ID") and os.environ.get(
@@ -24,6 +31,11 @@ class AWSStorage:
         ):
             s3_config["aws_access_key_id"] = os.environ["AWS_ACCESS_KEY_ID"]
             s3_config["aws_secret_access_key"] = os.environ["AWS_SECRET_ACCESS_KEY"]
+        else:
+            # Normal on ECS (task role); a mistake on a self-hosted stack.
+            missing = "AWS_ACCESS_KEY_ID" if not os.environ.get("AWS_ACCESS_KEY_ID") else "AWS_SECRET_ACCESS_KEY"
+            logger.info("S3 credentials not configured: %s is unset, using the default boto3 credential chain",
+                        missing)
 
         self.s3_client = boto3.client("s3", **s3_config)
 

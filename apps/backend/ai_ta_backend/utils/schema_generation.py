@@ -1,8 +1,11 @@
 import json
+import logging
 import os
 import re
 
 from ollama import Client
+
+logger = logging.getLogger(__name__)
 
 OLLAMA_SERVER_URL = os.getenv("OLLAMA_SERVER_URL")
 NCSA_HOSTED_API_KEY = os.getenv("NCSA_HOSTED_API_KEY", "")
@@ -113,19 +116,19 @@ def generate_schema_from_project_description(project_name: str, project_descript
     # timeout (error 524) doesn't kill long generations.
     stream = OLLAMA_CLIENT.generate(prompt=prompt, model=LLM, stream=True)
     json_schema_string = "".join(chunk['response'] for chunk in stream).strip()
-    print("Raw JSON Schema: ", json_schema_string)
+    logger.debug("Raw JSON schema: %s", json_schema_string)
 
     if '```' in json_schema_string:
       json_string = re.search(r'```(.*?)```', json_schema_string, re.DOTALL).group(1).strip()
       cleaned_json_string = "".join(line.strip() for line in json_string.splitlines())
-      print("Cleaned JSON Schema: ", cleaned_json_string)
+      logger.debug("Cleaned JSON schema: %s", cleaned_json_string)
       json_schema = json.loads(cleaned_json_string)
     else:
       json_schema = json.loads(json_schema_string)
-    print("Final JSON Schema: ", json_schema)
+    logger.debug("Final JSON schema: %s", json_schema)
+    logger.info("generated metadata schema course=%s fields=%d", project_name, len(json_schema))
     return json_schema
 
   except Exception as e:
-    print(f"Error in generate_schema_from_project_description: {e}")
-    print("Returning default schema...")
+    logger.exception("generating metadata schema failed course=%s, returning the default schema", project_name)
     return dict(DEFAULT_SCHEMA)

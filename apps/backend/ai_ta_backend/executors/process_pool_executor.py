@@ -1,4 +1,12 @@
+import logging
 from concurrent.futures import ProcessPoolExecutor
+
+try:
+  from ai_ta_backend.rabbitmq.log_setup import current_context, run_with_context
+except ModuleNotFoundError:
+  from log_setup import current_context, run_with_context
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessPoolExecutorInterface:
@@ -23,7 +31,20 @@ class ProcessPoolExecutorAdapter(ProcessPoolExecutorInterface):
     self.executor = ProcessPoolExecutor(max_workers=max_workers)
 
   def submit(self, fn, *args, **kwargs):
-    return self.executor.submit(fn, *args, **kwargs)
+    name = getattr(fn, '__name__', repr(fn))
+    # Worker processes do not inherit the request's log context, so pass it along.
+    future = self.executor.submit(run_with_context, current_context(), name, fn, *args, **kwargs)
+    # The only place that sees a failure before the task starts (e.g. an argument that cannot be pickled).
+    future.add_done_callback(lambda f: _log_task_failure(name, f))
+    return future
 
   def map(self, fn, *iterables, timeout=None, chunksize=1):
     return self.executor.map(fn, *iterables, timeout=timeout, chunksize=chunksize)
+
+
+def _log_task_failure(name, future):
+  if future.cancelled():
+    return
+  exc = future.exception()
+  if exc is not None:
+    logger.error("background task %s failed: %s: %s", name, type(exc).__name__, exc)

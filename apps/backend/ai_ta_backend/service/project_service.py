@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import re
+from urllib.parse import urlparse
 
 import redis
 from injector import inject
@@ -11,6 +13,8 @@ from ai_ta_backend.service.sentry_service import SentryService
 from ai_ta_backend.utils.crypto import encrypt_if_needed
 from ai_ta_backend.utils.schema_generation import (
     DEFAULT_SCHEMA, generate_schema_from_project_description)
+
+logger = logging.getLogger(__name__)
 
 # Project names double as URL path segments and exact-match keys in Redis and
 # Postgres, so new names are restricted to URL-safe characters. Keep in sync
@@ -53,7 +57,7 @@ class ProjectService:
         self.posthog = posthog_service
         self.sentry = sentry_service
 
-        print("Connecting to Redis... with url: ", os.environ['REDIS_URL'])
+        logger.debug("Redis configured host=%s", urlparse(os.environ['REDIS_URL']).hostname)
         self.redis_client = redis.Redis.from_url(os.environ['REDIS_URL'], db=0)
 
     def generate_json_schema(self, project_name: str, project_description: str | None) -> None:
@@ -67,7 +71,7 @@ class ProjectService:
             json_schema = generate_schema_from_project_description(project_name, project_description)
             self.sqlDb.updateProjects(project_name, {"metadata_schema": json_schema})
         except Exception as e:
-            print(f"Error in generate_json_schema for '{project_name}': ", e)
+            logger.exception("generate_json_schema failed course=%s", project_name)
             self.sentry.capture_exception(e)
 
     def create_project(self, project_name: str, project_description: str | None, project_owner_email: str,
@@ -112,10 +116,11 @@ class ProjectService:
             }
 
             # Set course_metadatas
-            print("Setting course_metadatas. value: ", value)
+            logger.info("writing course_metadatas course=%s is_private=%s course_admins=%d", project_name, is_private,
+                        len(value["course_admins"]))
             self.redis_client.hset('course_metadatas', key=project_name, value=json.dumps(value))
         except Exception as e:
-            print("Error in create_project: ", e)
+            logger.exception("create_project failed course=%s", project_name)
             self.sentry.capture_exception(e)
             raise
 
@@ -137,8 +142,9 @@ class ProjectService:
                         row['providerBodyNoModels']['apiKey'] = encrypt_if_needed(row['providerBodyNoModels']['apiKey'])
                         llm_val[row['providerName']] = row['providerBodyNoModels']
 
-                    print(f"Setting -llms default values. Key: `{redis_key}`, value: `{llm_val}`")
+                    logger.info("setting pre-assigned LLM keys course=%s providers=%d", project_name,
+                                len(pre_assigned_response.data))
                     self.redis_client.set(redis_key, json.dumps(llm_val))
         except Exception as e:
-            print("Error setting pre-assigned LLM keys in create_project: ", e)
+            logger.exception("setting pre-assigned LLM keys failed course=%s", project_name)
             self.sentry.capture_exception(e)

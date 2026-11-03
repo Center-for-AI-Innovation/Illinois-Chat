@@ -30,6 +30,8 @@ COPY . .
 
 # Set the Python path to include the ai_ta_backend directory
 ENV PYTHONPATH="${PYTHONPATH}:/usr/src/app/ai_ta_backend"
+# Send print() and log output straight to the container log (no buffering).
+ENV PYTHONUNBUFFERED=1
 
 # Make port 8001 available to the world outside this container
 EXPOSE 8001

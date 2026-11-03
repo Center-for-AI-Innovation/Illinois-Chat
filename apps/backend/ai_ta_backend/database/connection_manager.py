@@ -124,7 +124,7 @@ class ConnectionManager:
         database pooler's job (the documented setup is a Supabase transaction
         pooler), and this matches the host engines in `database/sql.py`.
         """
-        logger.info(f"Creating external DB engine for project: {project_name}")
+        logger.debug("Creating external DB engine course=%s", project_name)
         return create_engine(db_config["connection_uri"], poolclass=NullPool)
 
     # ── Vector Engine Resolution ──
@@ -189,7 +189,7 @@ class ConnectionManager:
 
     @staticmethod
     def _create_qdrant(project_name: str, qdrant_config: dict) -> QdrantClient:
-        logger.info(f"Creating external Qdrant client for project: {project_name}")
+        logger.debug("Creating external Qdrant client course=%s", project_name)
         return QdrantClient(
             url=qdrant_config["url"],
             api_key=qdrant_config["api_key"],
@@ -215,7 +215,7 @@ class ConnectionManager:
 
     @staticmethod
     def _create_s3(project_name: str, s3_config: dict) -> AWSStorage:
-        logger.info(f"Creating external S3 client for project: {project_name}")
+        logger.debug("Creating external S3 client course=%s", project_name)
         endpoint_url = s3_config.get("endpoint_url")
         region = s3_config.get("region")
         client_kwargs = dict(

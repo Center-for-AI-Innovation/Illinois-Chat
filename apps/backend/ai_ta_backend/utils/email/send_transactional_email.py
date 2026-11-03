@@ -1,7 +1,12 @@
+import logging
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+logger = logging.getLogger(__name__)
+
+_SMTP_VARS = ('SES_HOST', 'SES_PORT', 'USERNAME_SMTP', 'PASSWORD_SMTP')
 
 
 def send_email(subject: str, body_text: str, sender: str, recipients: list, bcc_recipients: list):
@@ -30,9 +35,20 @@ def send_email(subject: str, body_text: str, sender: str, recipients: list, bcc_
 
   # Add additional parts for HTML, attachments, etc. (optional)
 
+  # Raise one error that names the missing setting or the host; the caller
+  # that handles it logs it. Never put recipients or credentials in it.
+  for name in _SMTP_VARS:
+    if not os.getenv(name):
+      raise RuntimeError(f"SMTP not configured: {name} is unset")
+
   # Connect to SMTP server
-  with smtplib.SMTP_SSL(os.getenv('SES_HOST'), os.getenv('SES_PORT')) as server:  # type: ignore
+  try:
+    server = smtplib.SMTP_SSL(os.getenv('SES_HOST'), os.getenv('SES_PORT'))  # type: ignore
+  except OSError as e:
+    raise RuntimeError(f"SMTP unreachable at {os.getenv('SES_HOST')}: {e}") from e
+  with server:
     server.login(os.getenv('USERNAME_SMTP'), os.getenv('PASSWORD_SMTP'))  # type: ignore
     server.sendmail(sender, recipients + bcc_recipients, message.as_string())
 
+  logger.debug("email sent recipients=%d bcc=%d", len(recipients), len(bcc_recipients))
   return "Email sent successfully!"

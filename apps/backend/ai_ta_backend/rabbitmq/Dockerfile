@@ -26,6 +26,9 @@ ENV NLTK_DATA=/usr/share/nltk_data
 RUN mkdir -p $NLTK_DATA && chmod -R 755 $NLTK_DATA \
     && python -m nltk.downloader -d $NLTK_DATA punkt_tab averaged_perceptron_tagger_eng
 
+# Send print() and log output straight to the container log (no buffering).
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8001
 
 CMD ["python", "worker.py"]

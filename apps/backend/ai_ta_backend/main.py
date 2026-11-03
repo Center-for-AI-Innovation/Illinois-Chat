@@ -10,6 +10,21 @@ from dotenv import load_dotenv
 # Load .env before local imports so module-level code can access env vars
 load_dotenv()
 
+try:
+  from ai_ta_backend.rabbitmq.log_setup import configure_logging, install_request_logging
+except ModuleNotFoundError:
+  from log_setup import configure_logging, install_request_logging
+
+# Configure logging before any other local import: an import-time root
+# logging call would otherwise pin the root logger at WARNING.
+configure_logging()
+logger = logging.getLogger(__name__)
+logger.info("logging configured level=%s", logging.getLevelName(logging.getLogger().level))
+if os.getenv("SENTRY_DSN"):
+  logger.info("Sentry configured (initialised on first request)")
+else:
+  logger.info("Sentry disabled: SENTRY_DSN unset")
+
 from flask import (
   Flask,
   Response,
@@ -49,13 +64,15 @@ from ai_ta_backend.service.project_service import (
     is_valid_project_name,
 )
 from ai_ta_backend.service.retrieval_service import RetrievalService
+from ai_ta_backend.service.sentry_service import SentryService
 from ai_ta_backend.utils.email.send_transactional_email import send_email
 from ai_ta_backend.utils.pubmed_extraction import extractPubmedData
 from ai_ta_backend.utils.rerun_webcrawl_for_project import webscrape_documents
 from ai_ta_backend.rabbitmq.rmqueue import Queue
-from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
+from ai_ta_backend.rabbitmq.ingest_canvas import CanvasError, IngestCanvas
 
 app = Flask(__name__)
+install_request_logging(app)
 CORS(app)
 executor = Executor(app)
 # app.config['EXECUTOR_MAX_WORKERS'] = 5 nothing == picks defaults for me
@@ -161,7 +178,7 @@ def getTopContexts(service: RetrievalService) -> Response:
   found_documents = asyncio.run(service.getTopContexts(search_query, course_name, doc_groups, top_n, conversation_id))
   response = jsonify(found_documents)
   response.headers.add('Access-Control-Allow-Origin', '*')
-  print(f"⏰ Runtime of getTopContexts in main.py: {(time.monotonic() - start_time):.2f} seconds")
+  logger.debug("getTopContexts took %.2f s course=%s", time.monotonic() - start_time, course_name)
   return response
 
 @app.route('/llm-monitor-message', methods=['POST'])
@@ -188,7 +205,7 @@ def llm_monitor_message_main(service: RetrievalService, flaskExecutor: ExecutorI
   flaskExecutor.submit(service.llm_monitor_message, course_name, conversation_id, user_email, model_name)
   response = jsonify({"outcome": "Task started"})
   response.headers.add('Access-Control-Allow-Origin', '*')
-  print(f"⏰ Runtime of /llm-monitor-message in main.py: {(time.monotonic() - start_time):.2f} seconds")
+  logger.debug("llm-monitor-message took %.2f s course=%s", time.monotonic() - start_time, course_name)
 
   return response
 
@@ -233,8 +250,8 @@ def delete(service: RetrievalService, flaskExecutor: ExecutorInterface):
   start_time = time.monotonic()
   # background execution of tasks!!
   flaskExecutor.submit(service.delete_data, course_name, s3_path, source_url)
-  logging.info(f"From {course_name}, deleted file: {s3_path}")
-  logging.debug(f"⏰ Runtime of FULL delete func: {(time.monotonic() - start_time):.2f} seconds")
+  logger.info("From %s, deleted file: %s", course_name, s3_path)
+  logger.debug("⏰ Runtime of FULL delete func: %.2f seconds", time.monotonic() - start_time)
   # we need instant return. Delets are "best effort" assume always successful... sigh :(
   response = jsonify({"outcome": 'success'})
   response.headers.add('Access-Control-Allow-Origin', '*')
@@ -249,7 +266,6 @@ def process_chat_file_sync(service: RetrievalService):
     
     try:
         data = request.get_json()
-        print(f"📋 Request data: {data}")
         
         # Extract required parameters
         conversation_id = data.get('conversation_id')
@@ -257,6 +273,8 @@ def process_chat_file_sync(service: RetrievalService):
         course_name = data.get('course_name', 'chat')
         readable_filename = data.get('readable_filename', '')
         user_id = data.get('user_id', '')
+        logger.info("processing chat file course=%s conversation_id=%s file=%s", course_name, conversation_id,
+                    readable_filename or s3_path)
         
         if not conversation_id or not s3_path:
             error_response = {
@@ -299,6 +317,9 @@ def process_chat_file_sync(service: RetrievalService):
         return response
         
     except Exception as e:
+        body = request.get_json(silent=True) or {}
+        logger.exception("processing chat file failed course=%s file=%s", body.get('course_name', 'chat'),
+                         body.get('readable_filename') or body.get('s3_path'))
         error_response = {
             'success': False,
             'chunks_created': 0,
@@ -318,7 +339,7 @@ def nomic_map(service: NomicService):
     abort(400, description=f"Missing required parameter: 'course_name' must be provided. Course name: `{course_name}`")
 
   map_id = service.get_nomic_map(course_name, map_type)
-  print("nomic map\n", map_id)
+  logger.debug("nomic map course=%s map_type=%s result=%s", course_name, map_type, map_id)
 
   response = jsonify(map_id)
   response.headers.add('Access-Control-Allow-Origin', '*')
@@ -327,7 +348,7 @@ def nomic_map(service: NomicService):
 
 @app.route('/updateConversationMaps', methods=['GET'])
 def updateConversationMaps(service: NomicService, flaskExecutor: ExecutorInterface):
-  print("Starting conversation map update...")
+  logger.info("starting conversation map update")
 
   response = flaskExecutor.submit(service.update_conversation_maps)
 
@@ -338,7 +359,7 @@ def updateConversationMaps(service: NomicService, flaskExecutor: ExecutorInterfa
 
 @app.route('/updateDocumentMaps', methods=['GET'])
 def updateDocumentMaps(service: NomicService, flaskExecutor: ExecutorInterface):
-  print("Starting conversation map update...")
+  logger.info("starting document map update")
 
   response = flaskExecutor.submit(service.update_document_maps)
 
@@ -349,7 +370,7 @@ def updateDocumentMaps(service: NomicService, flaskExecutor: ExecutorInterface):
 
 @app.route('/cleanUpConversationMaps', methods=['GET'])
 def cleanUpConversationMaps(service: NomicService, flaskExecutor: ExecutorInterface):
-  print("Starting conversation map cleanup...")
+  logger.info("conversation map cleanup requested (disabled)")
 
   #response = flaskExecutor.submit(service.clean_up_conversation_maps)
 
@@ -360,7 +381,7 @@ def cleanUpConversationMaps(service: NomicService, flaskExecutor: ExecutorInterf
 
 @app.route('/cleanUpDocumentMaps', methods=['GET'])
 def cleanUpDocumentMaps(service: NomicService, flaskExecutor: ExecutorInterface):
-  print("Starting document map cleanup...")
+  logger.info("document map cleanup requested (disabled)")
 
   #response = flaskExecutor.submit(service.clean_up_document_maps)
 
@@ -399,6 +420,19 @@ def createConversationMap(service: NomicService):
   return response
 
 
+def _is_export_error(export_status: dict) -> bool:
+  """The export services report a failure as an "Error ..." string in `response`."""
+  return str(export_status.get('response', '')).startswith('Error')
+
+
+def _export_error_response(export_status: dict) -> Response:
+  # The export service already logged the failure with its traceback.
+  response = jsonify({'response': export_status['response']})
+  response.status_code = 500
+  response.headers.add('Access-Control-Allow-Origin', '*')
+  return response
+
+
 @app.route('/export-convo-history-csv', methods=['GET'])
 def export_convo_history(service: ExportService):
   course_name: str = request.args.get('course_name', default='', type=str)
@@ -410,7 +444,7 @@ def export_convo_history(service: ExportService):
     abort(400, description=f"Missing required parameter: 'course_name' must be provided. Course name: `{course_name}`")
 
   export_status = service.export_convo_history_json(course_name, from_date, to_date)
-  print("EXPORT FILE LINKS: ", export_status)
+  logger.info("export result course=%s response=%s", course_name, export_status.get('response'))
 
   if export_status['response'] == "No data found between the given dates.":
     response = Response(status=204)
@@ -419,6 +453,9 @@ def export_convo_history(service: ExportService):
   elif export_status['response'] == "Download from S3":
     response = jsonify({"response": "Download from S3", "s3_path": export_status['s3_path']})
     response.headers.add('Access-Control-Allow-Origin', '*')
+
+  elif _is_export_error(export_status):
+    response = _export_error_response(export_status)
 
   else:
     file_path = export_status['response']
@@ -452,7 +489,7 @@ def export_convo_history_v2(service: ExportService):
     abort(400, description=f"Missing required parameter: 'course_name' must be provided. Course name: `{course_name}`")
 
   export_status = service.export_convo_history(course_name, from_date, to_date)
-  print("Export processing response: ", export_status)
+  logger.info("export result course=%s response=%s", course_name, export_status.get('response'))
 
   if export_status['response'] == "No data found between the given dates.":
     response = Response(status=204)
@@ -461,6 +498,9 @@ def export_convo_history_v2(service: ExportService):
   elif export_status['response'] == "Download from S3":
     response = jsonify({"response": "Download from S3", "s3_path": export_status['s3_path']})
     response.headers.add('Access-Control-Allow-Origin', '*')
+
+  elif _is_export_error(export_status):
+    response = _export_error_response(export_status)
 
   else:
     file_path = export_status['response']
@@ -486,10 +526,8 @@ def export_convo_history_user(service: ExportService):
   if user_email == '' or project_name == '':
     abort(400, description=f"Missing required parameters: 'user_email' and 'project_name' must be provided.")
 
-  print("user_email: ", user_email)
-  print("project_name: ", project_name)
   export_status = service.export_convo_history_user(user_email, project_name)
-  print("Export processing response: ", export_status)
+  logger.info("user export result course=%s response=%s", project_name, export_status.get('response'))
 
   if export_status['response'] == "No data found for the given user and project.":
     response = Response(status=204)
@@ -506,6 +544,9 @@ def export_convo_history_user(service: ExportService):
     response = jsonify({'response': 'Error creating markdown directory!'})
     response.status_code = 500
     response.headers.add('Access-Control-Allow-Origin', '*')
+  elif _is_export_error(export_status):
+    response = _export_error_response(export_status)
+
   else:
     file_path = export_status['response']
     filename = os.path.basename(file_path)
@@ -534,7 +575,7 @@ def export_conversations_custom(service: ExportService):
     abort(400, description=f"Missing required parameter: 'course_name' and 'destination_email_ids' must be provided.")
 
   export_status = service.export_conversations(course_name, from_date, to_date, emails)
-  print("EXPORT FILE LINKS: ", export_status)
+  logger.info("export result course=%s response=%s", course_name, export_status.get('response'))
 
   if export_status['response'] == "No data found between the given dates.":
     response = Response(status=204)
@@ -543,6 +584,9 @@ def export_conversations_custom(service: ExportService):
   elif export_status['response'] == "Download from S3":
     response = jsonify({"response": "Download from S3", "s3_path": export_status['s3_path']})
     response.headers.add('Access-Control-Allow-Origin', '*')
+
+  elif _is_export_error(export_status):
+    response = _export_error_response(export_status)
 
   else:
     file_path = export_status['response']
@@ -571,7 +615,7 @@ def exportDocuments(service: ExportService):
     abort(400, description=f"Missing required parameter: 'course_name' must be provided. Course name: `{course_name}`")
 
   export_status = service.export_documents_json(course_name, from_date, to_date)
-  print("EXPORT FILE LINKS: ", export_status)
+  logger.info("export result course=%s response=%s", course_name, export_status.get('response'))
 
   if export_status['response'] == "No data found between the given dates.":
     response = Response(status=204)
@@ -580,6 +624,9 @@ def exportDocuments(service: ExportService):
   elif export_status['response'] == "Download from S3":
     response = jsonify({"response": "Download from S3", "s3_path": export_status['s3_path']})
     response.headers.add('Access-Control-Allow-Origin', '*')
+
+  elif _is_export_error(export_status):
+    response = _export_error_response(export_status)
 
   else:
     file_path = export_status['response']
@@ -652,12 +699,13 @@ def get_conversation_stats(service: RetrievalService) -> Response:
 def ingest() -> Response:
   active_queue = Queue()
   data = request.get_json()
-  logging.info("Data received: %s", data)
+  logger.info("ingest request course=%s file=%s s3_paths=%s", data.get('course_name'), data.get('readable_filename'),
+              data.get('s3_paths'))
 
   # TODO: Authentication?
 
   job_id = active_queue.addJobToIngestQueue(data)
-  logging.info("Result from addJobToIngestQueue:  %s", job_id)
+  logger.debug("addJobToIngestQueue returned job=%s", job_id)
 
   response = jsonify(
     {
@@ -671,7 +719,6 @@ def ingest() -> Response:
 @app.route('/canvas_ingest', methods=['POST'])
 def canvas_ingest() -> Response:
   data = request.get_json()
-  logging.info("Canvas ingest data: %s", data)
 
   course_name: str = data.get('course_name', '')
   canvas_url: str = data.get('canvas_url', None)
@@ -690,27 +737,40 @@ def canvas_ingest() -> Response:
     'discussions': str(discussions).lower() == 'true',
   }
 
-  print("Course Name: ", course_name)
-  print("Canvas URL: ", canvas_url)
-  print("Download Options: ", options)
+  logger.info("canvas ingest request course=%s canvas_url=%s options=%s", course_name, canvas_url, options)
 
   # canvas.illinois.edu/courses/COURSE_CODE
-  match = re.search(r'canvas\.illinois\.edu/courses/([^/]+)', canvas_url)
-  canvas_course_id = match.group(1) if match else None
+  match = re.search(r'canvas\.illinois\.edu/courses/([^/]+)', canvas_url) if isinstance(canvas_url, str) else None
+  if not match:
+    response = jsonify(error="Missing or invalid 'canvas_url': expected https://canvas.illinois.edu/courses/<id>")
+    response.status_code = 400
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+  canvas_course_id = match.group(1)
 
   canvas_id = os.getenv("CANVAS_ACCESS_TOKEN", default="")
   if len(canvas_id) == 0:
-      response = jsonify(message=f"CANVAS_ACCESS_TOKEN is not configured.")
+      logger.error("canvas ingest failed course=%s: CANVAS_ACCESS_TOKEN is unset", course_name)
+      # `error` is the field the Canvas form shows; `message` is kept for older callers.
+      response = jsonify(error="CANVAS_ACCESS_TOKEN is not configured.",
+                         message="CANVAS_ACCESS_TOKEN is not configured.")
       response.status_code = 500
       response.headers.add('Access-Control-Allow-Origin', '*')
       return response
 
   try:
       ingester = IngestCanvas()
-      accept_status = ingester.auto_accept_enrollments(canvas_course_id)
-      job_ids = ingester.ingest_course_content(canvas_course_id=canvas_course_id,
-                                       course_name=course_name,
-                                       content_ingest_dict=options)
+      ingester.auto_accept_enrollments(canvas_course_id)
+      job_ids, section_results = ingester.ingest_course_content(canvas_course_id=canvas_course_id,
+                                                                course_name=course_name,
+                                                                content_ingest_dict=options)
+
+      if not job_ids:
+        logger.error("canvas ingest queued no documents course=%s canvas_course_id=%s", course_name, canvas_course_id)
+        response = jsonify({"error": "Canvas ingest queued no documents", "section_results": section_results})
+        response.status_code = 502
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
       response = jsonify(
         {
@@ -720,7 +780,19 @@ def canvas_ingest() -> Response:
       )
       response.headers.add('Access-Control-Allow-Origin', '*')
       return response
+  except CanvasError as e:
+      # auto_accept_enrollments already wrote the one ERROR line for this failure.
+      response = jsonify({
+        "error": e.message,
+        "upstream": "canvas",
+        "upstream_status": e.upstream_status,
+        "upstream_message": e.upstream_message,
+      })
+      response.status_code = 502
+      response.headers.add('Access-Control-Allow-Origin', '*')
+      return response
   except Exception as e:
+      logger.exception("canvas ingest failed course=%s", course_name)
       response = jsonify(error=str(e), message=f"Internal Server Error {e}")
       response.status_code = 500
       response.headers.add('Access-Control-Allow-Origin', '*')
@@ -745,7 +817,7 @@ def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> 
     abort(400,
           description="Invalid 'project_name': names may only contain letters, numbers, "
           "dashes, underscores, and dots — a dot cannot be the first character (max 64 characters).")
-  print(f"In /createProject for: {project_name}")
+  logger.info("creating project course=%s", project_name)
   try:
     service.create_project(project_name, project_description, project_owner_email, is_private, allow_logged_in_users)
   except ProjectAlreadyExistsError as e:
@@ -754,6 +826,7 @@ def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> 
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response
   except Exception as e:
+    # project_service.create_project already logged the traceback.
     response = jsonify(error=str(e), message=f"Error while creating project: {e}")
     response.status_code = 500
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -850,6 +923,9 @@ def send_transactional_email(service: ExportService):
                bcc_recipients=bcc_recipients)
     response = Response(status=200)
   except Exception as e:
+    logger.exception("sending transactional email failed recipients=%s bcc=%s",
+                     len(to_recipients) if isinstance(to_recipients, list) else 1,
+                     len(bcc_recipients) if isinstance(bcc_recipients, list) else int(bool(bcc_recipients)))
     response = Response(status=500)
     response.data = f"An unexpected error occurred: {e}".encode()
 
@@ -881,6 +957,7 @@ def clinicalKGContexts(graph_db: GraphDatabase) -> Response:
     results = graph_db.getClinicalKGContexts(user_query)
     response = jsonify(results)
   except Exception as e:
+    logger.exception("clinical KG query failed query_len=%d", len(user_query))
     response = Response(status=500)
     response.data = f"An unexpected error occurred: {e}".encode()
 
@@ -910,7 +987,7 @@ def configure(binder: Binder) -> None:
   binder.bind(ProcessPoolExecutorInterface, to=ProcessPoolExecutorAdapter(max_workers=10), scope=SingletonScope)
   binder.bind(RetrievalService, to=RetrievalService, scope=RequestScope)
   binder.bind(PosthogService, to=PosthogService, scope=SingletonScope)
-  # binder.bind(SentryService, to=SentryService, scope=SingletonScope)
+  binder.bind(SentryService, to=SentryService, scope=SingletonScope)
   binder.bind(NomicService, to=NomicService, scope=SingletonScope)
   binder.bind(ExportService, to=ExportService, scope=SingletonScope)
   binder.bind(VectorDatabase, to=VectorDatabase, scope=SingletonScope)
