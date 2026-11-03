@@ -700,8 +700,8 @@ def ingest() -> Response:
   active_queue = Queue()
   data = request.get_json()
   # Name only the fields that are set: web-text jobs from crawlee carry `url`, file jobs carry `s3_paths`.
-  fields = ' '.join('%s=%s' % (key, data[key]) for key in ('url', 's3_paths') if data.get(key))
-  logger.info("ingest request course=%s file=%s %s", data.get('course_name'), data.get('readable_filename'), fields)
+  fields = ''.join(' %s=%s' % (key, data[key]) for key in ('url', 's3_paths') if data.get(key))
+  logger.info("ingest request course=%s file=%s%s", data.get('course_name'), data.get('readable_filename'), fields)
 
   # TODO: Authentication?
 

@@ -123,5 +123,5 @@ class Queue:
                          new_job_id, routing_key, type(e).__name__, e)
             status_db.delete_document_in_progress(new_job_id)
             raise
-        logger.info("job enqueued job=%s queue=%s", new_job_id, routing_key)
+        logger.info("job enqueued job=%s queue=%s file=%s", new_job_id, routing_key, inputs.get('readable_filename'))
         return new_job_id

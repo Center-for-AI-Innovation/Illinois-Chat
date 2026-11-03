@@ -42,6 +42,21 @@ def _failed(e: Exception) -> str:
     return "Failed! Error: " + _strip_query(str(e))
 
 
+class _YtDlpLogger:
+    """Sends yt-dlp's own messages to DEBUG. Without it yt-dlp writes a bare ERROR line to stderr
+    even with quiet=True; the same text is in the DownloadError that our except logs once.
+    Its messages repeat the video URL, so the query string is stripped."""
+
+    def debug(self, msg):
+        logger.debug("yt-dlp: %s", _strip_query(msg))
+
+    def warning(self, msg):
+        logger.debug("yt-dlp: %s", _strip_query(msg))
+
+    def error(self, msg):
+        logger.debug("yt-dlp: %s", _strip_query(msg))
+
+
 class CanvasError(Exception):
     """A Canvas call failed.
 
@@ -685,6 +700,8 @@ class IngestCanvas:
                         'outtmpl': f'{dir_path}/{course_id}_video_{count}.%(ext)s',  # Dynamic extension
                         'format': 'best',
                         'quiet': True,  # no progress lines in the backend log
+                        'no_warnings': True,
+                        'logger': _YtDlpLogger(),  # keeps yt-dlp's own ERROR line off stderr
                     }
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         info_dict = ydl.extract_info(url, download=True)

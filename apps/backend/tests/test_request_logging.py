@@ -82,6 +82,7 @@ def test_options_preflight_is_not_logged(client, caplog):
     caplog.set_level(logging.INFO)
     response = client.options("/work")
     assert response.status_code == 200
+    assert "X-Request-ID" in response.headers
     assert request_lines(caplog) == []
 
 

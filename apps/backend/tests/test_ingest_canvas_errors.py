@@ -9,6 +9,8 @@ Coverage:
     the configured access token", with one ERROR line.
   - A failed download of a link with ``?verifier=<secret>`` never writes the
     secret to the log (the requests/urllib3 traceback repeats the full URL).
+  - A video yt-dlp cannot fetch gives exactly one ERROR line (ours) and nothing
+    on stderr: yt-dlp's own messages go to DEBUG through ``_YtDlpLogger``.
 """
 
 from __future__ import annotations
@@ -127,3 +129,40 @@ def test_failed_download_does_not_log_the_verifier(download, monkeypatch, tmp_pa
     assert SECRET not in output
     assert "Traceback" not in output
     assert result.startswith("Failed! Error: ") and SECRET not in result
+
+
+class _FakeResponse:
+    """What ``requests.get(..., stream=True)`` returns, used as a context manager."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_failed_video_logs_one_error_and_nothing_on_stderr(monkeypatch, tmp_path, capfd):
+    # Only the pre-flight requests.get is faked; yt-dlp really runs and fails on the refused port.
+    monkeypatch.setattr(ingest_canvas.requests, "get", lambda *a, **k: _FakeResponse())
+    captured = []
+    monkeypatch.setattr(ingest_canvas.sentry_sdk, "capture_exception", captured.append)
+    collector = LineCollector()
+    root = logging.getLogger()
+    old_level = root.level
+    root.addHandler(collector)
+    root.setLevel(logging.DEBUG)
+    try:
+        result = IngestCanvas().download_videos_from_urls(["http://127.0.0.1:9/x?verifier=" + SECRET], 1, str(tmp_path))
+    finally:
+        root.removeHandler(collector)
+        root.setLevel(old_level)
+
+    assert len(captured) == 1 and isinstance(captured[0], ingest_canvas.yt_dlp.utils.DownloadError)
+    assert result.startswith("Failed! Error: ")
+    assert capfd.readouterr().err == ""
+    errors = [line for line in collector.lines if " ERROR   " in line.splitlines()[0]]
+    assert len(errors) == 1, collector.lines
+    assert "downloading Canvas videos failed canvas_course_id=1 url=/x" in errors[0]
+    # yt-dlp's own messages are kept, at DEBUG, without the query string.
+    assert any(" DEBUG   " in line and "yt-dlp: " in line for line in collector.lines)
+    assert SECRET not in "\n".join(collector.lines)
