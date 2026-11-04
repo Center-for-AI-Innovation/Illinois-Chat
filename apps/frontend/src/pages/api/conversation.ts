@@ -338,6 +338,12 @@ export function convertDBToChatConversation(
         created_at: msg.created_at || undefined,
         updated_at: msg.updated_at || undefined,
         feedback: feedbackObj,
+        ...(Array.isArray(parsedProcessedContent?.uiParts)
+          ? { uiParts: parsedProcessedContent.uiParts }
+          : {}),
+        ...(parsedProcessedContent?.uiMetadata !== undefined
+          ? { uiMetadata: parsedProcessedContent.uiMetadata }
+          : {}),
         wasQueryRewritten: msg.was_query_rewritten ?? null,
         queryRewriteText: msg.query_rewrite_text ?? null,
         ...(agentStepNumberFromProcessed !== undefined
@@ -396,8 +402,13 @@ export function convertChatToDBMessage(
   const processedContentPayload =
     (Array.isArray(chatMessage.agentEvents) &&
       chatMessage.agentEvents.length > 0) ||
-    typeof chatMessage.agentStepNumber === 'number'
+    typeof chatMessage.agentStepNumber === 'number' ||
+    Array.isArray(chatMessage.uiParts)
       ? JSON.stringify({
+          ...(chatMessage.uiParts ? { uiParts: chatMessage.uiParts } : {}),
+          ...(chatMessage.uiMetadata !== undefined
+            ? { uiMetadata: chatMessage.uiMetadata }
+            : {}),
           ...(Array.isArray(chatMessage.agentEvents) &&
           chatMessage.agentEvents.length > 0
             ? { agentEvents: chatMessage.agentEvents }

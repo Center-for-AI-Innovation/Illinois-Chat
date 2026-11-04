@@ -1,3 +1,4 @@
+import { type UIMessage } from 'ai'
 import {
   type AllLLMProviders,
   type AnySupportedModel,
@@ -32,6 +33,8 @@ export interface Conversation {
 }
 
 export interface Message {
+  uiParts?: UIMessage['parts']
+  uiMetadata?: UIMessage['metadata']
   id: string
   role: Role
 
