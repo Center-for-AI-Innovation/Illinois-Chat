@@ -10,8 +10,125 @@ vi.mock('~/utils/crypto', () => ({
 
 import { getOpenAICompatibleModels } from '../openaiCompatible'
 import { OpenAICompatibleModelID } from '../../types/openaiCompatible'
+import {
+  ProviderNames,
+  ReasoningCapableModels,
+  VisionCapableModels,
+  type OpenAICompatibleProvider,
+} from '../../LLMProvider'
 
 describe('getOpenAICompatibleModels', () => {
+  it('discovers Lumen chat models and aliases with capabilities and saved preferences', async () => {
+    const catalog = [
+      ['nemotron-3-super-120b-a12b', 262144, false],
+      ['gemma-4-31b-it', 46790, true],
+      ['ornith-1.0-35b', 262138, false],
+      ['deepseek-v4-flash', 511994, false],
+      ['muse-glimmer-30b', 131066, true],
+      ['glm-5.3', 524282, false],
+      ['glm', 524282, false],
+      ['deepseek-v4.1-flash', 1048570, true],
+      ['deepseek', 1048570, true],
+      ['deepseek-v4.1', 1048570, true],
+      ['beam-1.0', 524282, false],
+    ] as const
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [
+            ...catalog.map(([id]) => ({ id, owned_by: 'lumen' })),
+            { id: 'granite-speech-4.1-2b-plus', input_modalities: ['audio'] },
+          ],
+        }),
+      ),
+    )
+    const provider: OpenAICompatibleProvider = {
+      provider: ProviderNames.OpenAICompatible,
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'https://lumen.ncsa.illinois.edu/v1',
+      models: [
+        {
+          id: 'gemma-4-31b-it',
+          name: 'Gemma',
+          tokenLimit: 46790,
+          enabled: false,
+        },
+        {
+          id: 'deepseek',
+          name: 'DeepSeek',
+          tokenLimit: 1048570,
+          enabled: true,
+          default: true,
+        },
+      ],
+    }
+
+    const result = await getOpenAICompatibleModels(provider)
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://lumen.ncsa.illinois.edu/v1/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer dec:test-key',
+        }),
+      }),
+    )
+    expect(result.error).toBeUndefined()
+    expect(result.models).toHaveLength(catalog.length)
+    for (const [id, tokenLimit, vision] of catalog) {
+      expect(result.models?.find((model) => model.id === id)).toMatchObject({
+        id,
+        tokenLimit,
+        name: expect.stringMatching(/^Lumen:/),
+      })
+      expect(ReasoningCapableModels.has(id as OpenAICompatibleModelID)).toBe(
+        true,
+      )
+      expect(VisionCapableModels.has(id as OpenAICompatibleModelID)).toBe(
+        vision,
+      )
+    }
+    expect(
+      result.models?.find((model) => model.id === 'gemma-4-31b-it')?.enabled,
+    ).toBe(false)
+    expect(
+      result.models?.find((model) => model.id === 'deepseek'),
+    ).toMatchObject({ enabled: true, default: true })
+    for (const id of [
+      'glm',
+      'glm-5.3',
+      'deepseek-v4-flash',
+      'deepseek-v4.1-flash',
+      'deepseek-v4.1',
+    ]) {
+      expect(result.models?.find((model) => model.id === id)?.enabled).toBe(
+        false,
+      )
+    }
+    expect(
+      result.models?.find((model) => model.id === 'nemotron-3-super-120b-a12b')
+        ?.enabled,
+    ).toBe(true)
+  })
+
+  it('only offers Lumen models available to the key', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: [{ id: 'gemma-4-31b-it' }] })),
+    )
+    const provider: OpenAICompatibleProvider = {
+      provider: ProviderNames.OpenAICompatible,
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'https://lumen.ncsa.illinois.edu/v1',
+      models: [],
+    }
+
+    const result = await getOpenAICompatibleModels(provider)
+
+    expect(result.models?.map((model) => model.id)).toEqual(['gemma-4-31b-it'])
+  })
+
   it('requires baseUrl to include /v1', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const provider: any = {
