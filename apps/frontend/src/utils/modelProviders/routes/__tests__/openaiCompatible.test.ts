@@ -112,6 +112,44 @@ describe('getOpenAICompatibleModels', () => {
     ).toBe(true)
   })
 
+  it('discovers additional Lumen Qwen models with their reported capabilities', async () => {
+    const catalog = [
+      ['qwen3-coder-next', 131066, false, false],
+      ['qwen3.6-35b-a3b', 262138, false, true],
+      ['qwen3.8-27b', 250542, true, true],
+      ['qwen3.8-flash', 262138, true, false],
+    ] as const
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: catalog.map(([id]) => ({ id })) })),
+    )
+    const provider: OpenAICompatibleProvider = {
+      provider: ProviderNames.OpenAICompatible,
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'https://lumen.ncsa.illinois.edu/v1',
+      models: [],
+    }
+
+    const result = await getOpenAICompatibleModels(provider)
+
+    expect(result.error).toBeUndefined()
+    expect(result.models).toHaveLength(catalog.length)
+    for (const [id, tokenLimit, vision, reasoning] of catalog) {
+      expect(result.models?.find((model) => model.id === id)).toMatchObject({
+        id,
+        tokenLimit,
+        enabled: false,
+        name: expect.stringMatching(/^Lumen:/),
+      })
+      expect(VisionCapableModels.has(id as OpenAICompatibleModelID)).toBe(
+        vision,
+      )
+      expect(ReasoningCapableModels.has(id as OpenAICompatibleModelID)).toBe(
+        reasoning,
+      )
+    }
+  })
+
   it('only offers Lumen models available to the key', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ data: [{ id: 'gemma-4-31b-it' }] })),
