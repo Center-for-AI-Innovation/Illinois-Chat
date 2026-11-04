@@ -101,6 +101,8 @@ export const VisionCapableModels: Set<
   | OpenAICompatibleModelID
 > = new Set([
   // Lumen image-capable chat models
+  OpenAICompatibleModelID.Lumen_Qwen3_8_27B,
+  OpenAICompatibleModelID.Lumen_Qwen3_8_Flash,
   OpenAICompatibleModelID.Lumen_Gemma_4_31B,
   OpenAICompatibleModelID.Lumen_Muse_Glimmer_30B,
   OpenAICompatibleModelID.Lumen_DeepSeek_V4_1_Flash,
@@ -253,6 +255,8 @@ export const ReasoningCapableModels: Set<
   | NCSAHostedVLMModelID
 > = new Set([
   // Lumen reasoning models, including aliases
+  OpenAICompatibleModelID.Lumen_Qwen3_6_35B_A3B,
+  OpenAICompatibleModelID.Lumen_Qwen3_8_27B,
   OpenAICompatibleModelID.Lumen_Nemotron_3_Super_120B_A12B,
   OpenAICompatibleModelID.Lumen_Gemma_4_31B,
   OpenAICompatibleModelID.Lumen_Ornith_1_0_35B,

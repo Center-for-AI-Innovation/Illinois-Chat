@@ -10,6 +10,11 @@ export interface OpenAICompatibleModel {
 }
 
 export enum OpenAICompatibleModelID {
+  Lumen_Qwen3_Coder_Next = 'qwen3-coder-next',
+  Lumen_Qwen3_6_35B_A3B = 'qwen3.6-35b-a3b',
+  Lumen_Qwen3_8_27B = 'qwen3.8-27b',
+  Lumen_Qwen3_8_Flash = 'qwen3.8-flash',
+
   // Lumen chat models and aliases (audio-only models are excluded).
   Lumen_Nemotron_3_Super_120B_A12B = 'nemotron-3-super-120b-a12b',
   Lumen_Gemma_4_31B = 'gemma-4-31b-it',
@@ -185,6 +190,31 @@ export const OpenAICompatibleModels: Record<
   OpenAICompatibleModelID,
   OpenAICompatibleModel
 > = {
+  [OpenAICompatibleModelID.Lumen_Qwen3_Coder_Next]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_Coder_Next,
+    name: 'Lumen: Qwen3 Coder Next',
+    tokenLimit: 131066,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Qwen3_6_35B_A3B]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_6_35B_A3B,
+    name: 'Lumen: Qwen3.6 35B A3B',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Qwen3_8_27B]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_8_27B,
+    name: 'Lumen: Qwen3.8 27B',
+    tokenLimit: 250542,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Qwen3_8_Flash]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_8_Flash,
+    name: 'Lumen: Qwen3.8 Flash',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+
   // Context limits reported by Lumen /v1/models.
   [OpenAICompatibleModelID.Lumen_Nemotron_3_Super_120B_A12B]: {
     id: OpenAICompatibleModelID.Lumen_Nemotron_3_Super_120B_A12B,
