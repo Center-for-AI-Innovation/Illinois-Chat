@@ -1,4 +1,4 @@
-import { Montserrat, Courier_Prime } from 'next/font/google'
+import { Montserrat, Courier_Prime, Source_Sans_3 } from 'next/font/google'
 
 // Docs: https://nextjs.org/docs/pages/building-your-application/optimizing/fonts#with-tailwind-css
 
@@ -13,6 +13,22 @@ export const montserrat_paragraph = Montserrat({
   weight: '500',
   subsets: ['latin'],
   variable: '--font-montserratParagraph',
+  display: 'swap',
+})
+
+// Illinois brand typefaces (brand.illinois.edu/visual-identity/typography):
+// Montserrat for headings, Source Sans for everything else. Georgia, the
+// third brand face, is a system font and needs no loader.
+export const workspace_display = Montserrat({
+  weight: ['600', '700'],
+  subsets: ['latin'],
+  variable: '--font-ws-display',
+  display: 'swap',
+})
+
+export const workspace_body = Source_Sans_3({
+  subsets: ['latin'],
+  variable: '--font-ws-body',
   display: 'swap',
 })
 

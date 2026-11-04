@@ -5,6 +5,7 @@ import { type AppType } from 'next/app'
 import Maintenance from '~/components/UIUC-Components/Maintenance'
 import '~/styles/citation-tooltips.css'
 import '~/styles/globals.css'
+import 'streamdown/styles.css'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'

@@ -1,13 +1,19 @@
 import { type Config } from 'tailwindcss'
 
 export default {
-  content: ['./src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    './node_modules/streamdown/dist/*.js',
+  ],
   darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
         montserratHeading: ['var(--font-montserratHeading)'],
         montserratParagraph: ['var(--font-montserratParagraph)'],
+        wsDisplay: ['var(--font-ws-display)', 'Montserrat', 'Arial Black'],
+        wsBody: ['var(--font-ws-body)', 'Source Sans Pro', 'Arial'],
+        wsSerif: ['Georgia', 'serif'],
       },
       keyframes: {
         'accordion-down': {

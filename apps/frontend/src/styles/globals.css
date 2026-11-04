@@ -1831,3 +1831,164 @@ body {
 .math svg {
   display: unset;
 }
+
+/*
+  Chat workspace theme, limited to the Illinois brand palette and the
+  accessible web pairings at brand.illinois.edu/visual-identity/web-color.
+  Light mode follows the white and gray (il-storm-95) background pairings;
+  dark mode follows the Illini Blue background pairing. Supporting colors
+  (prairie, harvest, berry) appear only on status icons.
+  Scoped so shadcn and AI Elements primitives inside the workspace use these
+  tokens; portaled popovers keep the global Illinois tokens.
+*/
+.ic-workspace {
+  --ws-orange: #ff5f05;
+  --ws-blue: #13294b;
+  --ws-surface: #ffffff;
+  --ws-panel: #f4f4f4;
+  --ws-text: #252525;
+  --ws-heading: #13294b;
+  --ws-muted: #707372;
+  --ws-line: #c6c7c6;
+  --ws-link: #1d58a7;
+  --ws-accent: #c84113;
+  --ws-hover: #f4f4f4;
+  --ws-done: #006230;
+  --ws-waiting: #fcb316;
+  --ws-error: #5c0e41;
+  --ws-sidebar: #f9fafc;
+  --ws-sidebar-border: #dadfe7;
+  --ws-sidebar-accent: #e3ebf5;
+  --ws-sidebar-accent-text: #0b1d41;
+  --ws-input: #e5e5e5;
+  --ws-fill: #f1f3f7;
+  --ws-fill-hover: #e3ebf5;
+  --ws-raised: #ffffff;
+  --ws-elevation:
+    0 1px 2px rgb(19 41 75 / 0.07), 0 1px 1px rgb(19 41 75 / 0.04);
+
+  --background: var(--ws-surface);
+  --foreground: var(--ws-heading);
+  --muted: var(--ws-panel);
+  --muted-foreground: var(--ws-muted);
+  --secondary: var(--ws-panel);
+  --secondary-foreground: var(--ws-heading);
+  --accent: var(--ws-hover);
+  --accent-foreground: var(--ws-heading);
+  --primary: var(--ws-blue);
+  --primary-foreground: #ffffff;
+  --border: var(--ws-line);
+  --input: var(--ws-line);
+  --ring: var(--ws-accent);
+  /* Tailwind v4 theme names that registry components (Shimmer) reference. */
+  --color-background: var(--ws-surface);
+  --color-muted-foreground: var(--ws-muted);
+
+  font-family: var(--font-ws-body), 'Source Sans Pro', Arial, sans-serif;
+  color: var(--ws-text);
+  background: var(--ws-surface);
+}
+
+.dark .ic-workspace {
+  --ws-surface: #13294b;
+  --ws-panel: #13294b;
+  --ws-text: #ffffff;
+  --ws-heading: #ffffff;
+  --ws-muted: #c6c7c6;
+  --ws-line: #707372;
+  --ws-link: #ffffff;
+  --ws-accent: #ff5f05;
+  --ws-hover: #13294b;
+  --ws-done: #ffffff;
+  --ws-error: #ff5f05;
+  --ws-sidebar: rgb(255 255 255 / 0.04);
+  --ws-sidebar-border: rgb(255 255 255 / 0.14);
+  --ws-sidebar-accent: rgb(255 255 255 / 0.1);
+  --ws-sidebar-accent-text: #ffffff;
+  --ws-input: #707372;
+  --ws-fill: rgb(255 255 255 / 0.08);
+  --ws-fill-hover: rgb(255 255 255 / 0.14);
+  --ws-raised: rgb(255 255 255 / 0.08);
+  --ws-elevation: 0 1px 2px rgb(0 0 0 / 0.35);
+
+  --primary: #ff5f05;
+  --primary-foreground: #13294b;
+}
+
+/*
+  Text fields sit inside rounded shells (composer, search, popover search).
+  The global *:focus-visible outline would draw a rectangle around the bare
+  field, so the shell carries the focus ring instead.
+*/
+.ic-workspace
+  :is(
+    input:not([type='checkbox'], [type='radio'], [type='range']),
+    textarea
+  ):focus-visible {
+  outline: none !important;
+}
+
+.ic-workspace
+  :is([data-slot='input-group'], [data-ws-field]):has(
+    :is(input, textarea):focus-visible
+  ) {
+  border-color: var(--ws-orange);
+}
+
+.ic-workspace
+  :where(
+    [role='option'],
+    [role='menuitem'],
+    [role='menuitemradio'],
+    [role='menuitemcheckbox'],
+    [role='switch'],
+    [role='radio']
+  ):not([aria-disabled='true'], [data-disabled=''], [data-disabled='true']) {
+  cursor: pointer;
+}
+
+.ic-workspace ::selection {
+  color: #ffffff;
+  background-color: var(--ws-blue);
+}
+
+.dark .ic-workspace ::selection {
+  color: var(--ws-blue);
+  background-color: var(--ws-orange);
+}
+
+@keyframes ws-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@utility shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: ws-shimmer 2s linear infinite;
+}
+
+@utility shimmer-none {
+  color: inherit;
+  background-image: none;
+  animation: none;
+}
+
+@keyframes ws-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
