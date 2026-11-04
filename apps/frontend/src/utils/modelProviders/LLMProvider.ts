@@ -100,6 +100,13 @@ export const VisionCapableModels: Set<
   | SambaNovaModelID
   | OpenAICompatibleModelID
 > = new Set([
+  // Lumen image-capable chat models
+  OpenAICompatibleModelID.Lumen_Gemma_4_31B,
+  OpenAICompatibleModelID.Lumen_Muse_Glimmer_30B,
+  OpenAICompatibleModelID.Lumen_DeepSeek_V4_1_Flash,
+  OpenAICompatibleModelID.Lumen_DeepSeek,
+  OpenAICompatibleModelID.Lumen_DeepSeek_V4_1,
+
   // OpenAI models
   OpenAIModelID.o3,
   OpenAIModelID.o4_mini,
@@ -245,6 +252,19 @@ export const ReasoningCapableModels: Set<
   | OpenAICompatibleModelID
   | NCSAHostedVLMModelID
 > = new Set([
+  // Lumen reasoning models, including aliases
+  OpenAICompatibleModelID.Lumen_Nemotron_3_Super_120B_A12B,
+  OpenAICompatibleModelID.Lumen_Gemma_4_31B,
+  OpenAICompatibleModelID.Lumen_Ornith_1_0_35B,
+  OpenAICompatibleModelID.Lumen_DeepSeek_V4_Flash,
+  OpenAICompatibleModelID.Lumen_Muse_Glimmer_30B,
+  OpenAICompatibleModelID.Lumen_GLM_5_3,
+  OpenAICompatibleModelID.Lumen_GLM,
+  OpenAICompatibleModelID.Lumen_DeepSeek_V4_1_Flash,
+  OpenAICompatibleModelID.Lumen_DeepSeek,
+  OpenAICompatibleModelID.Lumen_DeepSeek_V4_1,
+  OpenAICompatibleModelID.Lumen_Beam_1_0,
+
   AnthropicModelID.Claude_Sonnet_4_6_Thinking,
   AnthropicModelID.Claude_Opus_4_6_Thinking,
   AnthropicModelID.Claude_Haiku_4_5_Thinking,
