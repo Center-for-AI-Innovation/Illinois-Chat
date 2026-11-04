@@ -14,8 +14,7 @@ import { DEFAULT_SYSTEM_PROMPT } from '@/utils/app/const'
 import { type Conversation } from '@/types/chat'
 import { type KeyValuePair } from '@/types/data'
 
-import { Chat } from '@/components/Chat/Chat'
-import { Chatbar } from '@/components/Chatbar/Chatbar'
+import { WorkspaceChat } from '@/components/ai-elements/workspace/WorkspaceChat'
 
 import HomeContext from './home.context'
 import { type HomeInitialState, initialState } from './home.state'
@@ -94,7 +93,6 @@ const Home = ({
     isLoading: isLastConversationLoading,
   } = useFetchLastConversation(course_name, current_email)
 
-  const stopConversationRef = useRef<boolean>(false)
   const getModels = useCallback(
     async (params: { projectName: string }, signal?: AbortSignal) => {
       const response = await fetch(`/api/models`, {
@@ -603,15 +601,9 @@ const Home = ({
               className="flex h-full w-full overflow-y-auto sm:pt-0"
             >
               <h1 className="sr-only">{course_name} — Illinois Chat</h1>
-              <Chatbar
-                current_email={current_email}
-                courseName={course_name}
-                courseMetadata={course_metadata}
-              />
 
               {course_metadata && (
-                <Chat
-                  stopConversationRef={stopConversationRef}
+                <WorkspaceChat
                   courseMetadata={course_metadata}
                   courseName={course_name}
                   currentEmail={current_email}
