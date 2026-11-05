@@ -13,6 +13,7 @@ import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 
 const CourseMain: NextPage = () => {
@@ -84,7 +85,9 @@ const CourseMain: NextPage = () => {
       setSidebarCollapsed={setSidebarCollapsed}
     >
       <Head>
-        <title>{projectName} — Materials — Illinois Chat</title>
+        <title>
+          {`${getChatbotDisplayName(projectName, metadata)} — Materials — Illinois Chat`}
+        </title>
         <meta
           name="UIUC.chat"
           content="The AI teaching assistant built for students at UIUC."
@@ -96,7 +99,9 @@ const CourseMain: NextPage = () => {
         tabIndex={-1}
         className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
-        <h1 className="sr-only">{projectName} Materials</h1>
+        <h1 className="sr-only">
+          {getChatbotDisplayName(projectName, metadata)} Materials
+        </h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
           <div className="mt-8 flex w-full flex-col items-center lg:mt-4"></div>
         </div>

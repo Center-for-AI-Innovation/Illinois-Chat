@@ -74,6 +74,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const textPredicate = q
       ? sql`AND (
           ${courseMetadata.course_name} ILIKE ${'%' + q + '%'}
+          OR (${courseMetadata.raw_metadata}->>'display_name') ILIKE ${'%' + q + '%'}
           OR ${courseMetadata.project_description} ILIKE ${'%' + q + '%'}
           OR ${courseMetadata.course_owner} ILIKE ${'%' + q + '%'}
           OR EXISTS (
@@ -117,14 +118,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )`
       : sql``
 
-    // Ranked ordering: user's own bots first (owner=0, admin=1), then alphabetical.
+    // Ranked ordering: user's own bots first (owner=0, admin=1), then
+    // alphabetical by the name people see (display name, else project name).
     const rankOrder = sql`
       CASE
         WHEN ${courseMetadata.course_owner} = ${userEmail} THEN 0
         WHEN ${userEmail} = ANY(${courseMetadata.course_admins}) THEN 1
         ELSE 2
       END,
-      LOWER(${courseMetadata.course_name})
+      LOWER(COALESCE(NULLIF(${courseMetadata.raw_metadata}->>'display_name', ''), ${courseMetadata.course_name}))
     `
 
     const rows = await db
@@ -142,7 +144,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Build cards, then re-sort: keep user-tier (owner > admin > other) as the
     // primary key, but within each tier order by chatbot tag precedence
     // (organization-tagged ahead of projectType-tagged, untagged last;
-    // alphabetical course name as a final tiebreaker).
+    // alphabetical display name as a final tiebreaker).
     const cards = rows.map((row) => {
       const metadata = row.raw_metadata as CourseMetadata
       return {
@@ -156,7 +158,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (a.tier !== b.tier) return a.tier - b.tier
       const byTag = compareChatbotTagPrecedence(a.tags, b.tags)
       if (byTag !== 0) return byTag
-      return a.card.course_name.localeCompare(b.card.course_name)
+      return a.card.title.localeCompare(b.card.title)
     })
 
     const results: ChatbotCardData[] = cards.map((c) => c.card)

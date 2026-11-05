@@ -1,6 +1,7 @@
 import type { CourseMetadata } from '~/types/courseMetadata'
 import type { ChatbotCardData } from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 
 const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL ?? ''
 
@@ -46,7 +47,7 @@ export function toChatbotCardData(
 
   return {
     course_name: courseName,
-    title: courseName,
+    title: getChatbotDisplayName(courseName, metadata),
     description: metadata.project_description ?? '',
     organization,
     projectType,

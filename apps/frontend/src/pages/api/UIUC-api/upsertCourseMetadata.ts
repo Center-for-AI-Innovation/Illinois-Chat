@@ -12,6 +12,10 @@ import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { upsertChatbotTags } from '~/utils/chatbotTagsRegistry'
 import { superAdmins } from '~/utils/superAdmins'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import {
+  getDisplayNameError,
+  normalizeDisplayName,
+} from '~/utils/chatbotDisplayName'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { courseName, courseMetadata } = req.body as {
@@ -23,6 +27,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!courseName) {
     console.error('Error: courseName is null or undefined')
     return res.status(400).json({ success: false, error: 'Missing courseName' })
+  }
+
+  // Display name: free text, capped; an empty value clears it.
+  if (courseMetadata && 'display_name' in courseMetadata) {
+    const raw = courseMetadata.display_name
+    if (raw != null && typeof raw !== 'string') {
+      return res
+        .status(400)
+        .json({ success: false, error: 'display_name must be a string' })
+    }
+    const displayNameError = getDisplayNameError(raw ?? '')
+    if (displayNameError) {
+      return res.status(400).json({ success: false, error: displayNameError })
+    }
+    courseMetadata.display_name = normalizeDisplayName(raw)
   }
 
   try {

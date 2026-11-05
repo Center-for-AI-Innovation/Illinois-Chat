@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useTheme } from '~/contexts/ThemeContext'
 import { ThemeToggle } from '../UIUC-Components/ThemeToggle'
+import { useChatbotDisplayName } from '~/hooks/queries/useChatbotDisplayName'
 
 interface NavItem {
   name: React.ReactNode
@@ -136,6 +137,7 @@ export default function NavigationSidebar({
   onCollapseToggle,
 }: NavigationSidebarProps) {
   const router = useRouter()
+  const displayName = useChatbotDisplayName(course_name)
 
   const navItems: NavItem[] = [
     {
@@ -271,8 +273,15 @@ export default function NavigationSidebar({
               >
                 <span>Chatbot</span>
                 <span>/</span>
-                <span className="line-clamp-3 font-semibold break-all text-(--foreground)">
-                  {course_name}
+                <span
+                  className="line-clamp-3 font-semibold break-all text-(--foreground)"
+                  title={
+                    displayName !== course_name
+                      ? `Alias of /${course_name}`
+                      : undefined
+                  }
+                >
+                  {displayName}
                 </span>
               </div>
             </div>
