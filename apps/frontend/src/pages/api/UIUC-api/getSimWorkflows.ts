@@ -6,6 +6,7 @@ import {
 } from '~/utils/simConfig'
 import { simUpstreamErrorResponse } from '~/utils/simDiscovery'
 import { getCourseMetadata, hasCourseAccess } from '~/server/authorization'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 
 /**
@@ -32,7 +33,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(404).json({ error: 'Project not found' })
   }
 
-  if (!req.user || !hasCourseAccess(req.user, courseMetadata)) {
+  if (courseMetadata.is_frozen) {
+    return res
+      .status(403)
+      .json({ error: 'Project is temporarily frozen by the administrator' })
+  }
+
+  if (
+    !req.user ||
+    (!hasCourseAccess(req.user, courseMetadata) &&
+      !(await isSuperAdminAsync(req.user.email)))
+  ) {
     return res.status(403).json({ error: 'Access denied' })
   }
 

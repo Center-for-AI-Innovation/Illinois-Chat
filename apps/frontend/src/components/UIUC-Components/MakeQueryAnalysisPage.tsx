@@ -31,6 +31,7 @@ import { useEffect, useState } from 'react'
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { GRID_CONFIGS, useResponsiveGrid } from '~/utils/responsiveGrid'
 import { downloadConversationHistory } from '~/utils/downloadConversationHistory'
 import { getProjectStats } from '../../pages/api/UIUC-api/getProjectStats'
@@ -105,6 +106,8 @@ const formatPercentageChange = (value: number | null | undefined) => {
 
 const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   const auth = useAuth()
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
@@ -371,12 +374,13 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
 
   const [view, setView] = useState('hour')
 
-  if (auth.isLoading || !courseMetadata) {
+  if (auth.isLoading || isSuperAdminLoading || !courseMetadata) {
     return <LoadingSpinner />
   }
 
   if (
     courseMetadata &&
+    isSuperAdmin !== true &&
     currentEmail !== (courseMetadata.course_owner as string) &&
     courseMetadata.course_admins.indexOf(currentEmail) === -1
   ) {

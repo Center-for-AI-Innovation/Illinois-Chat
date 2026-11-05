@@ -94,10 +94,10 @@ export function ChatbotDetailDialog({
     !!currentUserEmail &&
     !!resolvedMetadata &&
     (resolvedMetadata.course_admins ?? []).includes(currentUserEmail)
-  const isOwnerOrAdmin = isOwnerFromMetadata || isAdminFromMetadata
-
   // Prefer the explicit role passed in. Fall back to metadata-derived role
   // so admins still see the orange badge if a caller forgets to pass it.
+  // The button uses this resolved role, not course_admins alone: a platform
+  // super admin is not stored on the project, but the card still says 'admin'.
   const resolvedUserRole =
     card.userRole ??
     (isOwnerFromMetadata
@@ -107,6 +107,8 @@ export function ChatbotDetailDialog({
         : owner === 'You'
           ? 'owner'
           : 'member')
+  const showAdminSettings =
+    resolvedUserRole === 'owner' || resolvedUserRole === 'admin'
 
   const aboutText = resolvedMetadata?.project_description || description
 
@@ -245,7 +247,7 @@ export function ChatbotDetailDialog({
         {/* Fixed footer: Action Buttons */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[#e5e7eb] px-6 py-4 dark:border-[#32517a]">
           <div className="flex min-w-0 items-center gap-2">
-            {isOwnerOrAdmin && (
+            {showAdminSettings && (
               <NextLink href={`/${course_name}/dashboard`}>
                 <Button
                   variant="outline"
