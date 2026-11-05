@@ -8,16 +8,16 @@ The Flask backend (`ai_ta_backend/main.py`) and the RabbitMQ ingest worker (`ai_
 
 ## Run from this directory
 
-With the dev infrastructure started by `infra/scripts/start-dev.sh`, and Python 3.10 or 3.11:
+With the dev infrastructure started by `infra/scripts/start-dev.sh`, and [uv](https://docs.astral.sh/uv/) installed:
 
 ```bash
-python3.11 -m venv venv && source venv/bin/activate   # once
-pip install -r requirements.txt -r ai_ta_backend/rabbitmq/requirements.txt
+uv sync --all-extras   # once, and after pulling a changed uv.lock
 
-flask --app ai_ta_backend.main:app --debug run --port 8000   # backend
-python ai_ta_backend/rabbitmq/worker.py                      # ingest worker, in another terminal
+uv run flask --app ai_ta_backend.main:app --debug run --port 8000   # backend
+uv run python ai_ta_backend/rabbitmq/worker.py                      # ingest worker, in another terminal
+uv run pytest                                                       # tests
 ```
 
-Dependencies for the backend are in `requirements.txt`; the worker's are in `ai_ta_backend/rabbitmq/requirements.txt`.
+Dependencies are declared in `pyproject.toml` (shared, plus `api` and `worker` extras) and locked in `uv.lock`; `.python-version` pins the interpreter. To change one, edit `pyproject.toml`, run `uv lock`, and commit both files.
 
 Both read `apps/backend/.env`, which `start-dev.sh` writes. The containers for the full stack are built from `Self-Hosted-Dockerfile` (backend) and `ai_ta_backend/rabbitmq/Dockerfile` (worker).

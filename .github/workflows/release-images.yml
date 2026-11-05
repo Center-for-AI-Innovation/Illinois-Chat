@@ -66,7 +66,7 @@ jobs:
           WORKER_IMAGE_TAG: ${{ github.event.release.tag_name }}
         run: |
           cd apps/backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:$WORKER_IMAGE_TAG ai_ta_backend/rabbitmq/
+          docker build -f ai_ta_backend/rabbitmq/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY_WORKER:$WORKER_IMAGE_TAG .
 
       - name: Push worker image
         env:

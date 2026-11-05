@@ -93,7 +93,7 @@ The backend answers `GET /health` on port 8001:
 {"status": "healthy", "service": "ai-ta-backend", "timestamp": 1643723400.123}
 ```
 
-`apps/backend/Dockerfile.ecs` declares a Docker `HEALTHCHECK` against that route (30 s interval, 60 s start period, 3 retries), but the workflows build the backend from `Self-Hosted-Dockerfile`, which has none. Configure the health check on the ECS service or load balancer instead.
+The backend image (`Self-Hosted-Dockerfile`) declares no Docker `HEALTHCHECK`. Configure the health check on the ECS service or load balancer against that route instead.
 
 Environment variables for each service are set in its task definition; keep secrets in AWS Secrets Manager. The [Configuration reference](configuration.md) lists what each service reads, including the SMTP variables the backend needs to email export links.
 
