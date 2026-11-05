@@ -257,7 +257,7 @@ export default function Navbar({
   ]
 
   return (
-    <div className="fixed top-0 right-0 left-0 z-50 bg-(--navbar-background)">
+    <div className="fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-(--navbar-background)">
       {/* TODO: determine z-index values for major elements (nav, modals, tooltips, etc). for now, changed z-999 to z-50 to avoid modals being under the top navigation */}
       {/***************** top navigation for all pages *****************/}
 

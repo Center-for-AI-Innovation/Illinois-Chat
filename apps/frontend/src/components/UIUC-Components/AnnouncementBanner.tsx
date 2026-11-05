@@ -22,6 +22,11 @@ interface AnnouncementBannerProps {
    * inside the admin console is a duplicate label for screen readers.
    */
   preview?: boolean
+  /**
+   * Whether an unconfigured banner falls through to the legacy env/rebranding
+   * chain. Only the home page opts in; elsewhere "no banner" means no bar.
+   */
+  legacyFallback?: boolean
 }
 
 /**
@@ -32,6 +37,7 @@ interface AnnouncementBannerProps {
  */
 function resolveBannerContent(
   banner: AnnouncementBannerValue | null,
+  legacyFallback: boolean,
 ): ReactNode | null {
   if (banner) {
     if (!banner.enabled) return null
@@ -49,6 +55,8 @@ function resolveBannerContent(
       </>
     )
   }
+
+  if (!legacyFallback) return null
 
   // Legacy fallbacks, unchanged from the build-time banner this replaced.
   const useIllinoisChatConfig =
@@ -77,7 +85,7 @@ function resolveBannerContent(
 }
 
 /**
- * The orange announcement bar at the top of the home page.
+ * The orange announcement bar. Mounted site-wide by `SiteAnnouncementBanner`.
  *
  * Content comes from Redis at runtime (see `platformSettings.server.ts`), which
  * is why the same component backs the /admin live preview — what an operator
@@ -86,8 +94,9 @@ function resolveBannerContent(
 export function AnnouncementBanner({
   banner = null,
   preview = false,
+  legacyFallback = true,
 }: AnnouncementBannerProps) {
-  const content = resolveBannerContent(banner)
+  const content = resolveBannerContent(banner, legacyFallback)
   if (!content) return null
 
   const inner = (

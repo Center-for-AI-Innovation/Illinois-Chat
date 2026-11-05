@@ -227,7 +227,7 @@ export default function NavigationSidebar({
       {!isOpen && (
         <button
           aria-label="Toggle sidebar"
-          className="fixed top-[90px] left-[16px] z-40 flex h-[40px] w-[40px] cursor-pointer items-center justify-center rounded-(--radius-lg) border-none bg-(--dashboard-button) text-(--dashboard-button-foreground) shadow-md transition-all hover:scale-105 hover:bg-(--dashboard-button-hover) md:hidden"
+          className="fixed top-[calc(90px+var(--announcement-banner-height))] left-[16px] z-40 flex h-[40px] w-[40px] cursor-pointer items-center justify-center rounded-(--radius-lg) border-none bg-(--dashboard-button) text-(--dashboard-button-foreground) shadow-md transition-all hover:scale-105 hover:bg-(--dashboard-button-hover) md:hidden"
           onClick={onToggle}
         >
           <IconMenu2 size={20} aria-hidden="true" />
@@ -245,7 +245,7 @@ export default function NavigationSidebar({
       {/* Sidebar */}
       <aside
         aria-label="Settings navigation"
-        className={`fixed top-[80px] bottom-0 left-0 z-30 h-auto min-h-[calc(100vh-80px)] w-[280px] border-r border-(--dashboard-border) bg-(--sidebar-background) transition-all duration-300 ease-in-out md:bottom-auto md:h-[calc(100vh-80px)] md:translate-x-0 ${
+        className={`fixed top-[calc(80px+var(--announcement-banner-height))] bottom-0 left-0 z-30 h-auto min-h-[calc(100vh-80px-var(--announcement-banner-height))] w-[280px] border-r border-(--dashboard-border) bg-(--sidebar-background) transition-all duration-300 ease-in-out md:bottom-auto md:h-[calc(100vh-80px-var(--announcement-banner-height))] md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isCollapsed ? 'md:w-[80px]' : ''}`}
       >
