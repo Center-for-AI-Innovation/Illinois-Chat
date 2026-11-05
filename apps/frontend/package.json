@@ -114,7 +114,7 @@
     "rehype-mathjax": "^4.0.2",
     "remark-gfm": "^3.0.1",
     "remark-math": "^5.1.1",
-    "sanitize-html": "^2.14.0",
+    "sanitize-html": "^2.18.1",
     "sonner": "^2.0.7",
     "styled-components": "^6.4.2",
     "tailwind-merge": "^3.7.0",
