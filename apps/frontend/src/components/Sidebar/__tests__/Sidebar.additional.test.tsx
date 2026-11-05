@@ -111,6 +111,33 @@ describe('Sidebar – additional coverage', () => {
     expect(handleSearchTerm).toHaveBeenCalledWith('')
   })
 
+  it('focuses the chat input after Edit, but not once unmounted', () => {
+    vi.useFakeTimers()
+    try {
+      const textarea = document.createElement('textarea')
+      textarea.className = 'chat-input'
+      document.body.appendChild(textarea)
+      const focus = vi.spyOn(textarea, 'focus')
+
+      const first = renderSidebar()
+      fireEvent.click(screen.getByRole('button', { name: /Edit/i }))
+      vi.advanceTimersByTime(100)
+      expect(focus).toHaveBeenCalledTimes(1)
+      first.unmount()
+
+      // A pending timer must not outlive the component (it used to fire after
+      // the test environment was torn down and fail the CI run).
+      const second = renderSidebar()
+      fireEvent.click(screen.getByRole('button', { name: /Edit/i }))
+      second.unmount()
+      vi.advanceTimersByTime(100)
+      expect(focus).toHaveBeenCalledTimes(1)
+      textarea.remove()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // -------------------------------------------------------------------
   // Course name = 'chat' (Illinois flagship chatbot)
   // -------------------------------------------------------------------

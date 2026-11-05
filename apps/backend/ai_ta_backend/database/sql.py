@@ -367,6 +367,17 @@ class SQLDatabase:
         return response
 
     @_host_only
+    def hasActiveProjectDeletion(self, project_name: str) -> bool:
+        """True while a project_deletions row for this name is not completed.
+        The name stays reserved until the background purge finishes."""
+        with self.get_session() as session:
+            row = session.execute(
+                text("SELECT 1 FROM project_deletions WHERE project_name = :n AND status <> 'completed' LIMIT 1"),
+                {"n": project_name},
+            ).first()
+            return row is not None
+
+    @_host_only
     def getProjectByName(self, project_name: str):
         """Return a Project row by course_name, or None."""
         query = (

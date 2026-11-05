@@ -8,10 +8,12 @@ import ssl
 try:
     from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB
     from ai_ta_backend.rabbitmq.connection_resolver import WorkerConnectionResolver
+    from ai_ta_backend.rabbitmq.purge import is_project_deleting
     import ai_ta_backend.rabbitmq.models as models
 except ModuleNotFoundError:
     from rmsql import SQLAlchemyIngestDB
     from connection_resolver import WorkerConnectionResolver
+    from purge import is_project_deleting
     import models
 
 logging.getLogger('pika').setLevel(logging.WARNING)
@@ -24,10 +26,15 @@ sql_session = SQLAlchemyIngestDB()
 # the (host-only) project_external_connections lookup.
 resolver = WorkerConnectionResolver(sql_session)
 
+class ProjectDeletingError(Exception):
+    """Raised when ingesting into a project that is being deleted."""
+
+
 class Queue:
 
     def __init__(self):
         self.rabbitmq_queue = os.getenv('RABBITMQ_QUEUE', 'uiuc-chat')
+        self.rabbitmq_delete_queue = os.getenv('RABBITMQ_DELETE_QUEUE', 'uiuc-chat-delete')
         self.rabbitmq_url = os.getenv('RABBITMQ_URL', 'amqp://guest:guest@localhost:5672')
         self.rabbitmq_ssl = os.getenv('RABBITMQ_SSL', False)
         self.connect()
@@ -66,6 +73,9 @@ class Queue:
 
         if not self.is_connected():
             logging.error("RabbitMQ is offline")
+
+        if is_project_deleting(sql_session.engine, inputs.get('course_name', '')):
+            raise ProjectDeletingError(f"Project {inputs.get('course_name')!r} is being deleted")
 
         # SQL record first
         # Handle s3_paths: convert string to list, or get first element from list
@@ -109,3 +119,15 @@ class Queue:
         )
         logging.info(f"Job {new_job_id} enqueued")
         return new_job_id
+
+    def addJobToDeleteQueue(self, deletion_id: int):
+        """Queue the background purge for a project_deletions row. The row
+        carries all job state; the message is only a wake-up."""
+        self.channel.queue_declare(queue=self.rabbitmq_delete_queue, durable=True)
+        self.channel.basic_publish(
+            exchange='',
+            routing_key=self.rabbitmq_delete_queue,
+            body=json.dumps({'deletion_id': deletion_id}),
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
+        logging.info(f"Deletion {deletion_id} enqueued")

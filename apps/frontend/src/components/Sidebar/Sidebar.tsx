@@ -5,7 +5,7 @@ import {
   IconLayoutSidebarLeftExpand,
   IconMistOff,
 } from '@tabler/icons-react'
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -66,6 +66,10 @@ const Sidebar = <T,>({
 }: Props<T>) => {
   const { t } = useTranslation('promptbar')
   const nextRouter = useRouter()
+  // Pending "focus the chat input" timer from the New Chat button; cleared on
+  // unmount so it cannot fire against a torn-down document.
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => clearTimeout(focusTimer.current ?? undefined), [])
   const auth = useAuth()
   const permission = courseMetadata
     ? get_user_permission(courseMetadata, auth)
@@ -141,7 +145,8 @@ const Sidebar = <T,>({
             onClick={() => {
               handleCreateItem()
               handleSearchTerm('')
-              setTimeout(() => {
+              clearTimeout(focusTimer.current ?? undefined)
+              focusTimer.current = setTimeout(() => {
                 const chatInput = document.querySelector(
                   'textarea.chat-input',
                 ) as HTMLTextAreaElement

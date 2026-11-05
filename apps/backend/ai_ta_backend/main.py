@@ -52,7 +52,7 @@ from ai_ta_backend.service.retrieval_service import RetrievalService
 from ai_ta_backend.utils.email.send_transactional_email import send_email
 from ai_ta_backend.utils.pubmed_extraction import extractPubmedData
 from ai_ta_backend.utils.rerun_webcrawl_for_project import webscrape_documents
-from ai_ta_backend.rabbitmq.rmqueue import Queue
+from ai_ta_backend.rabbitmq.rmqueue import ProjectDeletingError, Queue
 from ai_ta_backend.rabbitmq.ingest_canvas import IngestCanvas
 
 app = Flask(__name__)
@@ -656,7 +656,13 @@ def ingest() -> Response:
 
   # TODO: Authentication?
 
-  job_id = active_queue.addJobToIngestQueue(data)
+  try:
+    job_id = active_queue.addJobToIngestQueue(data)
+  except ProjectDeletingError as e:
+    response = jsonify(error='Project is being deleted', message=str(e))
+    response.status_code = 409
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
   logging.info("Result from addJobToIngestQueue:  %s", job_id)
 
   response = jsonify(
@@ -765,6 +771,37 @@ def createProject(service: ProjectService, flaskExecutor: ExecutorInterface) -> 
     flaskExecutor.submit(service.generate_json_schema, project_name, project_description)
 
   response = jsonify({"success": True})
+  response.headers.add('Access-Control-Allow-Origin', '*')
+  return response
+
+
+@app.route('/deleteProject', methods=['POST'])
+def deleteProject() -> Response:
+  """
+  Queue the background purge for a chatbot deletion.
+
+  The frontend has already inserted the project_deletions row and hidden the
+  chatbot; this only publishes the wake-up message. Calling it again for the
+  same row is harmless (the worker claims each job once).
+  """
+  data = request.get_json(silent=True) or {}
+  try:
+    deletion_id = int(data.get('deletion_id'))
+  except (TypeError, ValueError):
+    abort(400, description="Missing or invalid 'deletion_id'.")
+
+  try:
+    with Queue() as queue:
+      queue.addJobToDeleteQueue(deletion_id)
+  except Exception as e:
+    logging.error("Failed to enqueue deletion %s: %s", deletion_id, e)
+    response = jsonify(error='Could not queue deletion', message=str(e))
+    response.status_code = 503
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+  response = jsonify({"outcome": "Queued delete task", "deletion_id": deletion_id})
+  response.status_code = 202
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 

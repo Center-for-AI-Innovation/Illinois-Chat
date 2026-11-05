@@ -20,9 +20,9 @@ import os
 from flask import Flask, jsonify, request
 
 try:
-    from ai_ta_backend.rabbitmq.rmqueue import Queue
+    from ai_ta_backend.rabbitmq.rmqueue import ProjectDeletingError, Queue
 except ModuleNotFoundError:  # standalone container: rabbitmq dir is the workdir
-    from rmqueue import Queue
+    from rmqueue import ProjectDeletingError, Queue
 
 logging.basicConfig(level=logging.INFO)
 
@@ -61,6 +61,8 @@ def ingest():
         with Queue() as queue:
             task_id = queue.addJobToIngestQueue(data)
         return jsonify({"outcome": "Queued Ingest task", "task_id": task_id}), 200
+    except ProjectDeletingError as exc:
+        return jsonify({"error": str(exc)}), 409
     except Exception as exc:  # noqa: BLE001 - surface any failure to the caller
         logging.exception("Failed to queue ingest job")
         return jsonify({"error": str(exc)}), 500

@@ -6,10 +6,12 @@ import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
 import { fetchPresignedUrl } from '~/utils/apiUtils'
+import { isSuperAdmin } from '~/utils/superAdmins'
 import GlobalFooter from './GlobalFooter'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { CannotEditCourse } from './CannotEditCourse'
+import DeleteChatbotCard from './DeleteChatbotCard'
 import DocumentGroupsCard from './DocumentGroupsCard'
 import DocumentsCard from './DocumentsCard'
 import { UploadCard } from './UploadCard'
@@ -114,6 +116,15 @@ const MakeOldCoursePage = ({
             />
 
             {/* <NomicDocumentsCard course_name={course_name} metadata={metadata} /> */}
+
+            {/* Owner / super admin only; course admins cannot delete */}
+            {(current_email === metadata?.course_owner ||
+              isSuperAdmin(current_email)) && (
+              <DeleteChatbotCard
+                course_name={course_name}
+                sidebarCollapsed={sidebarCollapsed}
+              />
+            )}
           </div>
         </div>
       </main>
