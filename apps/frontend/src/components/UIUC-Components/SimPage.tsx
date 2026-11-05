@@ -123,6 +123,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
     error: workflowsError,
     refetch: refetchWorkflows,
   } = useFetchAllWorkflows(course_name)
+  const simWorkflows = workflows?.filter((tool) => !tool.id.startsWith('nlip:'))
 
   // Load saved config on mount. The stored project row is the only source of
   // truth — the browser holds no copy of the credentials, so every user of the
@@ -597,7 +598,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
               {hasSavedConfig &&
                 isSuccess &&
                 workflows &&
-                workflows.length === 0 && (
+                simWorkflows?.length === 0 && (
                   <p
                     className={`${montserrat_paragraph.variable} font-montserratParagraph p-4 text-(--foreground) opacity-70`}
                   >
@@ -608,7 +609,8 @@ const SimPage = ({ course_name }: { course_name: string }) => {
               {hasSavedConfig &&
                 isSuccess &&
                 workflows &&
-                workflows.length > 0 && (
+                simWorkflows &&
+                simWorkflows.length > 0 && (
                   <Table
                     aria-label="Deployed Sim AI workflows"
                     className={`${montserrat_paragraph.variable} font-montserratParagraph`}
@@ -621,7 +623,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {workflows.map((tool, index) => (
+                      {simWorkflows.map((tool, index) => (
                         <TableRow
                           key={tool.id}
                           // The shadcn table only draws separators, so the
