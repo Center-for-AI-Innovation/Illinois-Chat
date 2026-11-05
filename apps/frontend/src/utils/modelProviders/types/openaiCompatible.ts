@@ -10,6 +10,24 @@ export interface OpenAICompatibleModel {
 }
 
 export enum OpenAICompatibleModelID {
+  Lumen_Qwen3_Coder_Next = 'qwen3-coder-next',
+  Lumen_Qwen3_6_35B_A3B = 'qwen3.6-35b-a3b',
+  Lumen_Qwen3_8_27B = 'qwen3.8-27b',
+  Lumen_Qwen3_8_Flash = 'qwen3.8-flash',
+
+  // Lumen chat models and aliases (audio-only models are excluded).
+  Lumen_Nemotron_3_Super_120B_A12B = 'nemotron-3-super-120b-a12b',
+  Lumen_Gemma_4_31B = 'gemma-4-31b-it',
+  Lumen_Ornith_1_0_35B = 'ornith-1.0-35b',
+  Lumen_DeepSeek_V4_Flash = 'deepseek-v4-flash',
+  Lumen_Muse_Glimmer_30B = 'muse-glimmer-30b',
+  Lumen_GLM_5_3 = 'glm-5.3',
+  Lumen_GLM = 'glm',
+  Lumen_DeepSeek_V4_1_Flash = 'deepseek-v4.1-flash',
+  Lumen_DeepSeek = 'deepseek',
+  Lumen_DeepSeek_V4_1 = 'deepseek-v4.1',
+  Lumen_Beam_1_0 = 'beam-1.0',
+
   // ============================================
   // OpenAI Models (via OpenRouter/Groq)
   // ============================================
@@ -172,6 +190,99 @@ export const OpenAICompatibleModels: Record<
   OpenAICompatibleModelID,
   OpenAICompatibleModel
 > = {
+  [OpenAICompatibleModelID.Lumen_Qwen3_Coder_Next]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_Coder_Next,
+    name: 'Lumen: Qwen3 Coder Next',
+    tokenLimit: 131066,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Qwen3_6_35B_A3B]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_6_35B_A3B,
+    name: 'Lumen: Qwen3.6 35B A3B',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Qwen3_8_27B]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_8_27B,
+    name: 'Lumen: Qwen3.8 27B',
+    tokenLimit: 250542,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Qwen3_8_Flash]: {
+    id: OpenAICompatibleModelID.Lumen_Qwen3_8_Flash,
+    name: 'Lumen: Qwen3.8 Flash',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+
+  // Context limits reported by Lumen /v1/models.
+  [OpenAICompatibleModelID.Lumen_Nemotron_3_Super_120B_A12B]: {
+    id: OpenAICompatibleModelID.Lumen_Nemotron_3_Super_120B_A12B,
+    name: 'Lumen: Nemotron 3 Super 120B A12B',
+    tokenLimit: 262144,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Gemma_4_31B]: {
+    id: OpenAICompatibleModelID.Lumen_Gemma_4_31B,
+    name: 'Lumen: Gemma 4 31B IT',
+    tokenLimit: 46790,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Ornith_1_0_35B]: {
+    id: OpenAICompatibleModelID.Lumen_Ornith_1_0_35B,
+    name: 'Lumen: Ornith 1.0 35B',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_DeepSeek_V4_Flash]: {
+    id: OpenAICompatibleModelID.Lumen_DeepSeek_V4_Flash,
+    name: 'Lumen: DeepSeek V4 Flash',
+    tokenLimit: 511994,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Muse_Glimmer_30B]: {
+    id: OpenAICompatibleModelID.Lumen_Muse_Glimmer_30B,
+    name: 'Lumen: Muse Glimmer 30B',
+    tokenLimit: 131066,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_GLM_5_3]: {
+    id: OpenAICompatibleModelID.Lumen_GLM_5_3,
+    name: 'Lumen: GLM 5.3',
+    tokenLimit: 524282,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_GLM]: {
+    id: OpenAICompatibleModelID.Lumen_GLM,
+    name: 'Lumen: GLM (latest)',
+    tokenLimit: 524282,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_DeepSeek_V4_1_Flash]: {
+    id: OpenAICompatibleModelID.Lumen_DeepSeek_V4_1_Flash,
+    name: 'Lumen: DeepSeek V4.1 Flash',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_DeepSeek]: {
+    id: OpenAICompatibleModelID.Lumen_DeepSeek,
+    name: 'Lumen: DeepSeek (latest)',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_DeepSeek_V4_1]: {
+    id: OpenAICompatibleModelID.Lumen_DeepSeek_V4_1,
+    name: 'Lumen: DeepSeek V4.1',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Lumen_Beam_1_0]: {
+    id: OpenAICompatibleModelID.Lumen_Beam_1_0,
+    name: 'Lumen: Beam 1.0',
+    tokenLimit: 524282,
+    enabled: true,
+  },
+
   [OpenAICompatibleModelID.GPT_5]: {
     id: OpenAICompatibleModelID.GPT_5,
     name: 'OpenAI: GPT-5',

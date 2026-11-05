@@ -17,6 +17,12 @@ Free NCSA-hosted models are a zero-cost starting point; commercial providers gen
 
 For commercial providers you paste your own API key on the LLMs page. Keys are stored encrypted per chatbot and used to serve the chatbot's requests from both the chat interface and the [Chat API](../api/chat.md). Your data is never used to train models — provider interactions are contractually protected.
 
+## Lumen
+
+To use [Lumen](https://lumen.ncsa.illinois.edu/help/connect), enable **OpenAI Compatible** on the LLMs page, set **Base URL** to `https://lumen.ncsa.illinois.edu/v1`, and enter your Lumen API key. Enable the models you want to offer and select a default.
+
+Illinois Chat shows supported chat models returned by Lumen for your key, including the `deepseek`, `deepseek-v4.1`, and `glm` aliases. Models requiring acknowledgment must first be acknowledged in Lumen before they appear. Audio-only transcription models are excluded from the chat model list.
+
 ## Enabling models
 
 - Each provider card has a switch; inside it, each model has its own switch. Users and the API can only use models that are enabled.
