@@ -19,7 +19,11 @@ import { Analytics } from '@vercel/analytics/next'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { useFetchMaintenanceMode } from '~/hooks/queries/useFetchMaintenanceMode'
-import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
+import { NAVBAR_BRANDING_QUERY_KEY } from '~/hooks/queries/useFetchNavbarBranding'
+import type {
+  AnnouncementBanner,
+  NavbarBranding,
+} from '~/utils/platformSettings.schema'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
 import { Toaster } from '@/components/shadcn/ui/sonner'
 
@@ -92,10 +96,12 @@ if (typeof window !== 'undefined') {
   }
 }
 
-/** Set only by pages whose getStaticProps reads the banner (the home page). */
+/** Set only by pages whose getStaticProps reads platform settings (home). */
 interface SiteBannerPageProps {
   announcementBanner?: AnnouncementBanner | null
   announcementBannerReadAt?: number
+  navbarBranding?: NavbarBranding
+  navbarBrandingReadAt?: number
 }
 
 const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
@@ -103,7 +109,20 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
   // Held in state so the cache survives re-renders. The maintenance gate reads
   // through React Query now, and a client rebuilt every render would drop that
   // cache and refetch on each render.
-  const [queryClient] = useState(() => new QueryClient())
+  const [queryClient] = useState(() => {
+    const client = new QueryClient()
+    // Seeded once so a statically generated page paints its navbar brand
+    // without waiting on a fetch; later navigations reuse the cache. Stamped
+    // with the read time so an old ISR page is refetched, not trusted.
+    const { navbarBranding, navbarBrandingReadAt } =
+      pageProps as SiteBannerPageProps
+    if (navbarBranding) {
+      client.setQueryData(NAVBAR_BRANDING_QUERY_KEY, navbarBranding, {
+        updatedAt: navbarBrandingReadAt ?? 0,
+      })
+    }
+    return client
+  })
 
   useEffect(() => {
     // Track page views in PostHog
