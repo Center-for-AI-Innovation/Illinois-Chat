@@ -39,6 +39,14 @@ export const nlipAgentSchema = z.object({
 export type NlipAgent = z.infer<typeof nlipAgentSchema>
 export type PublicNlipAgent = NlipAgent & { hasToken: boolean }
 
+// Project-scoped token that lets other agents query this project.
+export const nlipTokenNameSchema = z.string().trim().min(1).max(64)
+export interface NlipInboundToken {
+  id: string
+  name: string
+  createdAt: string
+}
+
 export const nlipConfigInputSchema = z
   .object({
     inboundEnabled: z.boolean(),
