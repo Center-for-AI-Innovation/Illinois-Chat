@@ -35,6 +35,7 @@ import {
   DialogTitle,
 } from '~/components/shadcn/ui/dialog'
 import { Separator } from '~/components/shadcn/ui/separator'
+import { Skeleton } from '~/components/shadcn/ui/skeleton'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
 import { ChatbotAccessLevelBadge } from './ChatbotAccessLevelBadge'
 import { ChatbotOrganizationBadge } from './ChatbotOrganizationBadge'
@@ -110,11 +111,14 @@ export function ChatbotDetailDialog({
 
   const aboutText = resolvedMetadata?.project_description || description
 
-  const { data: documentSummary = undefined } =
-    useFetchDocumentSummary(course_name)
+  const {
+    data: documentSummary,
+    isLoading: isSummaryLoading,
+    isError: isSummaryError,
+  } = useFetchDocumentSummary(course_name, { enabled: open })
 
-  const { data: maintainerProfiles = [] } =
-    useFetchMaintainerProfiles(course_name)
+  const { data: maintainerProfiles = [], isLoading: isMaintainersLoading } =
+    useFetchMaintainerProfiles(course_name, { enabled: open })
 
   // TODO: Replace with real timestamps from API
   const createdAt = card.created_at
@@ -194,10 +198,15 @@ export function ChatbotDetailDialog({
 
           {/* Data in This Project */}
           <div className="px-6 py-3">
-            <DocumentSummarySection summary={documentSummary} />
+            <DocumentSummarySection
+              summary={documentSummary}
+              isLoading={isSummaryLoading}
+              isError={isSummaryError}
+            />
           </div>
 
           {/* Maintained By */}
+          {isMaintainersLoading && <MaintainersSkeleton />}
           {maintainerProfiles && maintainerProfiles.length > 0 && (
             <div className="px-6 py-3">
               <h3 className="mb-3 text-base font-semibold">Maintained By</h3>
@@ -303,19 +312,58 @@ const FILE_TYPE_ICONS: Record<string, React.ReactNode> = {
   Code: <Code2 className="h-4 w-4 text-[#14b8a6]" />,
 }
 
+function MaintainersSkeleton() {
+  return (
+    <div className="px-6 py-3" aria-busy="true">
+      <h3 className="mb-3 text-base font-semibold">Maintained By</h3>
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-44" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DocumentSummarySection({
   summary,
+  isLoading,
+  isError,
 }: {
   readonly summary: DocumentSummary | undefined
+  readonly isLoading: boolean
+  readonly isError: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
+
+  if (isLoading) {
+    return (
+      <div
+        className="rounded-xl border border-[#e5e7eb] p-4 dark:border-[#32517a]"
+        aria-busy="true"
+      >
+        <h3 className="mb-3 text-base font-semibold">Data in This Project</h3>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-56" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!summary) {
     return (
       <div className="rounded-xl border border-[#e5e7eb] p-4 dark:border-[#32517a]">
         <h3 className="mb-3 text-base font-semibold">Data in This Project</h3>
         <p className="text-sm text-(--illinois-storm-medium) dark:text-[#94a3b8]">
-          No document data available yet.
+          {isError
+            ? 'Could not load document data.'
+            : 'No document data available yet.'}
         </p>
       </div>
     )
