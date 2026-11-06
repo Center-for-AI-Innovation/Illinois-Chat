@@ -37,7 +37,6 @@ export function useFetchMaintainerProfiles(
     queryKey: ['maintainerProfiles', course_name],
     queryFn: fetchMaintainerProfiles,
     retry: 1,
-    staleTime: 5 * 60 * 1000,
     enabled: enabled && !!course_name,
   })
 }

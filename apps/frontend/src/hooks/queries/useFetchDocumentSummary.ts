@@ -37,7 +37,6 @@ export function useFetchDocumentSummary(
     queryKey: ['documentSummary', course_name],
     queryFn: fetchDocumentSummary,
     retry: 1,
-    staleTime: 5 * 60 * 1000,
     enabled: enabled && !!course_name,
   })
 }

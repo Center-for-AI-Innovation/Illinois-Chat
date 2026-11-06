@@ -83,12 +83,6 @@ describe('useFetchMaintainerProfiles', () => {
     rerender({ enabled: true })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
-
-    // Reopening within staleTime reuses the cache.
-    rerender({ enabled: false })
-    rerender({ enabled: true })
-    await new Promise((r) => setTimeout(r, 0))
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('returns profiles[] on success', async () => {
@@ -155,12 +149,6 @@ describe('useFetchDocumentSummary', () => {
 
     rerender({ enabled: true })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
-
-    // Reopening within staleTime reuses the cache.
-    rerender({ enabled: false })
-    rerender({ enabled: true })
-    await new Promise((r) => setTimeout(r, 0))
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 
