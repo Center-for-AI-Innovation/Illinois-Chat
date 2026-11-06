@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
 import { toChatbotCardData, chatbotUserTier } from '~/utils/chatbotCard'
+import { accessiblePredicate } from '~/utils/getChatbots'
 
 const MAX_QUERY_LENGTH = 200
 const MAX_RESULTS = 500
@@ -62,13 +63,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     //   )
     const accessPredicate = sql`
       ${courseMetadata.is_frozen} = false
-      AND (
-        ${courseMetadata.is_private} = false
-        OR ${courseMetadata.allow_logged_in_users} = true
-        OR ${courseMetadata.course_owner} = ${userEmail}
-        OR ${userEmail} = ANY(${courseMetadata.course_admins})
-        OR ${userEmail} = ANY(${courseMetadata.approved_emails_list})
-      )
+      AND ${accessiblePredicate(userEmail)}
     `
 
     const textPredicate = q

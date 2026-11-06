@@ -14,69 +14,16 @@ import { ChatbotsFilterPanel } from '~/components/UIUC-Components/chatbots-hub/C
 import { ChatbotsSearchResults } from '~/components/UIUC-Components/chatbots-hub/ChatbotsSearchResults'
 import { ChatbotsSection } from '~/components/UIUC-Components/chatbots-hub/ChatbotsSection'
 import {
-  type ChatbotCardData,
-  type ChatbotSectionData,
+  type ChatbotProjectType,
   type SearchChatbotsParams,
   PROJECT_TYPE_TO_SECTION,
   DEFAULT_ACCESSIBLE_SECTION,
-  ACCESSIBLE_SECTION_ORDER,
-  YOUR_BOTS_SECTION,
+  PAGED_SECTIONS,
 } from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
-import {
-  useFetchAllCourseMetadata,
-  type CourseWithMetadata,
-} from '~/hooks/queries/useFetchAllCourseMetadata'
 import { useFetchFeaturedChatbots } from '~/hooks/queries/useFetchFeaturedChatbots'
 import { useSearchChatbots } from '~/hooks/queries/useSearchChatbots'
-import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
-
-function transformToCardData(
-  course: CourseWithMetadata,
-  currentUserEmail: string | undefined,
-) {
-  const isOwner = course.metadata.course_owner === currentUserEmail
-  const isAdmin =
-    !isOwner &&
-    !!currentUserEmail &&
-    (course.metadata.course_admins || []).includes(currentUserEmail)
-  const otherAdmins = (course.metadata.course_admins || []).filter(
-    (a) =>
-      a !== course.metadata.course_owner &&
-      !(isOwner && a === currentUserEmail),
-  )
-
-  const tags = sanitizeChatbotTags(course.metadata.tags)
-  const organization = tags.find((t) => t.category === 'organization')?.value
-  const projectType = tags.find((t) => t.category === 'projectType')?.value
-  const generalTags = tags
-    .filter((t) => t.category === 'general')
-    .map((t) => t.value)
-
-  return {
-    course_name: course.course_name,
-    title: course.course_name,
-    description: course.metadata.project_description || '',
-    organization,
-    projectType,
-    generalTags,
-    owner: isOwner ? 'You' : course.metadata.course_owner,
-    collaboratorCount: otherAdmins.length,
-    userRole: isOwner
-      ? ('owner' as const)
-      : isAdmin
-        ? ('admin' as const)
-        : ('member' as const),
-    accessLevel: course.metadata.is_private
-      ? course.metadata.allow_logged_in_users
-        ? ('unlisted' as const)
-        : ('private' as const)
-      : ('public' as const),
-    bannerImageS3: course.metadata.banner_image_s3,
-    metadata: course.metadata,
-  }
-}
 
 /** Card → synthetic ChatbotTag[] for precedence sorting (org first, then projectType). */
 function cardSortTags(card: { organization?: string; projectType?: string }) {
@@ -88,6 +35,25 @@ function cardSortTags(card: { organization?: string; projectType?: string }) {
   return tags
 }
 
+// Button to create a new chatbot, shown when the user has no bots of their own.
+const createFirstChatbot = (
+  <div className="flex flex-col items-center gap-6 py-10 text-center">
+    <p className="text-lg text-(--illinois-storm-dark) dark:text-[#c8d2e3]">
+      You don&apos;t have any chatbots yet.
+    </p>
+    <Link
+      href="/new"
+      className={cn(
+        buttonVariants(),
+        'h-10 gap-2 bg-(--illinois-blue) px-8 text-sm text-white hover:bg-(--foreground-dark) dark:bg-white dark:text-(--illinois-blue) dark:hover:bg-[#e5e7eb]',
+      )}
+    >
+      <Sparkles className="h-4 w-4" />
+      Create Your First Chatbot
+    </Link>
+  </div>
+)
+
 function hasActiveSearch(params: SearchChatbotsParams): boolean {
   return Boolean(
     params.q || params.category || params.privacy || params.my_bots,
@@ -98,7 +64,6 @@ const ChatbotsHubPage = () => {
   const router = useRouter()
   const auth = useAuth()
   const { course_name } = router.query
-  const currentUserEmail = auth.user?.profile.email as string | undefined
 
   const [searchParams, setSearchParams] = useState<SearchChatbotsParams>({})
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
@@ -122,12 +87,7 @@ const ChatbotsHubPage = () => {
     enabled: auth.isAuthenticated && isSearchActive,
   })
 
-  // Section-based data (default view when no search is active)
-  const { data: courses, isLoading: isCoursesLoading } =
-    useFetchAllCourseMetadata({
-      enabled: auth.isAuthenticated && !isSearchActive,
-    })
-
+  // Default view: four server-paged sections plus the featured Public Bots sample.
   const { data: featuredChatbots, isLoading: isFeaturedLoading } =
     useFetchFeaturedChatbots({
       enabled: auth.isAuthenticated && !isSearchActive,
@@ -151,96 +111,22 @@ const ChatbotsHubPage = () => {
     }
   }, [])
 
-  const sections = useMemo(() => {
-    if (isSearchActive) return []
-
-    // Merge both data sources into a single map keyed by course_name.
-    // - `courses` carries the user's own + admined bots (incl. private ones).
-    // - `featuredChatbots` is the curated/sampled set of bots to highlight on
-    //   the default page.
-    // A bot can appear in both; prefer the `courses` version because it has
-    // the full metadata + correct owner/role tagging.
-    const byCourseName = new Map<string, ChatbotCardData>()
-
-    if (featuredChatbots) {
-      for (const bot of featuredChatbots) {
-        byCourseName.set(bot.course_name, bot)
-      }
-    }
-
-    if (courses) {
-      for (const course of courses) {
-        byCourseName.set(
-          course.course_name,
-          transformToCardData(course, currentUserEmail),
+  // Public Bots stays on the featured sample; Course and Department bots have their own sections.
+  const publicBots = useMemo(
+    () =>
+      (featuredChatbots ?? [])
+        .filter(
+          (bot) =>
+            !bot.userRole &&
+            bot.accessLevel === 'public' &&
+            (PROJECT_TYPE_TO_SECTION[bot.projectType as ChatbotProjectType] ??
+              DEFAULT_ACCESSIBLE_SECTION) === DEFAULT_ACCESSIBLE_SECTION,
         )
-      }
-    }
-
-    if (byCourseName.size === 0) return []
-
-    // Bucket each bot. Owner/member relationships short-circuit into
-    // "Your Bots" regardless of privacy; everything else only lands in a
-    // project-type section if it's actually public, so the discovery
-    // sections (notably "Public Bots") never include private/unlisted bots.
-    const grouped = new Map<string, ChatbotSectionData>()
-    for (const bot of byCourseName.values()) {
-      const isYours =
-        bot.userRole === 'owner' ||
-        bot.userRole === 'admin' ||
-        bot.userRole === 'member'
-
-      let sectionTitle: string
-      if (isYours) {
-        sectionTitle = YOUR_BOTS_SECTION
-      } else if (bot.accessLevel === 'public') {
-        const projectType = bot.projectType as
-          | keyof typeof PROJECT_TYPE_TO_SECTION
-          | undefined
-        sectionTitle =
-          (projectType && PROJECT_TYPE_TO_SECTION[projectType]) ??
-          DEFAULT_ACCESSIBLE_SECTION
-      } else {
-        // Defensive: the search/featured APIs shouldn't return private bots
-        // for users without a relationship, but drop them here if they do.
-        continue
-      }
-
-      let section = grouped.get(sectionTitle)
-      if (!section) {
-        section = { title: sectionTitle, cards: [] }
-        grouped.set(sectionTitle, section)
-      }
-
-      section.cards.push(bot)
-    }
-
-    const result: ChatbotSectionData[] = []
-    for (const title of ACCESSIBLE_SECTION_ORDER) {
-      const section = grouped.get(title)
-      if (section) result.push(section)
-    }
-
-    // Within each section, surface organization-tagged bots first, then
-    // projectType-tagged, then untagged — matching the precedence rules from #598.
-    // "Your Bots" additionally puts owner before admin before member.
-    const yourBotsRoleRank: Record<string, number> = {
-      owner: 0,
-      admin: 1,
-      member: 2,
-    }
-    return result.map((section) => ({
-      ...section,
-      cards: [...section.cards].sort((a, b) => {
-        if (section.title === YOUR_BOTS_SECTION && a.userRole !== b.userRole) {
-          const aRank = yourBotsRoleRank[a.userRole ?? 'member'] ?? 2
-          const bRank = yourBotsRoleRank[b.userRole ?? 'member'] ?? 2
-          if (aRank !== bRank) return aRank - bRank
-        }
-        return compareChatbotTagPrecedence(cardSortTags(a), cardSortTags(b))
-      }),
-    }))
-  }, [courses, featuredChatbots, currentUserEmail, isSearchActive])
+        .sort((a, b) =>
+          compareChatbotTagPrecedence(cardSortTags(a), cardSortTags(b)),
+        ),
+    [featuredChatbots],
+  )
 
   if (auth.isLoading) {
     return (
@@ -257,9 +143,6 @@ const ChatbotsHubPage = () => {
       />
     )
   }
-
-  const isSectionsLoading =
-    !isSearchActive && (isCoursesLoading || isFeaturedLoading)
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#081735]">
@@ -292,30 +175,29 @@ const ChatbotsHubPage = () => {
                 isError={isSearchError}
               />
             </div>
-          ) : isSectionsLoading ? (
-            <div className="flex justify-center py-20">
-              <LoadingSpinner />
-            </div>
-          ) : sections.length > 0 ? (
-            sections.map((section) => (
-              <ChatbotsSection key={section.title} {...section} />
-            ))
           ) : (
-            <div className="flex flex-col items-center gap-6 px-4 py-20 text-center">
-              <p className="text-lg text-(--illinois-storm-dark) dark:text-[#c8d2e3]">
-                You don&apos;t have any chatbots yet.
-              </p>
-              <Link
-                href="/new"
-                className={cn(
-                  buttonVariants(),
-                  'h-10 gap-2 bg-(--illinois-blue) px-8 text-sm text-white hover:bg-(--foreground-dark) dark:bg-white dark:text-(--illinois-blue) dark:hover:bg-[#e5e7eb]',
-                )}
-              >
-                <Sparkles className="h-4 w-4" />
-                Create Your First Chatbot
-              </Link>
-            </div>
+            <>
+              {PAGED_SECTIONS.map(({ title, source }) => (
+                <ChatbotsSection
+                  key={title}
+                  title={title}
+                  source={source}
+                  empty={source === 'yours' ? createFirstChatbot : undefined}
+                />
+              ))}
+              {isFeaturedLoading ? (
+                <div className="flex justify-center py-20">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                publicBots.length > 0 && (
+                  <ChatbotsSection
+                    title={DEFAULT_ACCESSIBLE_SECTION}
+                    cards={publicBots}
+                  />
+                )
+              )}
+            </>
           )}
         </div>
       </div>

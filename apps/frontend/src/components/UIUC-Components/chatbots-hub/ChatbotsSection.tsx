@@ -1,11 +1,35 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/shadcn/ui/button'
+import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
+import {
+  type PagedChatbotsSource,
+  usePagedChatbots,
+} from '~/hooks/queries/usePagedChatbots'
 import { ChatbotHubCard } from './ChatbotHubCard'
-import { type ChatbotSectionData } from './chatbots.types'
+import { type ChatbotCardData } from './chatbots.types'
 import { useCardGridColumns } from './useCardGridColumns'
 
-export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
+type ChatbotsSectionProps = {
+  title: string
+  /** Shown in place of the grid when the section has no bots; otherwise the section is hidden. */
+  empty?: ReactNode
+} & (
+  | {
+      cards: ChatbotCardData[]
+      source?: never
+    }
+  | { source: PagedChatbotsSource; cards?: never }
+)
+
+// Section of chatbots, either from a static list or a paged API source.
+// The static list is only for Public Bots, till we get it from Admin UI instead of redis.
+export function ChatbotsSection({
+  title,
+  cards,
+  source,
+  empty,
+}: ChatbotsSectionProps) {
   const { ref: gridRef, columns } = useCardGridColumns()
   // Index of the first visible card, so a resize keeps the user's place.
   const [firstIndex, setFirstIndex] = useState(0)
@@ -16,14 +40,29 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
 
   // One row per page: page size follows the column count.
   const perPage = columns
-  const totalPages = Math.max(1, Math.ceil(cards.length / perPage))
+  // Remote sections fetch the page at firstIndex; the clamp below catches stale offsets.
+  const remoteStart = Math.floor(firstIndex / perPage) * perPage
+  const remote = usePagedChatbots({
+    source: source ?? 'yours',
+    offset: remoteStart,
+    limit: perPage,
+    enabled: !!source,
+  })
+  const total = source ? (remote.data?.total ?? 0) : cards.length
+  const isInitialLoad = !!source && !remote.data && !remote.isError
+
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
   // Clamp: the list can shrink (refetch) while `firstIndex` is stale.
   const currentPage = Math.min(Math.floor(firstIndex / perPage) + 1, totalPages)
   const start = (currentPage - 1) * perPage
-  const pageCards = cards.slice(start, start + perPage)
+  const pageCards = source
+    ? (remote.data?.results ?? [])
+    : cards.slice(start, start + perPage)
 
   // Re-anchor so the list growing back doesn't jump to the old page.
-  if (firstIndex >= cards.length && firstIndex !== start) setFirstIndex(start)
+  if (!isInitialLoad && firstIndex >= total && firstIndex !== start) {
+    setFirstIndex(start)
+  }
 
   useEffect(() => {
     if (pendingFocus.current === 'prev') prevRef.current?.focus()
@@ -35,6 +74,17 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
     if (page <= 1) pendingFocus.current = 'next'
     else if (page >= totalPages) pendingFocus.current = 'prev'
     setFirstIndex((page - 1) * perPage)
+  }
+
+  if (!isInitialLoad && total === 0) {
+    return empty ? (
+      <section className="px-4 py-10 sm:px-8">
+        <h2 className="mb-6 text-2xl font-bold text-(--illinois-blue) dark:text-white">
+          {title}
+        </h2>
+        {empty}
+      </section>
+    ) : null
   }
 
   return (
@@ -56,6 +106,11 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
           </div>
         ))}
       </div>
+      {isInitialLoad && (
+        <div className="flex justify-center py-10">
+          <LoadingSpinner />
+        </div>
+      )}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 text-sm text-(--illinois-storm-medium) dark:text-[#94a3b8]">
           <Button
@@ -71,7 +126,7 @@ export function ChatbotsSection({ title, cards }: ChatbotSectionData) {
             <ChevronLeft aria-hidden="true" />
           </Button>
           <span aria-live="polite" className="min-w-20 text-center">
-            {start + 1}–{start + pageCards.length} of {cards.length}
+            {start + 1}–{start + pageCards.length} of {total}
           </span>
           <Button
             ref={nextRef}
