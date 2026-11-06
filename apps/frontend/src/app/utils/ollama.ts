@@ -8,6 +8,7 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { OllamaModelIDs } from '~/utils/modelProviders/ollama'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
+import { ncsaHostedAuthHeaders } from '~/utils/ncsaHostedAuth'
 import { NextResponse } from 'next/server'
 
 export async function runOllamaChat(
@@ -34,7 +35,9 @@ export async function runOllamaChat(
       const ollama = createOpenAICompatible({
         name: 'ollama',
         baseURL: `${baseUrl.replace(/\/(?:api|v1)\/?$/, '').replace(/\/$/, '')}/v1`,
-        apiKey: process.env.NCSA_HOSTED_API_KEY || 'ollama',
+        // Only NCSA's own endpoint gets NCSA_HOSTED_API_KEY; a project-supplied
+        // baseUrl must never receive server credentials.
+        headers: ncsaHostedAuthHeaders(baseUrl),
       })
 
       if (conversation.messages.length === 0) {
