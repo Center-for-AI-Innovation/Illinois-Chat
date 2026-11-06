@@ -112,11 +112,15 @@ export function ChatbotDetailDialog({
 
   const aboutText = resolvedMetadata?.project_description || description
 
-  const { data: documentSummary = undefined } =
-    useFetchDocumentSummary(course_name)
+  const { data: documentSummary = undefined } = useFetchDocumentSummary(
+    course_name,
+    { enabled: open },
+  )
 
-  const { data: maintainerProfiles = [] } =
-    useFetchMaintainerProfiles(course_name)
+  const { data: maintainerProfiles = [] } = useFetchMaintainerProfiles(
+    course_name,
+    { enabled: open },
+  )
 
   // TODO: Replace with real timestamps from API
   const createdAt = card.created_at
