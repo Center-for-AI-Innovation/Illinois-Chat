@@ -65,11 +65,6 @@ export type ChatbotCardData = {
   last_updated_at?: string
 }
 
-export type ChatbotSectionData = {
-  title: string
-  cards: ChatbotCardData[]
-}
-
 export type AccessibleChatbotData = {
   course_name: string
   title: string

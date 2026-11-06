@@ -7,7 +7,6 @@ import { useFetchUserLastAccess } from '../queries/useFetchUserLastAccess'
 import { useFetchMaintainerProfiles } from '../queries/useFetchMaintainerProfiles'
 import { useFetchDocumentSummary } from '../queries/useFetchDocumentSummary'
 import { useSearchChatbots } from '../queries/useSearchChatbots'
-import { useFetchAllCourseMetadata } from '../queries/useFetchAllCourseMetadata'
 
 const originalFetch = globalThis.fetch
 afterEach(() => {
@@ -199,53 +198,5 @@ describe('useSearchChatbots', () => {
     })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(String(result.current.error)).toMatch(/Search failed/)
-  })
-})
-
-describe('useFetchAllCourseMetadata', () => {
-  it('flattens the per-course payload into {course_name, metadata}', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [
-        {
-          CS101: {
-            course_owner: 'owner@example.com',
-            course_admins: [],
-            is_private: false,
-          },
-        },
-        {
-          CS102: {
-            course_owner: 'owner@example.com',
-            course_admins: [],
-            // Coerces string booleans coming back from Redis.
-            is_private: 'true',
-          },
-        },
-      ],
-    }) as unknown as typeof fetch
-
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useFetchAllCourseMetadata(), {
-      wrapper: Wrapper,
-    })
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(result.current.data).toHaveLength(2)
-    expect(result.current.data?.[0]?.course_name).toBe('CS101')
-    expect(result.current.data?.[0]?.metadata.is_private).toBe(false)
-    expect(result.current.data?.[1]?.metadata.is_private).toBe(true)
-  })
-
-  it('throws on non-ok responses', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 502,
-    }) as unknown as typeof fetch
-
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useFetchAllCourseMetadata(), {
-      wrapper: Wrapper,
-    })
-    await waitFor(() => expect(result.current.isError).toBe(true))
   })
 })
