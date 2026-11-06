@@ -111,7 +111,7 @@ export function ChatbotsSearchBar({
             value={localQuery}
             onChange={handleInputChange}
             aria-label="Search chatbots"
-            className="h-12 rounded-xl border-[#e5e7eb] bg-white pr-10 pl-10 text-sm text-(--illinois-blue) placeholder:text-(--illinois-storm-medium) focus-visible:ring-(--illinois-blue) dark:border-[#32517a] dark:bg-[#13294b] dark:text-white dark:placeholder:text-[#94a3b8] dark:focus-visible:ring-white/30"
+            className="h-12 rounded-xl border-[#e5e7eb] bg-white pr-10 pl-10 text-sm text-(--illinois-blue) placeholder:text-(--illinois-storm-medium) focus-visible:ring-(--illinois-blue) dark:border-[#32517a] dark:bg-[#13294b] dark:text-white dark:placeholder:text-[#94a3b8] dark:focus-visible:ring-white/30 [&::-webkit-search-cancel-button]:appearance-none"
           />
           {localQuery && (
             <Button
