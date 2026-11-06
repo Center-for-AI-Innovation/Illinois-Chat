@@ -45,6 +45,7 @@ vi.mock('../MakeNewCoursePageSteps/StepCreate', () => ({
     isCheckingAvailability,
     onUpdateName,
     onUpdateDescription,
+    onUpdateProjectType,
   }: any) => (
     <div data-testid="step-create">
       <span data-testid="step-create-name">{project_name}</span>
@@ -62,6 +63,11 @@ vi.mock('../MakeNewCoursePageSteps/StepCreate', () => ({
       <input
         data-testid="mock-desc-input"
         onChange={(e) => onUpdateDescription(e.target.value)}
+      />
+      <button
+        type="button"
+        data-testid="mock-set-type"
+        onClick={() => onUpdateProjectType('Course')}
       />
     </div>
   ),
@@ -110,6 +116,7 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
   return {
     ...actual,
     createProject: vi.fn(async () => true),
+    callSetCourseMetadata: vi.fn(async () => true),
     fetchCourseMetadata: vi.fn(async () => ({
       is_frozen: false,
       is_private: false,
@@ -567,6 +574,57 @@ describe('MakeNewCoursePage', () => {
         const cached = queryClient.getQueryData(['courseMetadata', 'NewBot'])
         expect(cached).toEqual(mockMetadata)
       })
+    })
+
+    it('refreshes Your Bots only after the initial tags are saved', async () => {
+      const user = userEvent.setup()
+      mockFetchCourseAvailable(false)
+
+      const apiUtils = await import('~/utils/apiUtils')
+      let resolveTags!: (ok: boolean) => void
+      ;(
+        apiUtils.callSetCourseMetadata as ReturnType<typeof vi.fn>
+      ).mockImplementationOnce(
+        () => new Promise((resolve) => (resolveTags = resolve)),
+      )
+
+      const queryClient = createTestQueryClient()
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+      const MakeNewCoursePage = await importComponent()
+
+      renderWithProviders(
+        <MakeNewCoursePage
+          project_name="NewBot"
+          current_user_email="owner@example.com"
+          is_new_course={true}
+        />,
+        { queryClient },
+      )
+
+      await user.click(screen.getByTestId('mock-set-type'))
+      const continueBtn = await screen.findByRole('button', {
+        name: /Continue to next step/i,
+      })
+      await waitFor(() => expect(continueBtn).not.toBeDisabled(), {
+        timeout: 3000,
+      })
+      await user.click(continueBtn)
+
+      await waitFor(() =>
+        expect(apiUtils.callSetCourseMetadata).toHaveBeenCalledWith('NewBot', {
+          tags: [{ category: 'projectType', value: 'Course' }],
+        }),
+      )
+      expect(invalidate).not.toHaveBeenCalledWith({
+        queryKey: ['pagedChatbots', 'yours'],
+      })
+
+      resolveTags(true)
+      await waitFor(() =>
+        expect(invalidate).toHaveBeenCalledWith({
+          queryKey: ['pagedChatbots', 'yours'],
+        }),
+      )
     })
 
     it('warns and caches nothing when fetchCourseMetadata fails', async () => {
