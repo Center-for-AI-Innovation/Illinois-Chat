@@ -3,19 +3,22 @@ import {
   COUNTRY_OF_CONCERN_INFO_URL,
   CountryOfConcern,
   getCountryOfConcern,
+  COUNTRY_OF_CONCERN_WARNING,
   getCountryOfConcernBannerLede,
-  getCountryOfConcernLongMessage,
-  getCountryOfConcernShortMessage,
   isCocBannerDismissed,
   isCountryOfConcern,
+  isDeepSeekModel,
+  isDeepSeekNoticeDismissed,
   isLocallyHostedProvider,
   isChatbotCocAcknowledged,
   markChatbotCocAcknowledged,
   markCocBannerDismissed,
+  markDeepSeekNoticeDismissed,
 } from '~/utils/modelProviders/countriesOfConcern'
 
 const CHAT_KEY = 'coc-acknowledged-chatbots'
 const BANNER_KEY = 'coc-banner-dismissed-pairs'
+const DEEPSEEK_KEY = 'deepseek-directive-dismissed-pairs'
 
 describe('getCountryOfConcern / isCountryOfConcern', () => {
   it('returns null for missing input', () => {
@@ -116,15 +119,14 @@ describe('isLocallyHostedProvider', () => {
 
 describe('getCountryOfConcernBannerLede', () => {
   it('only claims local hosting when the model is locally hosted', () => {
-    const local = getCountryOfConcernBannerLede(CountryOfConcern.China, true)
+    const local = getCountryOfConcernBannerLede(true)
     expect(local).toContain('hosted locally at the U of I')
     expect(local).toContain('does not send your conversation to external')
   })
 
   it('warns that data leaves the university for third-party-served models', () => {
-    const remote = getCountryOfConcernBannerLede(CountryOfConcern.China, false)
+    const remote = getCountryOfConcernBannerLede(false)
     expect(remote).toContain('leaves university infrastructure')
-    expect(remote).toContain('China')
     expect(remote).toContain('rather than hosted locally')
     // Must never reassure the user that their data stays put on a model
     // served by a third party — that was the original bug.
@@ -133,20 +135,12 @@ describe('getCountryOfConcernBannerLede', () => {
 })
 
 describe('message helpers', () => {
-  it('short message names the country', () => {
-    const message = getCountryOfConcernShortMessage(CountryOfConcern.China)
-    expect(message).toContain('country of concern')
-    expect(message).toContain('China')
-  })
-
-  it('long message names the model and country', () => {
-    const message = getCountryOfConcernLongMessage(
-      'DeepSeek V3',
-      CountryOfConcern.China,
+  it('warning matches the expected text', () => {
+    expect(COUNTRY_OF_CONCERN_WARNING).toBe(
+      'This model was trained in a US government designated Country of Concern. ' +
+        'It may exhibit biases based on differences in geopolitical environments, ' +
+        'cultural norms, policy constraints, or censorship behaviors.',
     )
-    expect(message).toContain('DeepSeek V3')
-    expect(message).toContain('China')
-    expect(message).toContain('U.S. Department of Commerce')
   })
 
   it('exposes a canonical info URL', () => {
@@ -282,6 +276,48 @@ describe('isCocBannerDismissed / markCocBannerDismissed', () => {
       markCocBannerDismissed('bot-a', 'qwen/qwen3-32b'),
     ).not.toThrow()
     spy.mockRestore()
+  })
+})
+
+describe('isDeepSeekModel', () => {
+  it('matches OpenRouter and Ollama DeepSeek ids case-insensitively', () => {
+    expect(isDeepSeekModel('deepseek/deepseek-v3.2')).toBe(true)
+    expect(isDeepSeekModel('deepseek-r1:70b')).toBe(true)
+    expect(isDeepSeekModel('DeepSeek/DeepSeek-R1-Zero')).toBe(true)
+  })
+
+  it('does not match other models or empty ids', () => {
+    expect(isDeepSeekModel('qwen/qwen3-32b')).toBe(false)
+    expect(isDeepSeekModel('z-ai/glm-4.6')).toBe(false)
+    expect(isDeepSeekModel('gpt-4o')).toBe(false)
+    expect(isDeepSeekModel(null)).toBe(false)
+    expect(isDeepSeekModel('')).toBe(false)
+  })
+})
+
+describe('isDeepSeekNoticeDismissed / markDeepSeekNoticeDismissed', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('stays visible for users who already dismissed the CoC banner', () => {
+    markCocBannerDismissed('bot-a', 'deepseek-r1:70b')
+    expect(isDeepSeekNoticeDismissed('bot-a', 'deepseek-r1:70b')).toBe(false)
+  })
+
+  it('persists dismissal per (chatbot, model) pair under its own key', () => {
+    markDeepSeekNoticeDismissed('bot-a', 'deepseek-r1:70b')
+    expect(isDeepSeekNoticeDismissed('bot-a', 'deepseek-r1:70b')).toBe(true)
+    expect(isDeepSeekNoticeDismissed('bot-b', 'deepseek-r1:70b')).toBe(false)
+    expect(isCocBannerDismissed('bot-a', 'deepseek-r1:70b')).toBe(false)
+    expect(JSON.parse(window.localStorage.getItem(DEEPSEEK_KEY)!)).toEqual([
+      'bot-a::deepseek-r1:70b',
+    ])
+  })
+
+  it('returns false for missing ids', () => {
+    expect(isDeepSeekNoticeDismissed(null, 'deepseek-r1:70b')).toBe(false)
+    expect(isDeepSeekNoticeDismissed('bot-a', '')).toBe(false)
   })
 })
 

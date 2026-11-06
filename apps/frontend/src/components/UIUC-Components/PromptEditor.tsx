@@ -62,6 +62,7 @@ import { useDebouncedCallback } from 'use-debounce'
 import { v4 as uuidv4 } from 'uuid'
 import CustomCopyButton from '~/components/Buttons/CustomCopyButton'
 import { getModelLogo } from '~/components/Chat/ModelSelect'
+import { CountryOfConcernIcon } from '~/components/UIUC-Components/CountryOfConcern'
 import { LinkGeneratorModal } from '~/components/Modals/LinkGeneratorModal'
 import { findDefaultModel } from '~/components/UIUC-Components/api-inputs/LLMsApiKeyInputForm'
 import { type ChatBody } from '~/types/chat'
@@ -1156,6 +1157,10 @@ CRITICAL: The optimized prompt must:
                         aria-label="Select model"
                         className={`${montserrat_paragraph.variable} font-montserratParagraph cursor-pointer text-sm`}
                       />
+                      <CountryOfConcernIcon
+                        modelId={selectedModel}
+                        size={isSmallScreen ? 12 : 14}
+                      />
                       <ComboboxTrigger className="text-(--foreground-faded)">
                         <IconChevronDown
                           size={isSmallScreen ? 12 : 14}
@@ -1191,6 +1196,11 @@ CRITICAL: The optimized prompt must:
                                       <span className="ml-3 text-sm">
                                         {item.label}
                                       </span>
+                                      <CountryOfConcernIcon
+                                        modelId={item.modelId ?? item.value}
+                                        size="0.9rem"
+                                        className="ml-1.5"
+                                      />
                                     </div>
                                     {item.downloadSize && (
                                       <div className="mt-1 ml-8 flex items-center">
