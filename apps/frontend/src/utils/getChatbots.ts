@@ -16,7 +16,10 @@ import type { NextApiRequest } from 'next'
 import { db, courseMetadata, projects } from '~/db/dbClient'
 import type { CourseMetadata } from '~/types/courseMetadata'
 import type { ChatbotProjectType } from '~/types/chatbotTags'
-import type { SearchChatbotsResponse } from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
+import type {
+  ChatbotAccessLevel,
+  SearchChatbotsResponse,
+} from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
 import { toChatbotCardData } from '~/utils/chatbotCard'
 
 export const SORT_BY_VALUES = ['created_at', 'name'] as const
@@ -38,7 +41,8 @@ export type GetChatbotsOptions = Partial<PageParams> & {
   userEmail: string
   /** owned = owner/admin; others = accessible to the user but not owned. */
   user: 'owned' | 'others'
-  visibility?: 'public' | 'private'
+  /** Match the card's access level: public, unlisted (any logged-in user) or private (invited only). */
+  visibility?: ChatbotAccessLevel
   /** Match on the bot's first projectType tag. */
   type?: ChatbotProjectType
   /** Drop bots whose first projectType tag is one of these; untagged bots stay. */
@@ -58,6 +62,15 @@ export function accessiblePredicate(userEmail: string): SQL {
     eq(courseMetadata.allow_logged_in_users, true),
     ownedPredicate(userEmail),
     arrayContains(courseMetadata.approved_emails_list, [userEmail]),
+  )!
+}
+
+// SQL predicate for selecting Chatbots by access level: public, unlisted (any logged-in user) or private (invited only).
+function visibilityPredicate(level: ChatbotAccessLevel): SQL {
+  if (level === 'public') return eq(courseMetadata.is_private, false)
+  return and(
+    eq(courseMetadata.is_private, true),
+    eq(courseMetadata.allow_logged_in_users, level === 'unlisted'),
   )!
 }
 
@@ -83,11 +96,10 @@ function buildWhere(opts: GetChatbotsOptions): SQL {
 
   return and(
     eq(courseMetadata.is_frozen, false), // exclude frozen bots
-    opts.user === 'owned'  // filter by ownership (bots you own vs member) if requested
+    opts.user === 'owned' // filter by ownership (bots you own vs member) if requested
       ? owned
       : and(accessiblePredicate(userEmail), not(owned)),
-    opts.visibility &&  // filter by visibility if requested
-      eq(courseMetadata.is_private, opts.visibility === 'private'),
+    opts.visibility && visibilityPredicate(opts.visibility), // filter by access level if requested
     opts.type && eq(firstProjectType, opts.type), // filter by chatbot type
     opts.excludeTypes?.length // filter out specific chatbot types if requested
       ? // COALESCE keeps untagged bots, whose type is NULL.

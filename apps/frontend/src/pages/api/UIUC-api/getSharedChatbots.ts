@@ -2,7 +2,7 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getChatbots, parsePageParams } from '~/utils/getChatbots'
 
-/** Non-public chatbots shared with the caller, excluding Course and Department ones. */
+/** Private chatbots the caller was invited to, excluding Course and Department ones */
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })

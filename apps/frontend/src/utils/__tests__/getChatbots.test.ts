@@ -137,6 +137,29 @@ describe('getChatbots', () => {
     expect(render(calls.where).sql).not.toMatch(/not in/i)
   })
 
+  it.each([
+    ['public', { is_private: false, allow_logged_in_users: undefined }],
+    ['unlisted', { is_private: true, allow_logged_in_users: true }],
+    ['private', { is_private: true, allow_logged_in_users: false }],
+  ] as const)(
+    'visibility %s matches the card access level',
+    async (visibility, expected) => {
+      // owned skips accessiblePredicate, so each column appears only via visibility.
+      await getChatbots({ userEmail: 'me@x.edu', user: 'owned', visibility })
+      const { sql, params } = render(calls.where)
+      const paramFor = (column: string) => {
+        const m = sql.match(
+          new RegExp(`"course_metadata"\\."${column}" = \\$(\\d+)`),
+        )
+        return m ? params[Number(m[1]) - 1] : undefined
+      }
+      expect(paramFor('is_private')).toBe(expected.is_private)
+      expect(paramFor('allow_logged_in_users')).toBe(
+        expected.allow_logged_in_users,
+      )
+    },
+  )
+
   it('defaults to created_at desc with a course_name tiebreaker', async () => {
     await getChatbots({ userEmail: 'me@x.edu', user: 'owned' })
     const { sql } = render(calls.orderBy)

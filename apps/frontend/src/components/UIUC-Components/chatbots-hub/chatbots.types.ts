@@ -107,7 +107,8 @@ export const SHARED_SECTION = 'Shared with you'
 
 /**
  * Server-paged sections, in display order (Public Bots renders after these).
- * Each bot lands in one: yours first, then by type, then other non-public bots.
+ * Each bot lands in at most one: yours first, then by type, then private bots you were invited to.
+ * Unlisted bots outside Course/Department only show up in search.
  */
 export const PAGED_SECTIONS: { title: string; source: PagedChatbotsSource }[] =
   [
