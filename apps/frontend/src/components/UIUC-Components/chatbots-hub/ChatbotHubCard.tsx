@@ -48,7 +48,7 @@ export function ChatbotHubCard(card: ChatbotCardData) {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   const resolvedAccessLevel = accessLevel ?? (isPrivate ? 'private' : undefined)
-  const resolvedUserRole = userRole ?? (owner === 'You' ? 'owner' : 'member')
+  const resolvedUserRole = userRole ?? (owner === 'You' ? 'owner' : undefined)
   // Owner + admin share edit/share capabilities, so the rim + Settings gear
   // light up for both. Only the badge text distinguishes them.
   const hasAdminAccess =
@@ -108,10 +108,12 @@ export function ChatbotHubCard(card: ChatbotCardData) {
             <Info className="h-5 w-5 text-(--illinois-blue) dark:text-white" />
           </Button>
 
-          <ChatbotUserRoleBadge
-            role={resolvedUserRole}
-            className="relative z-10"
-          />
+          {resolvedUserRole && (
+            <ChatbotUserRoleBadge
+              role={resolvedUserRole}
+              className="relative z-10"
+            />
+          )}
         </div>
 
         <CardContent className="flex flex-1 flex-col px-5 pt-5 pb-4">
