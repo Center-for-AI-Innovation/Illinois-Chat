@@ -428,7 +428,37 @@ export const useFetchAllWorkflows = (course_name?: string) => {
     // Errors deliberately propagate so callers can show what actually failed
     // rather than an empty list that reads as "no tools configured".
     queryFn: async (): Promise<UIUCTool[]> => {
-      const tools = await fetchSimTools(course_name)
+      const [sim, nlip] = await Promise.allSettled([
+        fetchSimTools(course_name),
+        fetch(
+          `/api/UIUC-api/tools/nlipTools?${new URLSearchParams({ course_name })}`,
+        ).then(async (response) => {
+          if (!response.ok) throw new Error('Could not load NLIP agents')
+          const body = (await response.json()) as { tools: UIUCTool[] }
+          if (!Array.isArray(body.tools))
+            throw new Error('Invalid NLIP tool listing')
+          return body.tools
+        }),
+      ])
+      // Sim can be unavailable while NLIP agents remain usable (and vice versa).
+      if (sim.status === 'rejected' && nlip.status === 'rejected')
+        throw sim.reason
+      if (
+        sim.status === 'rejected' &&
+        nlip.status === 'fulfilled' &&
+        nlip.value.length === 0
+      )
+        throw sim.reason
+      if (
+        nlip.status === 'rejected' &&
+        sim.status === 'fulfilled' &&
+        sim.value.length === 0
+      )
+        throw nlip.reason
+      const tools = [
+        ...(sim.status === 'fulfilled' ? sim.value : []),
+        ...(nlip.status === 'fulfilled' ? nlip.value : []),
+      ]
       writeCachedSimTools(course_name, tools)
       return tools
     },
@@ -696,6 +726,27 @@ export async function callSimFunction(
   base_url?: string,
 ): Promise<ToolOutput> {
   const timeStart = Date.now()
+  if (tool.id.startsWith('nlip:')) {
+    const prefix = base_url ?? ''
+    const response = await fetch(
+      `${prefix}/api/UIUC-api/tools/nlipTools?${new URLSearchParams({ course_name: projectName })}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: tool.id.slice(5),
+          question: tool.aiGeneratedArgumentValues?.question,
+        }),
+      },
+    )
+    const result = (await response.json()) as {
+      output?: ToolOutput
+      error?: string
+    }
+    if (!response.ok || !result.output)
+      throw new Error(result.error ?? 'NLIP request failed')
+    return result.output
+  }
   const endpoint = base_url
     ? `${base_url}/api/UIUC-api/runSimWorkflow`
     : '/api/UIUC-api/runSimWorkflow'

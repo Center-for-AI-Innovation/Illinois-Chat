@@ -249,4 +249,31 @@ describe('sim tool cache resilience', () => {
     expect(tools.map((t: any) => t.name)).toEqual(['sim_greet'])
     expect(readCachedSimTools('proj')?.tools).toEqual(tools)
   })
+
+  describe('with NLIP agents', () => {
+    // Sim and NLIP are discovered in parallel; route each URL separately.
+    function mockDiscovery(sim: () => Promise<Response>, nlip: unknown) {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+        String(input).includes('nlipTools')
+          ? new Response(JSON.stringify(nlip), { status: 200 })
+          : sim(),
+      )
+    }
+
+    it('reports the Sim failure when no NLIP agents are configured', async () => {
+      const { useFetchAllWorkflows } = await import('../handleFunctionCalling')
+      mockDiscovery(() => Promise.reject(new Error('sim down')), { tools: [] })
+
+      const query = useFetchAllWorkflows('proj') as any
+      await expect(query.queryFn()).rejects.toThrow(/sim down/)
+    })
+
+    it('reports an invalid NLIP listing when Sim has no workflows', async () => {
+      const { useFetchAllWorkflows } = await import('../handleFunctionCalling')
+      mockDiscovery(async () => workflowsResponse([]), { tools: 'nope' })
+
+      const query = useFetchAllWorkflows('proj') as any
+      await expect(query.queryFn()).rejects.toThrow(/Invalid NLIP tool listing/)
+    })
+  })
 })
