@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
 import { toChatbotCardData, chatbotUserTier } from '~/utils/chatbotCard'
+import { accessiblePredicate } from '~/utils/getChatbots'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 const MAX_QUERY_LENGTH = 200
@@ -71,13 +72,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // `is_frozen = false` sits outside the role check and is not bypassed.
     const roleVisibility = isPlatformSuperAdmin
       ? sql`true`
-      : sql`
-        ${courseMetadata.is_private} = false
-        OR ${courseMetadata.allow_logged_in_users} = true
-        OR ${courseMetadata.course_owner} = ${userEmail}
-        OR ${userEmail} = ANY(${courseMetadata.course_admins})
-        OR ${userEmail} = ANY(${courseMetadata.approved_emails_list})
-      `
+      : accessiblePredicate(userEmail)
     const accessPredicate = sql`
       ${courseMetadata.is_frozen} = false
       AND (${roleVisibility})
