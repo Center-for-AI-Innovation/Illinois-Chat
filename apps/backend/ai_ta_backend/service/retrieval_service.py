@@ -32,6 +32,7 @@ from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapt
 # from ai_ta_backend.service.nomic_service import NomicService
 from ai_ta_backend.service.posthog_service import PosthogService
 from ai_ta_backend.service.sentry_service import SentryService
+from ai_ta_backend.utils.trusted_hosts import is_same_origin_as_any
 
 # Qwen query instruction for Illinois Chat retrieval.
 # Docs are embedded without instruction during ingest; only queries get this prefix.
@@ -741,8 +742,17 @@ class RetrievalService:
                 model=model,
             )
         else:
-            api_key = embedding_cfg.get("api_key", self.openai_api_key)
-            api_base = embedding_cfg.get("api_base", self.openai_api_base)
+            api_base = embedding_cfg.get("api_base") or self.openai_api_base
+            api_key = embedding_cfg.get("api_key")
+            if not api_key:
+                # The env key belongs to the env-configured endpoint; never send
+                # it to a project-supplied api_base.
+                if not is_same_origin_as_any(api_base, [self.openai_api_base]):
+                    raise ValueError(
+                        "embedding_config api_key is required when api_base "
+                        "is set to a custom endpoint"
+                    )
+                api_key = self.openai_api_key
             kwargs = dict(
                 model=model,
                 openai_api_key=api_key,

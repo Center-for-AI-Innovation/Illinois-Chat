@@ -255,6 +255,18 @@ describe('projectConnections/validation — embedding', () => {
     ).toBe(true)
   })
 
+  it('requires api_key when api_base is set', () => {
+    const r = embeddingConfigSchema.safeParse({
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      api_base: 'https://x.example/v1',
+    })
+    expect(r.success).toBe(false)
+    if (!r.success) {
+      expect(r.error.issues[0]?.path).toEqual(['api_key'])
+    }
+  })
+
   it('rejects non-URL base_url / api_base', () => {
     expect(
       embeddingConfigSchema.safeParse({

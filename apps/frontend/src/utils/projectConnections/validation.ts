@@ -166,6 +166,10 @@ export const embeddingConfigSchema = z
     message: "base_url is required when provider is 'ollama'",
     path: ['base_url'],
   })
+  .refine((cfg) => !cfg.api_base || !!cfg.api_key, {
+    message: 'api_key is required when api_base is set',
+    path: ['api_key'],
+  })
 export type EmbeddingOverrideConfig = z.infer<typeof embeddingConfigSchema>
 
 // project_id is looked up server-side from the projects table — the caller
