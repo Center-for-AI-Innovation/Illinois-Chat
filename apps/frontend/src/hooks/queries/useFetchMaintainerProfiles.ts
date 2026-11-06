@@ -29,11 +29,15 @@ async function fetchMaintainerProfiles({
   return data.profiles || []
 }
 
-export function useFetchMaintainerProfiles(course_name: string) {
+export function useFetchMaintainerProfiles(
+  course_name: string,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ['maintainerProfiles', course_name],
     queryFn: fetchMaintainerProfiles,
     retry: 1,
-    enabled: !!course_name,
+    staleTime: 5 * 60 * 1000,
+    enabled: enabled && !!course_name,
   })
 }
