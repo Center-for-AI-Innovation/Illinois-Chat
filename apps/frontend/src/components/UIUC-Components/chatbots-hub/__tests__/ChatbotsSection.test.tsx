@@ -165,6 +165,29 @@ describe('ChatbotsSection remote mode', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('shows an error with retry instead of the empty slot when loading fails', async () => {
+    const refetch = vi.fn()
+    usePagedChatbotsMock.mockReturnValue({
+      data: undefined,
+      isError: true,
+      refetch,
+    })
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ChatbotsSection
+        title="Your Bots"
+        source="yours"
+        empty={<p>No bots yet</p>}
+      />,
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't load chatbots.",
+    )
+    expect(screen.queryByText('No bots yet')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(refetch).toHaveBeenCalled()
+  })
+
   it('renders the empty slot when given', () => {
     usePagedChatbotsMock.mockReturnValue(remotePage(0, 5, 0))
     renderWithProviders(
