@@ -50,6 +50,8 @@ export function ChatbotsSection({
   })
   const total = source ? (remote.data?.total ?? 0) : cards.length
   const isInitialLoad = !!source && !remote.data && !remote.isError
+  // A failed fetch must not read as an empty section.
+  const isLoadError = !!source && !remote.data && remote.isError
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
   // Clamp: the list can shrink (refetch) while `firstIndex` is stale.
@@ -60,7 +62,13 @@ export function ChatbotsSection({
     : cards.slice(start, start + perPage)
 
   // Re-anchor so the list growing back doesn't jump to the old page.
-  if (!isInitialLoad && firstIndex >= total && firstIndex !== start) {
+  // Skipped on error so Retry refetches the page that failed.
+  if (
+    !isInitialLoad &&
+    !isLoadError &&
+    firstIndex >= total &&
+    firstIndex !== start
+  ) {
     setFirstIndex(start)
   }
 
@@ -74,6 +82,32 @@ export function ChatbotsSection({
     if (page <= 1) pendingFocus.current = 'next'
     else if (page >= totalPages) pendingFocus.current = 'prev'
     setFirstIndex((page - 1) * perPage)
+  }
+
+  if (isLoadError) {
+    return (
+      <section className="px-4 py-10 sm:px-8">
+        <h2 className="mb-6 text-2xl font-bold text-(--illinois-blue) dark:text-white">
+          {title}
+        </h2>
+        <div
+          role="alert"
+          className="flex flex-col items-center gap-3 py-10 text-center"
+        >
+          <p className="text-sm text-red-500 dark:text-red-400">
+            Couldn&apos;t load chatbots.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void remote.refetch()}
+          >
+            Try again
+          </Button>
+        </div>
+      </section>
+    )
   }
 
   if (!isInitialLoad && total === 0) {
