@@ -445,7 +445,8 @@ CREATE UNIQUE INDEX "documents_doc_groups_pkey" ON "documents_doc_groups" USING 
 CREATE INDEX "embeddings_embedding_1536_hnsw_idx" ON "embeddings" USING hnsw ((subvector("embedding", 1, 1536)::vector(1536)) vector_cosine_ops) WITH (m=16,ef_construction=64);--> statement-breakpoint
 CREATE INDEX "project_connection_audit_log_project_idx" ON "project_connection_audit_log" USING btree ("project_name","occurred_at" DESC);--> statement-breakpoint
 CREATE INDEX "folders_user_email_project_id_idx" ON "folders" USING btree ("user_email","project_id");--> statement-breakpoint
-CREATE INDEX "conversations_folder_id_idx" ON "conversations" USING btree ("folder_id");
+CREATE INDEX "conversations_folder_id_idx" ON "conversations" USING btree ("folder_id");--> statement-breakpoint
+CREATE INDEX "projects_course_name_idx" ON "projects" USING btree ("course_name");
 -- ---------------------------------------------------------------------------
 -- Functions and triggers (0001_custom_functions.sql, verbatim)
 -- ---------------------------------------------------------------------------
