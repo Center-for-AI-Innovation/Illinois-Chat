@@ -258,13 +258,17 @@ const MakeNewCoursePage = ({
       // Persist the wizard-set projectType/organization tags. Fire-and-forget:
       // a registry/tag failure should not block the wizard. The cache was
       // already updated above so the user sees them immediately.
-      if (initialTags.length > 0) {
-        void callSetCourseMetadata(project_name, { tags: initialTags } as never)
-      }
+      const tagsSaved =
+        initialTags.length > 0
+          ? callSetCourseMetadata(project_name, { tags: initialTags } as never)
+          : Promise.resolve(true)
 
-      void queryClient.invalidateQueries({
-        queryKey: ['pagedChatbots', 'yours'],
-      })
+      // Refetch Your Bots after the tag save so the new card isn't cached without tags.
+      void tagsSaved.then(() =>
+        queryClient.invalidateQueries({
+          queryKey: ['pagedChatbots', 'yours'],
+        }),
+      )
 
       return true
     } catch (error) {
