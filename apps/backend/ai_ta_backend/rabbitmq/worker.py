@@ -1,4 +1,5 @@
 import os
+import signal
 import ssl
 import traceback
 from typing import List, Optional
@@ -194,16 +195,25 @@ class Worker:
         )
 
     def process_job(self, channel, method, header, body):
-        content = json.loads(body.decode())
-        job_id = content['job_id']
+        try:
+            content = json.loads(body.decode())
+            job_id = content['job_id']
+            inputs = content['inputs']
+        except Exception:  # pylint: disable=broad-except
+            # Ack and discard: left unacked, a malformed message would be redelivered on every
+            # reconnect and, with prefetch 1, block the queue behind it.
+            logging.error("Discarding an unparseable ingest message (%d bytes):\n%s", len(body),
+                          traceback.format_exc())
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+            return
         logging.info("----------------------------------------")
         logging.info("--------------Incoming job--------------")
         logging.info("----------------------------------------")
-        inputs = content['inputs']
         logging.info(inputs)
 
         retry_count = content['retry_count'] if 'retry_count' in content else 0
 
+        status_db = None
         try:
             # Resolve the project's connections once. Ingest status tables live
             # on the project documents DB (external when configured, else host) --
@@ -264,7 +274,7 @@ class Worker:
             # republish: the broker redelivers the unacked message itself once it notices the
             # connection dropped, and listen_for_jobs reconnects.
             raise
-        except Exception:  # pylint: disable=broad-except
+        except Exception as e:  # pylint: disable=broad-except
             # Only resolver / status-DB errors get here: run_ingest_isolated never raises.
             if retry_count < MAX_JOB_RETRIES:
                 logging.error("Job %s failed before ingest; resubmitting (retry #%s):\n%s",
@@ -282,9 +292,30 @@ class Worker:
             else:
                 logging.error("Job %s failed after %s retries. Discarding job:\n%s",
                               job_id, MAX_JOB_RETRIES, traceback.format_exc())
-                # Ack even when discarding: left unacked, the delivery would block the consumer
-                # (prefetch 1) until the connection drops, then come back.
+                self._record_discarded_job(status_db or self.sql_session, job_id, inputs,
+                                           "%s: %s" % (type(e).__name__, e), retry_count + 1)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
+
+    @staticmethod
+    def _record_discarded_job(status_db, job_id, inputs, error, attempts):
+        """Best effort: move a discarded job from documents_in_progress to documents_failed so the
+        dashboard stops showing the file as ingesting. The database may be the thing that failed,
+        so this can fail as well; then it only logs."""
+        s3_paths = inputs.get('s3_paths', '')
+        try:
+            status_db.insert_failed_document({
+                "s3_path": s3_paths[0] if isinstance(s3_paths, list) and s3_paths else str(s3_paths or ''),
+                "readable_filename": inputs.get('readable_filename', ''),
+                "course_name": inputs.get('course_name', ''),
+                "url": inputs.get('url'),
+                "base_url": inputs.get('base_url'),
+                "doc_groups": inputs.get('groups', ''),
+                "error": "Job discarded after %d attempts: %s" % (attempts, error),
+            })
+            status_db.delete_document_in_progress(job_id)
+        except Exception:  # pylint: disable=broad-except
+            logging.warning("Could not record the discarded job %s in the database:\n%s", job_id,
+                            traceback.format_exc())
 
     def listen_for_jobs(self):
         """Consume until the process exits. A lost connection (broker restart, an idle time-out
@@ -363,6 +394,15 @@ if __name__ == '__main__':
     worker_thread = threading.Thread(target=worker.listen_for_jobs)
     worker_thread.start()
     worker_thread.join(0)
+
+    def _on_sigterm(signum, frame):
+        # python is PID 1 in the worker image, so without a handler SIGTERM is dropped and ECS
+        # SIGKILLs after stopTimeout, leaving an in-flight job as "worker crashed". Unwind
+        # app.run the way Ctrl+C does; the finally below stops the consumer after its current
+        # message.
+        logging.info("SIGTERM received; finishing the current message and stopping")
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _on_sigterm)
 
     logging.info("Running healthcheck endpoint")
     try:
