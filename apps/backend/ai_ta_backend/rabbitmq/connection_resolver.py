@@ -286,12 +286,7 @@ class WorkerConnectionResolver:
         pooler), and this matches the worker's host engine in rmsql.py.
         """
         logger.info("Creating external SQL engine for project: %s", project_name)
-        # connect_timeout (libpq, honoured by psycopg2 and psycopg): a host that drops SYNs would
-        # otherwise block the worker's consumer thread for the OS timeout (about 2 min on Linux),
-        # longer than its AMQP heartbeat. Only set for the Postgres drivers that take it.
-        uri = db_config["connection_uri"]
-        connect_args = {"connect_timeout": 10} if uri.startswith(("postgresql://", "postgresql+psycopg")) else {}
-        return create_engine(uri, poolclass=NullPool, connect_args=connect_args)
+        return create_engine(db_config["connection_uri"], poolclass=NullPool)
 
     # ── S3 ──
 

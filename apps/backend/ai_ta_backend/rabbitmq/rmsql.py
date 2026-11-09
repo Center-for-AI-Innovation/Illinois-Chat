@@ -94,9 +94,7 @@ class SQLAlchemyIngestDB:
 
         # Create engine and session
         logging.info("About to connect to DB from IngestSQL.py.")
-        # connect_timeout: a host that drops SYNs would otherwise block the worker's consumer
-        # thread for the OS timeout (about 2 min on Linux), longer than its AMQP heartbeat.
-        self.engine = create_engine(db_uri, poolclass=NullPool, connect_args={"connect_timeout": 10})
+        self.engine = create_engine(db_uri, poolclass=NullPool)
         self.Session = sessionmaker(bind=self.engine)
         logging.info("Successfully connected to DB from IngestSQL.py")
 
