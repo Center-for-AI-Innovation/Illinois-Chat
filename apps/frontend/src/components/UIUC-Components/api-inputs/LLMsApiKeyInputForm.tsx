@@ -68,6 +68,7 @@ import OpenAIProviderInput from './providers/OpenAIProviderInput'
 import OpenAICompatibleProviderInput from './providers/OpenAICompatibleProviderInput'
 import SambaNovaProviderInput from './providers/SambaNovaProviderInput'
 import WebLLMProviderInput from './providers/WebLLMProviderInput'
+import { useChatbotDisplayName } from '~/hooks/queries/useChatbotDisplayName'
 
 const isSmallScreen = false
 
@@ -409,6 +410,7 @@ export default function APIKeyInputForm({
 } = {}) {
   const routerProjectName = GetCurrentPageName()
   const projectName = projectNameProp || routerProjectName
+  const displayName = useChatbotDisplayName(projectName)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState(),
   )
@@ -719,7 +721,7 @@ export default function APIKeyInputForm({
       setSidebarCollapsed={setSidebarCollapsed}
     >
       <Head>
-        <title>{projectName} — LLMs — Illinois Chat</title>
+        <title>{`${displayName} — LLMs — Illinois Chat`}</title>
         <meta
           name="UIUC.chat"
           content="The AI teaching assistant built for students at UIUC."
@@ -732,7 +734,7 @@ export default function APIKeyInputForm({
         tabIndex={-1}
         className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
-        <h1 className="sr-only">{projectName} — LLMs — Illinois Chat</h1>
+        <h1 className="sr-only">{displayName} — LLMs — Illinois Chat</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
           <div className="flex w-full flex-col items-center">
             <Card

@@ -28,6 +28,7 @@ import {
   type CourseWithMetadata,
 } from '~/hooks/queries/useFetchAllCourseMetadata'
 import { useFetchFeaturedChatbots } from '~/hooks/queries/useFetchFeaturedChatbots'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import { useSearchChatbots } from '~/hooks/queries/useSearchChatbots'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
@@ -56,7 +57,7 @@ function transformToCardData(
 
   return {
     course_name: course.course_name,
-    title: course.course_name,
+    title: getChatbotDisplayName(course.course_name, course.metadata),
     description: course.metadata.project_description || '',
     organization,
     projectType,

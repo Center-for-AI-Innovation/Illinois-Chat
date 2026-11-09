@@ -2,6 +2,7 @@ import { useAuth } from 'react-oidc-context'
 import { useMemo, useState } from 'react'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { isSuperAdmin } from '~/utils/superAdmins'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import { useRouter } from 'next/router'
 import {
   Table,
@@ -92,9 +93,11 @@ const ListProjectTable: React.FC = () => {
       let comparison = 0
       switch (sortColumn) {
         case 'name':
-          comparison = courseNameA
+          comparison = getChatbotDisplayName(courseNameA, metadataA)
             .toLowerCase()
-            .localeCompare(courseNameB.toLowerCase())
+            .localeCompare(
+              getChatbotDisplayName(courseNameB, metadataB).toLowerCase(),
+            )
           break
         case 'privacy': {
           const privacyLevel = (m: typeof metadataA) =>
@@ -134,12 +137,13 @@ const ListProjectTable: React.FC = () => {
         const filteredAdmins = courseMetadata.course_admins.filter(
           (admin: string) => !isSuperAdmin(admin),
         )
+        const displayName = getChatbotDisplayName(courseName, courseMetadata)
 
         return (
           <TableRow
             role="row"
             tabIndex={0}
-            aria-label={courseName}
+            aria-label={displayName}
             key={courseName}
             className="cursor-pointer border-(--table-border) text-(--foreground) hover:bg-(--background-faded)"
             onClick={(e) => {
@@ -163,7 +167,14 @@ const ListProjectTable: React.FC = () => {
               }
             }}
           >
-            <TableCell className={cellClasses}>{courseName}</TableCell>
+            <TableCell className={cellClasses}>
+              {displayName}
+              {displayName !== courseName && (
+                <span className="block font-mono text-xs text-(--foreground-faded)">
+                  alias of /{courseName}
+                </span>
+              )}
+            </TableCell>
             <TableCell className={cellClasses}>
               {courseMetadata.is_private
                 ? courseMetadata.allow_logged_in_users

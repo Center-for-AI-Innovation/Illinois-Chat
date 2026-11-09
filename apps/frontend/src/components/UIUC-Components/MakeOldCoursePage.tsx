@@ -9,6 +9,7 @@ import { fetchPresignedUrl } from '~/utils/apiUtils'
 import GlobalFooter from './GlobalFooter'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { useChatbotDisplayName } from '~/hooks/queries/useChatbotDisplayName'
 import { CannotEditCourse } from './CannotEditCourse'
 import DocumentGroupsCard from './DocumentGroupsCard'
 import DocumentsCard from './DocumentsCard'
@@ -28,6 +29,8 @@ const MakeOldCoursePage = ({
     getInitialCollapsedState,
   )
   const router = useRouter()
+  // Hook rather than metadata prop: it follows display-name edits on this page.
+  const displayName = useChatbotDisplayName(course_name)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -77,7 +80,7 @@ const MakeOldCoursePage = ({
       setSidebarCollapsed={setSidebarCollapsed}
     >
       <Head>
-        <title>{course_name} — Dashboard — Illinois Chat</title>
+        <title>{`${displayName} — Dashboard — Illinois Chat`}</title>
         <meta
           name="description"
           content="The AI teaching assistant built for students at UIUC."
@@ -89,7 +92,7 @@ const MakeOldCoursePage = ({
         tabIndex={-1}
         className="course-page-main flex min-h-screen w-full flex-col items-center"
       >
-        <h1 className="sr-only">{course_name} Dashboard</h1>
+        <h1 className="sr-only">{displayName} Dashboard</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">
           <div className="flex w-full flex-col items-center">
             {/* Upload Card Section */}

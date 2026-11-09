@@ -408,7 +408,9 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
         setSidebarCollapsed={setSidebarCollapsed}
       >
         <Head>
-          <title>{course_name} — Analytics — Illinois Chat</title>
+          <title>
+            {`${getChatbotDisplayName(course_name, courseMetadata)} — Analytics — Illinois Chat`}
+          </title>
           <meta
             name="description"
             content="The AI teaching assistant built for students at UIUC."
@@ -421,7 +423,9 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
           tabIndex={-1}
           className="course-page-main flex min-h-screen w-full flex-col items-center"
         >
-          <h1 className="sr-only">{course_name} Analytics</h1>
+          <h1 className="sr-only">
+            {getChatbotDisplayName(course_name, courseMetadata)} Analytics
+          </h1>
           <div className="items-left flex w-full flex-col justify-center py-0">
             <div className="flex w-full flex-col items-center">
               <div className="pt-5"></div>
@@ -636,9 +640,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <p className="mb-px text-sm font-medium">
-                            Messages
-                          </p>
+                          <p className="mb-px text-sm font-medium">Messages</p>
                           <p className="text-xs text-(--foreground-faded)">
                             Total exchanges
                           </p>
@@ -833,7 +835,9 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200 lg:col-span-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="heading-h4">Conversation Visualizations</h4>
+                        <h4 className="heading-h4">
+                          Conversation Visualizations
+                        </h4>
                         <p className="mt-px text-sm">
                           Select a time range to filter the visualizations below
                         </p>
@@ -1060,6 +1064,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
 }
 
 import { type CourseMetadata } from '~/types/courseMetadata'
+import { getChatbotDisplayName } from '~/utils/chatbotDisplayName'
 import { showToast } from '~/utils/toastUtils'
 import { CannotEditCourse } from './CannotEditCourse'
 import GlobalFooter from './GlobalFooter'

@@ -19,6 +19,8 @@ export interface CourseMetadata {
   openai_api_key: string | undefined // TODO: remove
   disabled_models: string[] | undefined // TODO: remove
   project_description: string | undefined
+  // Optional label shown instead of the project name; see utils/chatbotDisplayName.
+  display_name?: string | null
   documentsOnly: boolean | undefined
   disableCitations?: boolean
   guidedLearning: boolean | undefined
@@ -55,6 +57,7 @@ export interface CourseMetadataOptionalForUpsert {
   system_prompt: string | undefined | null
   disabled_models: string[] | undefined
   project_description: string | undefined
+  display_name?: string | null
   documentsOnly: boolean | undefined
   disableCitations: boolean | undefined
   guidedLearning: boolean | undefined

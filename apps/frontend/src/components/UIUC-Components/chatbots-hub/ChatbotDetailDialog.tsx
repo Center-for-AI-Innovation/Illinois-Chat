@@ -138,6 +138,11 @@ export function ChatbotDetailDialog({
             <ChatbotUserRoleBadge role={resolvedUserRole} />
 
             <h2 className="text-2xl leading-tight font-bold">{title}</h2>
+            {title !== course_name && (
+              <p className="-mt-2 font-mono text-xs break-all text-(--illinois-storm-medium) dark:text-[#94a3b8]">
+                alias of /{course_name}
+              </p>
+            )}
 
             <p className="text-sm leading-relaxed text-(--illinois-storm-dark) dark:text-[#94a3b8]">
               {description}

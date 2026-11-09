@@ -98,4 +98,45 @@ describe('ProjectTable', () => {
     fireEvent.click(screen.getByText('CS101'), { metaKey: true })
     expect(open).toHaveBeenCalledWith('/CS101/chat', '_blank')
   })
+
+  it('shows and sorts by display name, with the project name underneath', async () => {
+    globalThis.__TEST_AUTH__ = {
+      isAuthenticated: true,
+      isLoading: false,
+      user: { profile: { email: 'u@example.com' } },
+    }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            'zz-bot': {
+              course_owner: 'u@example.com',
+              course_admins: [],
+              is_private: false,
+              display_name: 'Algebra Helper',
+            },
+          },
+          {
+            'mm-bot': {
+              course_owner: 'u@example.com',
+              course_admins: [],
+              is_private: false,
+            },
+          },
+        ]),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    renderWithProviders(<ProjectTable />)
+
+    const row = await screen.findByRole('row', { name: 'Algebra Helper' })
+    expect(row).toHaveTextContent('alias of /zz-bot')
+    // Rows sort by the name people see: "Algebra Helper" before "mm-bot".
+    const names = screen
+      .getAllByRole('row')
+      .map((r) => r.getAttribute('aria-label'))
+      .filter(Boolean)
+    expect(names).toEqual(['Algebra Helper', 'mm-bot'])
+  })
 })

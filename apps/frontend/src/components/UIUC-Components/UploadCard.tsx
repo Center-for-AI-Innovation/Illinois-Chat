@@ -1,6 +1,13 @@
+import { Badge } from '@/components/shadcn/ui/badge'
 import { Button } from '@/components/shadcn/ui/button'
 import { Card } from '@/components/shadcn/ui/card'
+import { Input } from '@/components/shadcn/ui/input'
 import { Textarea } from '@/components/shadcn/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/shadcn/ui/tooltip'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import {
   type CourseMetadata,
@@ -8,6 +15,12 @@ import {
 } from '~/types/courseMetadata'
 import { callSetCourseMetadata, uploadToS3 } from '~/utils/apiUtils'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
+import {
+  getChatbotDisplayName,
+  getDisplayNameError,
+  normalizeDisplayName,
+} from '~/utils/chatbotDisplayName'
+import { showToast } from '~/utils/toastUtils'
 import SetExampleQuestions from './SetExampleQuestions'
 import ChatbotTagsEditor from './ChatbotTagsEditor'
 // import { Checkbox } from '@radix-ui/react-checkbox'
@@ -61,6 +74,10 @@ export const UploadCard = memo(function UploadCard({
   const [projectDescription, setProjectDescription] = useState(
     initialMetadata?.project_description || '',
   )
+  const [displayNameInput, setDisplayNameInput] = useState(
+    initialMetadata?.display_name || '',
+  )
+  const [isSavingDisplayName, setIsSavingDisplayName] = useState(false)
   const queryClient = useQueryClient()
   const [introMessage, setIntroMessage] = useState(
     initialMetadata?.course_intro_message || '',
@@ -94,6 +111,55 @@ export const UploadCard = memo(function UploadCard({
       unsubscribe()
     }
   }, [projectName, queryClient])
+
+  const displayName = getChatbotDisplayName(projectName, metadata)
+  const displayNameError = getDisplayNameError(displayNameInput)
+  const displayNameChanged =
+    normalizeDisplayName(displayNameInput) !==
+    normalizeDisplayName(metadata?.display_name)
+  const displayNameHelp = (
+    <>
+      A friendly name people see instead of the project name. It is only a
+      label: the chatbot is not renamed, and its link{' '}
+      <span className="font-mono break-all">/{projectName}</span> and API name
+      stay the same. Leave empty to show the project name.
+    </>
+  )
+
+  const saveDisplayName = async () => {
+    if (!metadata || displayNameError) return
+    setIsSavingDisplayName(true)
+    const nextDisplayName = normalizeDisplayName(displayNameInput)
+    const ok = await callSetCourseMetadata(projectName, {
+      ...metadata,
+      display_name: nextDisplayName,
+    })
+    setIsSavingDisplayName(false)
+    if (!ok) {
+      showToast({
+        type: 'error',
+        title: 'Could not save display name',
+        message: 'Please try again.',
+      })
+      return
+    }
+    const updated = { ...metadata, display_name: nextDisplayName }
+    setMetadata(updated)
+    setDisplayNameInput(nextDisplayName ?? '')
+    queryClient.setQueryData(['courseMetadata', projectName], updated)
+    // Settings-page breadcrumbs and tab titles read this key.
+    queryClient.setQueryData(
+      ['chatbotDisplayName', projectName],
+      getChatbotDisplayName(projectName, updated),
+    )
+    showToast({
+      type: 'success',
+      title: nextDisplayName ? 'Display name updated' : 'Display name cleared',
+      message: nextDisplayName
+        ? `This chatbot now shows as "${nextDisplayName}".`
+        : `This chatbot now shows as "${projectName}".`,
+    })
+  }
 
   const handleCloseNotification = () => {
     setShowNotification(false)
@@ -134,13 +200,21 @@ export const UploadCard = memo(function UploadCard({
                   className={`${
                     montserrat_heading.variable
                   } font-montserratHeading min-w-0 text-base font-bold text-(--illinois-orange) sm:text-xl ${
-                    projectName.length > 40
+                    displayName.length > 40
                       ? 'max-w-[120px] truncate sm:max-w-[300px] lg:max-w-[400px]'
                       : ''
                   }`}
                 >
-                  {projectName}
+                  {displayName}
                 </h3>
+                {displayName !== projectName && (
+                  <span
+                    className="font-mono text-xs break-all text-(--foreground-faded)"
+                    title="The display name is an alias. The project name and its link do not change."
+                  >
+                    alias of /{projectName}
+                  </span>
+                )}
               </div>
 
               <div className="relative -inset-0.25 shrink-0 rounded-3xl p-0.5">
@@ -225,6 +299,67 @@ export const UploadCard = memo(function UploadCard({
           className="flex-[1_1_100%] p-4 min-[960px]:flex-[1_1_40%] min-[960px]:border-l min-[960px]:border-(--dashboard-border) sm:p-6"
         >
           <div className="flex h-full flex-col justify-start space-y-6">
+            <div className="flex flex-col">
+              <div className="mb-2 flex items-center gap-2">
+                <h3
+                  className={`${montserrat_heading.variable} font-montserratHeading text-[1.375rem] font-bold text-(--dashboard-foreground)`}
+                >
+                  <label htmlFor="display-name-input">Display Name</label>
+                </h3>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    aria-label="What is a display name?"
+                    className="cursor-help rounded-full focus-visible:ring-2 focus-visible:ring-(--ring) focus-visible:outline-none"
+                  >
+                    <Badge variant="outline">Alias</Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="block max-w-[280px] text-wrap">
+                    {displayNameHelp}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <p id="display-name-help" className="sr-only">
+                {displayNameHelp}
+              </p>
+              <Input
+                id="display-name-input"
+                placeholder={projectName}
+                value={displayNameInput}
+                aria-describedby="display-name-help display-name-error"
+                aria-invalid={Boolean(displayNameError)}
+                onChange={(e) => setDisplayNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && displayNameChanged) {
+                    e.preventDefault()
+                    void saveDisplayName()
+                  }
+                }}
+                className={`${montserrat_paragraph.variable} font-montserratParagraph bg-(--background) text-base text-(--foreground) dark:bg-(--background)`}
+              />
+              <p
+                id="display-name-error"
+                role="alert"
+                className="mt-1 px-1 text-sm text-(--destructive)"
+              >
+                {displayNameError}
+              </p>
+              <Button
+                type="button"
+                variant="dashboard"
+                className="mt-2 w-24 self-end"
+                aria-label="Update display name"
+                disabled={
+                  !displayNameChanged ||
+                  Boolean(displayNameError) ||
+                  isSavingDisplayName
+                }
+                onClick={() => void saveDisplayName()}
+              >
+                {isSavingDisplayName ? 'Saving…' : 'Update'}
+              </Button>
+            </div>
+
             <div className="flex flex-col">
               <h3
                 className={`${montserrat_heading.variable} font-montserratHeading mb-4 text-[1.375rem] font-bold text-(--dashboard-foreground)`}
