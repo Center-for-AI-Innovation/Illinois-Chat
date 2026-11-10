@@ -274,6 +274,33 @@ class OpenAIAPIProcessor:
     self.cleaned_results: List[str] = extract_context_from_results(self.results)
 
 
+def build_embeddings_dict(results: List[Any], input_texts: List[dict]) -> dict:
+  """Map each input text to its embedding from OpenAIAPIProcessor.results.
+
+  results contains one entry per API attempt. An attempt that was re-queued
+  for retry returns None, and a request that exhausted its attempts returns
+  [request_json, [error strings]]. Skip the None entries, and raise a clear
+  error if any input text ended up without an embedding.
+  """
+  embeddings: dict = {}
+  failures: List[str] = []
+  for item in results:
+    if item is None:
+      continue  # attempt was retried; its successful retry is a separate entry
+    request_json, response = item[0], item[1]
+    if isinstance(response, dict) and response.get('data'):
+      embeddings[request_json['input']] = response['data'][0]['embedding']
+    else:
+      failures.append(str(response))
+
+  missing = [t['input'] for t in input_texts if t['input'] not in embeddings]
+  if missing:
+    detail = f" Last errors: {failures[-1]}" if failures else ""
+    raise RuntimeError(
+        f"Embedding failed for {len(missing)} of {len(input_texts)} chunks after all retries.{detail}")
+  return embeddings
+
+
 def extract_context_from_results(results: List[Any]) -> List[str]:
   assistant_contents = []
   total_prompt_tokens = 0

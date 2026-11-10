@@ -51,12 +51,12 @@ from langchain.vectorstores import Qdrant
 
 try:
     from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB
-    from ai_ta_backend.rabbitmq.embeddings import OpenAIAPIProcessor
+    from ai_ta_backend.rabbitmq.embeddings import OpenAIAPIProcessor, build_embeddings_dict
     from ai_ta_backend.rabbitmq.trusted_hosts import is_same_origin_as_any
 except ModuleNotFoundError:
     # When running as worker outside Flask app, import from local path
     from rmsql import SQLAlchemyIngestDB
-    from embeddings import OpenAIAPIProcessor
+    from embeddings import OpenAIAPIProcessor, build_embeddings_dict
     from trusted_hosts import is_same_origin_as_any
 
 load_dotenv()
@@ -562,9 +562,7 @@ class Ingest:
                     logging_level=logging.INFO,
                     model=self.embedding_model)
                 asyncio.run(oai.process_api_requests_from_file())
-                embeddings_dict: dict[str, List[float]] = {
-                    item[0]['input']: item[1]['data'][0]['embedding'] for item in oai.results
-                }
+                embeddings_dict: dict[str, List[float]] = build_embeddings_dict(oai.results, input_texts)
             print(f"⏰ embeddings runtime: {(time.monotonic() - embeddings_start_time):.2f} seconds")
 
             if self.qdrant_client is not None:
