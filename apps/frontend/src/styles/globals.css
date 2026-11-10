@@ -491,25 +491,15 @@ button:disabled {
   animation: icon_scrolling 20s linear 0s infinite;
 }
 
-/*
- * WCAG 2.4.7 – Focus Visible (Level AA): a fallback focus indicator for
- * elements that don't draw their own, in the design system's focus style
- * (Figma "focus/default": 3px ring at 50%).
- */
-*:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--ring) 50%, transparent);
-  outline-offset: 0;
-}
 *:focus:not(:focus-visible) {
   outline: none;
 }
 
 /*
-/*
  * shadcn primitives draw their own design-system focus ring (border-ring +
- * 3px ring-ring/50), so the global outline above would double it up. Higher
- * specificity than `*:focus-visible`, and !important so it beats the global
- * rule's !important.
+ * 3px ring-ring/50), so the global orange outline (`*:focus-visible` at the top
+ * of this file) would double it up. Higher specificity, and !important to beat
+ * that rule's !important.
  */
 [data-slot='button']:focus-visible,
 [data-slot='switch']:focus-visible,
@@ -580,6 +570,8 @@ html[data-input-modality='keyboard']
   --secondary-foreground: var(--foreground);
   --muted: color-mix(in srgb, var(--foreground) 10%, var(--background));
   --muted-foreground: #8291a3;
+  --destructive: #f87171;
+  --destructive-foreground: #450a0a;
   --accent: color-mix(in srgb, var(--foreground) 10%, var(--background));
   --accent-foreground: var(--foreground);
   --accent-border: color-mix(in srgb, var(--foreground) 25%, var(--background));
@@ -594,7 +586,6 @@ html[data-input-modality='keyboard']
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
 
-  --muted-foreground: rgba(from var(--foreground) r g b / 0.8);
 
   --chat-background: color-mix(in srgb, var(--background), black 20%);
 

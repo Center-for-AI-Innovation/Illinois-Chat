@@ -60,6 +60,14 @@ describe('Switch', () => {
     expect(toggle.querySelector('svg')).toBeNull()
   })
 
+  it('keeps the legacy labeled variant', () => {
+    render(<Switch variant="labeled" aria-label="Toggle" />)
+
+    expect(screen.getByRole('switch', { name: 'Toggle' })).toHaveClass(
+      'data-checked:bg-(--dashboard-button)',
+    )
+  })
+
   it('keeps explicit legacy sizes', () => {
     render(<Switch size="default" aria-label="Toggle" />)
 

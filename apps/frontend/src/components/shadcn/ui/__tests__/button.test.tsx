@@ -56,4 +56,22 @@ describe('Button', () => {
       'shadow-xs',
     )
   })
+
+  it('keeps the legacy danger and dashboard variants', () => {
+    render(
+      <>
+        <Button variant="danger">Danger</Button>
+        <Button variant="dashboard">Dash</Button>
+      </>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Danger' })).toHaveClass(
+      'bg-red-600',
+      'text-white',
+    )
+    expect(screen.getByRole('button', { name: 'Dash' })).toHaveClass(
+      'bg-(--dashboard-button)',
+      'text-(--dashboard-button-foreground)',
+    )
+  })
 })

@@ -59,7 +59,7 @@ function SwitchField({
     <Field
       orientation="horizontal"
       data-slot="switch-field"
-      data-disabled={disabled}
+      data-disabled={disabled || undefined}
       className={cn(switchFieldVariants({ type, side }), className)}
     >
       <Switch
