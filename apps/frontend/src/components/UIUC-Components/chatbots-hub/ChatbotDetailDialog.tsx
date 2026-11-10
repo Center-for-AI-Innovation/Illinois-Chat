@@ -106,7 +106,7 @@ export function ChatbotDetailDialog({
         ? 'admin'
         : owner === 'You'
           ? 'owner'
-          : 'member')
+          : undefined)
 
   const aboutText = resolvedMetadata?.project_description || description
 
@@ -135,7 +135,9 @@ export function ChatbotDetailDialog({
         <div className="scrollbar-thin-auto min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
           {/* Header section */}
           <div className="space-y-3 px-6 pt-6 pb-2">
-            <ChatbotUserRoleBadge role={resolvedUserRole} />
+            {resolvedUserRole && (
+              <ChatbotUserRoleBadge role={resolvedUserRole} />
+            )}
 
             <h2 className="text-2xl leading-tight font-bold">{title}</h2>
 
