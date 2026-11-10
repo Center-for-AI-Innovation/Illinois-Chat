@@ -51,24 +51,25 @@ checkpoint.
 ## Phase 1 — Primitives
 
 Each primitive is its own checkpoint. For each one:
+
 1. Pull the variant matrix from its library page.
 2. Update the CVA classes.
 3. Add class-assertion tests.
 4. Screenshot a sample of the existing callers.
 
-| Primitive | File | Key changes |
-|---|---|---|
-| Switch | `switch.tsx` | 36×20 track with a 16px thumb is the default (`sm`); focus ring; ref type `HTMLElement` |
-| SwitchField (new) | `switch-field.tsx` | Label, description, side and box variants, composed from `field.tsx` |
-| Button | `button.tsx` | `default` h-9, `shadow-xs`; `sm` already matches |
-| Input / Label | `input.tsx`, `label.tsx` | `px-3`, `bg-background`, 6px gap between label and field |
-| Select | `select.tsx` | Trigger `px-3 gap-2`; popup and items restyled |
-| Separator | `separator.tsx` | Token-driven; horizontal and vertical |
-| Alert | `alert.tsx` | `destructive` description uses full `text-destructive` |
-| Card | `card.tsx` | Border plus `shadow-sm` instead of a ring; `rounded-xl`; title semibold |
-| Avatar | `avatar.tsx` | Round size-8; square `rounded-lg` variant |
-| Sidebar | `sidebar.tsx` | Menu, sub-menu and sub-item sizing; active item uses `bg-sidebar-accent` |
-| Breadcrumb | `breadcrumb.tsx` | text-sm foreground |
+| Primitive         | File                     | Key changes                                                                             |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| Switch            | `switch.tsx`             | 36×20 track with a 16px thumb is the default (`sm`); focus ring; ref type `HTMLElement` |
+| SwitchField (new) | `switch-field.tsx`       | Label, description, side and box variants, composed from `field.tsx`                    |
+| Button            | `button.tsx`             | `default` h-9, `shadow-xs`; `sm` already matches                                        |
+| Input / Label     | `input.tsx`, `label.tsx` | `px-3`, `bg-background`, 6px gap between label and field                                |
+| Select            | `select.tsx`             | Trigger `px-3 gap-2`; popup and items restyled                                          |
+| Separator         | `separator.tsx`          | Token-driven; horizontal and vertical                                                   |
+| Alert             | `alert.tsx`              | `destructive` description uses full `text-destructive`                                  |
+| Card              | `card.tsx`               | Border plus `shadow-sm` instead of a ring; `rounded-xl`; title semibold                 |
+| Avatar            | `avatar.tsx`             | Round size-8; square `rounded-lg` variant                                               |
+| Sidebar           | `sidebar.tsx`            | Menu, sub-menu and sub-item sizing; active item uses `bg-sidebar-accent`                |
+| Breadcrumb        | `breadcrumb.tsx`         | text-sm foreground                                                                      |
 
 Other primitives in the library (Checkbox, Dropdown Menu, Table, Textarea, Badge, Drawer, Calendar, Chart) follow
 the same process when a migrated page first needs them.
@@ -124,15 +125,15 @@ Every page goes through the same steps:
 
 ### Remaining pages, in the order they're expected to migrate
 
-| Page | Route today | Notes |
-|---|---|---|
-| Dashboard | `/[course_name]/dashboard` | Upload, integrations, branding. Large page; may be split into the design's "Project Data" / "Project Identity" groups |
-| Prompting | `/[course_name]/prompt` | System prompt, behavior settings |
-| Tools | `/[course_name]/tools` | |
-| Analysis | `/[course_name]/analysis` | Charts: use the library's Chart page |
-| API | `/[course_name]/api` | |
-| Chat | `/[course_name]/chat` | Not an admin page, so it needs its own layout pass |
-| Chatbots hub, home | `/chatbots`, `/` | Global nav reuse |
+| Page               | Route today                | Notes                                                                                                                 |
+| ------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Dashboard          | `/[course_name]/dashboard` | Upload, integrations, branding. Large page; may be split into the design's "Project Data" / "Project Identity" groups |
+| Prompting          | `/[course_name]/prompt`    | System prompt, behavior settings                                                                                      |
+| Tools              | `/[course_name]/tools`     |                                                                                                                       |
+| Analysis           | `/[course_name]/analysis`  | Charts: use the library's Chart page                                                                                  |
+| API                | `/[course_name]/api`       |                                                                                                                       |
+| Chat               | `/[course_name]/chat`      | Not an admin page, so it needs its own layout pass                                                                    |
+| Chatbots hub, home | `/chatbots`, `/`           | Global nav reuse                                                                                                      |
 
 When the design's own groupings (Project Data, Project Identity, User Access and Sharing) are ready, add them to the
 registry and retire `NavigationSidebar` and `SettingsLayout`.
