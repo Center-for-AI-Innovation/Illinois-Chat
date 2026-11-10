@@ -134,7 +134,7 @@ export const APIKeyInput = ({
             field.handleChange('')
             field.form.handleSubmit()
           }}
-          className="ml-2 text-(--foreground-faded) hover:bg-(--dashboard-button) hover:text-(--dashboard-button-foreground) hover:text-white"
+          className="ml-2 size-6 rounded-md text-(--foreground-faded) hover:bg-(--dashboard-button) hover:text-(--dashboard-button-foreground) hover:text-white"
         >
           <IconX size={12} aria-hidden="true" />
         </Button>

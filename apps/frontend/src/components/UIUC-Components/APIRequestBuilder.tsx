@@ -259,10 +259,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
             </SelectTrigger>
             <SelectContent>
               {languageOptions.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                >
+                <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
               ))}

@@ -545,8 +545,7 @@ button:disabled {
 
 html[data-input-modality='keyboard']
   .chat_input_container:has(textarea.chat-input:focus) {
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
 }
 
 /* use existing formulas dark/light as described above as much as possible and only change the primary colors as needed */
@@ -565,7 +564,7 @@ html[data-input-modality='keyboard']
     var(--background) 15%
   );
   --primary: #f1f6fe;
-  --primary-foreground: var(--background);
+  --primary-foreground: #081735;
   --secondary: color-mix(in srgb, var(--foreground) 10%, var(--background));
   --secondary-foreground: var(--foreground);
   --muted: color-mix(in srgb, var(--foreground) 10%, var(--background));
@@ -582,10 +581,13 @@ html[data-input-modality='keyboard']
   --popover: var(--background);
   --sidebar-background: color-mix(in srgb, var(--background), black 15%);
   --sidebar-foreground: var(--foreground);
-  --sidebar-accent: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --sidebar-accent: color-mix(
+    in srgb,
+    var(--foreground) 10%,
+    var(--background)
+  );
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
-
 
   --chat-background: color-mix(in srgb, var(--background), black 20%);
 

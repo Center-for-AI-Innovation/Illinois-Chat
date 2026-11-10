@@ -154,10 +154,7 @@ export function ChatbotDetailDialog({
                 </span>
               )}
               {createdAt && lastAccessedAt && (
-                <Separator
-                  orientation="vertical"
-                  className="h-3"
-                />
+                <Separator orientation="vertical" className="h-3" />
               )}
               {lastAccessedAt && (
                 <span className="inline-flex items-center gap-1">
