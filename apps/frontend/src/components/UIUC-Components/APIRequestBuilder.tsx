@@ -236,7 +236,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
         Request Builder
       </h3>
 
-      <Separator className="-mx-4 my-5 bg-(--dashboard-background-dark) sm:-mx-10" />
+      <Separator className="-mx-4 my-5 sm:-mx-10" />
 
       <div className="space-y-6">
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
@@ -262,7 +262,6 @@ fetch('${baseUrl}/api/chat-api/chat', {
                 <SelectItem
                   key={option.value}
                   value={option.value}
-                  className="rounded-md data-highlighted:bg-(--foreground-faded) data-highlighted:text-(--foreground)"
                 >
                   {option.label}
                 </SelectItem>
@@ -297,7 +296,7 @@ fetch('${baseUrl}/api/chat-api/chat', {
                           <ComboboxItem
                             key={item.value}
                             value={item}
-                            className="rounded-md data-highlighted:bg-(--foreground-faded) data-highlighted:text-(--foreground)"
+                            className="rounded-md"
                           >
                             {item.label}
                           </ComboboxItem>
