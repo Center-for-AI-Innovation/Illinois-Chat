@@ -108,7 +108,14 @@ function buildWhere(opts: GetChatbotsOptions): SQL {
   )!
 }
 
-// Sort by the requested field, with a tiebreaker on course_name to keep pages deterministic.
+// Private first, then unlisted, then public; drizzle has no CASE builder.
+const accessLevelRank = sql`CASE
+  WHEN ${visibilityPredicate('private')} THEN 0
+  WHEN ${visibilityPredicate('unlisted')} THEN 1
+  ELSE 2
+END`
+
+// Group by access level, then sort by the requested field, with a tiebreaker on course_name to keep pages deterministic.
 function buildOrderBy(sortBy: ChatbotsSortBy, sortDir: ChatbotsSortDir): SQL[] {
   const dir = sortDir === 'asc' ? asc : desc
   const primary =
@@ -117,7 +124,7 @@ function buildOrderBy(sortBy: ChatbotsSortBy, sortDir: ChatbotsSortDir): SQL[] {
       : // asc()/desc() can't add NULLS LAST.
         sql`${dir(createdAt())} NULLS LAST`
   // Tiebreaker keeps pages deterministic.
-  return [primary, asc(courseMetadata.course_name)]
+  return [asc(accessLevelRank), primary, asc(courseMetadata.course_name)]
 }
 
 // Returns a page of chatbots matching the given options, with total count.

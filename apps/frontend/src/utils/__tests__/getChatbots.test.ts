@@ -182,9 +182,19 @@ describe('getChatbots', () => {
       limit: 3,
     })
     expect(render(calls.orderBy).sql).toMatch(
-      /^LOWER\("course_metadata"\."course_name"\) asc, /i,
+      /END asc, LOWER\("course_metadata"\."course_name"\) asc, /i,
     )
     expect(calls).toMatchObject({ limit: 3, offset: 10 })
+  })
+
+  it('puts private, then unlisted, then public bots first', async () => {
+    await getChatbots({ userEmail: 'me@x.edu', user: 'owned', sortBy: 'name' })
+    const { sql, params } = render(calls.orderBy)
+    expect(sql).toMatch(
+      /^CASE[\s\S]*THEN 0[\s\S]*THEN 1[\s\S]*ELSE 2[\s\S]*END asc, /,
+    )
+    // allow_logged_in_users is false for private, true for unlisted.
+    expect(params).toEqual([true, false, true, true])
   })
 
   it('returns cards with created_at and the window total', async () => {
