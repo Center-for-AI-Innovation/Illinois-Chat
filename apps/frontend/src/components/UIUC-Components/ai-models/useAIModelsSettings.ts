@@ -92,6 +92,10 @@ export function useAIModelsSettings(projectName: string) {
         await mutateAsync({ projectName, llmProviders: next })
         savedRef.current = next
         ok = true
+        // The mutation's onError (from an overlapping failed save) may have
+        // written its stale snapshot over our newer optimistic state.
+        if (latestRef.current)
+          queryClient.setQueryData(queryKey, latestRef.current)
       } catch (error) {
         roundErrorRef.current =
           error instanceof Error ? error.message : String(error)
@@ -100,12 +104,16 @@ export function useAIModelsSettings(projectName: string) {
         if (inFlightRef.current === 1 && savedRef.current) {
           latestRef.current = savedRef.current
           queryClient.setQueryData(queryKey, savedRef.current)
+        } else if (latestRef.current) {
+          // Re-assert the pending state over onError's stale snapshot.
+          queryClient.setQueryData(queryKey, latestRef.current)
         }
       } finally {
         inFlightRef.current -= 1
         if (inFlightRef.current === 0) {
           latestRef.current = null
-          // One toast per settled round, however many actions it held.
+          // One toast each time the pending actions drain to zero, however many
+          // actions (or requests) that covered.
           const failure = roundErrorRef.current
           roundErrorRef.current = null
           showToast(

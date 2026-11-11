@@ -56,6 +56,20 @@ describe('AdminLayout', () => {
     expect(document.getElementById('admin-panel-content')).toHaveFocus()
   })
 
+  it('flags the document while mounted so the app skip link is hidden', () => {
+    globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    const { unmount } = render(
+      <ThemeProvider>
+        <AdminLayout courseName="CS101">
+          <p>content</p>
+        </AdminLayout>
+      </ThemeProvider>,
+    )
+    expect(document.documentElement).toHaveAttribute('data-admin-layout')
+    unmount()
+    expect(document.documentElement).not.toHaveAttribute('data-admin-layout')
+  })
+
   it('scrolls to the URL hash heading once the page mounts', () => {
     const scrollIntoView = vi
       .spyOn(HTMLElement.prototype, 'scrollIntoView')
