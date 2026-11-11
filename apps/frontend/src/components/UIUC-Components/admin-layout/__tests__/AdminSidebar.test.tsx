@@ -16,7 +16,7 @@ function renderSidebar(pathname: string) {
         {/* Stand-in for AdminLayout's scrolling content. */}
         <main id="admin-panel-content">
           <h2 id="default-model">Set the Default Model</h2>
-          <h2 id="closed-source">Closed Source LLMs</h2>
+          <h2 id="commercial">Commercial LLMs</h2>
         </main>
       </SidebarProvider>
     </ThemeProvider>,
@@ -67,7 +67,7 @@ describe('AdminSidebar', () => {
     expect(first).toHaveAttribute('href', '/CS101/ai-models#default-model')
     expect(first).toHaveAttribute('data-active')
     expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+      screen.getByRole('link', { name: 'Commercial LLMs' }),
     ).not.toHaveAttribute('data-active')
     expect(
       screen.getByRole('link', { name: 'AI Models (LLMs)' }),
@@ -78,12 +78,12 @@ describe('AdminSidebar', () => {
     renderSidebar('/[course_name]/ai-models')
 
     act(() => {
-      window.location.hash = '#closed-source'
+      window.location.hash = '#commercial'
       window.dispatchEvent(new HashChangeEvent('hashchange'))
     })
 
     expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+      screen.getByRole('link', { name: 'Commercial LLMs' }),
     ).toHaveAttribute('data-active')
     expect(
       screen.getByRole('link', { name: 'Set the Default Model' }),
@@ -102,24 +102,24 @@ describe('AdminSidebar', () => {
     const user = userEvent.setup()
     renderSidebar('/[course_name]/ai-models')
 
-    await user.click(screen.getByRole('link', { name: 'Closed Source LLMs' }))
+    await user.click(screen.getByRole('link', { name: 'Commercial LLMs' }))
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.contexts[0]).toBe(
-      document.getElementById('closed-source'),
+      document.getElementById('commercial'),
     )
     expect(scrollIntoView).toHaveBeenCalledWith(
       expect.objectContaining({ block: 'start' }),
     )
-    expect(window.location.hash).toBe('#closed-source')
+    expect(window.location.hash).toBe('#commercial')
     expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+      screen.getByRole('link', { name: 'Commercial LLMs' }),
     ).toHaveAttribute('aria-current', 'location')
   })
 
   it('scrolls back to the top when the current page item is clicked', async () => {
     const user = userEvent.setup()
-    window.location.hash = '#closed-source'
+    window.location.hash = '#commercial'
     renderSidebar('/[course_name]/ai-models')
 
     await user.click(screen.getByRole('link', { name: 'AI Models (LLMs)' }))
@@ -160,7 +160,7 @@ describe('AdminSidebar', () => {
     const user = userEvent.setup()
     const { rerender } = renderSidebar('/[course_name]/ai-models')
 
-    await user.click(screen.getByRole('link', { name: 'Closed Source LLMs' }))
+    await user.click(screen.getByRole('link', { name: 'Commercial LLMs' }))
     rerender(
       <ThemeProvider>
         <SidebarProvider>
@@ -170,8 +170,38 @@ describe('AdminSidebar', () => {
     )
 
     expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+      screen.getByRole('link', { name: 'Commercial LLMs' }),
     ).toHaveAttribute('data-active')
+  })
+
+  it('moves the highlight as the reader scrolls, without touching the URL', async () => {
+    renderSidebar('/[course_name]/ai-models')
+    const main = document.getElementById('admin-panel-content') as HTMLElement
+    const rect = (top: number) => ({ top }) as DOMRect
+    vi.spyOn(main, 'getBoundingClientRect').mockReturnValue(rect(0))
+    vi.spyOn(
+      document.getElementById('default-model') as HTMLElement,
+      'getBoundingClientRect',
+    ).mockReturnValue(rect(-300))
+    vi.spyOn(
+      document.getElementById('commercial') as HTMLElement,
+      'getBoundingClientRect',
+    ).mockReturnValue(rect(40))
+    const before = window.location.href
+
+    act(() => {
+      main.dispatchEvent(new Event('scroll'))
+    })
+
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole('link', { name: 'Commercial LLMs' }),
+      ).toHaveAttribute('data-active'),
+    )
+    expect(
+      screen.getByRole('link', { name: 'Set the Default Model' }),
+    ).not.toHaveAttribute('data-active')
+    expect(window.location.href).toBe(before)
   })
 
   it('marks the closed sidebar inert', () => {

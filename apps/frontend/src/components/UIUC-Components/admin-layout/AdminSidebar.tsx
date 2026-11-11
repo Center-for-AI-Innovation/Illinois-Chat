@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useState } from 'react'
+import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ChevronRight, Monitor, Moon, Sun, Undo2 } from 'lucide-react'
@@ -30,7 +30,13 @@ import { cn } from '@/components/shadcn/lib/utils'
 import { useTheme } from '~/contexts/ThemeContext'
 import { ADMIN_HOME_PAGE, ADMIN_SETTINGS_PAGES } from './admin-pages'
 import { type AdminPage } from './admin-pages.types'
-import { replaceHash, scrollContentToTop, scrollToSection } from './adminScroll'
+import {
+  type ActiveSectionTracker,
+  replaceHash,
+  scrollContentToTop,
+  scrollToSection,
+  trackActiveSection,
+} from './adminScroll'
 
 /**
  * Current URL hash, read after mount (SSR has none) and kept in sync.
@@ -59,18 +65,26 @@ function useLocationHash() {
 const isPlainClick = (e: MouseEvent) =>
   e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
 
+// The shared sidebar uses leading-none, which together with the label's
+// truncate (overflow hidden) clips descenders ("g" in "Prompting"). A real line
+// height on the label span fixes it without changing the item height.
+const LABEL_LINE_HEIGHT = '[&>span:last-child]:leading-5'
+
 function PageItem({
   page,
   courseName,
   activePath,
   hash,
   setHash,
+  onScrollStart,
 }: {
   page: AdminPage
   courseName: string
   activePath: string
   hash: string
   setHash: (hash: string) => void
+  /** Called before a click-triggered scroll, so scroll tracking pauses. */
+  onScrollStart: () => void
 }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const href = `/${courseName}/${page.path}`
@@ -84,6 +98,7 @@ function PageItem({
     if (isMobile) setOpenMobile(false)
     if (!isCurrent || !isPlainClick(e)) return
     e.preventDefault()
+    onScrollStart()
     if (sectionId) scrollToSection(sectionId)
     else scrollContentToTop()
     replaceHash(sectionId ?? '')
@@ -95,6 +110,7 @@ function PageItem({
       <SidebarMenuItem>
         <SidebarMenuButton
           isActive={isCurrent}
+          className={LABEL_LINE_HEIGHT}
           onClick={scrollInPlace()}
           render={
             <Link href={href} aria-current={isCurrent ? 'page' : undefined} />
@@ -113,6 +129,7 @@ function PageItem({
   return (
     <Collapsible defaultOpen={isCurrent} render={<SidebarMenuItem />}>
       <SidebarMenuButton
+        className={LABEL_LINE_HEIGHT}
         onClick={scrollInPlace()}
         render={
           <Link href={href} aria-current={isCurrent ? 'page' : undefined} />
@@ -136,6 +153,7 @@ function PageItem({
           {page.sections.map((section) => (
             <SidebarMenuSubItem key={section.id}>
               <SidebarMenuSubButton
+                className={LABEL_LINE_HEIGHT}
                 isActive={activeSection === section.id}
                 onClick={scrollInPlace(section.id)}
                 render={
@@ -201,6 +219,27 @@ function SidebarBody({ courseName }: { courseName: string }) {
   // "/[course_name]/ai-models" -> "ai-models"
   const activePath = router.pathname.split('/').pop() ?? ''
 
+  // Scroll following, for every admin page that lists sections: the highlight
+  // moves with the section the reader has reached. State only; the URL is left
+  // alone. Clicks pause it while their smooth scroll runs (see holdTracking).
+  const sections = ADMIN_SETTINGS_PAGES.find(
+    (page) => page.path === activePath,
+  )?.sections
+  const tracker = useRef<ActiveSectionTracker | null>(null)
+  useEffect(() => {
+    if (!sections?.length) return undefined
+    const t = trackActiveSection(
+      sections.map((section) => section.id),
+      setHash,
+    )
+    tracker.current = t
+    return () => {
+      t.stop()
+      tracker.current = null
+    }
+  }, [sections, setHash])
+  const holdTracking = () => tracker.current?.hold()
+
   return (
     <>
       <SidebarHeader>
@@ -234,6 +273,7 @@ function SidebarBody({ courseName }: { courseName: string }) {
               activePath={activePath}
               hash={hash}
               setHash={setHash}
+              onScrollStart={holdTracking}
             />
           </SidebarMenu>
           <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
@@ -246,6 +286,7 @@ function SidebarBody({ courseName }: { courseName: string }) {
                 activePath={activePath}
                 hash={hash}
                 setHash={setHash}
+                onScrollStart={holdTracking}
               />
             ))}
           </SidebarMenu>
