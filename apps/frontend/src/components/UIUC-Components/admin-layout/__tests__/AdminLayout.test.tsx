@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { AdminLayout } from '../AdminLayout'
@@ -70,7 +70,53 @@ describe('AdminLayout', () => {
     callbacks.forEach((cb) => cb()) // cards replace skeletons above the heading
     expect(scrollIntoView).toHaveBeenCalledTimes(2)
 
-    document.getElementById('main-content')!.dispatchEvent(new Event('wheel'))
+    document
+      .getElementById('admin-panel-content')!
+      .dispatchEvent(new Event('wheel'))
     expect(disconnect).toHaveBeenCalled()
+  })
+
+  it('keeps following when a top-level child is swapped for new content', async () => {
+    const scrollIntoView = vi
+      .spyOn(HTMLElement.prototype, 'scrollIntoView')
+      .mockImplementation(() => {})
+    const observed: Element[] = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(el: Element) {
+          observed.push(el)
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+    globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    window.location.hash = '#open-source'
+
+    const { rerender } = render(
+      <ThemeProvider>
+        <AdminLayout courseName="CS101">
+          <div data-testid="skeleton" />
+        </AdminLayout>
+      </ThemeProvider>,
+    )
+    const before = scrollIntoView.mock.calls.length
+
+    rerender(
+      <ThemeProvider>
+        <AdminLayout courseName="CS101">
+          <section data-testid="content">
+            <h2 id="open-source">Open Source LLMs</h2>
+          </section>
+        </AdminLayout>
+      </ThemeProvider>,
+    )
+    await waitFor(() =>
+      expect(scrollIntoView.mock.calls.length).toBeGreaterThan(before),
+    )
+    expect(
+      observed.some((el) => el.getAttribute('data-testid') === 'content'),
+    ).toBe(true)
   })
 })
