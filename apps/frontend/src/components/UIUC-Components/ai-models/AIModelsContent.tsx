@@ -98,6 +98,7 @@ export function AIModelsContent({
     if (id === 'default-model') {
       return (
         <DefaultModelCard
+          projectName={projectName}
           llmProviders={llmProviders}
           onChange={(model) => void settings.setDefaultModel(model)}
         />

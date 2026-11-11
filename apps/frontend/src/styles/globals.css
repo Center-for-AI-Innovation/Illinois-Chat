@@ -62,6 +62,12 @@ button:disabled {
   cursor: default;
 }
 
+/* Admin pages have no #main-content and ship their own skip link
+   (AdminLayout), so hide the app-level one there. */
+html[data-admin-layout] .app-skip-nav {
+  display: none;
+}
+
 /* Skip navigation link for keyboard/screen reader users */
 .skip-nav-link {
   position: absolute;
