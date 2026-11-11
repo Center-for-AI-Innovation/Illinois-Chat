@@ -32,7 +32,11 @@ import { ADMIN_HOME_PAGE, ADMIN_SETTINGS_PAGES } from './admin-pages'
 import { type AdminPage } from './admin-pages.types'
 import { replaceHash, scrollContentToTop, scrollToSection } from './adminScroll'
 
-/** Current URL hash, read after mount (SSR has none) and kept in sync. */
+/**
+ * Current URL hash, read after mount (SSR has none) and kept in sync.
+ * Only tracks the hash for highlighting; following a hash to its heading on
+ * arrival is owned by AdminLayout (its layout effect is mount-only).
+ */
 function useLocationHash() {
   const router = useRouter()
   const [hash, setHash] = useState('')
@@ -153,6 +157,8 @@ function PageItem({
   )
 }
 
+// Deliberately not ThemeToggle.tsx: the admin sidebar footer needs a labelled
+// three-way radiogroup (Light / Dark / Default), not the icon-only toggle.
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
@@ -266,7 +272,8 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
   }
   // Stay mounted when closed and collapse the width, so the header trigger
   // animates the panel instead of snapping it between one and two columns.
-  // `inert` takes the hidden links out of the tab order.
+  // `inert` takes the hidden links out of the tab order. `min-w-0` lets the
+  // shadcn Sidebar's width collapse past its content's min-content width.
   return (
     <Sidebar
       collapsible="none"
@@ -274,7 +281,7 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
       inert={!open}
       className={cn(
         'overflow-hidden transition-[width] duration-200 ease-linear',
-        !open && 'w-0 border-r-0',
+        !open && 'w-0 min-w-0',
       )}
     >
       <SidebarBody courseName={courseName} />

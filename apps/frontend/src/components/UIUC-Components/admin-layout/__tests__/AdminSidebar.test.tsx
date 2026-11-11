@@ -134,17 +134,7 @@ describe('AdminSidebar', () => {
     ).toHaveAttribute('aria-current', 'location')
   })
 
-  it('lets links to other pages navigate normally', async () => {
-    const user = userEvent.setup()
-    renderSidebar('/[course_name]/tools')
-
-    await user.click(screen.getByRole('link', { name: 'AI Models (LLMs)' }))
-
-    expect(scrollTo).not.toHaveBeenCalled()
-    expect(scrollIntoView).not.toHaveBeenCalled()
-  })
-
-  it('does not prevent default on links to other pages', () => {
+  it('lets links to other pages navigate normally, without preventDefault', () => {
     renderSidebar('/[course_name]/tools')
     const link = screen.getByRole('link', { name: 'AI Models (LLMs)' })
     // Runs after React's handlers (document is above the root). Record what
@@ -162,6 +152,8 @@ describe('AdminSidebar', () => {
       new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
     )
     expect(handlerPrevented).toBe(false)
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it('keeps the active section after an in-place click and a re-render', async () => {
@@ -182,7 +174,7 @@ describe('AdminSidebar', () => {
     ).toHaveAttribute('data-active')
   })
 
-  it('hides the desktop sidebar from the tab order when closed, without unmounting', () => {
+  it('marks the closed sidebar inert', () => {
     globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
     render(
       <ThemeProvider>

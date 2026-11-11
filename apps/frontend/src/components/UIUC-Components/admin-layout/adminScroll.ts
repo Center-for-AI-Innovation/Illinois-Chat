@@ -16,6 +16,11 @@ export function scrollToSection(id: string, smooth = true) {
   })
 }
 
+/** Moves focus into the scrolling panel (skip-link target). */
+export function focusAdminContent() {
+  document.getElementById(ADMIN_CONTENT_ID)?.focus()
+}
+
 export function scrollContentToTop() {
   document
     .getElementById(ADMIN_CONTENT_ID)
