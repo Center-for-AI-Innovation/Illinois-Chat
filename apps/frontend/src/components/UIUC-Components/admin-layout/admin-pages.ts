@@ -20,6 +20,8 @@ export const ADMIN_HOME_PAGE: AdminPage = {
 }
 
 export const ADMIN_SETTINGS_PAGES: AdminPage[] = [
+  // The /[course_name]/ai-models page lands in a later PR of this stack; until
+  // then this entry has no route behind it.
   {
     title: 'AI Models (LLMs)',
     icon: Bot,

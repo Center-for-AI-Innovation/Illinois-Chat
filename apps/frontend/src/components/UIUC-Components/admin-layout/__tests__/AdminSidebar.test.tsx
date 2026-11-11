@@ -14,7 +14,7 @@ function renderSidebar(pathname: string) {
       <SidebarProvider>
         <AdminSidebar courseName="CS101" />
         {/* Stand-in for AdminLayout's scrolling content. */}
-        <main id="main-content">
+        <main id="admin-panel-content">
           <h2 id="default-model">Set the Default Model</h2>
           <h2 id="closed-source">Closed Source LLMs</h2>
         </main>
@@ -125,7 +125,7 @@ describe('AdminSidebar', () => {
     await user.click(screen.getByRole('link', { name: 'AI Models (LLMs)' }))
 
     expect(scrollTo.mock.contexts[0]).toBe(
-      document.getElementById('main-content'),
+      document.getElementById('admin-panel-content'),
     )
     expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }))
     expect(window.location.hash).toBe('')
@@ -142,5 +142,55 @@ describe('AdminSidebar', () => {
 
     expect(scrollTo).not.toHaveBeenCalled()
     expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
+  it('does not prevent default on links to other pages', () => {
+    renderSidebar('/[course_name]/tools')
+    const link = screen.getByRole('link', { name: 'AI Models (LLMs)' })
+    // Runs after React's handlers (document is above the root). Record what
+    // they did, then cancel so jsdom does not attempt a real navigation.
+    let handlerPrevented: boolean | undefined
+    document.addEventListener(
+      'click',
+      (e) => {
+        handlerPrevented = e.defaultPrevented
+        e.preventDefault()
+      },
+      { once: true },
+    )
+    link.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
+    )
+    expect(handlerPrevented).toBe(false)
+  })
+
+  it('keeps the active section after an in-place click and a re-render', async () => {
+    const user = userEvent.setup()
+    const { rerender } = renderSidebar('/[course_name]/ai-models')
+
+    await user.click(screen.getByRole('link', { name: 'Closed Source LLMs' }))
+    rerender(
+      <ThemeProvider>
+        <SidebarProvider>
+          <AdminSidebar courseName="CS101" />
+        </SidebarProvider>
+      </ThemeProvider>,
+    )
+
+    expect(
+      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+    ).toHaveAttribute('data-active')
+  })
+
+  it('hides the desktop sidebar from the tab order when closed, without unmounting', () => {
+    globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    render(
+      <ThemeProvider>
+        <SidebarProvider defaultOpen={false}>
+          <AdminSidebar courseName="CS101" />
+        </SidebarProvider>
+      </ThemeProvider>,
+    )
+    expect(screen.getByLabelText('Project settings')).toHaveAttribute('inert')
   })
 })

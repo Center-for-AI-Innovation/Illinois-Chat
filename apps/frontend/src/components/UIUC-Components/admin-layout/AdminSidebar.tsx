@@ -264,9 +264,19 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
       </Sidebar>
     )
   }
-  if (!open) return null
+  // Stay mounted when closed and collapse the width, so the header trigger
+  // animates the panel instead of snapping it between one and two columns.
+  // `inert` takes the hidden links out of the tab order.
   return (
-    <Sidebar collapsible="none" aria-label="Project settings">
+    <Sidebar
+      collapsible="none"
+      aria-label="Project settings"
+      inert={!open}
+      className={cn(
+        'overflow-hidden transition-[width] duration-200 ease-linear',
+        !open && 'w-0 border-r-0',
+      )}
+    >
       <SidebarBody courseName={courseName} />
     </Sidebar>
   )
