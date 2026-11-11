@@ -70,13 +70,16 @@ export function ModelList({
         })}
       </ul>
 
-      <CountryOfConcernModal
-        modelName={pending?.name ?? null}
-        onClose={() => setPending(null)}
-        onConfirm={confirmPending}
-        title="Country of Concern Warning"
-        confirmLabel="Enable anyway"
-      />
+      {/* Mounted only while a flagged model is pending, not once per card. */}
+      {pending && (
+        <CountryOfConcernModal
+          modelName={pending?.name ?? null}
+          onClose={() => setPending(null)}
+          onConfirm={confirmPending}
+          title="Country of Concern Warning"
+          confirmLabel="Enable anyway"
+        />
+      )}
     </>
   )
 }
