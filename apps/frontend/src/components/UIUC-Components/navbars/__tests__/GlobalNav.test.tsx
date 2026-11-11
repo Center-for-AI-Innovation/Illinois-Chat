@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { axe, toHaveNoViolations } from 'jest-axe'
 
 import { GlobalNav } from '../GlobalNav'
+
+expect.extend(toHaveNoViolations)
 
 vi.mock('../AuthMenu', () => ({
   AuthMenu: () => <div data-testid="auth-menu" />,
@@ -44,4 +47,13 @@ describe('GlobalNav', () => {
 
     expect(screen.getByRole('banner')).not.toHaveClass('border-b')
   })
+
+  it.each(['static', 'fixed'] as const)(
+    'has no axe violations when %s',
+    async (position) => {
+      const { container } = render(<GlobalNav position={position} />)
+
+      expect(await axe(container)).toHaveNoViolations()
+    },
+  )
 })

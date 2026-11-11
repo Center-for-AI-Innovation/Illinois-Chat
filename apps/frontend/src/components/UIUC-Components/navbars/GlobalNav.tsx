@@ -6,7 +6,7 @@ import { cn } from '@/components/shadcn/lib/utils'
 import { montserrat_heading } from 'fonts'
 import { AuthMenu } from './AuthMenu'
 
-export const GLOBAL_NAV_LINKS = [
+const GLOBAL_NAV_LINKS = [
   { href: '/chatbots', label: 'Chatbots Hub', icon: House },
   { href: '/new', label: 'Create Your Own Bot', icon: WandSparkles },
 ]
@@ -30,9 +30,10 @@ export function GlobalNav({
   return (
     <header
       className={cn(
-        'bg-background shrink-0',
-        isFixed &&
-          'bg-background/95 fixed inset-x-0 top-0 z-50 backdrop-blur-xs',
+        'shrink-0',
+        isFixed
+          ? 'bg-background/95 fixed inset-x-0 top-0 z-50 backdrop-blur-xs'
+          : 'bg-background',
         !hideBorder && 'border-border border-b',
       )}
     >
