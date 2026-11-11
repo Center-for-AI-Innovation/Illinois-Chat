@@ -63,7 +63,7 @@ export function GlobalNav({
                   href={href}
                   className={cn(
                     buttonVariants({ variant: 'ghost' }),
-                    'text-primary shadow-xs',
+                    'text-primary',
                   )}
                 >
                   <Icon aria-hidden="true" />
