@@ -258,6 +258,54 @@ describe('useAIModelsSettings', () => {
     expect(cache[ProviderNames.OpenAI].enabled).toBe(true)
   })
 
+  it('rolls back to the post-success state when a third round fails', async () => {
+    const { hook, queryClient, handlers, control, flushDebounce } =
+      await setup()
+    let failFirst!: () => void
+    handlers.push(
+      () =>
+        new Promise<Response>((resolve) => {
+          failFirst = () => resolve(json({ error: 'boom' }, 500))
+        }),
+    )
+    control.holdModels = true
+
+    let first!: Promise<boolean>
+    act(() => {
+      first = hook.result.current.toggleProvider(ProviderNames.OpenAI, true)
+    })
+    await flushDebounce()
+    let second!: Promise<boolean>
+    act(() => {
+      second = hook.result.current.toggleModel(
+        ProviderNames.Anthropic,
+        'claude-a',
+        false,
+      )
+    })
+    await act(async () => failFirst())
+    await flushDebounce()
+    await expect(first).resolves.toBe(false)
+    await expect(second).resolves.toBe(true)
+
+    // Round 3 fails; the rollback target must be round 2's saved state.
+    handlers.push(() => json({ error: 'boom' }, 500))
+    let third!: Promise<boolean>
+    act(() => {
+      third = hook.result.current.toggleModel(
+        ProviderNames.Anthropic,
+        'claude-a',
+        true,
+      )
+    })
+    await flushDebounce()
+    await expect(third).resolves.toBe(false)
+
+    const cache = queryClient.getQueryData<AllLLMProviders>(KEY)!
+    expect(cache[ProviderNames.OpenAI].enabled).toBe(true)
+    expect(cache[ProviderNames.Anthropic].models?.[0]?.enabled).toBe(false)
+  })
+
   it('re-sends a failed change when a later action was queued on top of it', async () => {
     const { hook, upserts, handlers, flushDebounce } = await setup()
     let failFirst!: () => void
