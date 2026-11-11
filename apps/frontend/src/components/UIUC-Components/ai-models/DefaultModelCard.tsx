@@ -102,8 +102,14 @@ export function DefaultModelCard({
           }}
         >
           <SelectTrigger aria-label="Default model" className="w-full max-w-96">
-            <SelectValue placeholder="Select a model">
-              {(value: string | null) => (value ? labels.get(value) : null)}
+            <SelectValue>
+              {(value: string | null) =>
+                value ? (
+                  labels.get(value)
+                ) : (
+                  <span className="text-muted-foreground">Select a model</span>
+                )
+              }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>

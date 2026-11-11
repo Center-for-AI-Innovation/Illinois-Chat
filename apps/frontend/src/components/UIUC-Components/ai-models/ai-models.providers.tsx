@@ -99,7 +99,7 @@ export const CLOSED_SOURCE_PROVIDERS: ProviderConfig[] = [
         label: 'Base URL',
         placeholder: 'https://api.example.com/v1',
         validate: (value) =>
-          value && !/\/v1(\/|$)/.test(value.split(/[?#]/)[0] ?? '')
+          value && !/\/v1(\/|$)/.test(value.replace(/[?#].*$/, ''))
             ? 'Base URL must include /v1'
             : undefined,
       },
