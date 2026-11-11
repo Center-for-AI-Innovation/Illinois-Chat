@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { AdminLayout } from '../AdminLayout'
@@ -50,6 +51,21 @@ describe('AdminLayout', () => {
     vi.unstubAllGlobals()
     window.location.hash = ''
     globalThis.__TEST_ROUTER__ = undefined
+  })
+
+  it('skip link moves focus to the admin content panel', async () => {
+    globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    render(
+      <ThemeProvider>
+        <AdminLayout courseName="CS101">
+          <p>content</p>
+        </AdminLayout>
+      </ThemeProvider>,
+    )
+    const link = screen.getByRole('link', { name: 'Skip to admin content' })
+    expect(link).toHaveAttribute('href', '#admin-panel-content')
+    await userEvent.setup().click(link)
+    expect(document.getElementById('admin-panel-content')).toHaveFocus()
   })
 
   describe('access check', () => {

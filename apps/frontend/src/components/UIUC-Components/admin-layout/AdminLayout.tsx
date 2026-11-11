@@ -22,6 +22,18 @@ function AdminShell({
 }) {
   return (
     <div className="bg-background flex h-(--viewport-height) flex-col pt-(--navbar-height)">
+      {/* The app-level skip link in _app.tsx targets #main-content, which
+          does not exist here; this one targets the scrolling panel. */}
+      <a
+        href={`#${ADMIN_CONTENT_ID}`}
+        className="skip-nav-link"
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById(ADMIN_CONTENT_ID)?.focus()
+        }}
+      >
+        Skip to admin content
+      </a>
       <Navbar />
       <div className="flex min-h-0 flex-1 p-4 md:p-8">
         <SidebarProvider className="bg-background border-border min-h-0 overflow-hidden rounded-xl border shadow-sm">
