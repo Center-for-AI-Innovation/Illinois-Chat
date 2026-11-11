@@ -74,4 +74,12 @@ describe('Button', () => {
       'text-(--dashboard-button-foreground)',
     )
   })
+
+  it('uses a red 20% focus ring on destructive', () => {
+    render(<Button variant="destructive">Delete</Button>)
+
+    const button = screen.getByRole('button', { name: 'Delete' })
+    expect(button).toHaveClass('focus-visible:ring-destructive/20')
+    expect(button).not.toHaveClass('focus-visible:ring-ring/50')
+  })
 })

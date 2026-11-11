@@ -40,6 +40,7 @@ describe('Select', () => {
       'bg-background',
       'shadow-xs',
       'focus-visible:ring-[3px]',
+      'focus-visible:bg-accent',
     )
     expect(trigger).not.toHaveClass('aria-[invalid]:ring-[3px]')
   })
@@ -49,7 +50,7 @@ describe('Select', () => {
 
     const option = await screen.findByRole('option', { name: 'Llama 3.1 8b' })
     expect(option).toHaveClass(
-      'rounded-sm',
+      'rounded-xs',
       'pl-2',
       'pr-8',
       'focus:bg-accent',

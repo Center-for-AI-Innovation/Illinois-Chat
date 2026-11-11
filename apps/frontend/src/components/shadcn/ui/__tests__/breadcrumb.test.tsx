@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import {
   Breadcrumb,
+  BreadcrumbEllipsis,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
@@ -41,5 +42,12 @@ describe('Breadcrumb', () => {
     expect(screen.getByRole('link', { name: 'AI-Engineering' })).toHaveClass(
       'hover:text-foreground',
     )
+  })
+
+  // Figma ellipsis item is a 36px square with a 16px icon.
+  it('renders the ellipsis as a 36px square', () => {
+    render(<BreadcrumbEllipsis data-testid="ellipsis" />)
+
+    expect(screen.getByTestId('ellipsis')).toHaveClass('size-9')
   })
 })

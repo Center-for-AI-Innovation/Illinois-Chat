@@ -60,6 +60,14 @@ describe('Switch', () => {
     expect(toggle.querySelector('svg')).toBeNull()
   })
 
+  it('dims to 50% when disabled', () => {
+    render(<Switch disabled aria-label="Toggle" />)
+
+    expect(screen.getByRole('switch', { name: 'Toggle' })).toHaveClass(
+      'disabled:opacity-50',
+    )
+  })
+
   it('keeps the legacy labeled variant', () => {
     render(<Switch variant="labeled" aria-label="Toggle" />)
 
