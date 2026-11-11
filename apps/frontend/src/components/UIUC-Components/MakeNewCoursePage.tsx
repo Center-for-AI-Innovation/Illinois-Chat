@@ -15,7 +15,7 @@ import {
 import { showToast } from '~/utils/toastUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type ChatbotProjectType, type ChatbotTag } from '~/types/chatbotTags'
-import { ChatbotsGlobalNav } from './chatbots-hub/ChatbotsGlobalNav'
+import { GlobalNav } from './navbars/GlobalNav'
 import UploadNotification, { type FileUpload } from './UploadNotification'
 
 import StepCreate from './MakeNewCoursePageSteps/StepCreate'
@@ -367,7 +367,7 @@ const MakeNewCoursePage = ({
 
   return (
     <>
-      <ChatbotsGlobalNav />
+      <GlobalNav position="fixed" />
       <Head>
         <title>{project_name || 'New Project'} — Illinois Chat</title>
         <meta name="description" content="Create a new project on UIUC.chat." />
@@ -381,7 +381,6 @@ const MakeNewCoursePage = ({
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">
           <Card className="my-auto flex w-full max-w-[720px] flex-col rounded-2xl border border-(--dashboard-border)! bg-(--background) px-6 py-8 text-(--foreground) sm:px-10 sm:py-10">
-
             <div
               ref={stepContainerRef}
               className="step_container flex min-h-88 flex-col"

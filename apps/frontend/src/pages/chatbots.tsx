@@ -7,7 +7,7 @@ import { buttonVariants } from '~/components/shadcn/ui/button'
 import { cn } from '~/components/shadcn/lib/utils'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
-import { ChatbotsGlobalNav } from '~/components/UIUC-Components/chatbots-hub/ChatbotsGlobalNav'
+import { GlobalNav } from '~/components/UIUC-Components/navbars/GlobalNav'
 import { ChatbotsHeroSection } from '~/components/UIUC-Components/chatbots-hub/ChatbotsHeroSection'
 import { ChatbotsSearchBar } from '~/components/UIUC-Components/chatbots-hub/ChatbotsSearchBar'
 import { ChatbotsFilterPanel } from '~/components/UIUC-Components/chatbots-hub/ChatbotsFilterPanel'
@@ -263,7 +263,7 @@ const ChatbotsHubPage = () => {
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#081735]">
-      <ChatbotsGlobalNav hideBorder />
+      <GlobalNav position="fixed" hideBorder />
       <div className="mx-auto w-full pt-[72px]">
         {/* Search & Filter Bar — sticky just below the global nav */}
         <div className="border-border sticky top-[72px] z-30 space-y-4 border-b bg-white px-4 py-6 sm:px-8 dark:border-[#32517a] dark:bg-[#081735]">

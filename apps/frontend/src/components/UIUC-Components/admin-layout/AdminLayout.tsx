@@ -3,7 +3,7 @@ import { type ReactNode, useEffect } from 'react'
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
 import { AdminSidebar } from './AdminSidebar'
 import { ADMIN_CONTENT_ID, followSectionUntilSettled } from './adminScroll'
-import { GlobalNav } from './GlobalNav'
+import { GlobalNav } from '../navbars/GlobalNav'
 import { SubPageHeader } from './SubPageHeader'
 
 // Figma "Admin Sub-Pages": global nav over a bordered admin panel holding the

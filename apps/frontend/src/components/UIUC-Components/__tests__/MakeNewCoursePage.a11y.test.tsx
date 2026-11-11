@@ -24,6 +24,12 @@ vi.mock('../navbars/Navbar', () => ({
   default: () => <div data-testid="navbar" />,
 }))
 
+// The nav is a list of links; stubbing it keeps the wizard's progress dots the
+// only list items in the render.
+vi.mock('../navbars/GlobalNav', () => ({
+  GlobalNav: () => <div data-testid="global-nav" />,
+}))
+
 vi.mock('../GlobalFooter', () => ({
   __esModule: true,
   default: () => <div data-testid="footer" />,
