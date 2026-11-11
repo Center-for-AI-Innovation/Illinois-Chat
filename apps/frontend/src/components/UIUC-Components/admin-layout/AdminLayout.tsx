@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 
@@ -20,6 +20,13 @@ function AdminShell({
   courseName: string
   children: ReactNode
 }) {
+  // Hides the app-level skip link (its #main-content target is not on admin
+  // pages); this layout renders its own.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-admin-layout', '')
+    return () => document.documentElement.removeAttribute('data-admin-layout')
+  }, [])
+
   return (
     <div className="bg-background flex h-(--viewport-height) flex-col pt-(--navbar-height)">
       {/* The app-level skip link in _app.tsx targets #main-content, which

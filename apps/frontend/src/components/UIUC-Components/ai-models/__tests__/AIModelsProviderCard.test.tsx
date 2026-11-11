@@ -190,7 +190,10 @@ describe('AIModelsProviderCard', () => {
 
     expect(input).toHaveAccessibleDescription('Base URL must include /v1')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    await user.type(input, '/v1')
+    await user.type(input, '/v1bad')
+    expect(input).toHaveAccessibleDescription('Base URL must include /v1')
+    await user.clear(input)
+    await user.type(input, 'https://api.example.com/v1')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 

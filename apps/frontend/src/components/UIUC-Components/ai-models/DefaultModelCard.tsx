@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import {
   Card,
   CardContent,
@@ -20,8 +22,16 @@ import {
   LLM_PROVIDER_ORDER,
   type ProviderNames,
 } from '~/utils/modelProviders/LLMProvider'
+import {
+  getCountryOfConcern,
+  isChatbotCocAcknowledged,
+  markChatbotCocAcknowledged,
+} from '~/utils/modelProviders/countriesOfConcern'
+import { CountryOfConcernIcon } from '~/components/UIUC-Components/CountryOfConcern'
+import { CountryOfConcernModal } from '~/components/UIUC-Components/api-inputs/CountryOfConcernModal'
 
 interface DefaultModelCardProps {
+  projectName: string
   llmProviders: AllLLMProviders
   onChange: (model: { id: string; provider: ProviderNames }) => void
 }
@@ -40,9 +50,15 @@ function enabledModelGroups(providers: AllLLMProviders) {
 }
 
 export function DefaultModelCard({
+  projectName,
   llmProviders,
   onChange,
 }: DefaultModelCardProps) {
+  const [pending, setPending] = useState<{
+    id: string
+    name: string
+    provider: ProviderNames
+  } | null>(null)
   const groups = enabledModelGroups(llmProviders)
   const current = groups
     .flatMap((g) => g.models.map((m) => ({ ...m, provider: g.provider })))
@@ -62,16 +78,27 @@ export function DefaultModelCard({
           this default to use any of the models enabled below.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex items-center">
         <Select
           value={current ? toValue(current.provider, current.id) : null}
           onValueChange={(value) => {
             if (typeof value !== 'string') return
-            const [provider, ...id] = value.split('::')
-            onChange({
+            const [provider, ...rest] = value.split('::')
+            const model = {
               provider: provider as ProviderNames,
-              id: id.join('::'),
-            })
+              id: rest.join('::'),
+            }
+            // Same rule as the legacy /llms page: a flagged model needs a
+            // one-time acknowledgement per chatbot before it can be the
+            // default, even if it was enabled elsewhere.
+            if (
+              getCountryOfConcern(model.id) &&
+              !isChatbotCocAcknowledged(projectName)
+            ) {
+              setPending({ ...model, name: labels.get(value) ?? model.id })
+              return
+            }
+            onChange(model)
           }}
         >
           <SelectTrigger aria-label="Default model" className="w-full max-w-96">
@@ -95,6 +122,20 @@ export function DefaultModelCard({
             ))}
           </SelectContent>
         </Select>
+        <CountryOfConcernIcon modelId={current?.id} className="ml-2" />
+        {pending && (
+          <CountryOfConcernModal
+            modelName={pending.name}
+            onClose={() => setPending(null)}
+            onConfirm={() => {
+              markChatbotCocAcknowledged(projectName)
+              onChange({ id: pending.id, provider: pending.provider })
+              setPending(null)
+            }}
+            title="Default Model — Country of Concern Warning"
+            confirmLabel="Set as default anyway"
+          />
+        )}
       </CardContent>
     </Card>
   )
