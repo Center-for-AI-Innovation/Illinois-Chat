@@ -19,6 +19,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
 import { Toaster } from '@/components/shadcn/ui/sonner'
+import { source_sans } from '../../fonts'
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -86,8 +87,23 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
     effectRan.current = true
   }, [])
 
+  // next/font can't run in _document, so the font variable is set on :root
+  // here (Next's documented Pages Router pattern) to reach portals too.
+  const fontVariables = (
+    <style jsx global>{`
+      :root {
+        --font-source-sans: ${source_sans.style.fontFamily};
+      }
+    `}</style>
+  )
+
   if (isMaintenanceMode) {
-    return <Maintenance />
+    return (
+      <>
+        {fontVariables}
+        <Maintenance />
+      </>
+    )
   } else {
     return (
       <div
@@ -106,6 +122,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
           document.documentElement.dataset.inputModality = 'pointer'
         }}
       >
+        {fontVariables}
         <nav aria-label="Skip navigation">
           <a
             href="#main-content"

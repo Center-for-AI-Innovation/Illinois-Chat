@@ -636,9 +636,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <p className="mb-px text-sm font-medium">
-                            Messages
-                          </p>
+                          <p className="mb-px text-sm font-medium">Messages</p>
                           <p className="text-xs text-(--foreground-faded)">
                             Total exchanges
                           </p>
@@ -833,7 +831,9 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200 lg:col-span-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="heading-h4">Conversation Visualizations</h4>
+                        <h4 className="heading-h4">
+                          Conversation Visualizations
+                        </h4>
                         <p className="mt-px text-sm">
                           Select a time range to filter the visualizations below
                         </p>
@@ -866,7 +866,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                               <SelectItem
                                 key={option.value}
                                 value={option.value}
-                                className="data-highlighted:bg-(--foreground-faded)"
                               >
                                 {option.label}
                               </SelectItem>
@@ -1005,7 +1004,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                                 <SelectItem
                                   key={option.value}
                                   value={option.value}
-                                  className="data-highlighted:bg-(--foreground-faded)"
                                 >
                                   {option.label}
                                 </SelectItem>

@@ -134,7 +134,7 @@ export const APIKeyInput = ({
             field.handleChange('')
             field.form.handleSubmit()
           }}
-          className="ml-2 text-(--foreground-faded) hover:bg-(--dashboard-button) hover:text-(--dashboard-button-foreground) hover:text-white"
+          className="ml-2 size-6 rounded-md text-(--foreground-faded) hover:bg-(--dashboard-button) hover:text-(--dashboard-button-foreground) hover:text-white"
         >
           <IconX size={12} aria-hidden="true" />
         </Button>
@@ -319,7 +319,7 @@ const NewModelDropdown: React.FC<{
                     <ComboboxItem
                       key={item.value}
                       value={item}
-                      className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground) data-highlighted:bg-(--foreground-faded) ${
+                      className={`${montserrat_paragraph.variable} font-montserratParagraph text-(--foreground) ${
                         isSmallScreen ? 'text-xs' : 'text-sm'
                       }`}
                     >
