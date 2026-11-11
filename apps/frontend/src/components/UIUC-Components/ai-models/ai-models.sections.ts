@@ -5,5 +5,5 @@ import { type AdminPageSection } from '../admin-layout/admin-pages.types'
 export const AI_MODELS_SECTIONS = [
   { id: 'default-model', title: 'Set the Default Model' },
   { id: 'open-source', title: 'Open Source LLMs' },
-  { id: 'closed-source', title: 'Closed Source LLMs' },
+  { id: 'commercial', title: 'Commercial LLMs' },
 ] as const satisfies readonly AdminPageSection[]

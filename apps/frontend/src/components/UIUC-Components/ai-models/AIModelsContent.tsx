@@ -19,7 +19,7 @@ const SECTION_DESCRIPTIONS: Partial<
   Record<(typeof AI_MODELS_SECTIONS)[number]['id'], string>
 > = {
   'open-source': 'Your weights, your rules.',
-  'closed-source':
+  commercial:
     'The best performers, but you gotta pay their prices and follow their rules.',
 }
 
