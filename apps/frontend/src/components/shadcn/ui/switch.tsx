@@ -62,7 +62,7 @@ const switchContainerVariants = cva(
   {
     variants: {
       disabled: {
-        true: 'opacity-60',
+        true: 'opacity-50',
         false: 'cursor-pointer hover:bg-white/10',
       },
     },
