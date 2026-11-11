@@ -264,6 +264,7 @@ vi.mock('next/link', () => ({
   // Pass DOM attributes (aria-*, data-*, ref) through like the real Link;
   // drop only Next-specific routing props.
   default: React.forwardRef(function MockLink(props: any, ref) {
+    /* eslint-disable @typescript-eslint/no-unused-vars */
     const {
       prefetch: _prefetch,
       replace: _replace,
@@ -275,6 +276,7 @@ vi.mock('next/link', () => ({
       as: _as,
       ...rest
     } = props
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     return React.createElement('a', { ...rest, ref }, props.children)
   }),
 }))

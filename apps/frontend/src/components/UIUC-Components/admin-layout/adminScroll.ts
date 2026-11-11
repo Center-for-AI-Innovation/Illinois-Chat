@@ -1,9 +1,11 @@
-// Scrolling for the admin panel. Content scrolls inside <main id="main-content">
-// (see AdminLayout), not the window.
-export const ADMIN_CONTENT_ID = 'main-content'
+// Scrolling for the admin panel. Content scrolls inside
+// <main id="admin-panel-content"> (see AdminLayout), not the window. The id is
+// deliberately not "main-content": many page shells already use that id as the
+// app's skip-link target, and a duplicate would make getElementById ambiguous.
+export const ADMIN_CONTENT_ID = 'admin-panel-content'
 
 const scrollBehavior = (): ScrollBehavior =>
-  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
     ? 'auto'
     : 'smooth'
 
@@ -46,15 +48,36 @@ export function followSectionUntilSettled(id: string, timeoutMs = 5000) {
   scrollToSection(id, false)
   if (!main || typeof ResizeObserver === 'undefined') return () => {}
 
+  // Created before anything that can call `stop`, so `stop` never reads
+  // `timer` before it is initialised. The arrow defers the `stop` lookup.
+  const timer = setTimeout(() => stop(), timeoutMs)
+  const observed = new Set<Element>()
   const observer = new ResizeObserver(() => scrollToSection(id, false))
-  Array.from(main.children).forEach((child) => observer.observe(child))
+  const observeChildren = () =>
+    Array.from(main.children).forEach((child) => {
+      if (!observed.has(child)) {
+        observed.add(child)
+        observer.observe(child)
+      }
+    })
+  observeChildren()
+  // A page that swaps a top-level child (skeleton -> content) adds a new
+  // element the ResizeObserver has never seen; pick it up and re-scroll.
+  const mutations =
+    typeof MutationObserver === 'undefined'
+      ? undefined
+      : new MutationObserver(() => {
+          observeChildren()
+          scrollToSection(id, false)
+        })
+  mutations?.observe(main, { childList: true })
 
   const stop = () => {
     observer.disconnect()
+    mutations?.disconnect()
     clearTimeout(timer)
     USER_SCROLL_EVENTS.forEach((e) => main.removeEventListener(e, stop))
   }
-  const timer = setTimeout(stop, timeoutMs)
   USER_SCROLL_EVENTS.forEach((e) =>
     main.addEventListener(e, stop, { passive: true }),
   )
