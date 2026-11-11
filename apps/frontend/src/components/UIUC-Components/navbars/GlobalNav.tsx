@@ -39,7 +39,7 @@ export function GlobalNav({
     >
       <div
         className={cn(
-          'flex h-[72px] items-center justify-between px-4 md:px-12',
+          'flex h-[72px] items-center justify-between px-4 sm:px-8 md:px-12',
           isFixed && 'mx-auto w-full max-w-[1680px]',
         )}
       >
