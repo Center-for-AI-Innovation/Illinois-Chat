@@ -220,6 +220,44 @@ describe('useAIModelsSettings', () => {
     ).toBe(false)
   })
 
+  it('keeps a later successful save visible when an earlier overlapping save fails', async () => {
+    const { hook, queryClient, upserts, handlers, control, flushDebounce } =
+      await setup()
+    let failFirst!: () => void
+    handlers.push(
+      () =>
+        new Promise<Response>((resolve) => {
+          failFirst = () => resolve(json({ error: 'boom' }, 500))
+        }),
+    )
+    control.holdModels = true
+
+    let first!: Promise<boolean>
+    act(() => {
+      first = hook.result.current.toggleProvider(ProviderNames.OpenAI, true)
+    })
+    await flushDebounce() // batch 1 in flight
+
+    let second!: Promise<boolean>
+    act(() => {
+      second = hook.result.current.toggleModel(
+        ProviderNames.Anthropic,
+        'claude-a',
+        false,
+      )
+    })
+    await act(async () => failFirst())
+    await flushDebounce()
+
+    await expect(first).resolves.toBe(false)
+    await expect(second).resolves.toBe(true)
+    expect(upserts).toHaveLength(2)
+    const cache = queryClient.getQueryData<AllLLMProviders>(KEY)!
+    // Batch 2 carried both changes and saved; the cache must show them.
+    expect(cache[ProviderNames.Anthropic].models?.[0]?.enabled).toBe(false)
+    expect(cache[ProviderNames.OpenAI].enabled).toBe(true)
+  })
+
   it('re-sends a failed change when a later action was queued on top of it', async () => {
     const { hook, upserts, handlers, flushDebounce } = await setup()
     let failFirst!: () => void

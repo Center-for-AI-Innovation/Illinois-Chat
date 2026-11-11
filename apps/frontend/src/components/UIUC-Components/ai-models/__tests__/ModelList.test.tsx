@@ -69,11 +69,35 @@ describe('ModelList', () => {
     expect(isChatbotCocAcknowledged('CS101')).toBe(true)
   })
 
-  it('does not prompt once acknowledged, nor when disabling', async () => {
+  it('does not prompt once the chatbot has acknowledged', async () => {
     const user = userEvent.setup()
     markChatbotCocAcknowledged('CS101')
     const onToggle = renderList()
     await user.click(screen.getByRole('switch', { name: 'DeepSeek' }))
     expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('never prompts when disabling a flagged model', async () => {
+    const user = userEvent.setup()
+    const onToggle = vi.fn()
+    render(
+      <ModelList
+        projectName="CS101"
+        provider={ProviderNames.OpenAI}
+        models={
+          [
+            { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek', enabled: true },
+          ] as unknown as AnySupportedModel[]
+        }
+        onToggle={onToggle}
+      />,
+    )
+    await user.click(screen.getByRole('switch', { name: 'DeepSeek' }))
+    expect(onToggle).toHaveBeenCalledWith(
+      ProviderNames.OpenAI,
+      'deepseek/deepseek-v3.2',
+      false,
+    )
+    expect(screen.queryByText('Country of Concern Warning')).toBeNull()
   })
 })
