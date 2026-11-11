@@ -43,10 +43,14 @@ async function setup() {
   let serverState = makeProviders()
   const upserts: AllLLMProviders[] = []
   const handlers: UpsertHandler[] = []
+  const control = { holdModels: false }
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const url = String(input)
-    if (url.includes('/api/models')) return json(serverState)
+    if (url.includes('/api/models')) {
+      if (control.holdModels) return new Promise<Response>(() => {})
+      return json(serverState)
+    }
     if (url.includes('/api/UIUC-api/upsertLLMProviders')) {
       const { llmProviders } = JSON.parse(String(init?.body))
       upserts.push(llmProviders)
@@ -70,6 +74,7 @@ async function setup() {
     queryClient,
     upserts,
     handlers,
+    control,
     getServerState: () => serverState,
     flushDebounce: () => act(() => vi.advanceTimersByTimeAsync(1000)),
   }
@@ -121,7 +126,7 @@ describe('useAIModelsSettings', () => {
     expect(upserts[0]![ProviderNames.Anthropic].models?.[0]?.enabled).toBe(
       false,
     )
-    expect(showToast).toHaveBeenCalledTimes(2)
+    expect(showToast).toHaveBeenCalledTimes(1)
   })
 
   it('sends a toggle and a field save made within 1s together', async () => {
@@ -189,6 +194,26 @@ describe('useAIModelsSettings', () => {
     await waitFor(() =>
       expect(queryClient.getQueryData(KEY)).toEqual(getServerState()),
     )
+    expect(
+      queryClient.getQueryData<AllLLMProviders>(KEY)?.[ProviderNames.OpenAI]
+        .enabled,
+    ).toBe(false)
+  })
+
+  it('rolls the cache back on failure even if the refetch never lands', async () => {
+    const { hook, queryClient, handlers, control, flushDebounce } =
+      await setup()
+    handlers.push(() => json({ error: 'boom' }, 500))
+    // Hold every refetch open so only our own rollback can fix the cache.
+    control.holdModels = true
+
+    let result!: Promise<boolean>
+    act(() => {
+      result = hook.result.current.toggleProvider(ProviderNames.OpenAI, true)
+    })
+    await flushDebounce()
+
+    await expect(result).resolves.toBe(false)
     expect(
       queryClient.getQueryData<AllLLMProviders>(KEY)?.[ProviderNames.OpenAI]
         .enabled,

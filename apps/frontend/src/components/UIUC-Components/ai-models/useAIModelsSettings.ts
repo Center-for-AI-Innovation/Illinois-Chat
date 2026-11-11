@@ -48,11 +48,14 @@ function updateProvider(
  *   Actions therefore build on `latestRef` (our pending state) rather than the
  *   cache while anything is in flight.
  * - mutateAsync resolves/rejects for EVERY call in a batch, so per-call code
- *   after the await (toasts, draft resets) always runs.
+ *   after the await (draft resets) always runs. The toast is shown once, when
+ *   the last pending action settles.
+ * - A failed save restores the cache to the last known server state itself
+ *   (see savedRef); the onSettled refetch then confirms it.
  *
  * Accepted edge case: if a batch fails after a later action was already built
  * on top of it, that later payload re-sends the failed change. The error toast
- * says so, and the onSettled refetch shows the true server state.
+ * says so.
  */
 export function useAIModelsSettings(projectName: string) {
   const queryClient = useQueryClient()
@@ -61,42 +64,67 @@ export function useAIModelsSettings(projectName: string) {
   const { mutateAsync } = useUpdateProjectLLMProviders(queryClient)
 
   const latestRef = useRef<AllLLMProviders | null>(null)
+  // Server state as of the last save we know succeeded (or the cache when
+  // nothing was in flight). The mutation's own onError rollback snapshots the
+  // cache AFTER our optimistic write, so it cannot restore the server value.
+  const savedRef = useRef<AllLLMProviders | null>(null)
   const inFlightRef = useRef(0)
+  const roundErrorRef = useRef<string | null>(null)
 
   const commit = useCallback(
     async (
       apply: (providers: AllLLMProviders) => AllLLMProviders,
     ): Promise<boolean> => {
       const queryKey = ['projectLLMProviders', projectName]
-      const prev =
-        latestRef.current ?? queryClient.getQueryData<AllLLMProviders>(queryKey)
+      const cached = queryClient.getQueryData<AllLLMProviders>(queryKey)
+      const prev = latestRef.current ?? cached
       if (!prev) return false
+
+      if (inFlightRef.current === 0) savedRef.current = cached ?? null
 
       const next = apply(prev)
       latestRef.current = next
       inFlightRef.current += 1
       queryClient.setQueryData(queryKey, next)
 
+      let ok = false
       try {
         await mutateAsync({ projectName, llmProviders: next })
-        showToast({
-          title: 'Updated LLM providers',
-          message: "Now your project's users can use the supplied LLMs!",
-          type: 'success',
-        })
-        return true
+        savedRef.current = next
+        ok = true
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        showToast({
-          title: 'Error updating LLM providers',
-          message: `Some changes may not have saved: ${message}`,
-          type: 'error',
-        })
-        return false
+        roundErrorRef.current =
+          error instanceof Error ? error.message : String(error)
+        // Roll the cache back ourselves, but only when no later action is
+        // still pending: those carry their own optimistic state.
+        if (inFlightRef.current === 1 && savedRef.current) {
+          latestRef.current = savedRef.current
+          queryClient.setQueryData(queryKey, savedRef.current)
+        }
       } finally {
         inFlightRef.current -= 1
-        if (inFlightRef.current === 0) latestRef.current = null
+        if (inFlightRef.current === 0) {
+          latestRef.current = null
+          // One toast per settled round, however many actions it held.
+          const failure = roundErrorRef.current
+          roundErrorRef.current = null
+          showToast(
+            failure === null
+              ? {
+                  title: 'Updated LLM providers',
+                  message:
+                    "Now your project's users can use the supplied LLMs!",
+                  type: 'success',
+                }
+              : {
+                  title: 'Error updating LLM providers',
+                  message: `Some changes may not have saved: ${failure}`,
+                  type: 'error',
+                },
+          )
+        }
       }
+      return ok
     },
     [mutateAsync, projectName, queryClient],
   )
