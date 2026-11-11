@@ -261,12 +261,22 @@ vi.mock('next/image', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: (props: any) =>
-    React.createElement(
-      'a',
-      { href: props.href, className: props.className, onClick: props.onClick },
-      props.children,
-    ),
+  // Pass DOM attributes (aria-*, data-*, ref) through like the real Link;
+  // drop only Next-specific routing props.
+  default: React.forwardRef(function MockLink(props: any, ref) {
+    const {
+      prefetch: _prefetch,
+      replace: _replace,
+      scroll: _scroll,
+      shallow: _shallow,
+      passHref: _passHref,
+      legacyBehavior: _legacyBehavior,
+      locale: _locale,
+      as: _as,
+      ...rest
+    } = props
+    return React.createElement('a', { ...rest, ref }, props.children)
+  }),
 }))
 
 vi.mock('next/font/google', () => {
