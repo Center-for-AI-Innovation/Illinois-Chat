@@ -34,6 +34,26 @@ const providers = {
 } as unknown as AllLLMProviders
 
 describe('DefaultModelCard', () => {
+  it('shows the placeholder when no enabled model is the default', () => {
+    const none = {
+      [ProviderNames.OpenAI]: {
+        provider: ProviderNames.OpenAI,
+        enabled: true,
+        models: [{ id: 'gpt-a', name: 'GPT A', enabled: true }],
+      },
+    } as unknown as AllLLMProviders
+    render(
+      <DefaultModelCard
+        projectName="CS101"
+        llmProviders={none}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Default model' }),
+    ).toHaveTextContent('Select a model')
+  })
+
   it('shows the current default and offers only enabled models', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
