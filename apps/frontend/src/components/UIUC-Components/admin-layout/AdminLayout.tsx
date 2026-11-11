@@ -22,10 +22,6 @@ function AdminShell({
   courseName: string
   children: ReactNode
 }) {
-  // Arriving with a hash (a direct link, or a sidebar section link from
-  // another page): headings only exist once the page's access checks pass and
-  // this layout mounts, and the sections above keep growing as data loads, so
-  // follow the heading until the layout settles.
   // Hides the app-level skip link (its #main-content target is not on admin
   // pages); this layout renders its own.
   useEffect(() => {
@@ -33,6 +29,10 @@ function AdminShell({
     return () => document.documentElement.removeAttribute('data-admin-layout')
   }, [])
 
+  // Arriving with a hash (a direct link, or a sidebar section link from
+  // another page): headings only exist once the page's access checks pass and
+  // this layout mounts, and the sections above keep growing as data loads, so
+  // follow the heading until the layout settles.
   // Hash-following is owned here and runs on mount only: later sidebar clicks
   // on the current page scroll in place (see AdminSidebar), and the sidebar
   // must not be keyed on courseName, which would reset its hash state.

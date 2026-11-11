@@ -284,7 +284,11 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
         !open && 'w-0 min-w-0',
       )}
     >
-      <SidebarBody courseName={courseName} />
+      {/* Fixed-width inner column: while the outer width animates to 0 the
+          content is clipped instead of reflowing (and truncating) mid-way. */}
+      <div className="flex h-full min-h-0 w-(--sidebar-width) shrink-0 flex-col">
+        <SidebarBody courseName={courseName} />
+      </div>
     </Sidebar>
   )
 }
