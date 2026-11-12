@@ -5,7 +5,6 @@ import {
 } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Head from 'next/head'
-import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cva } from 'class-variance-authority'
@@ -13,10 +12,8 @@ import { useAuth } from 'react-oidc-context'
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
-import { type CourseMetadata } from '~/types/courseMetadata'
 import { type SimConfigField, type SimWorkflow } from '~/types/sim'
 import { type SimWorkflowFailure } from '~/utils/simDiscovery'
-import { fetchCourseMetadata } from '~/utils/apiUtils'
 import {
   clearCachedSimTools,
   storeDiscoveredSimTools,
@@ -37,7 +34,6 @@ import {
   TableRow,
 } from '@/components/shadcn/ui/table'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
-import { CannotEditCourse } from './CannotEditCourse'
 import GlobalFooter from './GlobalFooter'
 import { LoadingPlaceholderForAdminPages } from './MainPageBackground'
 
@@ -84,13 +80,8 @@ function maskKey(key: string): string {
 }
 
 const SimPage = ({ course_name }: { course_name: string }) => {
-  const router = useRouter()
   const auth = useAuth()
   const queryClient = useQueryClient()
-  const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
-    null,
-  )
-  const [currentEmail, setCurrentEmail] = useState('')
   // The stored key never reaches the browser — the server sends a masked
   // form, shown read-only. The input is only for a new key, so leaving it
   // empty can never delete the stored one; that takes the Remove button.
@@ -158,27 +149,6 @@ const SimPage = ({ course_name }: { course_name: string }) => {
         console.debug('[SimPage] failed to load Sim config', error)
       })
   }, [course_name])
-
-  // Fetch course metadata + auth
-  useEffect(() => {
-    const fetchData = async () => {
-      setCurrentEmail(auth.user?.profile.email as string)
-      try {
-        const metadata = (await fetchCourseMetadata(
-          course_name,
-        )) as CourseMetadata
-        if (metadata && metadata.is_private) {
-          metadata.is_private = JSON.parse(
-            metadata.is_private as unknown as string,
-          )
-        }
-        setCourseMetadata(metadata)
-      } catch (error) {
-        console.error(error)
-      }
-    }
-    fetchData()
-  }, [course_name, auth.isLoading, auth.user?.profile.email])
 
   const showStoredKey = storedKeyMasked !== null && !keyRemoved
 
@@ -281,18 +251,8 @@ const SimPage = ({ course_name }: { course_name: string }) => {
     if (saveError?.fields.includes(field)) setSaveError(null)
   }
 
-  if (auth.isLoading || !courseMetadata) {
+  if (auth.isLoading) {
     return <LoadingPlaceholderForAdminPages />
-  }
-
-  if (
-    courseMetadata &&
-    currentEmail !== (courseMetadata.course_owner as string) &&
-    courseMetadata.course_admins.indexOf(currentEmail) === -1
-  ) {
-    const safeName = encodeURIComponent(course_name)
-    router.replace(`/${safeName}/not_authorized`)
-    return <CannotEditCourse course_name={course_name} />
   }
 
   return (

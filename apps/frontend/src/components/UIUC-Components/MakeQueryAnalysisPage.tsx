@@ -105,14 +105,9 @@ const formatPercentageChange = (value: number | null | undefined) => {
 
 const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   const auth = useAuth()
-  const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
-    null,
-  )
-  const [currentEmail, setCurrentEmail] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState(),
   )
-  const router = useRouter()
 
   // Get responsive grid classes based on sidebar state
   const statsGridClasses = useResponsiveGrid(
@@ -161,30 +156,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   const [filteredStatsError, setFilteredStatsError] = useState<string | null>(
     null,
   )
-
-  // TODO: remove this hook... we should already have this from the /materials props???
-  useEffect(() => {
-    const fetchData = async () => {
-      setCurrentEmail(auth.user?.profile.email as string)
-
-      try {
-        const metadata: CourseMetadata = (await fetchCourseMetadata(
-          currentPageName,
-        )) as CourseMetadata
-
-        if (metadata && metadata.is_private) {
-          metadata.is_private = JSON.parse(
-            metadata.is_private as unknown as string,
-          )
-        }
-        setCourseMetadata(metadata)
-      } catch (error) {
-        console.error(error)
-      }
-    }
-
-    fetchData()
-  }, [currentPageName, !auth.isLoading, auth.user])
 
   const [hasConversationData, setHasConversationData] = useState<boolean>(true)
 
@@ -371,23 +342,8 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
 
   const [view, setView] = useState('hour')
 
-  if (auth.isLoading || !courseMetadata) {
+  if (auth.isLoading) {
     return <LoadingSpinner />
-  }
-
-  if (
-    courseMetadata &&
-    currentEmail !== (courseMetadata.course_owner as string) &&
-    courseMetadata.course_admins.indexOf(currentEmail) === -1
-  ) {
-    router.replace(`/${course_name}/not_authorized`)
-
-    return (
-      <CannotEditCourse
-        course_name={currentPageName as string}
-        // current_email={currentEmail as string}
-      />
-    )
   }
 
   const handleDownload = async (courseName: string) => {
@@ -636,9 +592,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                     <div className="rounded-lg bg-(--dashboard-background) p-4 text-(--dashboard-foreground) transition-all duration-200">
                       <div className="mb-3 flex items-center justify-between">
                         <div>
-                          <p className="mb-px text-sm font-medium">
-                            Messages
-                          </p>
+                          <p className="mb-px text-sm font-medium">Messages</p>
                           <p className="text-xs text-(--foreground-faded)">
                             Total exchanges
                           </p>
@@ -833,7 +787,9 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
                   <div className="rounded-xl bg-(--dashboard-background-faded) p-6 text-(--dashboard-foreground) transition-all duration-200 lg:col-span-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="heading-h4">Conversation Visualizations</h4>
+                        <h4 className="heading-h4">
+                          Conversation Visualizations
+                        </h4>
                         <p className="mt-px text-sm">
                           Select a time range to filter the visualizations below
                         </p>
@@ -1059,46 +1015,10 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   )
 }
 
-import { type CourseMetadata } from '~/types/courseMetadata'
 import { showToast } from '~/utils/toastUtils'
-import { CannotEditCourse } from './CannotEditCourse'
 import GlobalFooter from './GlobalFooter'
 
 import NomicDocumentMap from './NomicDocumentsMap'
-
-async function fetchCourseMetadata(course_name: string) {
-  try {
-    const response = await fetch(
-      `/api/UIUC-api/getCourseMetadata?course_name=${course_name}`,
-    )
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success === false) {
-        throw new Error(
-          data.message || 'An error occurred while fetching course metadata',
-        )
-      }
-      // Parse is_private field from string to boolean
-      if (
-        data.course_metadata &&
-        typeof data.course_metadata.is_private === 'string'
-      ) {
-        data.course_metadata.is_private =
-          data.course_metadata.is_private.toLowerCase() === 'true'
-      }
-      return data.course_metadata
-    } else {
-      throw new Error(
-        `Error fetching course metadata: ${
-          response.statusText || response.status
-        }`,
-      )
-    }
-  } catch (error) {
-    console.error('Error fetching course metadata:', error)
-    throw error
-  }
-}
 
 export default MakeQueryAnalysisPage
 
