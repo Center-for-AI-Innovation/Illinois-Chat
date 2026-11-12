@@ -300,7 +300,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
         })
         if (response.status === 200) {
           const data = await response.json()
-          setWeeklyTrends(data)
+          setWeeklyTrends(Array.isArray(data) ? data : [])
         } else {
           throw new Error('Failed to fetch weekly trends')
         }

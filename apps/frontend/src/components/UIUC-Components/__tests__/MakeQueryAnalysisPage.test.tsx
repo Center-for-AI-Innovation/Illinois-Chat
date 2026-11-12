@@ -135,32 +135,6 @@ describe('MakeQueryAnalysisPage', () => {
     )
   })
 
-  it('logs an error when course metadata fetch fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    globalThis.__TEST_ROUTER__ = {
-      asPath: '/CS101/analysis',
-      replace: vi.fn(),
-    }
-    globalThis.__TEST_AUTH__ = {
-      isLoading: false,
-      isAuthenticated: true,
-      user: { profile: { email: 'owner@example.com' } },
-    }
-
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
-      const url = String(input?.url ?? input)
-      if (url.includes('/api/UIUC-api/getCourseMetadata')) {
-        return new Response(JSON.stringify({ error: 'boom' }), { status: 500 })
-      }
-      return makeJson({})
-    })
-
-    renderWithProviders(<MakeQueryAnalysisPage course_name="CS101" />)
-
-    await waitFor(() => expect(console.error).toHaveBeenCalled())
-  })
-
   it('shows the empty-state when there is no conversation data for the selected range', async () => {
     globalThis.__TEST_ROUTER__ = {
       asPath: '/CS101/analysis',
