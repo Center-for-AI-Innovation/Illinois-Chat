@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
+import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
@@ -102,11 +103,7 @@ export function AdminLayout({
     auth.isLoading ||
     (auth.isAuthenticated && (isLoading || isSuperAdminLoading))
   ) {
-    return (
-      <div role="status" aria-busy="true" className="bg-background h-svh">
-        <span className="sr-only">Loading</span>
-      </div>
-    )
+    return <LoadingPlaceholderForAdminPages />
   }
 
   if (!auth.isAuthenticated) {
