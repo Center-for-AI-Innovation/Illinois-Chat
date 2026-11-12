@@ -123,7 +123,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
         }}
       >
         {fontVariables}
-        <nav aria-label="Skip navigation">
+        <nav aria-label="Skip navigation" className="app-skip-nav">
           <a
             href="#main-content"
             className="skip-nav-link"

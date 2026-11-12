@@ -1,11 +1,17 @@
 import { type ReactNode, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
+import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
 import { AdminSidebar } from './AdminSidebar'
-import { ADMIN_CONTENT_ID, followSectionUntilSettled } from './adminScroll'
+import {
+  ADMIN_CONTENT_ID,
+  focusAdminContent,
+  followSectionUntilSettled,
+} from './adminScroll'
 import { GlobalNav } from '../navbars/GlobalNav'
 import { SubPageHeader } from './SubPageHeader'
 
@@ -18,10 +24,20 @@ function AdminShell({
   courseName: string
   children: ReactNode
 }) {
+  // Hides the app-level skip link (its #main-content target is not on admin
+  // pages); this layout renders its own.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-admin-layout', '')
+    return () => document.documentElement.removeAttribute('data-admin-layout')
+  }, [])
+
   // Arriving with a hash (a direct link, or a sidebar section link from
   // another page): headings only exist once the page's access checks pass and
   // this layout mounts, and the sections above keep growing as data loads, so
   // follow the heading until the layout settles.
+  // Hash-following is owned here and runs on mount only: later sidebar clicks
+  // on the current page scroll in place (see AdminSidebar), and the sidebar
+  // must not be keyed on courseName, which would reset its hash state.
   useEffect(() => {
     const id = window.location.hash.slice(1)
     return id ? followSectionUntilSettled(id) : undefined
@@ -29,6 +45,18 @@ function AdminShell({
 
   return (
     <div className="bg-background flex h-svh flex-col">
+      {/* The app-level skip link in _app.tsx targets #main-content, which
+          does not exist here; this one targets the scrolling panel. */}
+      <a
+        href={`#${ADMIN_CONTENT_ID}`}
+        className="skip-nav-link"
+        onClick={(e) => {
+          e.preventDefault()
+          focusAdminContent()
+        }}
+      >
+        Skip to admin content
+      </a>
       <GlobalNav />
       <div className="flex min-h-0 flex-1 p-4 md:p-8">
         <SidebarProvider className="bg-background border-border min-h-0 overflow-hidden rounded-xl border shadow-sm">
@@ -65,26 +93,28 @@ export function AdminLayout({
   children: ReactNode
 }) {
   const auth = useAuth()
+  const router = useRouter()
   const email = auth.user?.profile.email
   const {
     data: metadata,
     isLoading,
     isError,
+    error,
   } = useFetchCourseMetadata({
     courseName,
     enabled: auth.isAuthenticated,
   })
 
+  // One loading look for every admin page (the same one the legacy pages use).
   if (auth.isLoading || (auth.isAuthenticated && isLoading)) {
-    return (
-      <div role="status" aria-busy="true" className="bg-background h-svh">
-        <span className="sr-only">Loading</span>
-      </div>
-    )
+    return <LoadingPlaceholderForAdminPages />
   }
 
   if (!auth.isAuthenticated) {
-    return <PermissionGate course_name={courseName} />
+    // After signing in, come back to the admin page that was asked for.
+    return (
+      <PermissionGate course_name={courseName} signInRedirect={router.asPath} />
+    )
   }
 
   // Fail closed: if the metadata cannot be read, nobody is let through.
@@ -96,7 +126,14 @@ export function AdminLayout({
       (metadata.course_admins ?? []).includes(email))
 
   if (!isOwnerOrAdmin) {
-    return <PermissionGate course_name={courseName} errorType={403} />
+    // A chatbot that does not exist is a 404, not a permissions problem.
+    const status = (error as { status?: number } | null)?.status
+    return (
+      <PermissionGate
+        course_name={courseName}
+        errorType={status === 404 ? 404 : 403}
+      />
+    )
   }
 
   return <AdminShell courseName={courseName}>{children}</AdminShell>
