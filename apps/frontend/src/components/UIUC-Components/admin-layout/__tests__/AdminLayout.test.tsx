@@ -1,11 +1,39 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { AdminLayout } from '../AdminLayout'
 
+const metadataState = vi.hoisted(() => ({
+  value: {} as Record<string, unknown>,
+}))
+
+vi.mock('~/hooks/queries/useFetchCourseMetadata', () => ({
+  useFetchCourseMetadata: () => metadataState.value,
+}))
+
+const OWNER = 'owner@example.com'
+const ADMIN = 'admin@example.com'
+
+function signInAs(email: string) {
+  globalThis.__TEST_AUTH__ = {
+    isAuthenticated: true,
+    user: { profile: { email } },
+  }
+}
+
 describe('AdminLayout', () => {
+  beforeEach(() => {
+    signInAs(OWNER)
+    metadataState.value = {
+      data: { course_owner: OWNER, course_admins: [ADMIN] },
+      isLoading: false,
+      isError: false,
+    }
+  })
+
   afterEach(() => {
+    globalThis.__TEST_AUTH__ = undefined
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     window.location.hash = ''
@@ -118,5 +146,75 @@ describe('AdminLayout', () => {
     expect(
       observed.some((el) => el.getAttribute('data-testid') === 'content'),
     ).toBe(true)
+  })
+
+  describe('access check', () => {
+    const renderLayout = () =>
+      render(
+        <ThemeProvider>
+          <AdminLayout courseName="CS101">
+            <p>admin page content</p>
+          </AdminLayout>
+        </ThemeProvider>,
+      )
+
+    beforeEach(() => {
+      globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    })
+
+    it('shows the page to the chatbot owner', () => {
+      renderLayout()
+
+      expect(screen.getByText('admin page content')).toBeInTheDocument()
+    })
+
+    it('shows the page to a chatbot admin', () => {
+      signInAs(ADMIN)
+      renderLayout()
+
+      expect(screen.getByText('admin page content')).toBeInTheDocument()
+    })
+
+    it('shows the 403 permission screen to everyone else, without the page', () => {
+      signInAs('student@example.com')
+      renderLayout()
+
+      expect(
+        screen.getByRole('heading', {
+          name: "You don't have sufficient permissions",
+        }),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
+
+    it('asks signed-out users to sign in', () => {
+      globalThis.__TEST_AUTH__ = { isAuthenticated: false, user: null }
+      renderLayout()
+
+      expect(
+        screen.getByRole('heading', { name: 'Sign in required' }),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
+
+    it('shows nothing of the page while the access check is loading', () => {
+      metadataState.value = { data: undefined, isLoading: true, isError: false }
+      renderLayout()
+
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
+
+    it('denies access when the chatbot metadata cannot be read', () => {
+      metadataState.value = { data: undefined, isLoading: false, isError: true }
+      renderLayout()
+
+      expect(
+        screen.getByRole('heading', {
+          name: "You don't have sufficient permissions",
+        }),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
   })
 })
