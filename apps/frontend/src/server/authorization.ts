@@ -77,6 +77,20 @@ export function isCourseRegularUser(
   )
 }
 
+export type CourseRole = 'owner' | 'admin' | 'member' | 'none'
+
+// Highest role the user holds on the course. The owner check runs first, so an
+// owner who is also listed in course_admins is reported as 'owner'.
+export function getCourseRole(
+  user: AuthenticatedUser,
+  courseMetadata: CourseMetadata,
+): CourseRole {
+  if (isCourseOwner(user, courseMetadata)) return 'owner'
+  if (isCourseAdmin(user, courseMetadata)) return 'admin'
+  if (hasCourseAccess(user, courseMetadata)) return 'member'
+  return 'none'
+}
+
 // Middleware for course-based access control
 export function withCourseAccess(courseName: string) {
   return function (
