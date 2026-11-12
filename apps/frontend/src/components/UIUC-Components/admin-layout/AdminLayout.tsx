@@ -1,7 +1,9 @@
 import { type ReactNode, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
+import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
 import { AdminSidebar } from './AdminSidebar'
@@ -91,26 +93,28 @@ export function AdminLayout({
   children: ReactNode
 }) {
   const auth = useAuth()
+  const router = useRouter()
   const email = auth.user?.profile.email
   const {
     data: metadata,
     isLoading,
     isError,
+    error,
   } = useFetchCourseMetadata({
     courseName,
     enabled: auth.isAuthenticated,
   })
 
+  // One loading look for every admin page (the same one the legacy pages use).
   if (auth.isLoading || (auth.isAuthenticated && isLoading)) {
-    return (
-      <div role="status" aria-busy="true" className="bg-background h-svh">
-        <span className="sr-only">Loading</span>
-      </div>
-    )
+    return <LoadingPlaceholderForAdminPages />
   }
 
   if (!auth.isAuthenticated) {
-    return <PermissionGate course_name={courseName} />
+    // After signing in, come back to the admin page that was asked for.
+    return (
+      <PermissionGate course_name={courseName} signInRedirect={router.asPath} />
+    )
   }
 
   // Fail closed: if the metadata cannot be read, nobody is let through.
@@ -122,7 +126,14 @@ export function AdminLayout({
       (metadata.course_admins ?? []).includes(email))
 
   if (!isOwnerOrAdmin) {
-    return <PermissionGate course_name={courseName} errorType={403} />
+    // A chatbot that does not exist is a 404, not a permissions problem.
+    const status = (error as { status?: number } | null)?.status
+    return (
+      <PermissionGate
+        course_name={courseName}
+        errorType={status === 404 ? 404 : 403}
+      />
+    )
   }
 
   return <AdminShell courseName={courseName}>{children}</AdminShell>

@@ -9,16 +9,20 @@ import { initiateSignIn } from '~/utils/authHelpers'
 export const PermissionGate = ({
   course_name,
   errorType,
+  signInRedirect,
 }: {
   course_name: string
   errorType?: 401 | 403 | 404 | null
+  /** Where to land after signing in. Defaults to the chatbot's dashboard. */
+  signInRedirect?: string
 }) => {
   const auth = useAuth()
 
   const handleSignIn = () => {
     void initiateSignIn(
       auth,
-      course_name === 'new' ? '/new' : `/${course_name}/dashboard`,
+      signInRedirect ??
+        (course_name === 'new' ? '/new' : `/${course_name}/dashboard`),
     )
   }
 
