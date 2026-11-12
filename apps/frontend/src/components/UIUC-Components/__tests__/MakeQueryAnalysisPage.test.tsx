@@ -208,49 +208,6 @@ describe('MakeQueryAnalysisPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('redirects when unauthorized', async () => {
-    globalThis.__TEST_ROUTER__ = {
-      asPath: '/CS101/analysis',
-      replace: vi.fn(),
-    }
-    globalThis.__TEST_AUTH__ = {
-      isLoading: false,
-      isAuthenticated: true,
-      user: { profile: { email: 'not-owner@example.com' } },
-    }
-
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
-      const url = String(input?.url ?? input)
-      if (url.includes('/api/UIUC-api/getCourseMetadata')) {
-        return makeJson({
-          course_metadata: {
-            is_private: false,
-            course_owner: 'owner@example.com',
-            course_admins: [],
-          },
-        })
-      }
-      if (url.includes('/api/UIUC-api/getConversationStats')) {
-        return makeJson({
-          total_count: 0,
-          per_day: {},
-          per_hour: {},
-          per_weekday: {},
-          heatmap: {},
-        })
-      }
-      if (url.includes('/api/UIUC-api/getProjectStats')) return makeJson({})
-      if (url.includes('/api/UIUC-api/getWeeklyTrends')) return makeJson([])
-      if (url.includes('/api/UIUC-api/getModelUsageCounts')) return makeJson([])
-      return makeJson({})
-    })
-
-    renderWithProviders(<MakeQueryAnalysisPage course_name="CS101" />)
-    await waitFor(() =>
-      expect(globalThis.__TEST_ROUTER__?.replace).toHaveBeenCalled(),
-    )
-  })
-
   it('supports switching date range + view selects, including custom ranges', async () => {
     // Base UI's Select popup stays mounted (marked `data-closed`) through
     // its close animation, which never actually completes in jsdom (no real

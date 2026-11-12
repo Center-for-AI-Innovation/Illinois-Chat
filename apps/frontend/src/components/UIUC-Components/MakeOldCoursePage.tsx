@@ -1,5 +1,4 @@
 import Head from 'next/head'
-import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 
 import SettingsLayout, {
@@ -9,7 +8,6 @@ import { fetchPresignedUrl } from '~/utils/apiUtils'
 import GlobalFooter from './GlobalFooter'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { CannotEditCourse } from './CannotEditCourse'
 import DocumentGroupsCard from './DocumentGroupsCard'
 import DocumentsCard from './DocumentsCard'
 import { UploadCard } from './UploadCard'
@@ -27,7 +25,6 @@ const MakeOldCoursePage = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState,
   )
-  const router = useRouter()
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -57,17 +54,6 @@ const MakeOldCoursePage = ({
 
     fetchData()
   }, [metadata])
-
-  // TODO: update this check to consider Admins & participants.
-  if (
-    metadata &&
-    current_email !== (metadata.course_owner as string) &&
-    metadata.course_admins.indexOf(current_email) === -1
-  ) {
-    router.replace(`/${course_name}/not_authorized`)
-
-    return <CannotEditCourse course_name={course_name as string} />
-  }
 
   return (
     <SettingsLayout

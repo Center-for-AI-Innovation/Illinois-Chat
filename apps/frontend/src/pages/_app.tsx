@@ -1,6 +1,7 @@
 import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
-import { type AppType } from 'next/app'
+import { type AppProps } from 'next/app'
+import { type NextPage } from 'next'
 
 import Maintenance from '~/components/UIUC-Components/Maintenance'
 import '~/styles/citation-tooltips.css'
@@ -11,6 +12,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useRouter } from 'next/router'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
+import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
 
 // import { SpeedInsights } from '@vercel/speed-insights/next'
@@ -52,7 +54,19 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
+export type NextPageWithLayout = NextPage & {
+  getLayout?: (page: React.ReactElement) => React.ReactNode
+}
+
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout
+}
+
+const MyApp = ({
+  Component,
+  pageProps: { ...pageProps },
+}: AppPropsWithLayout) => {
+  const getLayout = Component.getLayout ?? ((page) => page)
   const router = useRouter()
   const queryClient = new QueryClient()
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
@@ -134,7 +148,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               />
               <ThemeProvider>
                 <Toaster position="bottom-center" />
-                <Component {...pageProps} />
+                {getLayout(<Component {...pageProps} />)}
               </ThemeProvider>
             </PostHogProvider>
           </QueryClientProvider>
