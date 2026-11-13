@@ -13,7 +13,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
-import { IntegrationCard } from './project-data/IntegrationCard'
+import {
+  IntegrationCard,
+  IntegrationLogoTile,
+} from './project-data/IntegrationCard'
 import {
   IconHome,
   IconSitemap,
@@ -404,13 +407,13 @@ export default function WebsiteIngestForm({
           render={
             <IntegrationCard
               logo={
-                <span className="bg-muted flex size-20 items-center justify-center rounded-[14px] p-1">
+                <IntegrationLogoTile>
                   <IconLink
-                    className="size-14"
-                    stroke={1.25}
+                    className="size-[70%]"
+                    stroke={1.5}
                     aria-hidden="true"
                   />
-                </span>
+                </IntegrationLogoTile>
               }
               title="Website"
               description="Import content from any website with its URL. Recursive crawling with customizable depth."

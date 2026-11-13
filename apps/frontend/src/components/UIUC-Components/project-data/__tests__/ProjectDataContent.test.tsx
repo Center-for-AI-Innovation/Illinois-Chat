@@ -48,4 +48,13 @@ describe('ProjectDataContent', () => {
       .closest('section')
     expect(section).toContainElement(screen.getByTestId('integrations-section'))
   })
+
+  it('puts the layout toggle in the Integrations heading row', () => {
+    render(<ProjectDataContent projectName="CS101" />)
+    const row = screen.getByRole('heading', {
+      level: 2,
+      name: 'Integrations',
+    }).parentElement
+    expect(row).toContainElement(screen.getByTestId('integrations-toggle'))
+  })
 })
