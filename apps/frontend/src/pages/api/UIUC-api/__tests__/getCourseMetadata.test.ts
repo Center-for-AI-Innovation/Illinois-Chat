@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const full = {
+let full: Record<string, unknown> = {}
+const base = {
   course_owner: 'owner@illinois.edu',
   course_admins: ['admin@illinois.edu'],
   approved_emails_list: ['member@illinois.edu'],
@@ -27,7 +28,7 @@ vi.mock('~/utils/authMiddleware', () => ({
 
 import handler from '../getCourseMetadata'
 
-function run() {
+function run(extra: Record<string, unknown> = {}) {
   const res: any = {
     statusCode: 0,
     body: undefined,
@@ -40,13 +41,19 @@ function run() {
       return this
     },
   }
-  const req: any = { query: { course_name: 'demo' }, headers: {}, cookies: {} }
+  const req: any = {
+    query: { course_name: 'demo' },
+    headers: {},
+    cookies: {},
+    ...extra,
+  }
   return handler(req, res).then(() => res)
 }
 
 describe('GET getCourseMetadata redaction', () => {
   beforeEach(() => {
     currentUser = undefined
+    full = { ...base }
   })
 
   it('hides the system prompt from anonymous callers on public projects', async () => {
@@ -63,5 +70,23 @@ describe('GET getCourseMetadata redaction', () => {
     expect(res.body.course_metadata.course_admins).toEqual([
       'admin@illinois.edu',
     ])
+  })
+
+  it('keeps only the caller email for an approved user on a private project', async () => {
+    full = { ...base, is_private: true }
+    currentUser = { email: 'member@illinois.edu' }
+    const res = await run({ user: currentUser })
+    expect(res.body.course_metadata.system_prompt).toBeUndefined()
+    expect(res.body.course_metadata.approved_emails_list).toEqual([
+      'member@illinois.edu',
+    ])
+    expect(res.body.course_metadata.course_admins).toEqual([])
+  })
+
+  it('returns the full object to an admin on a private project', async () => {
+    full = { ...base, is_private: true }
+    currentUser = { email: 'admin@illinois.edu' }
+    const res = await run({ user: currentUser })
+    expect(res.body.course_metadata.system_prompt).toBe('secret prompt')
   })
 })

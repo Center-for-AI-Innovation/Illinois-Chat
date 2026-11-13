@@ -12,6 +12,7 @@ import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { upsertChatbotTags } from '~/utils/chatbotTagsRegistry'
 import { superAdmins } from '~/utils/superAdmins'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { STORED_SECRET_SENTINEL } from '~/server/redactCourseMetadata'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { courseName, courseMetadata } = req.body as {
@@ -26,6 +27,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Never persist the placeholder shown to non-admins in place of the key.
+    if (courseMetadata.openai_api_key === STORED_SECRET_SENTINEL) {
+      delete courseMetadata.openai_api_key
+    }
+
     const existing_metadata = await getCourseMetadata(courseName)
 
     // Combine the existing metadata with the new metadata, prioritizing the new values (order matters!)

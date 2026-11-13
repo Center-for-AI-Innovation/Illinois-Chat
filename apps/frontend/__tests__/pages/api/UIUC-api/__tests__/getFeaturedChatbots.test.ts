@@ -84,6 +84,7 @@ function fixtureRow(
     course_owner: string
     course_admins: string[]
     project_description: string
+    system_prompt: string
     is_private: boolean
     is_frozen: boolean
     tags: Array<{ category: string; value: string }>
@@ -165,6 +166,7 @@ describe('UIUC-api/getFeaturedChatbots', () => {
         course_name: 'featured-bot',
         course_owner: 'other@example.com',
         project_description: 'a public bot',
+        system_prompt: 'secret prompt',
         tags: [
           { category: 'organization', value: 'Grainger Engineering' },
           { category: 'projectType', value: 'Course' },
@@ -195,6 +197,7 @@ describe('UIUC-api/getFeaturedChatbots', () => {
     // Not the caller's bot, so raw metadata is not exposed.
     expect(card.metadata).toBeUndefined()
     expect(card.userRole).toBeUndefined()
+    expect(JSON.stringify(payload)).not.toContain('secret prompt')
   })
 
   it('returns 500 and a generic error message when the db throws', async () => {

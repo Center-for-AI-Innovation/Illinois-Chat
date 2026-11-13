@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { redactCourseMetadataFor } from '../redactCourseMetadata'
+import {
+  redactCourseMetadataFor,
+  STORED_SECRET_SENTINEL,
+} from '../redactCourseMetadata'
 import type { AuthenticatedUser } from '~/proxy'
 import type { CourseMetadata } from '~/types/courseMetadata'
 
@@ -29,8 +32,8 @@ describe('redactCourseMetadataFor', () => {
 
   it('strips secrets and keeps only the approved caller email', () => {
     const out = redactCourseMetadataFor(user('member@illinois.edu'), meta())
-    expect(out.system_prompt).toBeUndefined()
-    expect(out.openai_api_key).toBeUndefined()
+    expect(out.openai_api_key).toBe(STORED_SECRET_SENTINEL)
+    expect('system_prompt' in out).toBe(false)
     expect(out.approved_emails_list).toEqual(['member@illinois.edu'])
     expect(out.course_admins).toEqual([])
     expect(out.guidedLearning).toBe(true)
@@ -42,17 +45,25 @@ describe('redactCourseMetadataFor', () => {
       user('stranger@illinois.edu'),
       meta({ is_private: false }),
     )
-    expect(out.system_prompt).toBeUndefined()
+    expect('system_prompt' in out).toBe(false)
     expect(out.course_admins).toEqual([])
     expect(out.approved_emails_list).toEqual([])
   })
 
   it('redacts for anonymous callers', () => {
     const out = redactCourseMetadataFor(undefined, meta())
-    expect(out.system_prompt).toBeUndefined()
-    expect(out.openai_api_key).toBeUndefined()
+    expect('system_prompt' in out).toBe(false)
+    expect(out.openai_api_key).toBe(STORED_SECRET_SENTINEL)
     expect(out.course_admins).toEqual([])
     expect(out.approved_emails_list).toEqual([])
+  })
+
+  it('omits openai_api_key when none is stored', () => {
+    const out = redactCourseMetadataFor(
+      undefined,
+      meta({ openai_api_key: undefined }),
+    )
+    expect('openai_api_key' in out).toBe(false)
   })
 
   it('does not mutate the input', () => {

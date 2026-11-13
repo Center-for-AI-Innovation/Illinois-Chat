@@ -40,17 +40,29 @@ async function verifyRequestToken(
   )) as AuthenticatedUser
 }
 
-// Best-effort user lookup for endpoints that also serve anonymous callers.
-// Returns undefined when there is no token or it is invalid; never responds.
+/**
+ * Best-effort user lookup for endpoints that also serve anonymous callers.
+ * Returns undefined when there is no token, or the token is expired/invalid
+ * (the caller is then treated as anonymous). Never sends a response. Any other
+ * failure is unexpected and is rethrown rather than degrading to anonymous.
+ */
 export async function getOptionalUser(
   req: NextApiRequest,
 ): Promise<AuthenticatedUser | undefined> {
+  const token = getTokenFromCookies(req)
+  if (!token) return undefined
   try {
-    const token = getTokenFromCookies(req)
-    if (!token) return undefined
-    return (await verifyRequestToken(req, token)) ?? undefined
-  } catch {
-    return undefined
+    return await verifyRequestToken(req, token)
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      // TokenExpiredError extends JsonWebTokenError
+      console.debug(
+        'getOptionalUser: treating caller as anonymous:',
+        error.message,
+      )
+      return undefined
+    }
+    throw error
   }
 }
 

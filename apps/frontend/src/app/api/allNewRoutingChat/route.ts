@@ -21,9 +21,18 @@ async function handler(req: AuthenticatedRequest) {
   try {
     const body = await req.json()
     const { conversation, course_name, mode } = body as ChatBody
-    // Never trust metadata from the request body: it may be redacted (or
-    // forged). Load the real metadata, including the system prompt, server-side.
-    const courseMetadata = (await getCourseMetadata(course_name)) ?? undefined
+    // Never trust metadata from the request body: load it server-side so the
+    // real system prompt is used and callers cannot forge settings.
+    const courseMetadata = await getCourseMetadata(course_name)
+    if (!courseMetadata) {
+      return new Response(
+        JSON.stringify({
+          title: 'Project not found',
+          message: `Project '${course_name}' does not exist`,
+        }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
     body.courseMetadata = courseMetadata
     const hydratedConversation: Conversation | undefined =
       reconstructConversation(conversation)

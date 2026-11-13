@@ -69,6 +69,22 @@ describe('app/api/allNewRoutingChat POST', () => {
     expect(hoisted.persistMessageServer).toHaveBeenCalled()
   })
 
+  it('returns 404 when the project metadata is missing', async () => {
+    hoisted.getCourseMetadata.mockResolvedValueOnce(null as any)
+    hoisted.buildPrompt.mockClear()
+    const req = new Request('http://localhost', {
+      method: 'POST',
+      body: JSON.stringify({
+        course_name: 'gone',
+        conversation: { id: 'c1', messages: [] },
+        mode: 'chat',
+      }),
+    })
+    const res = await POST(req as any)
+    expect(res.status).toBe(404)
+    expect(hoisted.buildPrompt).not.toHaveBeenCalled()
+  })
+
   it('uses server-loaded metadata, not the request body copy', async () => {
     const req = new Request('http://localhost', {
       method: 'POST',

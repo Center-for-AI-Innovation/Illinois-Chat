@@ -43,6 +43,7 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock('~/utils/authMiddleware', () => ({
   withAuth: (fn: any) => fn,
+  getOptionalUser: async () => undefined,
 }))
 
 vi.mock('~/server/authorization', () => ({
