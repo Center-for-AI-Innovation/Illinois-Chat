@@ -1,6 +1,7 @@
 import {
   Bot,
   ChartColumnBig,
+  FileSpreadsheet,
   House,
   MessageSquareCode,
   SquareTerminal,
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react'
 
 import { AI_MODELS_SECTIONS } from '../ai-models/ai-models.sections'
+import { PROJECT_DATA_SECTIONS } from '../project-data/project-data.sections'
 import { type AdminPage } from './admin-pages.types'
 
 // Single registry for the admin sidebar. Only pages that exist today are
@@ -20,6 +22,12 @@ export const ADMIN_HOME_PAGE: AdminPage = {
 }
 
 export const ADMIN_SETTINGS_PAGES: AdminPage[] = [
+  {
+    title: 'Project Data',
+    icon: FileSpreadsheet,
+    path: 'project-data',
+    sections: PROJECT_DATA_SECTIONS,
+  },
   {
     title: 'AI Models (LLMs)',
     icon: Bot,
