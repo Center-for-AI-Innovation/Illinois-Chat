@@ -12,7 +12,7 @@ import DocumentGroupsCard from './DocumentGroupsCard'
 import DocumentsCard from './DocumentsCard'
 import { UploadCard } from './UploadCard'
 
-const MakeOldCoursePage = ({
+const ProjectDashboard = ({
   course_name,
   metadata,
   current_email,
@@ -109,4 +109,4 @@ const MakeOldCoursePage = ({
   )
 }
 
-export default MakeOldCoursePage
+export default ProjectDashboard
