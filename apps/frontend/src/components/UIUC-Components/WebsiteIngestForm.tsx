@@ -20,7 +20,6 @@ import {
   IconSubtask,
   IconWorld,
   IconWorldDownload,
-  IconArrowRight,
   IconHelp,
 } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
@@ -465,10 +464,10 @@ export default function WebsiteIngestForm({
                               className="text-(--foreground-faded)"
                             />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-[400px] bg-(--tooltip-background) text-wrap text-(--tooltip)">
+                          <TooltipContent className="max-w-[400px] text-wrap bg-(--tooltip-background) text-(--tooltip)">
                             We will attempt to visit this number of pages, but
-                            not all will be scraped if they&apos;re duplicates,
-                            broken or otherwise inaccessible.
+                            not all will be scraped if they&apos;re
+                            duplicates, broken or otherwise inaccessible.
                           </TooltipContent>
                         </Tooltip>
                       </div>

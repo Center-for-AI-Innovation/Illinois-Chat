@@ -4,7 +4,6 @@ import { Input } from '@/components/shadcn/ui/input'
 import {
   IconBrandGithub,
   IconWorldDownload,
-  IconArrowRight,
 } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'

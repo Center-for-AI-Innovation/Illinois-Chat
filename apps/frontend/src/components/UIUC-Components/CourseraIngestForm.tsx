@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Card } from '@/components/shadcn/ui/card'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
-import { IconArrowRight } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'
 import { motion } from 'framer-motion'
