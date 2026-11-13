@@ -36,6 +36,7 @@ import * as schema from '~/db/schema'
 import { db as hostDb } from '~/db/dbClient'
 import { s3Client as defaultS3Client } from '~/utils/s3Client'
 import { decryptProjectConfig, type EncryptedField } from '~/utils/crypto'
+import { isSameOriginAsAny } from '~/utils/ncsaHostedAuth'
 import type { EmbeddingOverrideConfig } from '~/utils/projectConnections/validation'
 
 import OpenAI from 'openai'
@@ -342,8 +343,16 @@ function buildEmbedding(
   // Default to OpenAI-compatible for anything else. The provider value has
   // already been narrowed by Zod (validation.ts) at the API boundary and by
   // ALLOWED_EMBEDDING_PROVIDERS on the backend resolver.
-  const apiKey = cfg.api_key || envApiKey
   const baseURL = cfg.api_base || envApiBase
+  // The env key belongs to the env-configured endpoint. Never fall back to
+  // it for a project-supplied api_base, or the project could capture it.
+  const usesEnvEndpoint = isSameOriginAsAny(baseURL, [envApiBase])
+  if (!cfg.api_key && !usesEnvEndpoint) {
+    throw new Error(
+      'embedding_config api_key is required when api_base is set to a custom endpoint',
+    )
+  }
+  const apiKey = cfg.api_key || envApiKey
   return {
     kind: 'openai',
     client: new OpenAI({ apiKey, baseURL }),

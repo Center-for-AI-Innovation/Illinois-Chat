@@ -44,6 +44,7 @@ import {
   supabasePoolerWarning,
   type EmbeddingOverrideConfig,
 } from '~/utils/projectConnections/validation'
+import { isSameOriginAsAny } from '~/utils/ncsaHostedAuth'
 
 const PROBE_TIMEOUT_MS = 5_000
 
@@ -531,19 +532,23 @@ export async function testEmbedding(
       probeUrl = new URL('/api/tags', u).toString()
     } else {
       // openai (or any future OpenAI-compatible provider)
-      const apiBase =
-        cfg.api_base ||
-        process.env.EMBEDDING_API_BASE ||
-        'https://api.openai.com/v1'
+      const envApiBase =
+        process.env.EMBEDDING_API_BASE || 'https://api.openai.com/v1'
+      const apiBase = cfg.api_base || envApiBase
+      // Only fall back to server env keys when probing the env-configured
+      // endpoint; a project-supplied api_base must bring its own api_key.
       const apiKey =
         cfg.api_key ||
-        process.env.OPENAI_API_KEY ||
-        process.env.NCSA_HOSTED_API_KEY
+        (isSameOriginAsAny(apiBase, [envApiBase])
+          ? process.env.OPENAI_API_KEY || process.env.NCSA_HOSTED_API_KEY
+          : undefined)
       if (!apiKey) {
         return {
           ok: false,
           code: 'auth',
-          message: 'No api_key supplied and OPENAI_API_KEY is not set',
+          message: cfg.api_base
+            ? 'api_key is required when api_base is set'
+            : 'No api_key supplied and OPENAI_API_KEY is not set',
         }
       }
       const u = new URL(apiBase)
