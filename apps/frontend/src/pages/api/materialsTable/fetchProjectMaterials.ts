@@ -3,10 +3,14 @@ import posthog from 'posthog-js'
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { type CourseDocument } from '~/types/courseMaterials'
-import { and, eq, asc, desc, sql } from 'drizzle-orm'
+import { and, eq, asc, desc, sql, type SQL } from 'drizzle-orm'
 import { documents, documentsDocGroups, docGroups } from '~/db/schema'
 import { type PgColumn } from 'drizzle-orm/pg-core'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import {
+  buildMaterialFilterConditions,
+  FilterValidationError,
+} from '~/server/materialFilters'
 
 type FetchDocumentsResponse = {
   final_docs?: CourseDocument[]
@@ -32,6 +36,7 @@ async function fetchDocuments(req: AuthenticatedRequest, res: NextApiResponse) {
     course_name,
     filter_key: search_key,
     filter_value: search_value,
+    filters: rawFilters,
     sort_column: rawSortColumn,
     sort_direction,
   } = req.query
@@ -52,6 +57,20 @@ async function fetchDocuments(req: AuthenticatedRequest, res: NextApiResponse) {
 
   const from = parseInt(fromStr)
   const to = parseInt(toStr)
+
+  let filterConditions: SQL[]
+  try {
+    filterConditions = buildMaterialFilterConditions(rawFilters, {
+      readable_filename: documents.readable_filename,
+      url: documents.url,
+      base_url: documents.base_url,
+    })
+  } catch (error) {
+    if (error instanceof FilterValidationError) {
+      return res.status(400).json({ error: error.message })
+    }
+    throw error
+  }
 
   try {
     const db = await connectionManager.getDocumentsDb(course_name as string)
@@ -77,66 +96,40 @@ async function fetchDocuments(req: AuthenticatedRequest, res: NextApiResponse) {
       doc_groups: sql`array_remove(array_agg(${docGroups.name}), null)`,
     }
 
+    const conditions: SQL[] = [eq(documents.course_name, course_name as string)]
     if (
       search_key &&
       search_value &&
       typeof search_key === 'string' &&
       search_key in documents
     ) {
+      // Legacy single-filter parameters
       const searchColumn = documents[
         search_key as keyof typeof documents
       ] as PgColumn
+      conditions.push(sql`${searchColumn} ILIKE ${`%${search_value}%`}`)
+    }
+    conditions.push(...filterConditions)
+    const whereClause = and(...conditions)
 
-      try {
-        foundDocs = await db
-          .select(baseQuery)
-          .from(documents)
-          .leftJoin(
-            documentsDocGroups,
-            eq(documents.id, documentsDocGroups.document_id),
-          )
-          .leftJoin(
-            docGroups,
-            eq(documentsDocGroups.doc_group_id, docGroups.id),
-          )
-          .where(
-            and(
-              eq(documents.course_name, course_name as string),
-              sql`${searchColumn} ILIKE ${`%${search_value}%`}`,
-            ),
-          )
-          .groupBy(documents.id)
-          .orderBy(
-            sort_dir === true ? asc(getSortColumn()) : desc(getSortColumn()),
-          )
-          .limit(to - from + 1)
-          .offset(from)
-      } catch (error) {
-        finalError = error
-      }
-    } else {
-      try {
-        foundDocs = await db
-          .select(baseQuery)
-          .from(documents)
-          .leftJoin(
-            documentsDocGroups,
-            eq(documents.id, documentsDocGroups.document_id),
-          )
-          .leftJoin(
-            docGroups,
-            eq(documentsDocGroups.doc_group_id, docGroups.id),
-          )
-          .where(eq(documents.course_name, course_name as string)) // No filter
-          .groupBy(documents.id)
-          .orderBy(
-            sort_dir === true ? asc(getSortColumn()) : desc(getSortColumn()),
-          )
-          .limit(to - from + 1)
-          .offset(from)
-      } catch (error) {
-        finalError = error
-      }
+    try {
+      foundDocs = await db
+        .select(baseQuery)
+        .from(documents)
+        .leftJoin(
+          documentsDocGroups,
+          eq(documents.id, documentsDocGroups.document_id),
+        )
+        .leftJoin(docGroups, eq(documentsDocGroups.doc_group_id, docGroups.id))
+        .where(whereClause)
+        .groupBy(documents.id)
+        .orderBy(
+          sort_dir === true ? asc(getSortColumn()) : desc(getSortColumn()),
+        )
+        .limit(to - from + 1)
+        .offset(from)
+    } catch (error) {
+      finalError = error
     }
 
     if (finalError) {
@@ -149,44 +142,18 @@ async function fetchDocuments(req: AuthenticatedRequest, res: NextApiResponse) {
     let count
     let countError
 
-    if (
-      search_key &&
-      search_value &&
-      typeof search_key === 'string' &&
-      search_key in documents
-    ) {
-      // Fetch the total count of documents for the selected course
-      try {
-        const countQuery = await db
-          .select({ count: sql`count(distinct ${documents.id})` })
-          .from(documents)
-          .where(
-            and(
-              eq(documents.course_name, course_name as string),
-              sql`${documents[search_key as keyof typeof documents] as PgColumn} ILIKE ${`%${search_value}%`}`,
-            ),
-          )
+    // Count uses the same conditions as the listing
+    try {
+      const countQuery = await db
+        .select({ count: sql`count(distinct ${documents.id})` })
+        .from(documents)
+        .where(whereClause)
 
-        count = countQuery[0]?.count ?? 0
-        countError = null
-      } catch (error) {
-        count = 0
-        countError = error
-      }
-    } else {
-      // Fetch the total count of documents for the selected course
-      try {
-        const countQuery = await db
-          .select({ count: sql`count(distinct ${documents.id})` })
-          .from(documents)
-          .where(eq(documents.course_name, course_name as string)) // No filter
-
-        count = countQuery[0]?.count ?? 0
-        countError = null
-      } catch (error) {
-        count = 0
-        countError = error
-      }
+      count = countQuery[0]?.count ?? 0
+      countError = null
+    } catch (error) {
+      count = 0
+      countError = error
     }
 
     if (countError) {
