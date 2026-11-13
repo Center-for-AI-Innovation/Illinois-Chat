@@ -51,14 +51,26 @@ describe('IntegrationsSection', () => {
   it('keeps a selection when the active toggle is clicked again', async () => {
     const user = userEvent.setup()
     renderSection()
-    await user.click(screen.getByRole('button', { name: 'Gallery view' }))
-    expect(screen.getByTestId('integrations-list')).toHaveAttribute(
-      'data-layout',
-      'gallery',
-    )
-    expect(
-      screen.getByRole('button', { name: 'Gallery view' }),
-    ).toHaveAttribute('aria-pressed', 'true')
+    const list = screen.getByTestId('integrations-list')
+
+    for (const name of ['Gallery view', 'Grid view']) {
+      await user.click(screen.getByRole('button', { name }))
+      await user.click(screen.getByRole('button', { name }))
+      // Re-clicking must not unpress the widget or change the layout.
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect(
+        screen
+          .getAllByRole('button')
+          .filter((b) => b.getAttribute('aria-pressed') === 'true'),
+      ).toHaveLength(1)
+      expect(list).toHaveAttribute(
+        'data-layout',
+        name === 'Grid view' ? 'grid' : 'gallery',
+      )
+    }
   })
 
   it('switches to a three-column grid and back', async () => {

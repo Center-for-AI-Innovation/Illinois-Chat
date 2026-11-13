@@ -30,7 +30,7 @@ export const IntegrationCard = forwardRef<
       type={type}
       aria-labelledby={titleId}
       className={cn(
-        'group focus-visible:ring-ring flex h-full w-full cursor-pointer flex-col items-start gap-3 rounded-2xl border border-(--dashboard-border) bg-transparent p-5 text-left text-(--dashboard-foreground) transition-shadow outline-none hover:shadow-md focus-visible:ring-2',
+        'group focus-visible:ring-ring flex h-full w-full cursor-pointer flex-col items-start gap-3 overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent p-5 text-left text-(--dashboard-foreground) transition-all duration-300 outline-none hover:scale-[1.02] hover:shadow-xl focus-visible:ring-2',
         className,
       )}
       {...props}
