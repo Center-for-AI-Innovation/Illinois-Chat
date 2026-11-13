@@ -11,6 +11,7 @@ vi.mock('../DocumentUploadSection', () => ({
 
 vi.mock('../IntegrationsSection', () => ({
   IntegrationsSection: () => <div data-testid="integrations-section" />,
+  IntegrationsLayoutToggle: () => <div data-testid="integrations-toggle" />,
 }))
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }))

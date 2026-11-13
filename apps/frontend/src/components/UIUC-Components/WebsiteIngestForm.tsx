@@ -20,6 +20,7 @@ import {
   IconSubtask,
   IconWorld,
   IconWorldDownload,
+  IconLink,
   IconHelp,
 } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
@@ -403,10 +404,16 @@ export default function WebsiteIngestForm({
           render={
             <IntegrationCard
               logo={
-                <IconWorldDownload className="h-8 w-8" aria-hidden="true" />
+                <span className="bg-muted flex size-20 items-center justify-center rounded-[14px] p-1">
+                  <IconLink
+                    className="size-14"
+                    stroke={1.25}
+                    aria-hidden="true"
+                  />
+                </span>
               }
               title="Website"
-              description="Import content from any website by providing the URL. Supports recursive crawling with customizable depth."
+              description="Import content from any website with its URL. Recursive crawling with customizable depth."
             />
           }
         />

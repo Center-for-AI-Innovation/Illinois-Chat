@@ -156,13 +156,13 @@ export default function MITIngestForm({
                 <Image
                   src="/media/mitocw_logo.jpg"
                   alt="MIT OCW Logo"
-                  width={32}
-                  height={32}
-                  className="rounded-full object-contain"
+                  width={80}
+                  height={80}
+                  className="size-20 rounded-[14px] object-contain"
                 />
               }
               title="MIT Course"
-              description="Import content from MIT OpenCourseWare, including lecture notes, assignments, and course materials."
+              description="Import content from MIT OpenCourseWare, including lecture notes, assignments, and more."
             />
           }
         />

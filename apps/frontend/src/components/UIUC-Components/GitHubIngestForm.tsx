@@ -1,10 +1,7 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
-import {
-  IconBrandGithub,
-  IconWorldDownload,
-} from '@tabler/icons-react'
+import { IconBrandGithub, IconWorldDownload } from '@tabler/icons-react'
 // import { APIKeyInput } from '../LLMsApiKeyInputForm'
 // import { ModelToggles } from '../ModelToggles'
 import { motion } from 'framer-motion'
@@ -270,7 +267,13 @@ export default function GitHubIngestForm({
         <DialogTrigger
           render={
             <IntegrationCard
-              logo={<IconBrandGithub className="h-8 w-8" aria-hidden="true" />}
+              logo={
+                <IconBrandGithub
+                  className="size-20"
+                  stroke={1.25}
+                  aria-hidden="true"
+                />
+              }
               title="GitHub"
               description="Import content from GitHub repositories, including documentation, code, and README files."
             />

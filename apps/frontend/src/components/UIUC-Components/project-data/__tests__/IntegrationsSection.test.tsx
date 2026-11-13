@@ -1,9 +1,14 @@
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { createTestQueryClient } from '~/test-utils/renderWithProviders'
-import { IntegrationsSection } from '../IntegrationsSection'
+import {
+  IntegrationsLayoutToggle,
+  IntegrationsSection,
+  type IntegrationsLayout,
+} from '../IntegrationsSection'
 
 vi.mock('../../CanvasIngestForm', () => ({
   default: () => <div>canvas-form</div>,
@@ -19,15 +24,26 @@ vi.mock('../../CourseraIngestForm', () => ({
   default: () => <div>coursera-form</div>,
 }))
 
-function renderSection() {
-  return render(
-    <IntegrationsSection
-      projectName="CS101"
-      uploadFiles={[]}
-      setUploadFiles={vi.fn()}
-      queryClient={createTestQueryClient()}
-    />,
+// Mirrors ProjectDataContent: the toggle sits in the heading row and the
+// layout state lives above both pieces.
+function Harness() {
+  const [layout, setLayout] = useState<IntegrationsLayout>('gallery')
+  return (
+    <>
+      <IntegrationsLayoutToggle layout={layout} onLayoutChange={setLayout} />
+      <IntegrationsSection
+        layout={layout}
+        projectName="CS101"
+        uploadFiles={[]}
+        setUploadFiles={vi.fn()}
+        queryClient={createTestQueryClient()}
+      />
+    </>
   )
+}
+
+function renderSection() {
+  return render(<Harness />)
 }
 
 describe('IntegrationsSection', () => {
@@ -44,7 +60,7 @@ describe('IntegrationsSection', () => {
     expect(list).toHaveAttribute('data-layout', 'gallery')
     expect(list).toHaveClass('overflow-x-auto')
     expect(
-      screen.getByRole('button', { name: 'Gallery view' }),
+      screen.getByRole('button', { name: 'Gallery View' }),
     ).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -53,7 +69,7 @@ describe('IntegrationsSection', () => {
     renderSection()
     const list = screen.getByTestId('integrations-list')
 
-    for (const name of ['Gallery view', 'Grid view']) {
+    for (const name of ['Gallery View', 'Grid View']) {
       await user.click(screen.getByRole('button', { name }))
       await user.click(screen.getByRole('button', { name }))
       // Re-clicking must not unpress the widget or change the layout.
@@ -68,7 +84,7 @@ describe('IntegrationsSection', () => {
       ).toHaveLength(1)
       expect(list).toHaveAttribute(
         'data-layout',
-        name === 'Grid view' ? 'grid' : 'gallery',
+        name === 'Grid View' ? 'grid' : 'gallery',
       )
     }
   })
@@ -78,15 +94,15 @@ describe('IntegrationsSection', () => {
     renderSection()
     const list = screen.getByTestId('integrations-list')
 
-    await user.click(screen.getByRole('button', { name: 'Grid view' }))
+    await user.click(screen.getByRole('button', { name: 'Grid View' }))
     expect(list).toHaveAttribute('data-layout', 'grid')
     expect(list).toHaveClass('grid-cols-3')
-    expect(screen.getByRole('button', { name: 'Grid view' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Grid View' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
 
-    await user.click(screen.getByRole('button', { name: 'Gallery view' }))
+    await user.click(screen.getByRole('button', { name: 'Gallery View' }))
     expect(list).toHaveAttribute('data-layout', 'gallery')
     expect(list).toHaveClass('overflow-x-auto')
   })
