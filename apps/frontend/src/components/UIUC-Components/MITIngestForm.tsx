@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
-import { IconArrowRight } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import {
   Dialog,
@@ -10,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
+import { IntegrationCard } from './project-data/IntegrationCard'
 import NextLink from 'next/link'
 import Image from 'next/image'
 import axios from 'axios'
@@ -150,41 +150,20 @@ export default function MITIngestForm({
         }}
       >
         <DialogTrigger
-          tabIndex={0}
-          nativeButton={false}
-          className="focus:bg-(--dashboard-background-dark)"
           render={
-            <div
-              className="group relative h-full cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-            >
-              <div className="mb-2 -ml-2 flex items-center justify-between">
-                <div className="flex items-center space-x-1">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full">
-                    <Image
-                      src="/media/mitocw_logo.jpg"
-                      alt="MIT OCW Logo"
-                      width={32}
-                      height={32}
-                      className="rounded-full object-contain"
-                    />
-                  </div>
-                  <p className="text-xl font-semibold">MIT Course</p>
-                </div>
-              </div>
-
-              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
-                Import content from MIT OpenCourseWare, including lecture notes,
-                assignments, and course materials.
-              </p>
-              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
-                <span>Configure import</span>
-                <IconArrowRight
-                  size={16}
-                  aria-hidden="true"
-                  className="ml-2 transition-transform group-hover:translate-x-1"
+            <IntegrationCard
+              logo={
+                <Image
+                  src="/media/mitocw_logo.jpg"
+                  alt="MIT OCW Logo"
+                  width={32}
+                  height={32}
+                  className="rounded-full object-contain"
                 />
-              </div>
-            </div>
+              }
+              title="MIT Course"
+              description="Import content from MIT OpenCourseWare, including lecture notes, assignments, and course materials."
+            />
           }
         />
 
