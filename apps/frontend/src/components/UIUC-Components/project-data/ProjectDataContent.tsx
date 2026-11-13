@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { Fragment, type ReactNode } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
 
@@ -6,6 +7,7 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import UploadNotification from '../UploadNotification'
 import { useUploadNotifications } from '~/hooks/useUploadNotifications'
 import { DocumentUploadSection } from './DocumentUploadSection'
+import { IntegrationsSection } from './IntegrationsSection'
 import { PROJECT_DATA_SECTIONS } from './project-data.sections'
 
 // Page shell: header plus the four section headings. Only the upload body
@@ -21,6 +23,7 @@ export function ProjectDataContent({
   // Lives here so later section bodies (integrations) share the same list.
   const { uploadFiles, setUploadFiles, closeNotification } =
     useUploadNotifications()
+  const queryClient = useQueryClient()
 
   const sectionBodies: Partial<Record<string, ReactNode>> = {
     'document-upload': (
@@ -29,6 +32,14 @@ export function ProjectDataContent({
         courseMetadata={courseMetadata}
         uploadFiles={uploadFiles}
         setUploadFiles={setUploadFiles}
+      />
+    ),
+    integrations: (
+      <IntegrationsSection
+        projectName={projectName}
+        uploadFiles={uploadFiles}
+        setUploadFiles={setUploadFiles}
+        queryClient={queryClient}
       />
     ),
   }
