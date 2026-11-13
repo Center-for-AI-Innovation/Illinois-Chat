@@ -14,6 +14,7 @@ import {
   useGatedIngestPoller,
 } from '~/hooks/useGatedIngestPoller'
 import { v4 as uuidv4 } from 'uuid'
+import { cn } from '@/components/shadcn/lib/utils'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
@@ -392,7 +393,9 @@ export function LargeDropzone({
       })
   }
 
-  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = event.target.files ? Array.from(event.target.files) : []
     // Reset so selecting the exact same file again still fires onChange.
     event.target.value = ''
@@ -404,129 +407,86 @@ export function LargeDropzone({
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* TODO: fix large dropzone display across all screens */}
+    <div className="flex w-full flex-col">
       <div
-        className="relative"
-        style={{
-          flex: 1,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexDirection: 'column',
+        role="button"
+        tabIndex={interactionDisabled ? -1 : 0}
+        aria-disabled={interactionDisabled}
+        aria-busy={uploadInProgress}
+        data-testid="dropzone"
+        onClick={openFileBrowser}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            openFileBrowser()
+          }
         }}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          'border-border focus-visible:ring-ring/50 relative min-h-50 w-full overflow-hidden rounded-xl border-2 border-dashed p-4 transition-colors outline-none focus-visible:ring-3',
+          isDisabled ? 'bg-muted' : 'bg-background',
+          isDragging && 'border-primary bg-accent',
+          interactionDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        )}
       >
-        <div
-          role="button"
-          tabIndex={interactionDisabled ? -1 : 0}
-          aria-disabled={interactionDisabled}
-          aria-busy={uploadInProgress}
-          data-testid="dropzone"
-          onClick={openFileBrowser}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              openFileBrowser()
-            }
-          }}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className="group relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-          style={{
-            width: '100%',
-            minHeight: '12.5rem',
-            height: 'auto',
-            backgroundColor: isDisabled
-              ? 'var(--background-faded)'
-              : 'var(--background)',
-            cursor: interactionDisabled ? 'not-allowed' : 'pointer',
-            borderWidth: '2px',
-            borderStyle: 'dashed',
-            borderColor: 'var(--dashboard-border)',
-            borderRadius: '0.75rem',
-            padding: '1rem',
-            margin: '0 auto',
-            maxWidth: '100%',
-            overflow: 'hidden',
-            background: 'var(--background)',
-          }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            aria-hidden="true"
-            tabIndex={-1}
-            disabled={interactionDisabled}
-            onChange={handleFileInputChange}
-            className="hidden"
-          />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          aria-hidden="true"
+          tabIndex={-1}
+          disabled={interactionDisabled}
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
 
-          {uploadInProgress && (
-            <div
-              data-testid="dropzone-loading-overlay"
-              className="absolute inset-0 z-10 flex items-center justify-center bg-(--background)/70"
-            >
-              <LoadingSpinner size="lg" />
-            </div>
+        {uploadInProgress && (
+          <div
+            data-testid="dropzone-loading-overlay"
+            className="bg-background/70 absolute inset-0 z-10 flex items-center justify-center"
+          >
+            <LoadingSpinner size="lg" />
+          </div>
+        )}
+
+        <div className="pointer-events-none flex flex-col items-center justify-center gap-2 px-2 py-4 sm:px-4">
+          {isDragging ? (
+            <IconDownload
+              size={isSmallScreen ? 30 : 40}
+              className="text-foreground"
+              stroke={1.5}
+              aria-hidden="true"
+            />
+          ) : (
+            !isDisabled && (
+              <IconCloudUpload
+                size={isSmallScreen ? 30 : 40}
+                className="text-muted-foreground"
+                stroke={1.5}
+                aria-hidden="true"
+              />
+            )
           )}
 
-          <div
-            style={{ pointerEvents: 'none' }}
-            className="flex flex-col items-center justify-center px-2 sm:px-4"
-          >
-            <div className="flex items-center justify-center gap-2 pt-3 sm:pt-5">
-              {isDragging ? (
-                <IconDownload
-                  size={isSmallScreen ? 30 : 50}
-                  color="var(--dashboard-foreground)"
-                  stroke={1.5}
-                  aria-hidden="true"
-                />
-              ) : (
-                !isDisabled && (
-                  <IconCloudUpload
-                    size={isSmallScreen ? 30 : 50}
-                    color="var(--illinois-orange)"
-                    stroke={1.5}
-                    aria-hidden="true"
-                  />
-                )
-              )}
-            </div>
+          <p className="text-foreground text-center text-base font-semibold">
+            {isDragging
+              ? 'Drop files here'
+              : isDisabled
+                ? 'Enter an available project name above! 👀'
+                : 'Upload Materials'}
+          </p>
 
-            <p
-              className={`text-center font-bold ${
-                isSmallScreen ? 'mt-4 text-base' : 'mt-8 text-lg'
-              } text-(--dashboard-foreground)`}
-            >
-              {isDragging
-                ? 'Drop files here'
-                : isDisabled
-                  ? 'Enter an available project name above! 👀'
-                  : 'Upload materials'}
+          {!isDisabled && (
+            <p className="text-muted-foreground text-center text-sm">
+              Drag&apos;n&apos;drop files or a whole folder here
             </p>
+          )}
 
-            {!isDisabled && (
-              <p
-                className={`mt-2.5 text-center ${
-                  isSmallScreen ? 'text-xs' : 'text-sm'
-                } text-(--foreground-faded)`}
-              >
-                Drag&apos;n&apos;drop files or a whole folder here
-              </p>
-            )}
-
-            <div className="mt-2 w-full overflow-x-hidden sm:mt-4">
-              <SupportedFileUploadTypes />
-            </div>
+          <div className="w-full">
+            <SupportedFileUploadTypes />
           </div>
         </div>
       </div>
