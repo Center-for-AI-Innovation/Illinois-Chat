@@ -29,11 +29,6 @@ import {
   ComboboxList,
   ComboboxTrigger,
 } from '@/components/shadcn/ui/combobox'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/shadcn/ui/tooltip'
 import HomeContext from '~/components/home/home.context'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import Link from 'next/link'
@@ -56,9 +51,9 @@ import {
   warningLargeModelIds,
 } from '~/utils/modelProviders/ConfigWebLLM'
 import {
-  getCountryOfConcern,
-  getCountryOfConcernShortMessage,
-} from '~/utils/modelProviders/countriesOfConcern'
+  CountryOfConcernIcon,
+  CountryOfConcernNotice,
+} from '../UIUC-Components/CountryOfConcern'
 import { LoadingSpinner } from '../UIUC-Components/LoadingSpinner'
 
 interface ModelDropdownProps {
@@ -203,7 +198,6 @@ export const ModelItem = forwardRef<
     const [isModelCached, setIsModelCached] = useState(false)
     const showSparkles = recommendedModelIds.includes(label)
     const showWarningLargeModel = warningLargeModelIds.includes(label)
-    const countryOfConcern = getCountryOfConcern(modelId)
     const { state, dispatch: homeDispatch } = useContext(HomeContext)
     // const {
     //   state: {
@@ -264,31 +258,11 @@ export const ModelItem = forwardRef<
               <span className="text-sm" style={{ marginLeft: '8px' }}>
                 {label}
               </span>
-              {countryOfConcern && (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span
-                        aria-label={`Country of concern warning: ${countryOfConcern}`}
-                        style={{
-                          marginLeft: '6px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
-                      />
-                    }
-                  >
-                    <IconAlertTriangle
-                      size="0.9rem"
-                      aria-hidden="true"
-                      className="text-yellow-500"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[280px] text-wrap">
-                    {getCountryOfConcernShortMessage(countryOfConcern)}
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              <CountryOfConcernIcon
+                modelId={modelId}
+                size="0.9rem"
+                className="ml-1.5"
+              />
             </div>
             {downloadSize && (
               <div
@@ -519,7 +493,6 @@ const ModelDropdown: React.FC<
   )
 
   const selectedModel = allModels.find((model) => model.id === value)
-  const selectedModelCountry = getCountryOfConcern(value)
 
   // Grouped by provider, in LLM_PROVIDER_ORDER, nested per Base UI
   // Combobox's grouping API.
@@ -614,30 +587,7 @@ const ModelDropdown: React.FC<
               }`}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {selectedModelCountry && (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span
-                        aria-label={`Country of concern warning: ${selectedModelCountry}`}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
-                      />
-                    }
-                  >
-                    <IconAlertTriangle
-                      size="1rem"
-                      aria-hidden="true"
-                      className="text-yellow-500"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[280px] text-wrap">
-                    {getCountryOfConcernShortMessage(selectedModelCountry)}
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              <CountryOfConcernIcon modelId={value} />
               <ComboboxTrigger className="text-(--modal-button-text)">
                 <IconChevronDown size="1rem" aria-hidden="true" />
               </ComboboxTrigger>
@@ -788,13 +738,10 @@ export const ModelSelect = React.forwardRef<HTMLDivElement, any>(
                             <p
                               className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
                             >
-                              Models marked with a yellow warning icon originate
-                              from countries the U.S. Department of Commerce has
-                              flagged as countries of concern (currently China,
-                              Russia, Iran, and North Korea). These models may
-                              carry data-handling, supply-chain, or compliance
-                              risks. They are disabled by default; admins can
-                              still enable them after reviewing the warning.
+                              Models marked with a yellow warning icon are
+                              disabled by default; admins can still enable them
+                              after reviewing this warning:{' '}
+                              <CountryOfConcernNotice />
                             </p>
                           </div>
 

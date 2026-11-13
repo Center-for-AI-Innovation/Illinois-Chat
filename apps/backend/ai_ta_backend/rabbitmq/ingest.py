@@ -52,12 +52,18 @@ from langchain.vectorstores import Qdrant
 try:
     from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB
     from ai_ta_backend.rabbitmq.embeddings import OpenAIAPIProcessor
+    from ai_ta_backend.rabbitmq.trusted_hosts import is_same_origin_as_any
 except ModuleNotFoundError:
     # When running as worker outside Flask app, import from local path
     from rmsql import SQLAlchemyIngestDB
     from embeddings import OpenAIAPIProcessor
+    from trusted_hosts import is_same_origin_as_any
 
 load_dotenv()
+
+
+class EmbeddingConfigError(ValueError):
+    """A project's embedding_config cannot be used. Retrying will not help."""
 
 # Ensure NLTK data is available so unstructured (Excel, PPTX, etc.) does not try to download from its URL (403 in many environments)
 def _ensure_nltk_data():
@@ -99,6 +105,7 @@ class Ingest:
         self.aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         self.s3_bucket_name = os.getenv('S3_BUCKET_NAME')
         self.posthog_api_key = os.getenv('POSTHOG_API_KEY')
+        self.posthog_host = os.getenv('POSTHOG_HOST')
 
         # Qdrant fields are always defined so engine-agnostic code paths can
         # inspect them without raising. They're populated only when a
@@ -153,6 +160,9 @@ class Ingest:
           - provider 'openai'/None → existing OpenAIAPIProcessor against the
             (optionally overridden) model / api_base / api_key.
         """
+        # Created first so main_ingest can record a failure raised below.
+        self.sql_session = SQLAlchemyIngestDB(engine=documents_sql_engine)
+
         # ── Embedding override ──
         # When the resolver supplies a per-project embedding, override the
         # env-derived attributes the embedding paths read. Leave them untouched
@@ -162,6 +172,12 @@ class Ingest:
         if embedding_model:
             self.embedding_model = embedding_model
         if embedding_provider != "ollama":
+            if (embedding_api_base and not embedding_api_key
+                    and not is_same_origin_as_any(embedding_api_base, [self.openai_api_base])):
+                # The env key belongs to the env-configured endpoint; never send
+                # it to a project-supplied api_base.
+                raise EmbeddingConfigError("embedding_config api_key is required when api_base "
+                                           "is set to a custom endpoint")
             if embedding_api_base:
                 # The OpenAIAPIProcessor needs a URL ending in /embeddings; the
                 # resolved api_base is a base URL.
@@ -211,14 +227,12 @@ class Ingest:
             )
 
         # ── PostHog ──
-        if self.posthog_api_key:
+        if self.posthog_api_key and self.posthog_host:
             self.posthog = Posthog(sync_mode=False, project_api_key=self.posthog_api_key,
-                                   host='https://app.posthog.com')
+                                   host=self.posthog_host)
         else:
             self.posthog = None
-            print("POSTHOG API KEY NOT FOUND!")
-
-        self.sql_session = SQLAlchemyIngestDB(engine=documents_sql_engine)
+            print("POSTHOG_API_KEY or POSTHOG_HOST not set, PostHog disabled")
 
     def _init_vectorstore(self):
         """Build the LangChain Qdrant vectorstore wrapper from the current qdrant_client."""
@@ -319,6 +333,22 @@ class Ingest:
 
             sentry_sdk.flush(timeout=20)
             return json.dumps(success_fail_dict)
+
+        except EmbeddingConfigError as e:
+            # A bad embedding_config fails every attempt. Record it so the
+            # document leaves documents_in_progress with a reason the admin sees.
+            logging.error(f"Ingest config error: {e}")
+            self.sql_session.insert_failed_document({
+                "s3_path": str(inputs.get('s3_paths', '')),
+                "readable_filename": inputs.get('readable_filename', ''),
+                "course_name": inputs.get('course_name', ''),
+                "url": inputs.get('url', None),
+                "base_url": inputs.get('base_url', None),
+                "doc_groups": inputs.get('groups', ''),
+                "error": str(e),
+            })
+            self.sql_session.delete_document_in_progress(job_id)
+            return json.dumps({"failure_ingest": {'error': str(e)}})
 
         except Exception as e:
             logging.error("Error in main_ingest: ", e)
