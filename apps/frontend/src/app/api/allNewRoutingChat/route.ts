@@ -4,7 +4,10 @@ import { type ChatBody, type Conversation } from '@/types/chat'
 import { routeModelRequest } from '~/utils/streamProcessing'
 import { buildPrompt } from '~/app/utils/buildPromptUtils'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
-import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import {
+  getCourseMetadata,
+  withCourseAccessFromRequest,
+} from '~/app/api/authorization'
 import { reconstructConversation } from '@/hooks/__internal__/conversation'
 import { persistMessageServer } from '~/pages/api/conversation'
 import { getModels } from '~/pages/api/models'
@@ -17,7 +20,11 @@ export const revalidate = 0
 async function handler(req: AuthenticatedRequest) {
   try {
     const body = await req.json()
-    const { conversation, course_name, courseMetadata, mode } = body as ChatBody
+    const { conversation, course_name, mode } = body as ChatBody
+    // Never trust metadata from the request body: it may be redacted (or
+    // forged). Load the real metadata, including the system prompt, server-side.
+    const courseMetadata = (await getCourseMetadata(course_name)) ?? undefined
+    body.courseMetadata = courseMetadata
     const hydratedConversation: Conversation | undefined =
       reconstructConversation(conversation)
 

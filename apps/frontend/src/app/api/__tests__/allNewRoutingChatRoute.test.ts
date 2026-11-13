@@ -6,6 +6,7 @@ const hoisted = vi.hoisted(() => {
     buildPrompt: vi.fn(async ({ conversation }: any) => conversation),
     reconstructConversation: vi.fn((c: any) => c),
     persistMessageServer: vi.fn(async () => undefined),
+    getCourseMetadata: vi.fn(async () => ({ system_prompt: 'server prompt' })),
     getModels: vi.fn(async () => ({
       OpenAICompatible: {
         enabled: true,
@@ -23,6 +24,7 @@ vi.mock('~/pages/api/models', () => ({
 
 vi.mock('~/app/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
+  getCourseMetadata: hoisted.getCourseMetadata,
 }))
 
 vi.mock('~/utils/streamProcessing', () => ({
@@ -65,6 +67,30 @@ describe('app/api/allNewRoutingChat POST', () => {
     expect(res.status).toBe(200)
     await expect(res.text()).resolves.toContain('done')
     expect(hoisted.persistMessageServer).toHaveBeenCalled()
+  })
+
+  it('uses server-loaded metadata, not the request body copy', async () => {
+    const req = new Request('http://localhost', {
+      method: 'POST',
+      body: JSON.stringify({
+        course_name: 'CS101',
+        conversation: { id: 'c1', messages: [] },
+        courseMetadata: { system_prompt: 'forged' },
+        mode: 'chat',
+      }),
+    })
+    await POST(req as any)
+    expect(hoisted.getCourseMetadata).toHaveBeenCalledWith('CS101')
+    expect(hoisted.buildPrompt).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        courseMetadata: { system_prompt: 'server prompt' },
+      }),
+    )
+    expect(hoisted.routeModelRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        courseMetadata: { system_prompt: 'server prompt' },
+      }),
+    )
   })
 
   it('routes with stored providers, not ones sent in the request', async () => {
