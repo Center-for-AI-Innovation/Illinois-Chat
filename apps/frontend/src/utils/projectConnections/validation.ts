@@ -164,17 +164,18 @@ function parseAllowedProviders(): readonly string[] {
 export const EMBEDDING_PROVIDERS = parseAllowedProviders()
 export type EmbeddingProvider = (typeof EMBEDDING_PROVIDERS)[number]
 
-export const embeddingConfigSchema = z
-  .object({
-    // Runtime tuple is type-narrowed for `z.enum`. `parseAllowedProviders`
-    // already validated non-empty, so the cast is safe.
-    provider: z.enum(EMBEDDING_PROVIDERS as unknown as [string, ...string[]]),
-    model: z.string().min(1),
-    base_url: z.string().url().optional(),
-    api_base: z.string().url().optional(),
-    api_key: secretSchema.optional(),
-    query_instruction: z.string().optional(),
-  })
+const embeddingConfigObjectSchema = z.object({
+  // Runtime tuple is type-narrowed for `z.enum`. `parseAllowedProviders`
+  // already validated non-empty, so the cast is safe.
+  provider: z.enum(EMBEDDING_PROVIDERS as unknown as [string, ...string[]]),
+  model: z.string().min(1),
+  base_url: z.string().url().optional(),
+  api_base: z.string().url().optional(),
+  api_key: secretSchema.optional(),
+  query_instruction: z.string().optional(),
+})
+
+export const embeddingConfigSchema = embeddingConfigObjectSchema
   .refine((cfg) => cfg.provider !== 'ollama' || !!cfg.base_url, {
     message: "base_url is required when provider is 'ollama'",
     path: ['base_url'],
@@ -218,9 +219,8 @@ export type UpsertBody = z.infer<typeof upsertBodySchema>
 // secrets, so a request that changes one toggle legitimately arrives without
 // `api_key`.
 //
-// `embedding` uses its inner object because `embeddingConfigSchema` carries a
-// `.refine()` and ZodEffects has no `.partial()`. The refinement still runs on
-// the merged result.
+// `embedding` uses the base object because refinements wrap it in ZodEffects.
+// Both refinements still run on the merged result.
 function patchSchema<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
   const shape: z.ZodRawShape = {}
   for (const [name, field] of Object.entries(schema.shape)) {
@@ -235,7 +235,7 @@ const partialConfigSchemas = {
   s3: patchSchema(s3ConfigSchema),
   database: patchSchema(databaseConfigSchema),
   qdrant: patchSchema(qdrantConfigSchema),
-  embedding: patchSchema(embeddingConfigSchema.innerType()),
+  embedding: patchSchema(embeddingConfigObjectSchema),
 } as const
 
 export const patchBodySchema = z.discriminatedUnion('kind', [
