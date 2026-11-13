@@ -31,6 +31,8 @@ export function IntegrationsSection({
   return (
     <div className="flex flex-col gap-4">
       <ToggleGroup
+        // multiple={false} pins single-select; the guard below also drops the
+        // empty selection a re-click of the active item would report.
         multiple={false}
         variant="outline"
         spacing={0}
@@ -57,7 +59,7 @@ export function IntegrationsSection({
           '[&>*]:flex',
           layout === 'gallery'
             ? 'flex gap-4 overflow-x-auto pb-2 [&>*]:w-72 [&>*]:shrink-0'
-            : 'grid grid-cols-3 gap-4',
+            : 'grid auto-rows-fr grid-cols-3 gap-4',
         )}
       >
         <CanvasIngestForm
