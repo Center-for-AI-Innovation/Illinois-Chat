@@ -7,7 +7,6 @@ import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import SupportedFileUploadTypes from './SupportedFileUploadTypes'
 import { LoadingSpinner } from './LoadingSpinner'
-import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
 import {
   isActiveUpload,
@@ -19,6 +18,9 @@ import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
 const POLL_INTERVAL_MS = 5000
+
+// Figma cloud-upload icon is 48px wide.
+const CLOUD_ICON_SIZE = 48
 
 const isActiveDocument = (file: FileUpload) => isActiveUpload(file, 'document')
 
@@ -114,7 +116,6 @@ export function LargeDropzone({
   const [uploadInProgress, setUploadInProgress] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const router = useRouter()
-  const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const fileInputRef = useRef<HTMLInputElement>(null)
   // dragenter/dragleave fire on every child element the cursor crosses, not
   // just at the dropzone's own boundary. A counter (incremented on enter,
@@ -426,9 +427,11 @@ export function LargeDropzone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          'border-border focus-visible:ring-ring/50 relative min-h-50 w-full overflow-hidden rounded-xl border-2 border-dashed p-4 transition-colors outline-none focus-visible:ring-3',
-          isDisabled ? 'bg-muted' : 'bg-background',
-          isDragging && 'border-primary bg-accent',
+          // Panel per Figma "Upload Materials Panel": 264px tall, 3px dashed
+          // uiuc-slate/400 border on uiuc-slate/25, 24px radius, 80px side padding.
+          'focus-visible:ring-ring/50 relative flex min-h-66 w-full flex-col items-center justify-center gap-8 overflow-hidden rounded-3xl border-[3px] border-dashed border-[#a6b4c7] px-6 py-9 transition-colors outline-none focus-visible:ring-3 md:flex-row md:gap-16 md:px-20 dark:border-white/25',
+          isDisabled ? 'bg-muted' : 'bg-[#f9fafc] dark:bg-white/5',
+          isDragging && 'border-primary bg-accent dark:border-primary',
           interactionDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         )}
       >
@@ -452,10 +455,10 @@ export function LargeDropzone({
           </div>
         )}
 
-        <div className="pointer-events-none flex flex-col items-center justify-center gap-2 px-2 py-4 sm:px-4">
+        <div className="pointer-events-none flex flex-col items-center gap-8">
           {isDragging ? (
             <IconDownload
-              size={isSmallScreen ? 30 : 40}
+              size={CLOUD_ICON_SIZE}
               className="text-foreground"
               stroke={1.5}
               aria-hidden="true"
@@ -463,32 +466,34 @@ export function LargeDropzone({
           ) : (
             !isDisabled && (
               <IconCloudUpload
-                size={isSmallScreen ? 30 : 40}
-                className="text-muted-foreground"
+                size={CLOUD_ICON_SIZE}
+                color="var(--illinois-orange-branding)"
                 stroke={1.5}
                 aria-hidden="true"
               />
             )
           )}
 
-          <p className="text-foreground text-center text-base font-semibold">
-            {isDragging
-              ? 'Drop files here'
-              : isDisabled
-                ? 'Enter an available project name above! 👀'
-                : 'Upload Materials'}
-          </p>
-
-          {!isDisabled && (
-            <p className="text-muted-foreground text-center text-sm">
-              Drag&apos;n&apos;drop files or a whole folder here
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p className="text-accent-foreground text-xl leading-none font-semibold">
+              {isDragging
+                ? 'Drop files here'
+                : isDisabled
+                  ? 'Enter an available project name above! 👀'
+                  : 'Upload Materials'}
             </p>
-          )}
 
-          <div className="w-full">
-            <SupportedFileUploadTypes />
+            {!isDisabled && (
+              <p className="text-base leading-6 text-(--foreground-subtle)">
+                Drag-and-drop your own files and content,
+                <br />
+                or click to open your file browser.
+              </p>
+            )}
           </div>
         </div>
+
+        <SupportedFileUploadTypes />
       </div>
     </div>
   )

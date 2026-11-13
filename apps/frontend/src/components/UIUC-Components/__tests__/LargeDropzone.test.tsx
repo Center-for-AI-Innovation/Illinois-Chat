@@ -1,6 +1,13 @@
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 
 import type { FileUpload } from '../UploadNotification'
 
@@ -162,7 +169,21 @@ describe('LargeDropzone', () => {
 
     expect(screen.getByText('Upload Materials')).toBeInTheDocument()
     expect(
-      screen.getByText(/Drag.*drop files or a whole folder here/i),
+      screen.getByText(/click to open your file browser/i),
+    ).toBeInTheDocument()
+  })
+
+  it('lists the supported file types as icons', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    render(<LargeDropzone {...defaultProps()} />)
+
+    const list = screen.getByRole('list', { name: 'Supported file types' })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(7)
+    expect(
+      within(list).getByRole('img', { name: 'PDF files supported' }),
     ).toBeInTheDocument()
   })
 
@@ -174,7 +195,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps({ isDisabled: true })} />)
 
     expect(
-      screen.queryByText(/Drag.*drop files or a whole folder here/i),
+      screen.queryByText(/click to open your file browser/i),
     ).not.toBeInTheDocument()
   })
 
@@ -213,7 +234,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps()} />)
 
     const dropzone = screen.getByTestId('dropzone')
-    const child = screen.getByText(/Drag.*drop files or a whole folder here/i)
+    const child = screen.getByText(/click to open your file browser/i)
 
     // Enter the dropzone, then cross onto a child element (enter fires on
     // the child too), then leave the child (dragleave fires on the child,
