@@ -6,7 +6,6 @@ const hoisted = vi.hoisted(() => {
     buildPrompt: vi.fn(async ({ conversation }: any) => conversation),
     reconstructConversation: vi.fn((c: any) => c),
     persistMessageServer: vi.fn(async () => undefined),
-    getCourseMetadata: vi.fn(async () => ({ system_prompt: 'server prompt' })),
     getModels: vi.fn(async () => ({
       OpenAICompatible: {
         enabled: true,
@@ -24,7 +23,6 @@ vi.mock('~/pages/api/models', () => ({
 
 vi.mock('~/app/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
-  getCourseMetadata: hoisted.getCourseMetadata,
 }))
 
 vi.mock('~/utils/streamProcessing', () => ({
@@ -69,22 +67,6 @@ describe('app/api/allNewRoutingChat POST', () => {
     expect(hoisted.persistMessageServer).toHaveBeenCalled()
   })
 
-  it('returns 404 when the project metadata is missing', async () => {
-    hoisted.getCourseMetadata.mockResolvedValueOnce(null as any)
-    hoisted.buildPrompt.mockClear()
-    const req = new Request('http://localhost', {
-      method: 'POST',
-      body: JSON.stringify({
-        course_name: 'gone',
-        conversation: { id: 'c1', messages: [] },
-        mode: 'chat',
-      }),
-    })
-    const res = await POST(req as any)
-    expect(res.status).toBe(404)
-    expect(hoisted.buildPrompt).not.toHaveBeenCalled()
-  })
-
   it('uses server-loaded metadata, not the request body copy', async () => {
     const req = new Request('http://localhost', {
       method: 'POST',
@@ -95,8 +77,8 @@ describe('app/api/allNewRoutingChat POST', () => {
         mode: 'chat',
       }),
     })
+    ;(req as any).courseMetadata = { system_prompt: 'server prompt' }
     await POST(req as any)
-    expect(hoisted.getCourseMetadata).toHaveBeenCalledWith('CS101')
     expect(hoisted.buildPrompt).toHaveBeenLastCalledWith(
       expect.objectContaining({
         courseMetadata: { system_prompt: 'server prompt' },

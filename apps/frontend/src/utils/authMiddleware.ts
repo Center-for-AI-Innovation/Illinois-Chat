@@ -18,8 +18,6 @@ export interface AuthenticatedRequest extends NextApiRequest {
   courseName?: string
 }
 
-// Verify an access token for this request's host. Throws the underlying jwt
-// error when the token is expired or invalid.
 async function verifyRequestToken(
   req: NextApiRequest,
   token: string,
@@ -40,12 +38,7 @@ async function verifyRequestToken(
   )) as AuthenticatedUser
 }
 
-/**
- * Best-effort user lookup for endpoints that also serve anonymous callers.
- * Returns undefined when there is no token, or the token is expired/invalid
- * (the caller is then treated as anonymous). Never sends a response. Any other
- * failure is unexpected and is rethrown rather than degrading to anonymous.
- */
+// Expired or invalid tokens count as anonymous; other failures rethrow.
 export async function getOptionalUser(
   req: NextApiRequest,
 ): Promise<AuthenticatedUser | undefined> {
