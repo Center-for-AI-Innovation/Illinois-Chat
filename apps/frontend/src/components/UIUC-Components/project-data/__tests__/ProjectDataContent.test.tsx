@@ -9,6 +9,12 @@ vi.mock('../DocumentUploadSection', () => ({
   ),
 }))
 
+vi.mock('../IntegrationsSection', () => ({
+  IntegrationsSection: () => <div data-testid="integrations-section" />,
+}))
+
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }))
+
 vi.mock('../../UploadNotification', () => ({ default: () => null }))
 
 import { ProjectDataContent } from '../ProjectDataContent'
@@ -32,5 +38,13 @@ describe('ProjectDataContent', () => {
       .getByRole('heading', { level: 2, name: 'Document Upload' })
       .closest('section')
     expect(section).toContainElement(screen.getByTestId('upload-section'))
+  })
+
+  it('renders the integrations section under the integrations heading', () => {
+    render(<ProjectDataContent projectName="CS101" />)
+    const section = screen
+      .getByRole('heading', { level: 2, name: 'Integrations' })
+      .closest('section')
+    expect(section).toContainElement(screen.getByTestId('integrations-section'))
   })
 })
