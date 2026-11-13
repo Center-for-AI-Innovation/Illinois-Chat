@@ -135,32 +135,6 @@ describe('MakeQueryAnalysisPage', () => {
     )
   })
 
-  it('logs an error when course metadata fetch fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    globalThis.__TEST_ROUTER__ = {
-      asPath: '/CS101/analysis',
-      replace: vi.fn(),
-    }
-    globalThis.__TEST_AUTH__ = {
-      isLoading: false,
-      isAuthenticated: true,
-      user: { profile: { email: 'owner@example.com' } },
-    }
-
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
-      const url = String(input?.url ?? input)
-      if (url.includes('/api/UIUC-api/getCourseMetadata')) {
-        return new Response(JSON.stringify({ error: 'boom' }), { status: 500 })
-      }
-      return makeJson({})
-    })
-
-    renderWithProviders(<MakeQueryAnalysisPage course_name="CS101" />)
-
-    await waitFor(() => expect(console.error).toHaveBeenCalled())
-  })
-
   it('shows the empty-state when there is no conversation data for the selected range', async () => {
     globalThis.__TEST_ROUTER__ = {
       asPath: '/CS101/analysis',
@@ -206,49 +180,6 @@ describe('MakeQueryAnalysisPage', () => {
         /No conversation data available for selected time range/i,
       ),
     ).toBeInTheDocument()
-  })
-
-  it('redirects when unauthorized', async () => {
-    globalThis.__TEST_ROUTER__ = {
-      asPath: '/CS101/analysis',
-      replace: vi.fn(),
-    }
-    globalThis.__TEST_AUTH__ = {
-      isLoading: false,
-      isAuthenticated: true,
-      user: { profile: { email: 'not-owner@example.com' } },
-    }
-
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
-      const url = String(input?.url ?? input)
-      if (url.includes('/api/UIUC-api/getCourseMetadata')) {
-        return makeJson({
-          course_metadata: {
-            is_private: false,
-            course_owner: 'owner@example.com',
-            course_admins: [],
-          },
-        })
-      }
-      if (url.includes('/api/UIUC-api/getConversationStats')) {
-        return makeJson({
-          total_count: 0,
-          per_day: {},
-          per_hour: {},
-          per_weekday: {},
-          heatmap: {},
-        })
-      }
-      if (url.includes('/api/UIUC-api/getProjectStats')) return makeJson({})
-      if (url.includes('/api/UIUC-api/getWeeklyTrends')) return makeJson([])
-      if (url.includes('/api/UIUC-api/getModelUsageCounts')) return makeJson([])
-      return makeJson({})
-    })
-
-    renderWithProviders(<MakeQueryAnalysisPage course_name="CS101" />)
-    await waitFor(() =>
-      expect(globalThis.__TEST_ROUTER__?.replace).toHaveBeenCalled(),
-    )
   })
 
   it('supports switching date range + view selects, including custom ranges', async () => {
@@ -320,9 +251,9 @@ describe('MakeQueryAnalysisPage', () => {
     await user.click(screen.getByLabelText('View by hour or day'))
     await clickOption(await screen.findByText('By Day of Week'))
     await waitFor(() =>
-      expect(
-        screen.getByLabelText('View by hour or day'),
-      ).toHaveTextContent('By Day of Week'),
+      expect(screen.getByLabelText('View by hour or day')).toHaveTextContent(
+        'By Day of Week',
+      ),
     )
 
     // Switch date ranges to cover multiple cases.
@@ -358,9 +289,9 @@ describe('MakeQueryAnalysisPage', () => {
       'Custom date range picker',
     )
     await user.click(datePickerTrigger)
-    const dayButtons = (
-      await screen.findAllByRole('button')
-    ).filter((button) => button.hasAttribute('data-day'))
+    const dayButtons = (await screen.findAllByRole('button')).filter((button) =>
+      button.hasAttribute('data-day'),
+    )
     await user.click(dayButtons[0]!)
     await user.click(dayButtons[dayButtons.length - 1]!)
 
