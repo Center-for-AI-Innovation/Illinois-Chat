@@ -18,6 +18,47 @@ export interface AuthenticatedRequest extends NextApiRequest {
   courseName?: string
 }
 
+async function verifyRequestToken(
+  req: NextApiRequest,
+  token: string,
+): Promise<AuthenticatedUser> {
+  const rawHost = req.headers['x-forwarded-host'] ?? req.headers['host']
+  const hostValue = Array.isArray(rawHost) ? rawHost[0] : rawHost
+
+  // Fallback to 'localhost' if undefined
+  const hostname = (hostValue ?? 'localhost').split(':')[0]
+  const keycloakBaseUrl = getKeycloakBaseFromHost(hostname)
+  const issuerUrl = getKeycloakIssuerUrl(hostname)
+
+  // Verify JWT token using Keycloak's JWKS endpoint
+  return (await verifyTokenAsync(
+    token,
+    keycloakBaseUrl,
+    issuerUrl,
+  )) as AuthenticatedUser
+}
+
+// Expired or invalid tokens count as anonymous; other failures rethrow.
+export async function getOptionalUser(
+  req: NextApiRequest,
+): Promise<AuthenticatedUser | undefined> {
+  const token = getTokenFromCookies(req)
+  if (!token) return undefined
+  try {
+    return await verifyRequestToken(req, token)
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      // TokenExpiredError extends JsonWebTokenError
+      console.debug(
+        'getOptionalUser: treating caller as anonymous:',
+        error.message,
+      )
+      return undefined
+    }
+    throw error
+  }
+}
+
 // Middleware to verify JWT token
 export function withAuth(
   handler: (
@@ -33,20 +74,7 @@ export function withAuth(
         return res.status(401).json({ error: 'Missing token' })
       }
 
-      const rawHost = req.headers['x-forwarded-host'] ?? req.headers['host']
-      const hostValue = Array.isArray(rawHost) ? rawHost[0] : rawHost
-
-      // Fallback to 'localhost' if undefined
-      const hostname = (hostValue ?? 'localhost').split(':')[0]
-      const keycloakBaseUrl = getKeycloakBaseFromHost(hostname)
-      const issuerUrl = getKeycloakIssuerUrl(hostname)
-
-      // Verify JWT token using Keycloak's JWKS endpoint
-      const decoded = (await verifyTokenAsync(
-        token,
-        keycloakBaseUrl,
-        issuerUrl,
-      )) as AuthenticatedUser
+      const decoded = await verifyRequestToken(req, token)
 
       // Add user to request object
       req.user = decoded

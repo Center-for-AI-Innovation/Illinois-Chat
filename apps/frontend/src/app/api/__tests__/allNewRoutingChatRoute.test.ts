@@ -67,6 +67,30 @@ describe('app/api/allNewRoutingChat POST', () => {
     expect(hoisted.persistMessageServer).toHaveBeenCalled()
   })
 
+  it('uses server-loaded metadata, not the request body copy', async () => {
+    const req = new Request('http://localhost', {
+      method: 'POST',
+      body: JSON.stringify({
+        course_name: 'CS101',
+        conversation: { id: 'c1', messages: [] },
+        courseMetadata: { system_prompt: 'forged' },
+        mode: 'chat',
+      }),
+    })
+    ;(req as any).courseMetadata = { system_prompt: 'server prompt' }
+    await POST(req as any)
+    expect(hoisted.buildPrompt).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        courseMetadata: { system_prompt: 'server prompt' },
+      }),
+    )
+    expect(hoisted.routeModelRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        courseMetadata: { system_prompt: 'server prompt' },
+      }),
+    )
+  })
+
   it('routes with stored providers, not ones sent in the request', async () => {
     hoisted.buildPrompt.mockResolvedValueOnce({
       id: 'c1',
