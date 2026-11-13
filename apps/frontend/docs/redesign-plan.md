@@ -133,21 +133,20 @@ and the Chatbots hub/home after.
 Project Identity and Access and Sharing are their own pages. They take the description, greeting, example questions,
 tags, banner and share settings.
 
-Base components are restyled in place, because the admin revamp ships together.
+Base components are restyled in place, because the admin revamp ships together. When the pages are ready, retire
+`NavigationSidebar` and `SettingsLayout`.
 
-When the pages are ready, retire `NavigationSidebar` and `SettingsLayout`.
-
------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Dashboard | `/[course_name]/dashboard` | Upload, integrations, branding. Large page; may be split into the design's "Project Data" / "Project Identity" groups |
-| Prompting | `/[course_name]/prompt` | System prompt, behavior settings |
-| Tools | `/[course_name]/tools` | |
-| Analysis | `/[course_name]/analysis` | Charts: use the library's Chart page |
-| API | `/[course_name]/api` | |
-| Chat | `/[course_name]/chat` | Not an admin page, so it needs its own layout pass |
-| Chatbots hub, home | `/chatbots`, `/` | Global nav reuse |
-
-When the design's own groupings (Project Data, Project Identity, User Access and Sharing) are ready, add them to the
-registry and retire `NavigationSidebar` and `SettingsLayout`.
+| Page               | Route today                | Notes                                                |
+| ------------------ | -------------------------- | ---------------------------------------------------- |
+| Project Data       | `/[course_name]/dashboard` | Upload, integrations, document groups, project files |
+| Project Identity   | `/[course_name]/dashboard` | Description, greeting, example questions, tags       |
+| Access and Sharing | `/[course_name]/dashboard` | Banner and share settings                            |
+| Prompting          | `/[course_name]/prompt`    | System prompt, behavior settings                     |
+| Tools              | `/[course_name]/tools`     |                                                      |
+| Analysis           | `/[course_name]/analysis`  | Charts: use the library's Chart page                 |
+| API                | `/[course_name]/api`       |                                                      |
+| Chat               | `/[course_name]/chat`      | Not an admin page, so it needs its own layout pass   |
+| Chatbots hub, home | `/chatbots`, `/`           | Global nav reuse                                     |
 
 ---
 
