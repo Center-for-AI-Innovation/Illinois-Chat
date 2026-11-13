@@ -38,8 +38,9 @@ export function useFetchCourseRole({
   return useQuery<CourseRole, CourseRoleError>({
     queryKey: ['courseRole', courseName],
     queryFn: () => fetchCourseRole(courseName),
-    // 401/403/404 are definitive answers; don't retry them
-    retry: false,
+    // Retry network errors and 5xx; 4xx are definitive answers
+    retry: (count, error) =>
+      count < 2 && !(error instanceof CourseRoleError && error.status < 500),
     enabled: enabled && Boolean(courseName),
   })
 }

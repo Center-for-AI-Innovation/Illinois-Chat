@@ -66,9 +66,10 @@ const MyApp = ({
   Component,
   pageProps: { ...pageProps },
 }: AppPropsWithLayout) => {
+  // Using getLayout allows the layout to stay mounted preventing refetching of data on every page change.
   const getLayout = Component.getLayout ?? ((page) => page)
   const router = useRouter()
-  const queryClient = new QueryClient()
+  const [queryClient] = useState(() => new QueryClient())
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
   const effectRan = useRef(false)
 

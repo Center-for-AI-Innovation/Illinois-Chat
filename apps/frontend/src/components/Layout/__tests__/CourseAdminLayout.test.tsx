@@ -1,6 +1,6 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 const hoisted = vi.hoisted(() => ({
   router: { isReady: true, query: { course_name: 'my-bot' } as any },
@@ -24,6 +24,14 @@ vi.mock('~/components/UIUC-Components/PermissionGate', () => ({
 }))
 vi.mock('~/components/UIUC-Components/CannotEditCourse', () => ({
   CannotEditCourse: () => <div>cannot-edit-course</div>,
+}))
+vi.mock('~/components/UIUC-Components/CourseIsFrozen', () => ({
+  CourseIsFrozen: () => <div>course-is-frozen</div>,
+}))
+vi.mock('~/components/UIUC-Components/RoleCheckFailed', () => ({
+  RoleCheckFailed: (p: { onRetry: () => void }) => (
+    <button onClick={p.onRetry}>role-check-failed</button>
+  ),
 }))
 vi.mock('~/components/UIUC-Components/CannotEditGPT4', () => ({
   CannotEditGPT4Page: () => <div>cannot-edit-gpt4</div>,
@@ -72,15 +80,16 @@ describe('CourseAdminLayout', () => {
     expect(Child).not.toHaveBeenCalled()
   })
 
-  it('shows CannotEditCourse on a 403', () => {
+  it('shows CourseIsFrozen on a 403', () => {
     hoisted.role = {
       isPending: false,
       isError: true,
+      isLoadingError: true,
       data: undefined,
       error: { status: 403 },
     }
     renderLayout()
-    expect(screen.getByText('cannot-edit-course')).toBeTruthy()
+    expect(screen.getByText('course-is-frozen')).toBeTruthy()
   })
 
   it('shows the sign-in gate when signed out and does not fetch the role', () => {
@@ -96,11 +105,53 @@ describe('CourseAdminLayout', () => {
     hoisted.role = {
       isPending: false,
       isError: true,
+      isLoadingError: true,
       data: undefined,
       error: { status: 404 },
     }
     renderLayout()
     expect(screen.getByText('permission-gate-404')).toBeTruthy()
+  })
+
+  it('shows the sign-in gate on a 401 from the role check', () => {
+    hoisted.role = {
+      isPending: false,
+      isError: true,
+      isLoadingError: true,
+      data: undefined,
+      error: { status: 401 },
+    }
+    renderLayout()
+    expect(screen.getByText('permission-gate-signin')).toBeTruthy()
+  })
+
+  it('shows a retryable error when the role check fails with a 5xx', () => {
+    const refetch = vi.fn()
+    hoisted.role = {
+      isPending: false,
+      isError: true,
+      isLoadingError: true,
+      data: undefined,
+      error: { status: 500 },
+      refetch,
+    }
+    renderLayout()
+    fireEvent.click(screen.getByText('role-check-failed'))
+    expect(refetch).toHaveBeenCalled()
+    expect(Child).not.toHaveBeenCalled()
+  })
+
+  it('keeps the page mounted when a background refetch fails', () => {
+    hoisted.role = {
+      isPending: false,
+      isError: true,
+      isLoadingError: false,
+      isRefetchError: true,
+      data: 'owner',
+      error: { status: 500 },
+    }
+    renderLayout()
+    expect(screen.getByText('page-content')).toBeTruthy()
   })
 
   it('shows CannotEditGPT4Page for no-context projects', () => {

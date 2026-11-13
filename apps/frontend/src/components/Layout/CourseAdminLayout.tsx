@@ -2,9 +2,11 @@ import React from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 import { CannotEditCourse } from '~/components/UIUC-Components/CannotEditCourse'
+import { CourseIsFrozen } from '~/components/UIUC-Components/CourseIsFrozen'
 import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
 import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import { RoleCheckFailed } from '~/components/UIUC-Components/RoleCheckFailed'
 import { useFetchCourseRole } from '~/hooks/queries/useFetchCourseRole'
 import { isNoContextProject } from '~/utils/projectName'
 
@@ -47,12 +49,25 @@ export default function CourseAdminLayout({
     return <LoadingPlaceholderForAdminPages />
   }
 
-  if (role.isError) {
-    if (role.error.status === 404) {
+  // Only a failed first load blocks; a failed refetch keeps the confirmed role
+  if (role.isLoadingError) {
+    const status = role.error.status
+    if (status === 401) {
+      return <PermissionGate course_name={courseName} />
+    }
+    if (status === 404) {
       return <PermissionGate course_name={courseName} errorType={404} />
     }
-    // 403 (frozen or forbidden), or anything else we can't verify: fail closed
-    return <CannotEditCourse course_name={courseName} />
+    // The role endpoint only returns 403 for a frozen project
+    if (status === 403) {
+      return <CourseIsFrozen course_name={courseName} />
+    }
+    return (
+      <RoleCheckFailed
+        course_name={courseName}
+        onRetry={() => void role.refetch()}
+      />
+    )
   }
 
   if (role.data !== 'owner' && role.data !== 'admin') {

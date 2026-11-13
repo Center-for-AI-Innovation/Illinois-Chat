@@ -8,7 +8,6 @@ import Head from 'next/head'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cva } from 'class-variance-authority'
-import { useAuth } from 'react-oidc-context'
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
@@ -35,7 +34,6 @@ import {
 } from '@/components/shadcn/ui/table'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
 import GlobalFooter from './GlobalFooter'
-import { LoadingPlaceholderForAdminPages } from './MainPageBackground'
 
 interface ToolRoutingStatus {
   status: 'custom' | 'default' | 'offline'
@@ -80,7 +78,6 @@ function maskKey(key: string): string {
 }
 
 const SimPage = ({ course_name }: { course_name: string }) => {
-  const auth = useAuth()
   const queryClient = useQueryClient()
   // The stored key never reaches the browser — the server sends a masked
   // form, shown read-only. The input is only for a new key, so leaving it
@@ -249,10 +246,6 @@ const SimPage = ({ course_name }: { course_name: string }) => {
   const onFieldEdit = (field: SimConfigField) => {
     setJustSaved(false)
     if (saveError?.fields.includes(field)) setSaveError(null)
-  }
-
-  if (auth.isLoading) {
-    return <LoadingPlaceholderForAdminPages />
   }
 
   return (
