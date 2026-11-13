@@ -62,8 +62,6 @@ const formatDateRangeLabel = (dateRange: [Date | null, Date | null]) => {
   return to ? `${fmt(from)} – ${fmt(to)}` : fmt(from)
 }
 
-import { useAuth } from 'react-oidc-context'
-
 export const GetCurrentPageName = () => {
   // /CS-125/dashboard --> CS-125
   return useRouter().asPath.slice(1).split('/')[0] as string
@@ -104,7 +102,6 @@ const formatPercentageChange = (value: number | null | undefined) => {
 }
 
 const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
-  const auth = useAuth()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState(),
   )
@@ -341,10 +338,6 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   }, [course_name])
 
   const [view, setView] = useState('hour')
-
-  if (auth.isLoading) {
-    return <LoadingSpinner />
-  }
 
   const handleDownload = async (courseName: string) => {
     setIsLoading(true)
