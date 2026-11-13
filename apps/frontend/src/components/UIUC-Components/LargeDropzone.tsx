@@ -7,17 +7,20 @@ import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import SupportedFileUploadTypes from './SupportedFileUploadTypes'
 import { LoadingSpinner } from './LoadingSpinner'
-import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
 import {
   isActiveUpload,
   useGatedIngestPoller,
 } from '~/hooks/useGatedIngestPoller'
 import { v4 as uuidv4 } from 'uuid'
+import { cn } from '@/components/shadcn/lib/utils'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
 const POLL_INTERVAL_MS = 5000
+
+// Figma cloud-upload icon is 48px wide.
+const CLOUD_ICON_SIZE = 48
 
 const isActiveDocument = (file: FileUpload) => isActiveUpload(file, 'document')
 
@@ -113,7 +116,6 @@ export function LargeDropzone({
   const [uploadInProgress, setUploadInProgress] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const router = useRouter()
-  const isSmallScreen = useMediaQuery('(max-width: 960px)')
   const fileInputRef = useRef<HTMLInputElement>(null)
   // dragenter/dragleave fire on every child element the cursor crosses, not
   // just at the dropzone's own boundary. A counter (incremented on enter,
@@ -392,7 +394,9 @@ export function LargeDropzone({
       })
   }
 
-  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = event.target.files ? Array.from(event.target.files) : []
     // Reset so selecting the exact same file again still fires onChange.
     event.target.value = ''
@@ -404,131 +408,92 @@ export function LargeDropzone({
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* TODO: fix large dropzone display across all screens */}
+    <div className="flex w-full flex-col">
       <div
-        className="relative"
-        style={{
-          flex: 1,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexDirection: 'column',
+        role="button"
+        tabIndex={interactionDisabled ? -1 : 0}
+        aria-disabled={interactionDisabled}
+        aria-busy={uploadInProgress}
+        data-testid="dropzone"
+        onClick={openFileBrowser}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            openFileBrowser()
+          }
         }}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          // Panel per Figma "Upload Materials Panel": 264px tall, 3px dashed
+          // uiuc-slate/400 border on uiuc-slate/25, 24px radius, 80px side padding.
+          'focus-visible:ring-ring/50 relative flex min-h-66 w-full flex-col items-center justify-center gap-8 overflow-hidden rounded-3xl border-[3px] border-dashed border-[#a6b4c7] px-6 py-9 transition-colors outline-none focus-visible:ring-3 md:flex-row md:gap-16 md:px-20 dark:border-white/25',
+          isDisabled ? 'bg-muted' : 'bg-[#f9fafc] dark:bg-white/5',
+          isDragging && 'border-primary bg-accent dark:border-primary',
+          interactionDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        )}
       >
-        <div
-          role="button"
-          tabIndex={interactionDisabled ? -1 : 0}
-          aria-disabled={interactionDisabled}
-          aria-busy={uploadInProgress}
-          data-testid="dropzone"
-          onClick={openFileBrowser}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              openFileBrowser()
-            }
-          }}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className="group relative cursor-pointer overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-          style={{
-            width: '100%',
-            minHeight: '12.5rem',
-            height: 'auto',
-            backgroundColor: isDisabled
-              ? 'var(--background-faded)'
-              : 'var(--background)',
-            cursor: interactionDisabled ? 'not-allowed' : 'pointer',
-            borderWidth: '2px',
-            borderStyle: 'dashed',
-            borderColor: 'var(--dashboard-border)',
-            borderRadius: '0.75rem',
-            padding: '1rem',
-            margin: '0 auto',
-            maxWidth: '100%',
-            overflow: 'hidden',
-            background: 'var(--background)',
-          }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            aria-hidden="true"
-            tabIndex={-1}
-            disabled={interactionDisabled}
-            onChange={handleFileInputChange}
-            className="hidden"
-          />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          aria-hidden="true"
+          tabIndex={-1}
+          disabled={interactionDisabled}
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
 
-          {uploadInProgress && (
-            <div
-              data-testid="dropzone-loading-overlay"
-              className="absolute inset-0 z-10 flex items-center justify-center bg-(--background)/70"
-            >
-              <LoadingSpinner size="lg" />
-            </div>
+        {uploadInProgress && (
+          <div
+            data-testid="dropzone-loading-overlay"
+            className="bg-background/70 absolute inset-0 z-10 flex items-center justify-center"
+          >
+            <LoadingSpinner size="lg" />
+          </div>
+        )}
+
+        <div className="pointer-events-none flex flex-col items-center gap-8">
+          {isDragging ? (
+            <IconDownload
+              size={CLOUD_ICON_SIZE}
+              className="text-foreground"
+              stroke={1.5}
+              aria-hidden="true"
+            />
+          ) : (
+            !isDisabled && (
+              <IconCloudUpload
+                size={CLOUD_ICON_SIZE}
+                color="var(--illinois-orange-branding)"
+                stroke={1.5}
+                aria-hidden="true"
+              />
+            )
           )}
 
-          <div
-            style={{ pointerEvents: 'none' }}
-            className="flex flex-col items-center justify-center px-2 sm:px-4"
-          >
-            <div className="flex items-center justify-center gap-2 pt-3 sm:pt-5">
-              {isDragging ? (
-                <IconDownload
-                  size={isSmallScreen ? 30 : 50}
-                  color="var(--dashboard-foreground)"
-                  stroke={1.5}
-                  aria-hidden="true"
-                />
-              ) : (
-                !isDisabled && (
-                  <IconCloudUpload
-                    size={isSmallScreen ? 30 : 50}
-                    color="var(--illinois-orange)"
-                    stroke={1.5}
-                    aria-hidden="true"
-                  />
-                )
-              )}
-            </div>
-
-            <p
-              className={`text-center font-bold ${
-                isSmallScreen ? 'mt-4 text-base' : 'mt-8 text-lg'
-              } text-(--dashboard-foreground)`}
-            >
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p className="text-accent-foreground text-xl leading-none font-semibold">
               {isDragging
                 ? 'Drop files here'
                 : isDisabled
                   ? 'Enter an available project name above! 👀'
-                  : 'Upload materials'}
+                  : 'Upload Materials'}
             </p>
 
             {!isDisabled && (
-              <p
-                className={`mt-2.5 text-center ${
-                  isSmallScreen ? 'text-xs' : 'text-sm'
-                } text-(--foreground-faded)`}
-              >
-                Drag&apos;n&apos;drop files or a whole folder here
+              <p className="text-base leading-6 text-(--foreground-subtle)">
+                Drag-and-drop your own files and content,
+                <br />
+                or click to open your file browser.
               </p>
             )}
-
-            <div className="mt-2 w-full overflow-x-hidden sm:mt-4">
-              <SupportedFileUploadTypes />
-            </div>
           </div>
         </div>
+
+        <SupportedFileUploadTypes />
       </div>
     </div>
   )

@@ -4,9 +4,7 @@ import {
   IconFileTypeDocx,
   IconFileTypePpt,
   IconFileTypeXls,
-  IconVideo,
   IconPhoto,
-  IconMusic,
   IconCode,
   IconFileTypeTxt,
   type TablerIcon,
@@ -22,55 +20,44 @@ import { motion } from 'framer-motion'
 interface FileType {
   icon: TablerIcon
   label: string
+  // Stroke colors are the Figma file-type icon colors.
   color: string
 }
 const SupportedFileUploadTypes = () => {
   // FIXME: disable audio and video temporarily until figure out Whisper model
+  // (Figma also shows video and music icons; they stay off until then.)
   const fileTypes: FileType[] = [
-    { icon: IconFileTypePdf, label: 'PDF', color: 'text-red-500' },
-    { icon: IconFileTypeDocx, label: 'Word', color: 'text-blue-500' },
-    { icon: IconFileTypePpt, label: 'PPT', color: 'text-orange-500' },
-    { icon: IconFileTypeXls, label: 'Excel', color: 'text-green-500' },
-    // { icon: IconVideo, label: 'Video', color: 'text-purple-500' },
-    { icon: IconPhoto, label: 'Image', color: 'text-pink-500' },
-    // { icon: IconMusic, label: 'Audio', color: 'text-yellow-500' },
-    { icon: IconCode, label: 'Code', color: 'text-cyan-500' },
-    {
-      icon: IconFileTypeTxt,
-      label: 'Text',
-      color: 'text-(--foreground-faded)',
-    },
+    { icon: IconFileTypePdf, label: 'PDF', color: '#dd524c' },
+    { icon: IconFileTypeDocx, label: 'Word', color: '#4d81ee' },
+    { icon: IconFileTypePpt, label: 'PPT', color: '#e97b35' },
+    { icon: IconFileTypeXls, label: 'Excel', color: '#5ec269' },
+    { icon: IconPhoto, label: 'Image', color: '#da5597' },
+    { icon: IconCode, label: 'Code', color: '#52b3d0' },
+    { icon: IconFileTypeTxt, label: 'Text', color: '#9a9d9c' },
   ]
 
   return (
-    <>
-      <TooltipProvider>
-        <div className="mt-8 mb-6 flex flex-wrap justify-center gap-4">
-          {fileTypes.map((type, index) => {
-            if (!type.icon) {
-              console.error(`Missing icon for type: ${type.label}`)
-              return null // Skip rendering this item if icon is missing
-            }
-            const IconComponent = type.icon
-
-            return (
-              <Tooltip key={index}>
+    <TooltipProvider>
+      <ul
+        aria-label="Supported file types"
+        className="grid shrink-0 list-none grid-cols-[repeat(3,fit-content(100%))] gap-x-6 gap-y-4"
+      >
+        {fileTypes.map((type) => {
+          const IconComponent = type.icon
+          return (
+            <li key={type.label}>
+              <Tooltip>
                 <TooltipTrigger
                   tabIndex={-1}
                   render={
-                    <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      className="flex flex-col items-center"
-                    >
+                    <motion.div whileHover={{ scale: 1.1 }}>
                       <IconComponent
-                        className={`h-6 w-6 ${type.color}`}
-                        size={24}
+                        size={32}
+                        color={type.color}
                         stroke={1.5}
-                        aria-hidden="true"
+                        aria-label={`${type.label} files supported`}
+                        role="img"
                       />
-                      <span className="mt-1 text-xs text-gray-500">
-                        {type.label}
-                      </span>
                     </motion.div>
                   }
                 />
@@ -78,11 +65,11 @@ const SupportedFileUploadTypes = () => {
                   <p>{type.label} files supported</p>
                 </TooltipContent>
               </Tooltip>
-            )
-          })}
-        </div>
-      </TooltipProvider>
-    </>
+            </li>
+          )
+        })}
+      </ul>
+    </TooltipProvider>
   )
 }
 

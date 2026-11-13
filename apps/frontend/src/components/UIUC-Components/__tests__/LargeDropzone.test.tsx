@@ -1,6 +1,13 @@
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 
 import type { FileUpload } from '../UploadNotification'
 
@@ -153,16 +160,30 @@ describe('LargeDropzone', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows "Upload materials" and drag-n-drop hint when enabled', async () => {
+  it('shows "Upload Materials" and drag-n-drop hint when enabled', async () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
     mockTimers()
     vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
     expect(
-      screen.getByText(/Drag.*drop files or a whole folder here/i),
+      screen.getByText(/click to open your file browser/i),
+    ).toBeInTheDocument()
+  })
+
+  it('lists the supported file types as icons', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
+
+    render(<LargeDropzone {...defaultProps()} />)
+
+    const list = screen.getByRole('list', { name: 'Supported file types' })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(7)
+    expect(
+      within(list).getByRole('img', { name: 'PDF files supported' }),
     ).toBeInTheDocument()
   })
 
@@ -174,7 +195,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps({ isDisabled: true })} />)
 
     expect(
-      screen.queryByText(/Drag.*drop files or a whole folder here/i),
+      screen.queryByText(/click to open your file browser/i),
     ).not.toBeInTheDocument()
   })
 
@@ -190,14 +211,14 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps()} />)
 
     const dropzone = screen.getByTestId('dropzone')
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
 
     fireEvent.dragEnter(dropzone)
     expect(screen.getByText('Drop files here')).toBeInTheDocument()
-    expect(screen.queryByText('Upload materials')).not.toBeInTheDocument()
+    expect(screen.queryByText('Upload Materials')).not.toBeInTheDocument()
 
     fireEvent.dragLeave(dropzone)
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
   })
 
   it('stays in the dragging state while the cursor crosses a child element', async () => {
@@ -213,7 +234,7 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps()} />)
 
     const dropzone = screen.getByTestId('dropzone')
-    const child = screen.getByText(/Drag.*drop files or a whole folder here/i)
+    const child = screen.getByText(/click to open your file browser/i)
 
     // Enter the dropzone, then cross onto a child element (enter fires on
     // the child too), then leave the child (dragleave fires on the child,
@@ -227,7 +248,7 @@ describe('LargeDropzone', () => {
 
     // Actually leaving the dropzone still resets the state correctly.
     fireEvent.dragLeave(dropzone)
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
   })
 
   it('does not enter the dragging state when disabled', async () => {
