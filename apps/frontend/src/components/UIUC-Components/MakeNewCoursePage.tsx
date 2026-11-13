@@ -258,9 +258,17 @@ const MakeNewCoursePage = ({
       // Persist the wizard-set projectType/organization tags. Fire-and-forget:
       // a registry/tag failure should not block the wizard. The cache was
       // already updated above so the user sees them immediately.
-      if (initialTags.length > 0) {
-        void callSetCourseMetadata(project_name, { tags: initialTags } as never)
-      }
+      const tagsSaved =
+        initialTags.length > 0
+          ? callSetCourseMetadata(project_name, { tags: initialTags } as never)
+          : Promise.resolve(true)
+
+      // Refetch Your Bots after the tag save so the new card isn't cached without tags.
+      void tagsSaved.then(() =>
+        queryClient.invalidateQueries({
+          queryKey: ['pagedChatbots', 'yours'],
+        }),
+      )
 
       return true
     } catch (error) {
@@ -381,7 +389,6 @@ const MakeNewCoursePage = ({
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">
           <Card className="my-auto flex w-full max-w-[720px] flex-col rounded-2xl border border-(--dashboard-border)! bg-(--background) px-6 py-8 text-(--foreground) sm:px-10 sm:py-10">
-
             <div
               ref={stepContainerRef}
               className="step_container flex min-h-88 flex-col"
