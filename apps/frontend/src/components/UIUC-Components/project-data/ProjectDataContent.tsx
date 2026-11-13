@@ -1,13 +1,16 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
 
 import { Separator } from '@/components/shadcn/ui/separator'
 import { type CourseMetadata } from '~/types/courseMetadata'
+import UploadNotification from '../UploadNotification'
+import { useUploadNotifications } from '~/hooks/useUploadNotifications'
+import { DocumentUploadSection } from './DocumentUploadSection'
 import { PROJECT_DATA_SECTIONS } from './project-data.sections'
 
-// Page shell: header plus the four section headings. The section bodies
-// (upload, integrations, document groups, project files) are added by the
-// following pages of the stack.
+// Page shell: header plus the four section headings. Only the upload body
+// exists so far; integrations, document groups and project files follow in the
+// next pages of the stack.
 export function ProjectDataContent({
   projectName,
   courseMetadata,
@@ -15,6 +18,21 @@ export function ProjectDataContent({
   projectName: string
   courseMetadata?: CourseMetadata
 }) {
+  // Lives here so later section bodies (integrations) share the same list.
+  const { uploadFiles, setUploadFiles, closeNotification } =
+    useUploadNotifications()
+
+  const sectionBodies: Partial<Record<string, ReactNode>> = {
+    'document-upload': (
+      <DocumentUploadSection
+        projectName={projectName}
+        courseMetadata={courseMetadata}
+        uploadFiles={uploadFiles}
+        setUploadFiles={setUploadFiles}
+      />
+    ),
+  }
+
   return (
     <div
       className="flex flex-col"
@@ -42,10 +60,16 @@ export function ProjectDataContent({
               >
                 {section.title}
               </h2>
+              {sectionBodies[section.id]}
             </section>
           </Fragment>
         ))}
       </div>
+      <UploadNotification
+        files={uploadFiles}
+        onClose={closeNotification}
+        projectName={projectName}
+      />
     </div>
   )
 }

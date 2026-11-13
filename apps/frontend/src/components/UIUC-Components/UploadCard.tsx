@@ -22,7 +22,8 @@ import GitHubIngestForm from './GitHubIngestForm'
 import LargeDropzone from './LargeDropzone'
 import MITIngestForm from './MITIngestForm'
 import ShareSettingsModal from './ShareSettingsModal'
-import UploadNotification, { type FileUpload } from './UploadNotification'
+import UploadNotification from './UploadNotification'
+import { useUploadNotifications } from '~/hooks/useUploadNotifications'
 import WebsiteIngestForm from './WebsiteIngestForm'
 
 const montserrat_light = Montserrat({
@@ -65,10 +66,10 @@ export const UploadCard = memo(function UploadCard({
   const [introMessage, setIntroMessage] = useState(
     initialMetadata?.course_intro_message || '',
   )
-  const [showNotification, setShowNotification] = useState(false)
   const [isIntroMessageUpdated, setIsIntroMessageUpdated] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
-  const [uploadFiles, setUploadFiles] = useState<FileUpload[]>([])
+  const { uploadFiles, setUploadFiles, closeNotification } =
+    useUploadNotifications()
   const [metadata, setMetadata] = useState(initialMetadata)
   const descriptionRef = useAutosizeTextarea(projectDescription)
   const greetingRef = useAutosizeTextarea(introMessage)
@@ -95,15 +96,6 @@ export const UploadCard = memo(function UploadCard({
     }
   }, [projectName, queryClient])
 
-  const handleCloseNotification = () => {
-    setShowNotification(false)
-    setUploadFiles([])
-  }
-  const handleSetUploadFiles = (
-    updateFn: React.SetStateAction<FileUpload[]>,
-  ) => {
-    setUploadFiles(updateFn)
-  }
   return (
     <Card
       className={`mt-[2%] ${cardWidthClasses} gap-0 rounded-4xl border py-0 text-base shadow-none ring-0`}
@@ -175,7 +167,7 @@ export const UploadCard = memo(function UploadCard({
               courseMetadata={metadata as CourseMetadata}
               is_new_course={false}
               uploadFiles={uploadFiles}
-              setUploadFiles={handleSetUploadFiles}
+              setUploadFiles={setUploadFiles}
               queryClient={queryClient}
               auth={auth}
             />
@@ -184,27 +176,27 @@ export const UploadCard = memo(function UploadCard({
           <div className="grid grid-cols-1 gap-3 px-4 py-4 min-[1192px]:grid-cols-3 min-[1192px]:gap-5 sm:px-6 sm:py-6 md:grid-cols-2 md:gap-4 md:px-8">
             <CanvasIngestForm
               project_name={projectName}
-              setUploadFiles={handleSetUploadFiles}
+              setUploadFiles={setUploadFiles}
               queryClient={queryClient}
             />
 
             <WebsiteIngestForm
               project_name={projectName}
               uploadFiles={uploadFiles}
-              setUploadFiles={handleSetUploadFiles}
+              setUploadFiles={setUploadFiles}
               queryClient={queryClient}
             />
 
             <GitHubIngestForm
               project_name={projectName}
               uploadFiles={uploadFiles}
-              setUploadFiles={handleSetUploadFiles}
+              setUploadFiles={setUploadFiles}
               queryClient={queryClient}
             />
 
             <MITIngestForm
               project_name={projectName}
-              setUploadFiles={handleSetUploadFiles}
+              setUploadFiles={setUploadFiles}
               queryClient={queryClient}
             />
 
@@ -212,7 +204,7 @@ export const UploadCard = memo(function UploadCard({
           </div>
           <UploadNotification
             files={uploadFiles}
-            onClose={handleCloseNotification}
+            onClose={closeNotification}
             projectName={projectName}
           />
         </div>

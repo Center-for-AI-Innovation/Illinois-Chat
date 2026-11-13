@@ -38,14 +38,14 @@ const SupportedFileUploadTypes = () => {
     {
       icon: IconFileTypeTxt,
       label: 'Text',
-      color: 'text-(--foreground-faded)',
+      color: 'text-muted-foreground',
     },
   ]
 
   return (
     <>
       <TooltipProvider>
-        <div className="mt-8 mb-6 flex flex-wrap justify-center gap-4">
+        <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-3">
           {fileTypes.map((type, index) => {
             if (!type.icon) {
               console.error(`Missing icon for type: ${type.label}`)
@@ -68,7 +68,7 @@ const SupportedFileUploadTypes = () => {
                         stroke={1.5}
                         aria-hidden="true"
                       />
-                      <span className="mt-1 text-xs text-gray-500">
+                      <span className="text-muted-foreground mt-1 text-xs">
                         {type.label}
                       </span>
                     </motion.div>
