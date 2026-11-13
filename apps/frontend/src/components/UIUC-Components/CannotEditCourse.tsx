@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Head from 'next/head'
 import { Button } from '@/components/shadcn/ui/button'
 import { montserrat_heading } from 'fonts'
+import { buildProjectChatPath } from '~/utils/projectName'
 
 const buttonClassName =
   'login-btn h-auto min-h-12 bg-(--button) text-white hover:bg-(--button-hover)'
@@ -43,7 +44,7 @@ export const CannotEditCourse = ({ course_name }: { course_name: string }) => {
               account.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-              <Link href={`/${course_name}/chat`}>
+              <Link href={buildProjectChatPath(course_name)}>
                 <Button
                   className={buttonClassName}
                   style={{ fontSize: '24px' }}
