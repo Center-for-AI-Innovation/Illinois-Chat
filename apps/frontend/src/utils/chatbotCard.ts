@@ -22,14 +22,23 @@ function isUserBot(metadata: CourseMetadata, userEmail: string): boolean {
 /**
  * Build a safe card payload from a raw course_metadata row.
  * Only attaches raw metadata for bots the caller owns or admins.
+ *
+ * Platform super admins hold admin-tier access through the live check, so
+ * the card has to grant them the admin role too — otherwise the hub hides
+ * Settings from someone whose edits the server accepts. Ownership is
+ * untouched: they get 'admin', never 'owner'. Raw metadata stays limited
+ * to stored owners and project admins; the role is enough for the button.
  */
 export function toChatbotCardData(
   courseName: string,
   metadata: CourseMetadata,
   userEmail: string,
+  isPlatformSuperAdmin = false,
 ): ChatbotCardData {
   const isOwner = metadata.course_owner === userEmail
-  const isAdmin = !isOwner && (metadata.course_admins ?? []).includes(userEmail)
+  const isAdmin =
+    !isOwner &&
+    (isPlatformSuperAdmin || (metadata.course_admins ?? []).includes(userEmail))
   const admins = (metadata.course_admins ?? []).filter(
     (a) => a !== metadata.course_owner && a !== DEFAULT_ADMIN_EMAIL,
   )

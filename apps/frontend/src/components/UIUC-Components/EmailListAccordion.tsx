@@ -134,16 +134,21 @@ function EmailListAccordion({
       let updatedMetadata: CourseMetadata
 
       if (is_for_admins) {
+        // Removes only the requested address. This used to strip the
+        // super-admin allowlist and immediately re-add it, which meant the
+        // browser re-seeded platform admins into `course_admins` on every
+        // edit and deleting one was a silent no-op. Super admins now get
+        // project access from a live check on the server, so this list holds
+        // project roles and nothing else. Pre-existing baked-in entries are
+        // left as they are — no cleanup — which is why the render below still
+        // filters them out of the display.
         const updatedCourseAdmins = courseAdmins.filter(
-          (admin) => admin !== email_address && !superAdmins.includes(admin),
+          (admin) => admin !== email_address,
         )
-        const finalAdmins = [
-          ...new Set([...updatedCourseAdmins, ...superAdmins]),
-        ]
 
         updatedMetadata = {
           ...metadata,
-          course_admins: finalAdmins,
+          course_admins: updatedCourseAdmins,
         }
       } else {
         const updatedEmailAddresses = emailAddresses.filter(
@@ -180,14 +185,9 @@ function EmailListAccordion({
         let updatedMetadata: CourseMetadata
 
         if (is_for_admins) {
-          const updatedCourseAdmins = [...courseAdmins, trimmedValue]
-          const finalAdmins = [
-            ...new Set([...updatedCourseAdmins, ...superAdmins]),
-          ]
-
           updatedMetadata = {
             ...metadata,
-            course_admins: finalAdmins,
+            course_admins: [...new Set([...courseAdmins, trimmedValue])],
           }
         } else {
           const updatedEmailAddresses = [...emailAddresses, trimmedValue]
@@ -230,14 +230,9 @@ function EmailListAccordion({
     if (emails) {
       const toBeAdded = emails.filter((email: string) => !isInList(email))
       if (is_for_admins) {
-        const updatedCourseAdmins = [...courseAdmins, ...toBeAdded]
-        const finalAdmins = [
-          ...new Set([...updatedCourseAdmins, ...superAdmins]),
-        ]
-
         const updatedMetadata = {
           ...metadata,
-          course_admins: finalAdmins,
+          course_admins: [...new Set([...courseAdmins, ...toBeAdded])],
         }
 
         const response = await callSetCourseMetadata(

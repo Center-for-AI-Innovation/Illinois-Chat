@@ -7,6 +7,7 @@ import { getBatchProjectTimestamps } from '~/utils/projectTimestamps'
 import { db } from '~/db/dbClient'
 import { conversations } from '~/db/schema'
 import { eq, max } from 'drizzle-orm'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 export type CourseMetadataWithLastAccess = CourseMetadata & {
   last_accessed_at?: string | null
@@ -17,6 +18,13 @@ export const getCoursesByOwnerOrAdmin = async (
 ): Promise<{ [key: string]: CourseMetadataWithLastAccess }[]> => {
   let all_course_metadata_raw: { [key: string]: string } | null = null
   try {
+    // Resolved once, not per project. Super admins used to appear in this list
+    // only because they were seeded into every project's `course_admins`; now
+    // that seeding has stopped, the role check has to grant them the full list
+    // explicitly or their project list would silently shrink to what they
+    // personally own.
+    const isPlatformSuperAdmin = await isSuperAdminAsync(currUserEmail)
+
     const redisClient = await ensureRedisConnected()
     all_course_metadata_raw = await redisClient.hGetAll('course_metadatas')
     if (!all_course_metadata_raw) {
@@ -29,15 +37,18 @@ export const getCoursesByOwnerOrAdmin = async (
         let courseMetadata: CourseMetadata | null = null
         try {
           courseMetadata = JSON.parse(value) as CourseMetadata
-          // Filter out frozen/archived courses
+          // Filter out frozen/archived courses. Above the role check, and
+          // deliberately not bypassed — frozen projects stay hidden from
+          // super admins too.
           if (courseMetadata.is_frozen === true) {
             return acc
           }
           if (
-            courseMetadata.course_owner &&
-            courseMetadata.course_admins &&
-            (courseMetadata.course_owner === currUserEmail ||
-              courseMetadata.course_admins.includes(currUserEmail))
+            isPlatformSuperAdmin ||
+            (courseMetadata.course_owner &&
+              courseMetadata.course_admins &&
+              (courseMetadata.course_owner === currUserEmail ||
+                courseMetadata.course_admins.includes(currUserEmail)))
           ) {
             acc.push({ [key]: courseMetadata })
           }

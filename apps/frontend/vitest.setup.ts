@@ -261,12 +261,28 @@ vi.mock('next/image', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: (props: any) =>
-    React.createElement(
-      'a',
-      { href: props.href, className: props.className, onClick: props.onClick },
-      props.children,
-    ),
+  // Forwards the ref and every DOM prop so aria-*, data-*, and target survive,
+  // and so primitives that render through a Link (base-ui `render`) compose.
+  default: React.forwardRef<HTMLAnchorElement, any>(function MockLink(
+    {
+      href,
+      prefetch: _prefetch,
+      replace: _replace,
+      scroll: _scroll,
+      shallow: _shallow,
+      passHref: _passHref,
+      legacyBehavior: _legacyBehavior,
+      locale: _locale,
+      ...props
+    },
+    ref,
+  ) {
+    return React.createElement('a', {
+      ...props,
+      ref,
+      href: typeof href === 'string' ? href : href?.pathname,
+    })
+  }),
 }))
 
 vi.mock('next/font/google', () => {

@@ -1,5 +1,6 @@
 import { Button, buttonVariants } from '@/components/shadcn/ui/button'
-import { type NextPage } from 'next'
+import { type GetStaticProps, type NextPage } from 'next'
+import { PHASE_PRODUCTION_BUILD } from 'next/constants'
 import Head from 'next/head'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -8,9 +9,21 @@ import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
-import { LandingPageHeader } from '~/components/UIUC-Components/navbars/GlobalHeader'
+import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
 import router from 'next/router'
+import type {
+  AnnouncementBanner as AnnouncementBannerValue,
+  NavbarBranding,
+} from '~/utils/platformSettings.schema'
+// Server-only (imports `redis`). Referenced solely from getStaticProps below,
+// so Next's SSG transform drops it from the client bundle.
+import {
+  readAnnouncementBanner,
+  readNavbarBranding,
+  toPublicAnnouncementBanner,
+  toPublicNavbarBranding,
+} from '~/utils/platformSettings.server'
 
 // Typing animation component
 const TypingAnimation: React.FC = () => {
@@ -128,15 +141,25 @@ const TypingAnimation: React.FC = () => {
   )
 }
 
-const Home: NextPage = () => {
-  const [isTooltipVisible, setIsTooltipVisible] = useState(false)
+interface HomeProps {
+  /**
+   * The runtime announcement banner, or `null` when Redis holds no usable
+   * configuration. Not rendered here: `_app` hands it to the site-wide
+   * `SiteAnnouncementBanner` so the bar is in the first paint on this page.
+   */
+  announcementBanner?: AnnouncementBannerValue | null
+  /** Epoch ms of the Redis read, so the client knows how stale it is. */
+  announcementBannerReadAt?: number
+  /** Seeds the navbar brand into `_app`'s query cache for the first paint. */
+  navbarBranding?: NavbarBranding
+  navbarBrandingReadAt?: number
+}
+
+const Home: NextPage<HomeProps> = () => {
   const useIllinoisChatConfig = useMemo(() => {
     return (
       process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG?.toLowerCase() === 'true'
     )
-  }, [])
-  const IllinoisChatBannerContent = useMemo(() => {
-    return process.env.NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT || null
   }, [])
 
   return (
@@ -159,7 +182,7 @@ const Home: NextPage = () => {
               max-width: 100vw;
             }
             body, html {
-              overflow-x: hidden;
+              overflow-x: clip;
               width: 100%;
               margin: 0;
               padding: 0;
@@ -168,56 +191,12 @@ const Home: NextPage = () => {
         </style>
       </Head>
 
-      {/* Rebranding announcement header bar */}
-      <section
-        aria-label="Site announcement"
-        className="relative w-full py-2 text-center"
-        style={{
-          background: 'var(--illinois-orange)',
-          color: 'var(--illinois-white)',
-        }}
-      >
-        <div
-          className={`inline-block ${montserrat_heading.variable} font-montserratHeading`}
-        >
-          <div className="relative inline-block cursor-help">
-            <span
-              className="text-lg font-bold"
-              onMouseEnter={() => setIsTooltipVisible(true)}
-              onMouseLeave={() => setIsTooltipVisible(false)}
-            >
-              {/*1. If useIllinoisChatConfig && IllinoisChatBannerContent → render HTML from IllinoisChatBannerContent*/}
-              {/*2. If !useIllinoisChatConfig → render default "Heads up" banner*/}
-              {/*3. Otherwise → render nothing*/}
-              {useIllinoisChatConfig && IllinoisChatBannerContent ? (
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: IllinoisChatBannerContent,
-                  }}
-                />
-              ) : !useIllinoisChatConfig ? (
-                <>
-                  Heads up: we’ve rebranded to Illinois Chat — please visit{' '}
-                  <a
-                    href="https://chat.illinois.edu"
-                    className="underline"
-                    tabIndex={0}
-                  >
-                    chat.illinois.edu
-                  </a>
-                </>
-              ) : null}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <LandingPageHeader />
+      <Navbar />
 
       <main
         id="main-content"
         tabIndex={-1}
-        className={`illinois-blue-gradient-bg flex min-h-screen flex-col items-center justify-center overflow-hidden ${montserrat_paragraph.variable} font-montserratParagraph`}
+        className={`illinois-blue-gradient-bg flex min-h-(--viewport-height) flex-col items-center justify-center overflow-hidden pt-(--navbar-height) ${montserrat_paragraph.variable} font-montserratParagraph`}
       >
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 px-4 py-8 sm:px-8 sm:py-20">
           <div className="flex w-full max-w-3xl flex-col items-start justify-center gap-8 sm:flex-row">
@@ -807,6 +786,53 @@ const Home: NextPage = () => {
       <GlobalFooter />
     </>
   )
+}
+
+/**
+ * Reads the announcement banner from Redis at generation time.
+ *
+ * ISR rather than client-side fetching so the public landing page stays static
+ * and visitors never see the bar pop in after paint.
+ *
+ * `readAnnouncementBanner()` is deliberately non-throwing: Next also runs this
+ * during `next build` inside Docker, where Redis is unreachable. A throw there
+ * fails the image build, so at build time an unreachable store degrades to the
+ * legacy banner. At runtime it throws instead, so Next keeps serving the last
+ * good page rather than regenerating one with the wrong banner.
+ *
+ * `revalidate: 30` bounds how stale a fresh page load can be. `res.revalidate('/')`
+ * from the settings PUT only regenerates the replica that served that request;
+ * the others pick the change up on this timer. Tabs already open follow
+ * changes through `SiteAnnouncementBanner`, which polls.
+ */
+export const getStaticProps: GetStaticProps<HomeProps> = async () => {
+  const [banner, branding] = await Promise.all([
+    readAnnouncementBanner(),
+    readNavbarBranding(),
+  ])
+  if (
+    (banner.state === 'unavailable' || branding.state === 'unavailable') &&
+    process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD
+  ) {
+    throw new Error('Redis unavailable; keeping the previous home page')
+  }
+
+  const readAt = Date.now()
+  return {
+    props: {
+      announcementBanner: toPublicAnnouncementBanner(banner),
+      announcementBannerReadAt: readAt,
+      // A build without Redis must not bake in the default brand; without
+      // the prop the navbar fetches the real one like every other page.
+      ...(branding.state === 'unavailable'
+        ? {}
+        : {
+            navbarBranding: toPublicNavbarBranding(branding),
+            navbarBrandingReadAt: readAt,
+          }),
+    },
+    revalidate: 30,
+  }
 }
 
 export default Home

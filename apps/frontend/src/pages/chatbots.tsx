@@ -7,7 +7,7 @@ import { buttonVariants } from '~/components/shadcn/ui/button'
 import { cn } from '~/components/shadcn/lib/utils'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
 import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackground'
-import { ChatbotsGlobalNav } from '~/components/UIUC-Components/chatbots-hub/ChatbotsGlobalNav'
+import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { ChatbotsHeroSection } from '~/components/UIUC-Components/chatbots-hub/ChatbotsHeroSection'
 import { ChatbotsSearchBar } from '~/components/UIUC-Components/chatbots-hub/ChatbotsSearchBar'
 import { ChatbotsFilterPanel } from '~/components/UIUC-Components/chatbots-hub/ChatbotsFilterPanel'
@@ -28,6 +28,7 @@ import {
   type CourseWithMetadata,
 } from '~/hooks/queries/useFetchAllCourseMetadata'
 import { useFetchFeaturedChatbots } from '~/hooks/queries/useFetchFeaturedChatbots'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { useSearchChatbots } from '~/hooks/queries/useSearchChatbots'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
@@ -35,12 +36,21 @@ import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
 function transformToCardData(
   course: CourseWithMetadata,
   currentUserEmail: string | undefined,
+  /**
+   * Platform super admins hold admin-tier access to every project through the
+   * live check in the API middlewares, so the card has to grant them the admin
+   * role too — otherwise it hides the Settings affordance for someone whose
+   * edits the server accepts. Ownership is untouched: they get 'admin', never
+   * 'owner'.
+   */
+  isPlatformSuperAdmin = false,
 ) {
   const isOwner = course.metadata.course_owner === currentUserEmail
   const isAdmin =
     !isOwner &&
-    !!currentUserEmail &&
-    (course.metadata.course_admins || []).includes(currentUserEmail)
+    (isPlatformSuperAdmin ||
+      (!!currentUserEmail &&
+        (course.metadata.course_admins || []).includes(currentUserEmail)))
   const otherAdmins = (course.metadata.course_admins || []).filter(
     (a) =>
       a !== course.metadata.course_owner &&
@@ -66,8 +76,8 @@ function transformToCardData(
     userRole: isOwner
       ? ('owner' as const)
       : isAdmin
-        ? ('admin' as const)
-        : ('member' as const),
+      ? ('admin' as const)
+      : ('member' as const),
     accessLevel: course.metadata.is_private
       ? course.metadata.allow_logged_in_users
         ? ('unlisted' as const)
@@ -99,6 +109,9 @@ const ChatbotsHubPage = () => {
   const auth = useAuth()
   const { course_name } = router.query
   const currentUserEmail = auth.user?.profile.email as string | undefined
+  const { data: isPlatformSuperAdmin } = useFetchIsSuperAdmin({
+    enabled: auth.isAuthenticated,
+  })
 
   const [searchParams, setSearchParams] = useState<SearchChatbotsParams>({})
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
@@ -172,7 +185,11 @@ const ChatbotsHubPage = () => {
       for (const course of courses) {
         byCourseName.set(
           course.course_name,
-          transformToCardData(course, currentUserEmail),
+          transformToCardData(
+            course,
+            currentUserEmail,
+            isPlatformSuperAdmin === true,
+          ),
         )
       }
     }
@@ -240,7 +257,13 @@ const ChatbotsHubPage = () => {
         return compareChatbotTagPrecedence(cardSortTags(a), cardSortTags(b))
       }),
     }))
-  }, [courses, featuredChatbots, currentUserEmail, isSearchActive])
+  }, [
+    courses,
+    featuredChatbots,
+    currentUserEmail,
+    isSearchActive,
+    isPlatformSuperAdmin,
+  ])
 
   if (auth.isLoading) {
     return (
@@ -262,11 +285,11 @@ const ChatbotsHubPage = () => {
     !isSearchActive && (isCoursesLoading || isFeaturedLoading)
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#081735]">
-      <ChatbotsGlobalNav hideBorder />
-      <div className="mx-auto w-full pt-[72px]">
+    <main className="min-h-(--viewport-height) bg-white dark:bg-[#081735]">
+      <Navbar hideBorder />
+      <div className="mx-auto w-full pt-(--navbar-height)">
         {/* Search & Filter Bar — sticky just below the global nav */}
-        <div className="border-border sticky top-[72px] z-30 space-y-4 border-b bg-white px-4 py-6 sm:px-8 dark:border-[#32517a] dark:bg-[#081735]">
+        <div className="border-border sticky top-[calc(var(--navbar-height)+var(--announcement-banner-height))] z-30 space-y-4 border-b bg-white px-4 py-6 sm:px-8 dark:border-[#32517a] dark:bg-[#081735]">
           <ChatbotsSearchBar
             params={searchParams}
             onParamsChange={handleParamsChange}

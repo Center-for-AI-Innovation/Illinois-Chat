@@ -228,7 +228,7 @@ describe('axe accessibility audit', () => {
     expect(results).toHaveNoViolations()
   })
 
-  it('GlobalHeader has no violations', async () => {
+  it('Navbar has no violations', async () => {
     globalThis.__TEST_AUTH__ = {
       isLoading: false,
       isAuthenticated: true,
@@ -239,45 +239,11 @@ describe('axe accessibility audit', () => {
       AuthMenu: () => React.createElement('div', null, 'AuthMenu'),
     }))
 
-    const { LandingPageHeader } =
-      await import('~/components/UIUC-Components/navbars/GlobalHeader')
+    const Navbar = (await import('~/components/UIUC-Components/navbars/Navbar'))
+      .default
 
-    const { container } = renderWithProviders(<LandingPageHeader />)
-
-    const results = await axe(container)
-    expect(results).toHaveNoViolations()
-  })
-
-  it('ChatNavbar has no violations', async () => {
-    globalThis.__TEST_AUTH__ = {
-      isLoading: false,
-      isAuthenticated: false,
-      user: null,
-    }
-    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/chat', push: vi.fn() }
-
-    vi.mock('~/components/UIUC-Components/navbars/ThemeToggle', () => ({
-      ThemeToggle: () => React.createElement('div'),
-    }))
-
-    vi.mock('~/components/Chat/UserSettings', () => ({
-      UserSettings: () => React.createElement('div'),
-    }))
-
-    const ChatNavbar = (
-      await import('~/components/UIUC-Components/navbars/ChatNavbar')
-    ).default
-
-    const { container } = renderWithProviders(
-      <ChatNavbar bannerUrl="" isgpt4 />,
-      {
-        homeState: { showModelSettings: false } as any,
-        homeContext: {
-          dispatch: vi.fn(),
-          handleNewConversation: vi.fn(),
-        },
-      },
-    )
+    const { container } = renderWithProviders(<Navbar />)
+    await screen.findByRole('link', { name: /home$/i })
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()

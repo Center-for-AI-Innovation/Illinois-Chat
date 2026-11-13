@@ -9,7 +9,11 @@ const hoisted = vi.hoisted(() => {
 })
 
 vi.mock('~/utils/authMiddleware', () => ({
-  withAuth: (h: any) => h,
+  withAuth: () => {
+    throw new Error(
+      'Public maintenance notices must not require authentication',
+    )
+  },
 }))
 
 vi.mock('~/utils/redisClient', () => ({

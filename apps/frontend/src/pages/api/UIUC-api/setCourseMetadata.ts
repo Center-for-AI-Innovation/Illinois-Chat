@@ -21,9 +21,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const banner_image_s3 = req.query.banner_image_s3 as string
   const is_private = JSON.parse((req.query.is_private as string) || 'false')
   const is_frozen = JSON.parse((req.query.is_frozen as string) || 'false')
-  const course_admins = JSON.parse(
-    (req.query.course_admins as string) || JSON.stringify(superAdmins),
-  )
+  // Defaults to empty, not to the super-admin allowlist. Persisting platform
+  // admins here would make their access unrevocable — see the note in
+  // upsertCourseMetadata.ts.
+  const course_admins = JSON.parse((req.query.course_admins as string) || '[]')
   const approved_emails_list = JSON.parse(
     (req.query.approved_emails_list as string) || '[]',
   )

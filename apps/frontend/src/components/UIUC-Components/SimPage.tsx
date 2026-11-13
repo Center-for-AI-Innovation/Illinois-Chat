@@ -13,6 +13,7 @@ import { useAuth } from 'react-oidc-context'
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type SimConfigField, type SimWorkflow } from '~/types/sim'
 import { type SimWorkflowFailure } from '~/utils/simDiscovery'
@@ -86,6 +87,8 @@ function maskKey(key: string): string {
 const SimPage = ({ course_name }: { course_name: string }) => {
   const router = useRouter()
   const auth = useAuth()
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const queryClient = useQueryClient()
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
@@ -281,12 +284,13 @@ const SimPage = ({ course_name }: { course_name: string }) => {
     if (saveError?.fields.includes(field)) setSaveError(null)
   }
 
-  if (auth.isLoading || !courseMetadata) {
+  if (auth.isLoading || isSuperAdminLoading || !courseMetadata) {
     return <LoadingPlaceholderForAdminPages />
   }
 
   if (
     courseMetadata &&
+    isSuperAdmin !== true &&
     currentEmail !== (courseMetadata.course_owner as string) &&
     courseMetadata.course_admins.indexOf(currentEmail) === -1
   ) {
@@ -309,7 +313,7 @@ const SimPage = ({ course_name }: { course_name: string }) => {
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="course-page-main flex min-h-screen w-full flex-col items-center">
+      <main className="course-page-main flex min-h-(--viewport-height) w-full flex-col items-center">
         <div className="items-left flex w-full flex-col justify-center py-0">
           <div className="flex w-full flex-col items-center">
             {/* Config card */}

@@ -13,6 +13,7 @@ import fetchCourseMetadataServer from '~/pages/api/chat-api/util/fetchCourseMeta
 import { determineAndValidateModelServer } from '~/server/determineAndValidateModelServer'
 import { validateApiKeyAndRetrieveData } from './keys/validate'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 import posthog from 'posthog-js'
 import { NextApiRequest, type NextApiResponse } from 'next'
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -167,7 +168,12 @@ export default async function chat(
   }
 
   // Check user permissions
-  const permission = get_user_permission(courseMetadata, authContext)
+  // The super-admin lookup reads Redis, so it only runs when the stored
+  // project roles do not already grant edit access.
+  let permission = get_user_permission(courseMetadata, authContext)
+  if (permission !== 'edit' && (await isSuperAdminAsync(email))) {
+    permission = get_user_permission(courseMetadata, authContext, true)
+  }
 
   if (permission !== 'edit') {
     posthog.capture('stream_api_permission_denied', {

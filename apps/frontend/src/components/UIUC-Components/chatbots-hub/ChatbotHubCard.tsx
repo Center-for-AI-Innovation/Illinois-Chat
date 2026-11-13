@@ -205,7 +205,7 @@ export function ChatbotHubCard(card: ChatbotCardData) {
                   </span>
                 )}
               </div>
-              {metadata && (
+              {(hasAdminAccess || metadata) && (
                 <div className="relative z-10 flex shrink-0 items-center gap-1">
                   {hasAdminAccess && (
                     <Link
@@ -219,15 +219,17 @@ export function ChatbotHubCard(card: ChatbotCardData) {
                       <Settings className="h-4 w-4 text-(--illinois-blue) dark:text-white" />
                     </Link>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    aria-label={`Share ${title}`}
-                    onClick={() => setIsShareModalOpen(true)}
-                  >
-                    <Share2 className="h-4 w-4 text-(--illinois-blue) dark:text-white" />
-                  </Button>
+                  {metadata && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label={`Share ${title}`}
+                      onClick={() => setIsShareModalOpen(true)}
+                    >
+                      <Share2 className="h-4 w-4 text-(--illinois-blue) dark:text-white" />
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

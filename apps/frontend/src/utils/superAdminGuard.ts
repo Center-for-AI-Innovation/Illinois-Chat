@@ -4,7 +4,7 @@
 
 import type { NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { isSuperAdmin } from '~/utils/superAdmins'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 type ApiHandler = (
   req: AuthenticatedRequest,
@@ -17,7 +17,7 @@ export function withSuperAdminOnly(handler: ApiHandler): ApiHandler {
       res.status(401).json({ error: 'User not authenticated' })
       return
     }
-    if (!isSuperAdmin(req.user.email)) {
+    if (!(await isSuperAdminAsync(req.user.email))) {
       res.status(403).json({
         error: 'Forbidden',
         message: 'This action requires super-admin privileges.',

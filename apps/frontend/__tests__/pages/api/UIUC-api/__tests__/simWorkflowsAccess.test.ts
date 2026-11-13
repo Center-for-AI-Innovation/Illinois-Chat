@@ -7,11 +7,16 @@ import runSimWorkflow from '~/pages/api/UIUC-api/runSimWorkflow'
 
 const hoisted = vi.hoisted(() => ({
   hGet: vi.fn(),
+  isSuperAdminAsync: vi.fn(),
   resolveSimCredentials: vi.fn(),
 }))
 
 vi.mock('~/utils/redisClient', () => ({
   ensureRedisConnected: vi.fn(async () => ({ hGet: hoisted.hGet })),
+}))
+
+vi.mock('~/utils/superAdmins.server', () => ({
+  isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
 // Stands in for the cookie check: a request without `testUser` has no token.
@@ -51,11 +56,52 @@ const runRequest = (testUser?: { email: string }) =>
 
 describe('Sim workflow routes access', () => {
   beforeEach(() => {
+    hoisted.isSuperAdminAsync.mockResolvedValue(false)
     hoisted.resolveSimCredentials.mockResolvedValue({
       ok: false,
       reason: 'not_configured',
     })
   })
+
+  it.each([
+    ['list', getSimWorkflows, listRequest],
+    ['run', runSimWorkflow, runRequest],
+  ] as const)(
+    'lets a non-member super admin %s private project tools',
+    async (_action, handler, request) => {
+      setProject({ is_private: true, course_owner: 'owner@x.edu' })
+      hoisted.isSuperAdminAsync.mockResolvedValue(true)
+      const res = createMockRes()
+
+      await handler(request({ email: 'super@x.edu' }), res)
+
+      expect(hoisted.isSuperAdminAsync).toHaveBeenCalledWith('super@x.edu')
+      expect(hoisted.resolveSimCredentials).toHaveBeenCalledWith('legacy-bot')
+      expect(res.status).not.toHaveBeenCalledWith(401)
+      expect(res.status).not.toHaveBeenCalledWith(403)
+    },
+  )
+
+  it.each([
+    ['list', getSimWorkflows, listRequest],
+    ['run', runSimWorkflow, runRequest],
+  ] as const)(
+    'blocks a super admin from %s access to frozen project tools',
+    async (_action, handler, request) => {
+      setProject({
+        is_private: true,
+        is_frozen: true,
+        course_owner: 'owner@x.edu',
+      })
+      hoisted.isSuperAdminAsync.mockResolvedValue(true)
+      const res = createMockRes()
+
+      await handler(request({ email: 'super@x.edu' }), res)
+
+      expect(res.status).toHaveBeenCalledWith(403)
+      expect(hoisted.resolveSimCredentials).not.toHaveBeenCalled()
+    },
+  )
 
   it('lists no tools for an anonymous visitor on a public project', async () => {
     setProject({ is_private: false, course_owner: 'owner@x.edu' })
