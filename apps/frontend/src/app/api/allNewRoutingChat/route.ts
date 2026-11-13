@@ -7,6 +7,7 @@ import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
 import { reconstructConversation } from '@/hooks/__internal__/conversation'
 import { persistMessageServer } from '~/pages/api/conversation'
+import { getModels } from '~/pages/api/models'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,8 @@ async function handler(req: AuthenticatedRequest) {
         userIdentifier: newConversation.userEmail ?? '',
       })
     }
+    // Get providers from redis store for safe-guarding and validation
+    body.llmProviders = await getModels(course_name)
     const result = await routeModelRequest(body as ChatBody)
 
     return result

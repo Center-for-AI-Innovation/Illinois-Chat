@@ -40,9 +40,12 @@ def extractPubmedData():
     
   # Initialize only if not already initialized
   if 'POSTHOG' not in globals():
-        POSTHOG = Posthog(sync_mode=False, 
-                         project_api_key=os.environ['POSTHOG_API_KEY'], 
-                         host="https://app.posthog.com")
+        posthog_host = os.getenv("POSTHOG_HOST")
+        POSTHOG = Posthog(sync_mode=False,
+                         # Only require the key when analytics is enabled.
+                         project_api_key=os.environ['POSTHOG_API_KEY'] if posthog_host else 'disabled',
+                         host=posthog_host,
+                         disabled=not posthog_host)
 
   # TODO: Replace with DATABASE_CLIENT
   if 'SUPABASE_CLIENT' not in globals():
