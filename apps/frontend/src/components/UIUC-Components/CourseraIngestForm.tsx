@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
+import { IntegrationCard } from './project-data/IntegrationCard'
 // import { Checkbox } from '@radix-ui/react-checkbox'
 import NextLink from 'next/link'
 import Image from 'next/image'
@@ -74,41 +75,20 @@ export default function CourseraIngestForm(): JSX.Element {
         }}
       >
         <DialogTrigger
-          tabIndex={0}
-          nativeButton={false}
-          className="focus:bg-(--dashboard-background-dark)"
           render={
-            <Card
-              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
-              style={{ height: '100%' }}
-            >
-              <div className="mb-2 -ml-2 flex items-center justify-between">
-                <div className="flex items-center space-x-1">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full">
-                    <Image
-                      src="/media/coursera_logo_cutout.png"
-                      alt="Coursera Logo"
-                      width={32}
-                      height={32}
-                      className="h-8 w-8 object-contain"
-                    />
-                  </div>
-                  <span className="text-xl font-semibold">Coursera</span>
-                </div>
-              </div>
-              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
-                Import content from Coursera courses, including lectures,
-                assignments, and course materials.
-              </p>
-              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
-                <span>Configure import</span>
-                <IconArrowRight
-                  size={16}
-                  aria-hidden="true"
-                  className="ml-2 transition-transform group-hover:translate-x-1"
+            <IntegrationCard
+              logo={
+                <Image
+                  src="/media/coursera_logo_cutout.png"
+                  alt="Coursera Logo"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
                 />
-              </div>
-            </Card>
+              }
+              title="Coursera"
+              description="Import content from Coursera courses, including lectures, assignments, and course materials."
+            />
           }
         />
 

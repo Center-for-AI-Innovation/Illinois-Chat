@@ -66,7 +66,7 @@ describe('MITIngestForm', () => {
     expect(
       screen.getByText(/Import content from MIT OpenCourseWare/i),
     ).toBeInTheDocument()
-    expect(screen.getByText(/Configure import/i)).toBeInTheDocument()
+    expect(screen.getByText(/Configure Import/)).toBeInTheDocument()
     expect(screen.getByAltText('MIT OCW Logo')).toBeInTheDocument()
   })
 
@@ -95,23 +95,31 @@ describe('MITIngestForm', () => {
     ).toBeInTheDocument()
   })
 
-  it('opens the dialog via keyboard (Enter and Space) on the trigger card', async () => {
-    const queryClient = createTestQueryClient()
-    const { default: MITIngestForm } = await import('../MITIngestForm')
+  it.each([
+    ['Enter', '{Enter}'],
+    ['Space', ' '],
+  ])(
+    'opens the dialog via keyboard (%s) on the trigger card',
+    async (_name, key) => {
+      const user = userEvent.setup()
+      const queryClient = createTestQueryClient()
+      const { default: MITIngestForm } = await import('../MITIngestForm')
 
-    renderWithProviders(
-      <Harness Component={MITIngestForm} queryClient={queryClient} />,
-      { queryClient },
-    )
+      renderWithProviders(
+        <Harness Component={MITIngestForm} queryClient={queryClient} />,
+        { queryClient },
+      )
 
-    const card = screen.getByRole('button', { name: /MIT Course/i })
-
-    // Simulate Enter key
-    fireEvent.keyDown(card, { key: 'Enter' })
-    await waitFor(() =>
-      expect(screen.getByPlaceholderText('Enter URL...')).toBeInTheDocument(),
-    )
-  })
+      const card = screen.getByRole('button', { name: /MIT Course/i })
+      expect(card.tagName).toBe('BUTTON')
+      await user.tab()
+      expect(card).toHaveFocus()
+      await user.keyboard(key)
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText('Enter URL...')).toBeInTheDocument(),
+      )
+    },
+  )
 
   it('shows the example MIT OCW link', async () => {
     const user = userEvent.setup()

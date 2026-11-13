@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
+import { IntegrationCard } from './project-data/IntegrationCard'
 import {
   IconHome,
   IconSitemap,
@@ -400,36 +401,14 @@ export default function WebsiteIngestForm({
         }}
       >
         <DialogTrigger
-          tabIndex={0}
-          nativeButton={false}
-          className="focus:bg-(--dashboard-background-dark)"
           render={
-            <div className="group relative h-full cursor-pointer overflow-hidden rounded-2xl border border-(--dashboard-border) bg-transparent px-6 py-4 text-(--dashboard-foreground) transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
-              <div className="mb-2 -ml-2 flex items-center justify-between">
-                <div className="flex items-center space-x-1">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full">
-                    <IconWorldDownload className="h-8 w-8" aria-hidden="true" />
-                  </div>
-                  <p className="text-xl font-semibold text-(--dashboard-foreground)">
-                    Website
-                  </p>
-                </div>
-              </div>
-
-              <p className="mb-4 text-sm leading-relaxed text-(--dashboard-foreground-faded)">
-                Import content from any website by providing the URL. Supports
-                recursive crawling with customizable depth.
-              </p>
-
-              <div className="mt-auto flex items-center text-sm font-bold text-(--dashboard-button)">
-                <span>Configure import</span>
-                <IconArrowRight
-                  size={16}
-                  aria-hidden="true"
-                  className="ml-2 transition-transform group-hover:translate-x-1"
-                />
-              </div>
-            </div>
+            <IntegrationCard
+              logo={
+                <IconWorldDownload className="h-8 w-8" aria-hidden="true" />
+              }
+              title="Website"
+              description="Import content from any website by providing the URL. Supports recursive crawling with customizable depth."
+            />
           }
         />
 
@@ -486,10 +465,10 @@ export default function WebsiteIngestForm({
                               className="text-(--foreground-faded)"
                             />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-[400px] text-wrap bg-(--tooltip-background) text-(--tooltip)">
+                          <TooltipContent className="max-w-[400px] bg-(--tooltip-background) text-wrap text-(--tooltip)">
                             We will attempt to visit this number of pages, but
-                            not all will be scraped if they&apos;re
-                            duplicates, broken or otherwise inaccessible.
+                            not all will be scraped if they&apos;re duplicates,
+                            broken or otherwise inaccessible.
                           </TooltipContent>
                         </Tooltip>
                       </div>
