@@ -2,6 +2,7 @@ import React from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 import { CannotEditCourse } from '~/components/UIUC-Components/CannotEditCourse'
+import { CourseIsFrozen } from '~/components/UIUC-Components/CourseIsFrozen'
 import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
 import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
@@ -57,8 +58,9 @@ export default function CourseAdminLayout({
     if (status === 404) {
       return <PermissionGate course_name={courseName} errorType={404} />
     }
+    // The role endpoint only returns 403 for a frozen project
     if (status === 403) {
-      return <CannotEditCourse course_name={courseName} />
+      return <CourseIsFrozen course_name={courseName} />
     }
     return (
       <RoleCheckFailed

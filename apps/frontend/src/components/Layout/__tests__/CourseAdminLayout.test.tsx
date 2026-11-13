@@ -25,6 +25,9 @@ vi.mock('~/components/UIUC-Components/PermissionGate', () => ({
 vi.mock('~/components/UIUC-Components/CannotEditCourse', () => ({
   CannotEditCourse: () => <div>cannot-edit-course</div>,
 }))
+vi.mock('~/components/UIUC-Components/CourseIsFrozen', () => ({
+  CourseIsFrozen: () => <div>course-is-frozen</div>,
+}))
 vi.mock('~/components/UIUC-Components/RoleCheckFailed', () => ({
   RoleCheckFailed: (p: { onRetry: () => void }) => (
     <button onClick={p.onRetry}>role-check-failed</button>
@@ -77,7 +80,7 @@ describe('CourseAdminLayout', () => {
     expect(Child).not.toHaveBeenCalled()
   })
 
-  it('shows CannotEditCourse on a 403', () => {
+  it('shows CourseIsFrozen on a 403', () => {
     hoisted.role = {
       isPending: false,
       isError: true,
@@ -86,7 +89,7 @@ describe('CourseAdminLayout', () => {
       error: { status: 403 },
     }
     renderLayout()
-    expect(screen.getByText('cannot-edit-course')).toBeTruthy()
+    expect(screen.getByText('course-is-frozen')).toBeTruthy()
   })
 
   it('shows the sign-in gate when signed out and does not fetch the role', () => {

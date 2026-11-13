@@ -11,14 +11,18 @@ const buttonClassName =
 export const RoleCheckFailed = ({
   course_name,
   onRetry,
+  title = "We couldn't check your access to this chatbot",
+  message = 'Something went wrong while loading your permissions. Try again in a moment.',
 }: {
   course_name: string
   onRetry: () => void
+  title?: string
+  message?: string
 }) => {
   return (
     <>
       <Head>
-        <title>Couldn&apos;t check your access — Illinois Chat</title>
+        <title>{title} — Illinois Chat</title>
       </Head>
       <main
         id="main-content"
@@ -40,13 +44,12 @@ export const RoleCheckFailed = ({
             <h2
               className={`${montserrat_heading.variable} font-montserratHeading p-8 text-center text-4xl font-bold text-(--foreground)`}
             >
-              We couldn&apos;t check your access to this chatbot
+              {title}
             </h2>
             <p
               className={`${montserrat_heading.variable} font-montserratHeading max-w-2xl p-4 text-center text-lg text-(--foreground)`}
             >
-              Something went wrong while loading your permissions. Try again in
-              a moment.
+              {message}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
               <Button
