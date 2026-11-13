@@ -160,9 +160,9 @@ export default function CanvasIngestForm({
                 <Image
                   src="/media/canvas_logo.png"
                   alt="Canvas logo"
-                  width={32}
-                  height={32}
-                  className="object-contain"
+                  width={80}
+                  height={80}
+                  className="size-20 rounded-[14px] object-contain"
                 />
               }
               title="Canvas"

@@ -79,9 +79,9 @@ export default function CourseraIngestForm(): JSX.Element {
                 <Image
                   src="/media/coursera_logo_cutout.png"
                   alt="Coursera Logo"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 object-contain"
+                  width={80}
+                  height={80}
+                  className="size-20 rounded-[14px] object-contain"
                 />
               }
               title="Coursera"

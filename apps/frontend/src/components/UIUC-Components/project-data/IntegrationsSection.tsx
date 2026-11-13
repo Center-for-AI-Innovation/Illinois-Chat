@@ -1,4 +1,5 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { type Dispatch, type SetStateAction } from 'react'
+import { IconLayoutGrid, IconLayoutRows } from '@tabler/icons-react'
 import { type QueryClient } from '@tanstack/react-query'
 
 import { cn } from '@/components/shadcn/lib/utils'
@@ -13,44 +14,64 @@ import MITIngestForm from '../MITIngestForm'
 import WebsiteIngestForm from '../WebsiteIngestForm'
 import { type FileUpload } from '../UploadNotification'
 
-type IntegrationsLayout = 'gallery' | 'grid'
+export type IntegrationsLayout = 'gallery' | 'grid'
+
+// Segmented Gallery/Grid control, rendered in the section heading row.
+export function IntegrationsLayoutToggle({
+  layout,
+  onLayoutChange,
+}: {
+  layout: IntegrationsLayout
+  onLayoutChange: (layout: IntegrationsLayout) => void
+}) {
+  return (
+    <ToggleGroup
+      // multiple={false} pins single-select; the guard below also drops the
+      // empty selection a re-click of the active item would report.
+      multiple={false}
+      spacing={0.5}
+      aria-label="Integrations layout"
+      className="bg-background rounded-[10px] p-0.5"
+      value={[layout]}
+      onValueChange={(value) => {
+        // Single-select: ignore the click that would clear the selection.
+        const next = value[0] as IntegrationsLayout | undefined
+        if (next) onLayoutChange(next)
+      }}
+    >
+      <ToggleGroupItem
+        value="gallery"
+        className="aria-pressed:bg-accent h-9 gap-2 rounded-lg px-3"
+      >
+        <IconLayoutRows aria-hidden="true" />
+        Gallery View
+      </ToggleGroupItem>
+      <ToggleGroupItem
+        value="grid"
+        className="aria-pressed:bg-accent h-9 gap-2 rounded-lg px-3"
+      >
+        <IconLayoutGrid aria-hidden="true" />
+        Grid View
+      </ToggleGroupItem>
+    </ToggleGroup>
+  )
+}
 
 export function IntegrationsSection({
+  layout,
   projectName,
   uploadFiles,
   setUploadFiles,
   queryClient,
 }: {
+  layout: IntegrationsLayout
   projectName: string
   uploadFiles: FileUpload[]
   setUploadFiles: Dispatch<SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }) {
-  const [layout, setLayout] = useState<IntegrationsLayout>('gallery')
-
   return (
     <div className="flex flex-col gap-4">
-      <ToggleGroup
-        // multiple={false} pins single-select; the guard below also drops the
-        // empty selection a re-click of the active item would report.
-        multiple={false}
-        variant="outline"
-        spacing={0}
-        aria-label="Integrations layout"
-        value={[layout]}
-        onValueChange={(value) => {
-          // Single-select: ignore the click that would clear the selection.
-          const next = value[0] as IntegrationsLayout | undefined
-          if (next) setLayout(next)
-        }}
-      >
-        <ToggleGroupItem value="gallery" aria-label="Gallery view">
-          Gallery
-        </ToggleGroupItem>
-        <ToggleGroupItem value="grid" aria-label="Grid view">
-          Grid
-        </ToggleGroupItem>
-      </ToggleGroup>
       <div
         data-testid="integrations-list"
         data-layout={layout}
@@ -58,8 +79,8 @@ export function IntegrationsSection({
           // Each form's wrapper is a flex box so its card fills the row height.
           '[&>*]:flex',
           layout === 'gallery'
-            ? 'flex gap-4 overflow-x-auto pb-2 [&>*]:w-72 [&>*]:shrink-0'
-            : 'grid auto-rows-fr grid-cols-3 gap-4',
+            ? 'flex gap-[29px] overflow-x-auto pt-3 pr-8 pb-8 [&>*]:w-[349px] [&>*]:shrink-0'
+            : 'grid auto-rows-fr grid-cols-3 gap-6',
         )}
       >
         <CanvasIngestForm
