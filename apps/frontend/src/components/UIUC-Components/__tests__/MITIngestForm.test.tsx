@@ -110,7 +110,7 @@ describe('MITIngestForm', () => {
         { queryClient },
       )
 
-      const card = screen.getByRole('button', { name: /MIT Course/i })
+      const card = screen.getByRole('button', { name: 'MIT Course' })
       expect(card.tagName).toBe('BUTTON')
       await user.tab()
       expect(card).toHaveFocus()
