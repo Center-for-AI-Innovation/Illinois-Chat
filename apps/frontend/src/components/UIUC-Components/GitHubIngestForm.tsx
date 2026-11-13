@@ -12,7 +12,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/shadcn/ui/dialog'
-import { IntegrationCard } from './project-data/IntegrationCard'
+import {
+  IntegrationCard,
+  IntegrationLogoTile,
+} from './project-data/IntegrationCard'
 // import { Checkbox } from '@radix-ui/react-checkbox'
 import { showToast } from '~/utils/toastUtils'
 import axios from 'axios'
@@ -268,11 +271,13 @@ export default function GitHubIngestForm({
           render={
             <IntegrationCard
               logo={
-                <IconBrandGithub
-                  className="size-20"
-                  stroke={1.25}
-                  aria-hidden="true"
-                />
+                <IntegrationLogoTile>
+                  <IconBrandGithub
+                    className="size-[70%]"
+                    stroke={1.5}
+                    aria-hidden="true"
+                  />
+                </IntegrationLogoTile>
               }
               title="GitHub"
               description="Import content from GitHub repositories, including documentation, code, and README files."

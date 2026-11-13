@@ -158,7 +158,7 @@ export default function MITIngestForm({
                   alt="MIT OCW Logo"
                   width={80}
                   height={80}
-                  className="size-20 rounded-[14px] object-contain"
+                  className="size-full rounded-[14px] object-contain"
                 />
               }
               title="MIT Course"
