@@ -48,6 +48,19 @@ describe('IntegrationsSection', () => {
     ).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('keeps a selection when the active toggle is clicked again', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await user.click(screen.getByRole('button', { name: 'Gallery view' }))
+    expect(screen.getByTestId('integrations-list')).toHaveAttribute(
+      'data-layout',
+      'gallery',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Gallery view' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('switches to a three-column grid and back', async () => {
     const user = userEvent.setup()
     renderSection()

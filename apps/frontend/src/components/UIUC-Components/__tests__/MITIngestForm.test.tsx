@@ -41,7 +41,7 @@ function Harness({ Component, queryClient }: any) {
 }
 
 async function openDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByText(/Configure import/i))
+  await user.click(await screen.findByText('Configure Import'))
 }
 
 describe('MITIngestForm', () => {

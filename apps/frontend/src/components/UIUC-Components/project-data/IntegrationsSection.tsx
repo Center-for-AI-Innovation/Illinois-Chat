@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { type QueryClient } from '@tanstack/react-query'
 
 import { cn } from '@/components/shadcn/lib/utils'
@@ -23,7 +23,7 @@ export function IntegrationsSection({
 }: {
   projectName: string
   uploadFiles: FileUpload[]
-  setUploadFiles: React.Dispatch<React.SetStateAction<FileUpload[]>>
+  setUploadFiles: Dispatch<SetStateAction<FileUpload[]>>
   queryClient: QueryClient
 }) {
   const [layout, setLayout] = useState<IntegrationsLayout>('gallery')
@@ -31,6 +31,7 @@ export function IntegrationsSection({
   return (
     <div className="flex flex-col gap-4">
       <ToggleGroup
+        multiple={false}
         variant="outline"
         spacing={0}
         aria-label="Integrations layout"
@@ -52,6 +53,8 @@ export function IntegrationsSection({
         data-testid="integrations-list"
         data-layout={layout}
         className={cn(
+          // Each form's wrapper is a flex box so its card fills the row height.
+          '[&>*]:flex',
           layout === 'gallery'
             ? 'flex gap-4 overflow-x-auto pb-2 [&>*]:w-72 [&>*]:shrink-0'
             : 'grid grid-cols-3 gap-4',
@@ -79,6 +82,7 @@ export function IntegrationsSection({
           setUploadFiles={setUploadFiles}
           queryClient={queryClient}
         />
+        {/* Coursera is deliberately stateless: it takes no props. */}
         <CourseraIngestForm />
       </div>
     </div>

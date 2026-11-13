@@ -7,7 +7,7 @@ import {
   AlertTitle,
   AlertDescription,
 } from '@/components/shadcn/ui/alert'
-import { IconArrowRight, IconAlertTriangle } from '@tabler/icons-react'
+import { IconAlertTriangle } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import {
   Dialog,

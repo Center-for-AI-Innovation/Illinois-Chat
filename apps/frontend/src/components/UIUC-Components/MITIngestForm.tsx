@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/shadcn/ui/button'
 import { Input } from '@/components/shadcn/ui/input'
-import { IconArrowRight } from '@tabler/icons-react'
 import { motion } from 'framer-motion'
 import {
   Dialog,
