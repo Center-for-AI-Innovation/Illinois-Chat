@@ -5,6 +5,8 @@ wandb
 *.ipynb
 *.pem
 qdrant_data/*
+.agents/
+skills-lock.json
 
 venv-*/
 # don't expose env files
