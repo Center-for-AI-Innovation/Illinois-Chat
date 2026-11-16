@@ -97,15 +97,15 @@ export function ChatbotHubCard(card: ChatbotCardData) {
             <ProjectTypeIcon className="h-16 w-16 text-(--illinois-blue) dark:text-white" />
           </div>
 
-          {/* Info icon — visible on hover or keyboard focus */}
+          {/* Info icon — always visible */}
           <Button
             variant="ghost"
             size="icon"
-            className="relative z-10 h-9 w-9 rounded-full bg-white/60 opacity-0 backdrop-blur-xs transition-opacity duration-200 group-hover:opacity-100 hover:bg-white/80 focus-visible:opacity-100 dark:bg-[#0c1f3f]/60 dark:hover:bg-[#0c1f3f]/80"
+            className="group/info relative z-10 h-9 w-9 rounded-full bg-white/60 backdrop-blur-xs transition-colors hover:bg-(--illinois-blue) dark:bg-[#0c1f3f]/60 dark:hover:bg-white"
             aria-label={`Details for ${title}`}
             onClick={() => setIsDetailOpen(true)}
           >
-            <Info className="h-5 w-5 text-(--illinois-blue) dark:text-white" />
+            <Info className="h-5 w-5 text-(--illinois-blue) group-hover/info:text-white dark:text-white dark:group-hover/info:text-[#0c1f3f]" />
           </Button>
 
           <ChatbotUserRoleBadge

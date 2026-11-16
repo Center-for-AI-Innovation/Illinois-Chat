@@ -66,6 +66,25 @@ describe('useFetchUserLastAccess', () => {
 })
 
 describe('useFetchMaintainerProfiles', () => {
+  it('does not fetch until enabled', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    }) as unknown as typeof fetch
+
+    const { Wrapper } = createWrapper()
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useFetchMaintainerProfiles('CS101', { enabled }),
+      { wrapper: Wrapper, initialProps: { enabled: false } },
+    )
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+    rerender({ enabled: true })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('returns profiles[] on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -114,6 +133,25 @@ describe('useFetchMaintainerProfiles', () => {
 })
 
 describe('useFetchDocumentSummary', () => {
+  it('does not fetch until enabled', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    }) as unknown as typeof fetch
+
+    const { Wrapper } = createWrapper()
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useFetchDocumentSummary('CS101', { enabled }),
+      { wrapper: Wrapper, initialProps: { enabled: false } },
+    )
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+    rerender({ enabled: true })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('returns documentSummary on success', async () => {
     const summary = { total_file_count: 3, total_size_bytes: 9, by_type: [] }
     globalThis.fetch = vi.fn().mockResolvedValue({
