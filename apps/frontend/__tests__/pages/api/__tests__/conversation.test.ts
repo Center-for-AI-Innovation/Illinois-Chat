@@ -209,7 +209,7 @@ describe('conversation API', () => {
     expect(JSON.stringify(boundary.contexts)).not.toMatch(/\\ud83e"/)
   })
 
-  it('convertChatToDBMessage strips lone surrogates and null bytes from tool outputs (#414)', () => {
+  it('convertChatToDBMessage sanitizes lone surrogates and null bytes in tool outputs (#414)', () => {
     const out = convertChatToDBMessage(
       {
         id: uuidv4(),
@@ -240,7 +240,7 @@ describe('conversation API', () => {
         output: {
           text: 'ok',
           data: {
-            contexts: [{ text: 'aaaaa...', filename: 'f' }],
+            contexts: [{ text: 'aaaaa\uFFFD...', filename: 'f' }],
             extra: 'xy',
             count: 1,
           },

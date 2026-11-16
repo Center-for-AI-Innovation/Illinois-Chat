@@ -7,10 +7,10 @@ describe('sanitizeText', () => {
     expect(sanitizeText(input)).toBe('abcd')
   })
 
-  it('removes lone surrogates but keeps valid surrogate pairs', () => {
-    expect(sanitizeText('a\ud83e...')).toBe('a...')
-    expect(sanitizeText('a\udd16b')).toBe('ab')
-    expect(sanitizeText('🤖 ok \ud83e')).toBe('🤖 ok ')
+  it('replaces lone surrogates with U+FFFD but keeps valid surrogate pairs', () => {
+    expect(sanitizeText('a\ud83e...')).toBe('a\uFFFD...')
+    expect(sanitizeText('a\udd16b')).toBe('a\uFFFDb')
+    expect(sanitizeText('🤖 ok \ud83e')).toBe('🤖 ok \uFFFD')
   })
 })
 
