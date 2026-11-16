@@ -156,7 +156,11 @@ export default function ShareSettingsModal({
     setMetadata(updatedMetadata)
     queryClient.setQueryData(['courseMetadata', projectName], updatedMetadata)
     await callSetCourseMetadata(projectName, updatedMetadata)
-    await queryClient.invalidateQueries({ queryKey: ['allCourseMetadata'] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['allCourseMetadata'] }),
+      // Access level decides the hub section and badge.
+      queryClient.invalidateQueries({ queryKey: ['pagedChatbots'] }),
+    ])
     showSuccessToast(
       `Access changed to "${ACCESS_LABELS[level]}"`,
       'Access updated',
