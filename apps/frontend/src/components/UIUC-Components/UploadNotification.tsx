@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LoadingSpinner } from './LoadingSpinner'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { useQuery } from '@tanstack/react-query'
+import { truncateText } from '~/utils/sanitization'
 
 export interface FileUpload {
   name: string
@@ -204,11 +205,6 @@ function UploadNotificationContent({
           />
         )
     }
-  }
-
-  const truncateText = (text: string, maxLength = 20) => {
-    if (text.length <= maxLength) return text
-    return text.slice(0, maxLength) + '...'
   }
 
   /** Extract just the error message when backend returns verbose dict like {'failure_ingest': {'error': '...'}} */

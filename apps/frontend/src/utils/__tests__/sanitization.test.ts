@@ -1,10 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeForLogging, sanitizeText } from '../sanitization'
+import { sanitizeForLogging, sanitizeText, truncateText } from '../sanitization'
 
 describe('sanitizeText', () => {
   it('removes null bytes in multiple forms', () => {
     const input = `a\u0000b\\u0000c\0d`
     expect(sanitizeText(input)).toBe('abcd')
+  })
+
+  it('removes lone surrogates but keeps valid surrogate pairs', () => {
+    expect(sanitizeText('a\ud83e...')).toBe('a...')
+    expect(sanitizeText('a\udd16b')).toBe('ab')
+    expect(sanitizeText('🤖 ok \ud83e')).toBe('🤖 ok ')
+  })
+})
+
+describe('truncateText', () => {
+  it('returns short text unchanged', () => {
+    expect(truncateText('abc', 5)).toBe('abc')
+  })
+
+  it('truncates by code point so emoji at the boundary are not split', () => {
+    const text = 'a'.repeat(99) + '🤖 AI and LLMs'
+    const out = truncateText(text, 100)
+    expect(out).toBe('a'.repeat(99) + '🤖...')
+    expect(out.isWellFormed()).toBe(true)
+  })
+
+  it('does not truncate when only UTF-16 length exceeds the limit', () => {
+    const text = '🤖'.repeat(100)
+    expect(truncateText(text, 100)).toBe(text)
   })
 })
 

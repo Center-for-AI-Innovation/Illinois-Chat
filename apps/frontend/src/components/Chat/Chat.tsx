@@ -90,6 +90,7 @@ import { createLogConversationPayload } from '@/hooks/__internal__/conversation'
 import { useRunAgent } from '@/hooks/queries/useRunAgent'
 import { runServerAgentMode } from './runServerAgentMode'
 import { showToast } from '~/utils/toastUtils'
+import { truncateText } from '~/utils/sanitization'
 
 const DEFAULT_DOCUMENT_GROUP = {
   id: 'DocGroup-all',
@@ -480,10 +481,7 @@ export const Chat = memo(
               : content
 
             // This is where we can customize the name of the conversation
-            const customName =
-              contentText.length > 30
-                ? contentText.substring(0, 30) + '...'
-                : contentText
+            const customName = truncateText(contentText, 30)
 
             updatedConversation = {
               ...updatedConversation,

@@ -21,7 +21,11 @@ import {
   AllSupportedModels,
   type GenericSupportedModel,
 } from '~/utils/modelProviders/LLMProvider'
-import { sanitizeText } from '@/utils/sanitization'
+import {
+  sanitizeForLogging,
+  sanitizeText,
+  truncateText,
+} from '@/utils/sanitization'
 import { inArray, eq, and, isNull, sql, gt } from 'drizzle-orm'
 import {
   NewConversations,
@@ -424,11 +428,7 @@ export function convertChatToDBMessage(
           url: context.url,
           // Sanitize and truncate text to 100 characters and add ellipsis if needed
           text: context.text
-            ? sanitizeText(
-                context.text.length > 100
-                  ? context.text.slice(0, 100) + '...'
-                  : context.text,
-              )
+            ? sanitizeText(truncateText(context.text, 100))
             : '',
         }
 
@@ -445,8 +445,10 @@ export function convertChatToDBMessage(
         }
         return JSON.parse(JSON.stringify(context)) // Ensure context is JSON-compatible
       }) || [],
+    // Tool outputs can carry arbitrary text (e.g. truncated retrieval snippets);
+    // strip null bytes and lone surrogates, which Postgres jsonb rejects.
     tools: chatMessage.tools
-      ? JSON.parse(JSON.stringify(chatMessage.tools))
+      ? sanitizeForLogging(JSON.parse(JSON.stringify(chatMessage.tools)))
       : null,
     latest_system_message: chatMessage.latestSystemMessage
       ? sanitizeText(chatMessage.latestSystemMessage)
@@ -829,7 +831,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         res
           .status(500)
           .json({ error: `Error saving conversation` + error?.toString() })
-        console.error('Error saving conversation:', error)
+        // Drizzle wraps DB failures as "Failed query: ..."; the Postgres error is on `cause`.
+        console.error(
+          'Error saving conversation:',
+          error,
+          (error as { cause?: unknown })?.cause ?? '',
+        )
       }
       break
 
