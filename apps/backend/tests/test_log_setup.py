@@ -96,9 +96,42 @@ def test_traceback_follows_on_next_lines():
         import sys
         record = make_record("failed", level=logging.ERROR, exc_info=sys.exc_info())
     lines = LineFormatter().format(record).split("\n")
-    assert lines[0].endswith("failed")
+    assert re.search(r" failed at=test_log_setup\.py:\d+$", lines[0])
     assert lines[1].startswith("Traceback (most recent call last):")
     assert lines[-1] == "ValueError: boom"
+
+
+def test_warning_and_error_lines_end_with_the_log_call_location():
+    for level in (logging.WARNING, logging.ERROR, logging.CRITICAL):
+        line = LineFormatter().format(make_record("queue is slow", level=level))
+        assert line.endswith(" queue is slow at=test_log_setup.py:1"), line
+
+
+def test_info_and_debug_lines_have_no_location():
+    for level in (logging.DEBUG, logging.INFO):
+        assert " at=" not in LineFormatter().format(make_record("hello", level=level))
+
+
+def test_location_is_the_deepest_app_frame_of_the_traceback():
+    import json
+    import sys
+
+    def parse():
+        return json.loads("{not json")  # raises inside the standard library
+
+    try:
+        parse()
+    except ValueError:
+        record = make_record("parse failed", level=logging.ERROR, exc_info=sys.exc_info())
+    expected = "at=test_log_setup.py:%d" % (parse.__code__.co_firstlineno + 1)
+    assert LineFormatter().format(record).split("\n")[0].endswith("parse failed " + expected)
+
+
+def test_library_and_warnings_records_have_no_location():
+    library = logging.LogRecord("pika", logging.ERROR, "/x/lib/python3.10/site-packages/pika/a.py", 7, "lost", (), None)
+    assert " at=" not in LineFormatter().format(library)
+    captured = logging.LogRecord("py.warnings", logging.WARNING, __file__, 1, "a.py:3: RuntimeWarning: x", (), None)
+    assert " at=" not in LineFormatter().format(captured)
 
 
 def test_password_in_url_is_redacted():

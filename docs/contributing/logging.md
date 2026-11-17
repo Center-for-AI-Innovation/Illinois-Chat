@@ -8,11 +8,11 @@ Every service writes plain text, one event per line, in the same field order:
 
 ```text
 2026-11-02T14:03:01.123Z INFO    ai_ta_backend.rabbitmq.rmqueue rid=5f3a9c1e0b2d job enqueued job=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17 queue=uiuc-chat
-2026-11-02T14:03:09.410Z ERROR   ingest rid=5f3a9c1e0b2d job=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17 course=ece120 _ingest_single_pdf failed for courses/ece120/lecture1.pdf
+2026-11-02T14:03:09.410Z ERROR   ingest rid=5f3a9c1e0b2d job=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17 course=ece120 _ingest_single_pdf failed for courses/ece120/lecture1.pdf at=ingest.py:1042
 Traceback (most recent call last):
   ...
 fitz.fitz.FileDataError: cannot open broken document
-2026-11-02T14:03:09.471Z ERROR   ingest rid=5f3a9c1e0b2d job=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17 course=ece120 done handler=_ingest_single_pdf file=courses/ece120/lecture1.pdf result=failed err=FileDataError: cannot open broken document ms=126
+2026-11-02T14:03:09.471Z ERROR   ingest rid=5f3a9c1e0b2d job=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17 course=ece120 done handler=_ingest_single_pdf file=courses/ece120/lecture1.pdf result=failed err=FileDataError: cannot open broken document ms=126 at=ingest.py:1981
 ```
 
 1. The time in UTC, with milliseconds.
@@ -20,6 +20,7 @@ fitz.fitz.FileDataError: cannot open broken document
 3. The logger name: the Python module name, for example `ai_ta_backend.main`, `ingest` or `worker`. There is no service name; the container or the CloudWatch log group already gives it.
 4. `rid=` (request id), `job=` (ingest job) and `course=` (project name), each only when it is known.
 5. The message. It says what failed and why in plain words, with the exception type and text after a colon. Details go in `key=value` pairs such as `file=`, `status=` and `ms=`.
+6. `at=<file>:<line>`, on `WARNING`, `ERROR` and `CRITICAL` lines only. It names the line of our code behind the line. With a traceback, it is the deepest frame in our own code: the line that raised, or the line that called the library that raised. Without one, it is the line of the log call. Lines from libraries and captured Python warnings have no `at=`.
 
 A newline inside the message is written as `\n`, so a value cannot fake a new log line. A traceback keeps its real newlines and follows on the next lines. A password in a connection URL (`://user:password@`) is written as `://***@`. There is no JSON format and no switch for one.
 

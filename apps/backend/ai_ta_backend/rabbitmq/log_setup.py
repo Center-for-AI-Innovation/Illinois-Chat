@@ -37,6 +37,8 @@ _context: contextvars.ContextVar = contextvars.ContextVar('log_context', default
 
 # Hide the password in a URL such as amqp://user:secret@host.
 _PASSWORD_IN_URL = re.compile(r'://[^/@\s]+:[^/@\s]+@')
+# Path parts that mark a file as not ours, for the at= field.
+_LIBRARY_PATH_PARTS = ('site-packages', 'dist-packages', os.sep + 'lib' + os.sep + 'python')
 _REQUEST_ID = re.compile(r'[A-Za-z0-9_-]{1,64}')
 
 _PLAIN_FORMAT = '%(asctime)s.%(msecs)03dZ %(levelname)-7s %(name)s %(message)s'
@@ -102,8 +104,37 @@ def _one_line(text: str) -> str:
 # Formatter and setup
 # ---------------------------------------------------------------------------
 
+def _is_app_file(path) -> bool:
+    """True for our own source files, False for installed libraries and the standard library."""
+    return bool(path) and not path.startswith('<') and not any(part in path for part in _LIBRARY_PATH_PARTS)
+
+
+def _source_location(record: logging.LogRecord) -> str:
+    """`file.py:line` of the code behind a WARNING or higher record, or '' when there is none.
+
+    With an exception, it is the deepest frame of the traceback that is in our own code: the
+    line that raised, or the line that called the library that raised. Without one, it is the
+    line of the log call. Records from libraries and from `warnings` get nothing; a captured
+    warning already has its file and line in the message.
+    """
+    if record.levelno < logging.WARNING or record.name == 'py.warnings':
+        return ''
+    tb = record.exc_info[2] if record.exc_info and len(record.exc_info) == 3 else None
+    found = None
+    while tb is not None:
+        if _is_app_file(tb.tb_frame.f_code.co_filename):
+            found = (tb.tb_frame.f_code.co_filename, tb.tb_lineno)
+        tb = tb.tb_next
+    if found is None and _is_app_file(record.pathname):
+        found = (record.pathname, record.lineno)
+    if found is None:
+        return ''
+    return '%s:%d' % (os.path.basename(found[0]), found[1])
+
+
 class LineFormatter(logging.Formatter):
-    """One line per record: UTC time, level, logger name, context, message.
+    """One line per record: UTC time, level, logger name, context, message, and for
+    WARNING and higher `at=file.py:line`.
 
     Newlines in the message are escaped so a value cannot fake a second log line.
     The traceback keeps its real newlines.
@@ -119,6 +150,9 @@ class LineFormatter(logging.Formatter):
             message = _PASSWORD_IN_URL.sub('://***@', _one_line(record.getMessage()))
             line = '%s.%03dZ %-7s %s %s%s' % (self.formatTime(record, self.datefmt), record.msecs,
                                               record.levelname, record.name, _render_context(), message)
+            location = _source_location(record)
+            if location:
+                line += ' at=' + location
             if record.exc_info and not record.exc_text:
                 record.exc_text = self.formatException(record.exc_info)
             if record.exc_text:
