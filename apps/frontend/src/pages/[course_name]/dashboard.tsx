@@ -11,6 +11,7 @@ import {
   getPermissionGateError,
   type PermissionGateErrorType,
 } from '~/components/UIUC-Components/PermissionGate'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
@@ -29,6 +30,8 @@ const CourseMain: NextPage = () => {
   const courseName = getCurrentPageName() as string
 
   const auth = useAuth()
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const [metadata, setMetadata] = useState<CourseMetadata | null>()
   const [isLoading, setIsLoading] = useState(true)
   const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
@@ -82,7 +85,7 @@ const CourseMain: NextPage = () => {
     setIsLoading(false)
   }, [router.isReady, auth.isLoading, metadata])
 
-  if (isLoading) {
+  if (isLoading || isSuperAdminLoading) {
     return <LoadingPlaceholderForAdminPages />
   }
 
@@ -115,6 +118,7 @@ const CourseMain: NextPage = () => {
         course_name={courseName as string}
         metadata={metadata as CourseMetadata}
         current_email={auth.user?.profile.email as string}
+        isSuperAdmin={isSuperAdmin === true}
       />
     </>
   )

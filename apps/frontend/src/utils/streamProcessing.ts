@@ -45,6 +45,7 @@ import { NCSAHostedVLMModelID } from './modelProviders/types/NCSAHostedVLM'
 import { OpenAIModelID } from './modelProviders/types/openai'
 import { SambaNovaModelID } from './modelProviders/types/SambaNova'
 import { webLLMModels } from './modelProviders/WebLLM'
+import { REDACTED_SECRET } from './modelProviders/providerSecrets'
 import { OpenAIError } from './server'
 
 /**
@@ -760,6 +761,10 @@ export const getOpenAIKey = (
   courseMetadata: CourseMetadata,
   userApiKey: string,
 ) => {
+  // A stored project key reaches the client only as a placeholder; send nothing so the server uses it.
+  if (llmProviders[ProviderNames.OpenAI]?.apiKey === REDACTED_SECRET) {
+    return ''
+  }
   const key =
     llmProviders[ProviderNames.OpenAI]?.apiKey &&
     llmProviders[ProviderNames.OpenAI]?.apiKey != ''

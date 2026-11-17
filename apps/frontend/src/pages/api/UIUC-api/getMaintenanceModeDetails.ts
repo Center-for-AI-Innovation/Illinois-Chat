@@ -1,5 +1,5 @@
 import { type NextApiResponse } from 'next'
-import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { getLogger } from '~/utils/server/log'
 
@@ -32,4 +32,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler)
+export default handler

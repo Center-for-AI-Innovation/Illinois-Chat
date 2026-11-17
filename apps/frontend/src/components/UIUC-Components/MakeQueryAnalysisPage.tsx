@@ -31,6 +31,7 @@ import { useEffect, useState } from 'react'
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { GRID_CONFIGS, useResponsiveGrid } from '~/utils/responsiveGrid'
 import { downloadConversationHistory } from '~/utils/downloadConversationHistory'
 import ConversationsHeatmapByHourChart from './ConversationsHeatmapByHourChart'
@@ -104,6 +105,8 @@ const formatPercentageChange = (value: number | null | undefined) => {
 
 const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
   const auth = useAuth()
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
@@ -370,12 +373,13 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
 
   const [view, setView] = useState('hour')
 
-  if (auth.isLoading || !courseMetadata) {
+  if (auth.isLoading || isSuperAdminLoading || !courseMetadata) {
     return <LoadingSpinner />
   }
 
   if (
     courseMetadata &&
+    isSuperAdmin !== true &&
     currentEmail !== (courseMetadata.course_owner as string) &&
     courseMetadata.course_admins.indexOf(currentEmail) === -1
   ) {
@@ -418,7 +422,7 @@ const MakeQueryAnalysisPage = ({ course_name }: { course_name: string }) => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="course-page-main flex min-h-screen w-full flex-col items-center"
+          className="course-page-main flex min-h-(--viewport-height) w-full flex-col items-center"
         >
           <h1 className="sr-only">{course_name} Analytics</h1>
           <div className="items-left flex w-full flex-col justify-center py-0">

@@ -17,12 +17,15 @@ import {
   type PermissionGateErrorType,
 } from '~/components/UIUC-Components/PermissionGate'
 import { getOrCreateAnonymousUserId } from '~/utils/anonymousUserId'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 const ChatPage: NextPage = () => {
   const [metadata, setMetadata] = useState<CourseMetadata | null>()
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const auth = useAuth()
+  const { data: isPlatformSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const email = auth.user?.profile.email
   const [currentEmail, setCurrentEmail] = useState('')
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
@@ -37,8 +40,8 @@ const ChatPage: NextPage = () => {
     return typeof raw === 'string'
       ? raw
       : Array.isArray(raw)
-        ? raw[0]
-        : undefined
+      ? raw[0]
+      : undefined
   }
   const courseName = getCurrentPageName() as string
 
@@ -95,7 +98,15 @@ const ChatPage: NextPage = () => {
   // Enforce permissions similar to /[course_name]/chat
   useEffect(() => {
     const checkAuthorization = async () => {
-      if (auth.isLoading || !router.isReady || !metadata || !auth) {
+      // Waits on the super-admin answer as well, since the branches below
+      // redirect to /not_authorized.
+      if (
+        auth.isLoading ||
+        !router.isReady ||
+        !metadata ||
+        !auth ||
+        isSuperAdminLoading
+      ) {
         return
       }
 
@@ -126,7 +137,11 @@ const ChatPage: NextPage = () => {
           }
         }
 
-        const permission = get_user_permission(metadata, auth)
+        const permission = get_user_permission(
+          metadata,
+          auth,
+          isPlatformSuperAdmin === true,
+        )
         if (permission === 'no_permission') {
           await router.replace(`/chat/not_authorized`)
           return
@@ -147,6 +162,8 @@ const ChatPage: NextPage = () => {
     metadata,
     auth,
     router,
+    isPlatformSuperAdmin,
+    isSuperAdminLoading,
   ])
 
   if (auth.isLoading) {

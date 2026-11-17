@@ -65,6 +65,24 @@ describe('toChatbotCardData', () => {
     expect(card.metadata).toBe(meta)
   })
 
+  it('grants a platform super admin the admin role without exposing raw metadata', () => {
+    const meta = makeMetadata({
+      course_owner: 'other@example.com',
+      course_admins: [],
+    })
+    const card = toChatbotCardData('cs101', meta, 'me@example.com', true)
+    expect(card.userRole).toBe('admin')
+    expect(card.owner).toBe('other@example.com')
+    expect(card.metadata).toBeUndefined()
+  })
+
+  it('does not let the super-admin flag override ownership', () => {
+    const meta = makeMetadata({ course_owner: 'me@example.com' })
+    const card = toChatbotCardData('cs101', meta, 'me@example.com', true)
+    expect(card.userRole).toBe('owner')
+    expect(card.metadata).toBe(meta)
+  })
+
   it('hides raw metadata from callers who are neither owner nor admin', () => {
     const meta = makeMetadata({
       course_owner: 'other@example.com',

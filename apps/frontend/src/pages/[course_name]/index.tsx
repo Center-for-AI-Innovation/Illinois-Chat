@@ -14,6 +14,7 @@ import {
   getPermissionGateError,
   type PermissionGateErrorType,
 } from '~/components/UIUC-Components/PermissionGate'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 const AUTH_ROUTES = ['sign-in', 'sign-up']
 
@@ -21,6 +22,8 @@ const IfCourseExists: NextPage = () => {
   const router = useRouter()
 
   const auth = useAuth()
+  const { data: isPlatformSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const { course_name } = router.query
   const [courseName, setCourseName] = useState<string | null>(null)
   const [courseMetadataIsLoaded, setCourseMetadataIsLoaded] = useState(false)
@@ -75,8 +78,16 @@ const IfCourseExists: NextPage = () => {
 
     const checkAuth = async () => {
       // AUTH
-      if (courseMetadata && !auth.isLoading) {
-        const permission_str = get_user_permission(courseMetadata, auth)
+      //
+      // Waits on the super-admin check too: this branch redirects to
+      // /not_authorized, and evaluating before the answer arrives would bounce
+      // a super admin off a project the API would have let them into.
+      if (courseMetadata && !auth.isLoading && !isSuperAdminLoading) {
+        const permission_str = get_user_permission(
+          courseMetadata,
+          auth,
+          isPlatformSuperAdmin === true,
+        )
 
         if (permission_str === 'edit' || permission_str === 'view') {
           console.debug('Can view or edit')
@@ -102,6 +113,8 @@ const IfCourseExists: NextPage = () => {
     auth,
     courseMetadata,
     courseName,
+    isPlatformSuperAdmin,
+    isSuperAdminLoading,
   ])
 
   if (errorType !== null) {

@@ -29,13 +29,34 @@ import { getBedrockModels } from '~/utils/modelProviders/routes/bedrock'
 import { getGeminiModels } from '~/utils/modelProviders/routes/gemini'
 import { getSambaNovaModels } from '~/utils/modelProviders/routes/sambanova'
 import { getOpenAICompatibleModels } from '~/utils/modelProviders/routes/openaiCompatible'
+import { redactProviderSecrets } from '~/utils/modelProviders/providerSecrets'
+import {
+  MODELS_CACHE_TTL_SECONDS,
+  modelsCacheKey,
+} from '~/utils/modelProviders/modelsCache'
 import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.models')
 
+// Cached so per-message callers skip the providers' model-listing fetches.
 export async function getModels(
   projectName: string,
 ): Promise<AllLLMProviders | null> {
+  const redisClient = await ensureRedisConnected()
+  const cached = await redisClient.get(modelsCacheKey(projectName))
+  if (cached) return JSON.parse(cached) as AllLLMProviders
+
+  const resolved = await resolveModels(projectName)
+
+  await redisClient.set(
+    modelsCacheKey(projectName),
+    JSON.stringify(resolved),
+    { EX: MODELS_CACHE_TTL_SECONDS },
+  )
+  return resolved
+}
+
+async function resolveModels(projectName: string): Promise<AllLLMProviders> {
   // Fetch the project's API keys
   let llmProviders: AllLLMProviders
   const redisClient = await ensureRedisConnected()
@@ -152,7 +173,9 @@ async function handler(
 
     const allLLMProviders = await getModels(projectName)
 
-    return res.status(200).json(allLLMProviders as AllLLMProviders)
+    return res
+      .status(200)
+      .json(redactProviderSecrets(allLLMProviders as AllLLMProviders))
   } catch (error) {
     log.error('could not load the project models', undefined, error)
     return res.status(500).json({ error: JSON.stringify(error) })

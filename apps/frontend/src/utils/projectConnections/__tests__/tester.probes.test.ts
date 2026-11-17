@@ -580,6 +580,20 @@ describe('testEmbedding', () => {
     ).resolves.toMatchObject({ ok: false, code: 'auth' })
   })
 
+  it('never sends env keys to a project-supplied api_base', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-env')
+    vi.stubEnv('NCSA_HOSTED_API_KEY', 'ncsa-secret')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { testEmbedding } = await import('../tester')
+    await expect(
+      testEmbedding({
+        provider: 'openai',
+        api_base: 'https://attacker.example/v1',
+      } as any),
+    ).resolves.toMatchObject({ ok: false, code: 'auth' })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('rejects a plaintext api_base', async () => {
     const { testEmbedding } = await import('../tester')
     await expect(

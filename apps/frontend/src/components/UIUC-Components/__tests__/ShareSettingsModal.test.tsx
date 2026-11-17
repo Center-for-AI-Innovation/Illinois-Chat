@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { renderWithProviders } from '~/test-utils/renderWithProviders'
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from '~/test-utils/renderWithProviders'
 
 vi.mock('framer-motion', () => ({
   motion: new Proxy(
@@ -85,6 +88,8 @@ describe('ShareSettingsModal', () => {
 
     const ShareSettingsModal = (await import('../ShareSettingsModal')).default
     const onClose = vi.fn()
+    const queryClient = createTestQueryClient()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
 
     renderWithProviders(
       <ShareSettingsModal
@@ -93,7 +98,7 @@ describe('ShareSettingsModal', () => {
         projectName="CS101"
         metadata={{ is_private: true, allow_logged_in_users: false } as any}
       />,
-      { homeContext: { dispatch: vi.fn() } },
+      { homeContext: { dispatch: vi.fn() }, queryClient },
     )
 
     await user.click(screen.getByRole('button', { name: /Copy share link/i }))
@@ -115,6 +120,10 @@ describe('ShareSettingsModal', () => {
           allow_logged_in_users: false,
         }),
       ),
+    )
+    // Hub sections refetch so the bot moves section and badge.
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['pagedChatbots'] }),
     )
 
     // Close button works.

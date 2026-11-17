@@ -10,6 +10,19 @@ import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.createProject')
 
+const MIRROR_ATTEMPTS = 3
+
+async function withRetry(fn: () => Promise<void>): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (attempt >= MIRROR_ATTEMPTS) throw err
+      await new Promise((resolve) => setTimeout(resolve, 200 * attempt))
+    }
+  }
+}
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -100,7 +113,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     try {
       const seeded = (await getCourseMetadata(project_name)) as CourseMetadata
       if (seeded) {
-        await writeCourseMetadata(project_name, seeded)
+        // The hub's Your Bots reads Postgres, so retry before accepting drift.
+        await withRetry(() => writeCourseMetadata(project_name, seeded))
       } else {
         log.warn(
           'Redis metadata missing after backend create; Postgres not mirrored',
@@ -109,7 +123,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     } catch (pgErr) {
       log.error(
-        'failed to mirror the project to Postgres; search index may lag until backfill runs',
+        'failed to mirror the project to Postgres after retries; search and the hub may miss it until backfill runs',
         { course: project_name },
         pgErr,
       )

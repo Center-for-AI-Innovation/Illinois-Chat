@@ -4,6 +4,7 @@ import { routeModelRequest } from '~/utils/streamProcessing'
 import { type ChatBody } from '@/types/chat'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getModels } from '~/pages/api/models'
 import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.queryRewrite')
@@ -16,6 +17,8 @@ export const revalidate = 0
 async function handler(req: AuthenticatedRequest) {
   try {
     const body = await req.json()
+    // Get providers from redis store for safe-guarding and validation
+    body.llmProviders = await getModels(req.courseName!)
     const response = await routeModelRequest(body as ChatBody)
     return response
   } catch (error) {
