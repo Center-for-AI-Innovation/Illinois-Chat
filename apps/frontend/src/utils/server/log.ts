@@ -116,9 +116,7 @@ type SourceMapLike = {
 function builtin<T>(name: string): T | undefined {
   try {
     const proc = process as { getBuiltinModule?: (id: string) => unknown }
-    return typeof proc.getBuiltinModule === 'function'
-      ? (proc.getBuiltinModule(name) as T)
-      : undefined
+    return proc.getBuiltinModule?.(name) as T | undefined
   } catch {
     return undefined
   }

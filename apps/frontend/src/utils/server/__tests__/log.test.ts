@@ -280,9 +280,16 @@ describe('getLogger', () => {
     try {
       getLogger('s').info('in browser')
       getLogger('s').error('failed in browser', new Error('boom'))
+      // A frame of a built chunk: there is no file system to read its map.
+      const err = new Error('in a chunk')
+      err.stack = 'Error: in a chunk\n    at m (/app/chunk.js:1:5)'
+      getLogger('s').error('chunk frame', err)
     } finally {
       vi.unstubAllGlobals()
     }
+    expect(c.error.mock.calls[1]![0]).toMatch(
+      /\nError: in a chunk\n    at m \(\/app\/chunk\.js:1:5\)$/,
+    )
     expect(c.log.mock.calls[0]![0]).toMatch(/ INFO    s in browser$/)
     expect(c.error.mock.calls[0]![0]).toMatch(
       / ERROR   s failed in browser at=\S+:\d+\nError: boom\n/,
