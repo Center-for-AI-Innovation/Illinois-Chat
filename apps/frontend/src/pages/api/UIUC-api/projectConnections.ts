@@ -308,7 +308,11 @@ async function handlePatch(
     if (validationError) {
       return res.status(400).json({ error: validationError })
     }
-    console.error('[projectConnections] patch failed:', e)
+    log.error(
+      'project connection patch failed',
+      { course: projectName, kind },
+      e,
+    )
     await writeAuditEntry({
       actor_email: actorEmail,
       action: 'upsert',

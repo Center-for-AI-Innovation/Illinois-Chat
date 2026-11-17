@@ -47,7 +47,7 @@ If you do not have the id, find the failing line first and copy its `rid=` value
 docker compose --project-directory . -f infra/docker/docker-compose.yaml logs backend worker | grep -E ' (ERROR|CRITICAL) '
 ```
 
-Add `frontend crawlee` to the list of services to include their lines. The frontend's API routes under `/api/` also send the request id back in the `X-Request-ID` response header (every route that checks sign-in or project access, which is nearly all of them). The Network tab of the browser's developer tools shows it for each call.
+Add `frontend crawlee` to the list of services to include their lines. The frontend's API routes under `/api/` also send the request id back in the `X-Request-ID` response header (every route that checks sign-in or project access, and the public routes for the health check, the announcement banner, the navbar brand and the maintenance text). The Network tab of the browser's developer tools shows it for each call.
 
 **Ids in error messages.** When a file upload, a Canvas import, or a website or GitHub import fails, the error text in the app ends with the request id, for example `(ref: 5f3a9c1e0b2d)`. Ask the person who saw the error for that text, then search the logs for `rid=5f3a9c1e0b2d` as above. There is no `(ref: ...)` when the request never reached the server, for example after a network error.
 

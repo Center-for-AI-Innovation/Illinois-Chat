@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from 'redis'
+import { getLogger } from '~/utils/server/log'
+import { runPagesRoute } from '~/utils/server/routeContext'
+
+const log = getLogger('api.healthcheck')
 // import { HeadBucketCommand } from '@aws-sdk/client-s3'
 // import { db, keycloakDB } from '~/db/dbClient'
 // import { s3Client } from '~/utils/s3Client'
@@ -23,10 +27,7 @@ function serializeError(err: any) {
   }
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const checks: Record<string, { status: string; error?: string }> = {
     app: { status: 'ok' },
   }
@@ -44,6 +45,7 @@ export default async function handler(
       await redis.disconnect()
     } catch (err: any) {
       checks.redis = { status: 'error', error: serializeError(err) }
+      log.error('health check failed', { check: 'redis' }, err)
     }
   } else {
     checks.redis = { status: 'skipped', error: 'No Redis config' }
@@ -98,4 +100,13 @@ export default async function handler(
     checks,
     timestamp: new Date().toISOString(),
   })
+}
+
+// Opens the request context: a request id, the X-Request-ID response header
+// and one ERROR line with a 500 when the handler throws.
+export default async function healthcheckRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => handler(req, res))
 }
