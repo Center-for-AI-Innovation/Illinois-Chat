@@ -5,9 +5,12 @@ import { type ProjectWideLLMProviders } from '~/types/courseMetadata'
 import { encryptKeyIfNeeded } from '~/utils/crypto'
 import {
   type AllLLMProviders,
+  type BedrockProvider,
   type LLMProvider,
 } from '~/utils/modelProviders/LLMProvider'
+import { restoreRedactedSecrets } from '~/utils/modelProviders/providerSecrets'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { modelsCacheKey } from '~/utils/modelProviders/modelsCache'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -52,6 +55,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       (await redisClient.get(redisKey)) || '{}',
     ) as ProjectWideLLMProviders
 
+    llmProviders = restoreRedactedSecrets(llmProviders, existingLLMs)
+
     // Ensure all keys are encrypted, then save to DB.
     const processProviders = async () => {
       for (const providerName in llmProviders) {
@@ -63,6 +68,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             apiKey:
               (await encryptKeyIfNeeded(provider.apiKey!)) ?? provider.apiKey,
           } as LLMProvider & { provider: typeof typedProviderName }
+        }
+      }
+      const bedrock = llmProviders.Bedrock as BedrockProvider | undefined
+      if (bedrock) {
+        llmProviders.Bedrock = {
+          ...bedrock,
+          accessKeyId:
+            (await encryptKeyIfNeeded(bedrock.accessKeyId!)) ??
+            bedrock.accessKeyId,
+          secretAccessKey:
+            (await encryptKeyIfNeeded(bedrock.secretAccessKey!)) ??
+            bedrock.secretAccessKey,
         }
       }
     }
@@ -79,6 +96,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Save the combined metadata
     await redisClient.set(redisKey, JSON.stringify(combined_llms))
+    await redisClient.del(modelsCacheKey(courseName))
     return res.status(200).json({ success: true })
   } catch (error) {
     console.error('Error upserting LLM providers:', error)

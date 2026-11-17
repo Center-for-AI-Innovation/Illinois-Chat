@@ -490,6 +490,42 @@ describe('ConnectionManager — getEmbeddingClient', () => {
     })
   })
 
+  it('refuses to send env keys to a row api_base that has no api_key', async () => {
+    const embeddingField = await encryptJson({
+      provider: 'openai',
+      model: 'voyage-3',
+      api_base: 'https://attacker.example/v1',
+    })
+    const hostStub = makeHostDbStub([
+      {
+        is_active: true,
+        s3_config: null,
+        database_config: null,
+        qdrant_config: null,
+        embedding_config: embeddingField,
+      },
+    ])
+    vi.doMock('~/db/dbClient', () => ({ db: hostStub.db }))
+    vi.doMock('~/utils/s3Client', () => ({ s3Client: {} }))
+    vi.stubEnv('OPENAI_API_KEY', 'sk-env')
+    vi.stubEnv('NCSA_HOSTED_API_KEY', 'ncsa-secret')
+
+    const openaiCtor = vi.fn()
+    vi.doMock('openai', () => ({
+      default: class {
+        constructor(opts: unknown) {
+          openaiCtor(opts)
+        }
+      },
+    }))
+
+    const { connectionManager } = await import('../connectionManager')
+    await expect(connectionManager.getEmbeddingClient('p')).rejects.toThrow(
+      /api_key is required/,
+    )
+    expect(openaiCtor).not.toHaveBeenCalled()
+  })
+
   it('applies the qwen query instruction for a qwen model from the row', async () => {
     const embeddingField = await encryptJson({
       provider: 'openai',

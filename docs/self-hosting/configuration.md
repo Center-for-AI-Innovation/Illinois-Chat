@@ -141,6 +141,7 @@ The worker reads these from its process environment. None is in the root templat
 | `RABBITMQ_PREFETCH_COUNT` | full, dev | `1` | none |
 | `MAX_JOB_RETRIES` | full, dev | `10`; only a job that fails before ingest starts (the database lookup or the connection resolve) is re-queued, right away, up to this many times. With the default that is 11 attempts in all (the first try plus 10 retries); the worker log counts them as `attempt n/11` and ends with `discarded after 11 attempts`. A file that fails during ingest is not re-queued: the worker tries it up to 3 times in the same job, then records the failure | none |
 | `INGEST_SUBPROCESS_TIMEOUT` | full, dev | `300` seconds | none |
+| `RABBITMQ_HEARTBEAT` | full, dev | `60` seconds. AMQP heartbeat timeout the worker asks for; pika lets the client override the broker, so this value is what gets used. Keep it under 350 so idle connections survive AWS NAT gateways and load balancers. `broker` accepts the broker's proposal; `0` is refused | none |
 | `QDRANT_UPSERT_BATCH_SIZE` | full, dev | `100` | none |
 | `EMBEDDING_MAX_ATTEMPTS` | full, dev | `10` | none |
 
@@ -186,7 +187,8 @@ Read by `docker-compose.sim.yaml`, which both start scripts load unless `--no-si
 
 | Variable | Read by | Required or default | In template |
 | --- | --- | --- | --- |
-| `POSTHOG_API_KEY` | full (backend), dev | `not_a_key` | root, worker |
+| `POSTHOG_API_KEY` | full (backend, worker), dev, worker | `not_a_key` (backend), empty (worker); only used when `POSTHOG_HOST` is set | root, worker |
+| `POSTHOG_HOST` | full (backend, worker), dev, worker | empty; backend and worker send no PostHog events | root, backend, worker |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | dev | empty; not passed by Compose | root |
 | `NOMIC_API_KEY` | dev | empty; not passed by Compose | root |
 | `SENTRY_DSN` | dev | empty; not passed by Compose | root |

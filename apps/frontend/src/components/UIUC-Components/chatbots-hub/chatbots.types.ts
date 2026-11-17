@@ -1,4 +1,5 @@
 import { type CourseMetadata } from '~/types/courseMetadata'
+import type { PagedChatbotsSource } from '~/hooks/queries/usePagedChatbots'
 
 export type ChatbotAccessLevel = 'private' | 'unlisted' | 'public'
 /**
@@ -64,11 +65,6 @@ export type ChatbotCardData = {
   last_updated_at?: string
 }
 
-export type ChatbotSectionData = {
-  title: string
-  cards: ChatbotCardData[]
-}
-
 export type AccessibleChatbotData = {
   course_name: string
   title: string
@@ -102,18 +98,20 @@ export const PROJECT_TYPE_TO_SECTION: Record<ChatbotProjectType, string> = {
 /** Fallback section for public chatbots with unknown project types */
 export const DEFAULT_ACCESSIBLE_SECTION = 'Public Bots'
 
+export const SHARED_SECTION = 'Shared with you'
+
 /**
- * Ordered list of section titles. "Your Bots" surfaces first so users see
- * their own + shared work before discovery sections. The discovery sections
- * are scoped to PUBLIC bots only — private/unlisted bots the user owns or is
- * a member of live in "Your Bots".
+ * Server-paged sections, in display order (Public Bots renders after these).
+ * Each bot lands in at most one: yours first, then by type, then private bots you were invited to.
+ * Unlisted bots outside Course/Department only show up in search.
  */
-export const ACCESSIBLE_SECTION_ORDER = [
-  YOUR_BOTS_SECTION,
-  'Course Assistants',
-  'Department Resources',
-  'Public Bots',
-]
+export const PAGED_SECTIONS: { title: string; source: PagedChatbotsSource }[] =
+  [
+    { title: YOUR_BOTS_SECTION, source: 'yours' },
+    { title: 'Course Assistants', source: 'course' },
+    { title: 'Department Resources', source: 'department' },
+    { title: SHARED_SECTION, source: 'shared' },
+  ]
 
 /** Query parameters accepted by the searchChatbots API */
 export type SearchChatbotsParams = {

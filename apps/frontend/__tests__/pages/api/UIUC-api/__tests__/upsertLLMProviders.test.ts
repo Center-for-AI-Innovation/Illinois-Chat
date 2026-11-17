@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMockReq, createMockRes } from '~/test-utils/nextApi'
+import { REDACTED_SECRET } from '~/utils/modelProviders/providerSecrets'
 
 const hoisted = vi.hoisted(() => {
   return {
@@ -7,6 +8,7 @@ const hoisted = vi.hoisted(() => {
     encryptKeyIfNeeded: vi.fn(async (k: string) => `enc:${k}`),
     redisGet: vi.fn(),
     redisSet: vi.fn(),
+    redisDel: vi.fn(),
   }
 })
 
@@ -64,6 +66,7 @@ describe('UIUC-api/upsertLLMProviders', () => {
         JSON.stringify({ OpenAI: { apiKey: 'old' } }),
       ),
       set: hoisted.redisSet.mockResolvedValueOnce(undefined),
+      del: hoisted.redisDel,
     })
 
     const res = createMockRes()
@@ -80,5 +83,79 @@ describe('UIUC-api/upsertLLMProviders', () => {
     expect(res.status).toHaveBeenCalledWith(200)
     expect(hoisted.encryptKeyIfNeeded).toHaveBeenCalledWith('k')
     expect(hoisted.redisSet).toHaveBeenCalled()
+    expect(hoisted.redisDel).toHaveBeenCalledWith('CS101-llms-resolved')
+  })
+
+  it('keeps stored secrets when the form sends back the placeholder', async () => {
+    hoisted.ensureRedisConnected.mockResolvedValueOnce({
+      get: hoisted.redisGet.mockResolvedValueOnce(
+        JSON.stringify({
+          OpenAI: { apiKey: 'v1.stored.openai' },
+          Bedrock: { accessKeyId: 'v1.stored.id', secretAccessKey: 'v1.s.k' },
+        }),
+      ),
+      set: hoisted.redisSet.mockResolvedValueOnce(undefined),
+      del: hoisted.redisDel,
+    })
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          projectName: 'CS101',
+          llmProviders: {
+            OpenAI: { apiKey: REDACTED_SECRET, enabled: false, models: [] },
+            Bedrock: {
+              accessKeyId: REDACTED_SECRET,
+              secretAccessKey: REDACTED_SECRET,
+              models: [],
+            },
+            Anthropic: { apiKey: REDACTED_SECRET, models: [] },
+          },
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const saved = JSON.parse(hoisted.redisSet.mock.calls[0]![1])
+    expect(saved.OpenAI.apiKey).toBe('enc:v1.stored.openai')
+    expect(saved.OpenAI.enabled).toBe(false)
+    expect(saved.Bedrock.accessKeyId).toBe('enc:v1.stored.id')
+    expect(saved.Bedrock.secretAccessKey).toBe('enc:v1.s.k')
+    // No stored Anthropic key, so the placeholder must not be saved as one.
+    expect(saved.Anthropic.apiKey).toBeUndefined()
+    expect(JSON.stringify(saved)).not.toContain(REDACTED_SECRET)
+  })
+
+  it('encrypts Bedrock credentials before saving', async () => {
+    hoisted.ensureRedisConnected.mockResolvedValueOnce({
+      get: hoisted.redisGet.mockResolvedValueOnce('{}'),
+      set: hoisted.redisSet.mockResolvedValueOnce(undefined),
+      del: hoisted.redisDel,
+    })
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          projectName: 'CS101',
+          llmProviders: {
+            Bedrock: {
+              accessKeyId: 'AKIA',
+              secretAccessKey: 'shh',
+              models: [],
+            },
+          },
+        },
+      }) as any,
+      res as any,
+    )
+
+    const saved = JSON.parse(hoisted.redisSet.mock.calls[0]![1])
+    expect(saved.Bedrock.accessKeyId).toBe('enc:AKIA')
+    expect(saved.Bedrock.secretAccessKey).toBe('enc:shh')
   })
 })

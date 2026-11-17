@@ -8,6 +8,7 @@ import logging
 import json
 import sys
 import threading
+import time
 import multiprocessing as mp
 
 try:
@@ -35,6 +36,45 @@ worker_thread: threading.Thread | None = None
 worker_running = threading.Event()
 
 INGEST_TIMEOUT = int(os.getenv('INGEST_SUBPROCESS_TIMEOUT', '300'))  # seconds; per-doc OCR watchdog cap
+# Fixed idle cut-off of AWS NAT gateways and network load balancers (Amazon MQ brokers sit
+# behind one): a TCP flow with no packets for this long is dropped and the next packet gets RST.
+AWS_IDLE_CUTOFF = 350  # seconds
+
+
+def _heartbeat_from_env():
+    """AMQP heartbeat timeout in seconds, from RABBITMQ_HEARTBEAT (default 60).
+
+    Pika sends a frame every half the timeout, so 60 keeps traffic on the wire every 30s, under
+    AWS_IDLE_CUTOFF. In pika an explicit integer always overrides the broker's proposal (the
+    broker-side setting only matters for a client that passes None), which is how the old 900
+    got negotiated unchanged (#376). "broker" passes None; 0 would disable heartbeats and is
+    refused, as are unparsable values: both fall back to 60.
+    """
+    raw = os.getenv('RABBITMQ_HEARTBEAT', '').strip().lower()
+    if raw == '':
+        return 60
+    if raw == 'broker':
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        value = -1
+    if value < 1:
+        logger.warning("RABBITMQ_HEARTBEAT=%r is invalid or would disable heartbeats; using 60", raw)
+        return 60
+    if value / 2 >= AWS_IDLE_CUTOFF:
+        logger.warning("RABBITMQ_HEARTBEAT=%s sends a frame only every %ss, past the %ss idle cut-off of AWS "
+                       "NAT gateways and load balancers; idle connections will be dropped (#376)",
+                       value, value // 2, AWS_IDLE_CUTOFF)
+    return value
+
+
+RABBITMQ_HEARTBEAT = _heartbeat_from_env()
+# How often the consumer thread services the AMQP connection while an ingest child runs.
+# Must stay well under RABBITMQ_HEARTBEAT / 2 so heartbeat frames go out on time.
+KEEPALIVE_INTERVAL = 1.0  # seconds
+RECONNECT_MAX_DELAY = 60  # seconds; cap on the back-off between reconnect attempts
+STABLE_SESSION = 30  # seconds; a consume session shorter than this keeps the back-off growing
 
 
 def _ingest_child(job_id, rid, inputs):
@@ -59,14 +99,34 @@ def _ingest_child(job_id, rid, inputs):
         sys.exit(3)
 
 
-def run_ingest_isolated(job_id, rid, inputs):
+def run_ingest_isolated(job_id, rid, inputs, keepalive=None, _target=_ingest_child):
     """Run main_ingest in a spawned child with a hard timeout so a hung/huge OCR can't block the
     consumer thread (RabbitMQ heartbeats) or the Flask ALB health check, and a native segfault in
-    the OCR libs kills only the child. Returns None on clean completion, else an error string."""
+    the OCR libs kills only the child. Returns None on clean completion, else an error string.
+
+    `keepalive`, when given, is called about every KEEPALIVE_INTERVAL seconds while the child
+    runs. The worker passes a function that services the AMQP connection, so heartbeat frames
+    keep flowing during a long OCR instead of the consumer thread going silent in join(). If it
+    raises (the connection was lost mid-job) the wait carries on without it: the child's work
+    and the per-document status rows are still worth finishing, and the broker redelivers the
+    unacked message by itself once it notices the connection is gone.
+    """
     ctx = mp.get_context('spawn')  # spawn, NOT fork: worker is multithreaded (Flask) -> fork can deadlock
-    p = ctx.Process(target=_ingest_child, args=(job_id, rid, inputs))
+    p = ctx.Process(target=_target, args=(job_id, rid, inputs))  # _target is swapped only by tests
     p.start()
-    p.join(INGEST_TIMEOUT)
+    deadline = time.monotonic() + INGEST_TIMEOUT
+    while p.is_alive():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        p.join(min(KEEPALIVE_INTERVAL, remaining))
+        if keepalive is not None:
+            try:
+                keepalive()
+            except Exception:  # pylint: disable=broad-except
+                logger.warning("RabbitMQ connection lost while an ingest child was running; "
+                               "waiting for the child without heartbeats", exc_info=True)
+                keepalive = None
     if p.is_alive():
         p.kill()
         p.join(10)
@@ -89,7 +149,9 @@ class Worker:
         self.rabbitmq_queue = os.getenv('RABBITMQ_QUEUE', 'uiuc-chat')
         self.connection: pika.BlockingConnection | None = None
         self.channel: pika.adapters.blocking_connection.BlockingChannel | None = None
-        self.connect()
+        self._stop = threading.Event()
+        # No connect() here: listen_for_jobs owns connecting, so a broker that is down at
+        # start-up is retried with back-off instead of crashing the process before Flask is up.
 
         self.sql_session = SQLAlchemyIngestDB()
         self.resolver = WorkerConnectionResolver(self.sql_session)
@@ -104,10 +166,9 @@ class Worker:
 
     def connect(self):
         parameters = pika.URLParameters(self.rabbitmq_url)
-        # Keep the connection alive across the long (up to INGEST_TIMEOUT) subprocess wait so
-        # RabbitMQ doesn't drop us mid-OCR and redeliver the message (which the redelivery guard
-        # would then mislabel as "worker crashed").
-        parameters.heartbeat = max(900, INGEST_TIMEOUT * 3)
+        # Short heartbeat on purpose (see _heartbeat_from_env). The long ingest wait no longer
+        # needs a long timeout: run_ingest_isolated services the connection while the child runs.
+        parameters.heartbeat = RABBITMQ_HEARTBEAT
         if self.rabbitmq_ssl:
             # Necessary for AWS AmazonMQ
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
@@ -214,7 +275,9 @@ class Worker:
                     # OCR can't block RabbitMQ heartbeats or the ALB health check, and a native
                     # segfault kills only the child. On timeout/crash: record a clear failure and
                     # ack (no requeue -> no redelivery-guard mislabel).
-                    failure = run_ingest_isolated(job_id, content.get('request_id'), inputs)
+                    failure = run_ingest_isolated(
+                        job_id, content.get('request_id'), inputs,
+                        keepalive=lambda: self.connection.process_data_events(time_limit=0))
                     if failure is not None:
                         logger.error("job failed: %s", failure[:500])
                         status_db.insert_failed_document({
@@ -230,8 +293,13 @@ class Worker:
                     channel.basic_ack(delivery_tag=method.delivery_tag)
                     if failure is None:
                         logger.info("job done ms=%d", int((time.monotonic() - started) * 1000))
+        except pika.exceptions.AMQPError:
+            # The connection or channel is gone (lost mid-job, or the ack above failed). Don't
+            # republish: the broker redelivers the unacked message itself once it notices the
+            # connection dropped, and listen_for_jobs reconnects.
+            raise
         except Exception as e:  # pylint: disable=broad-except
-            # Only resolver and DB errors get here: run_ingest_isolated never raises.
+            # Only resolver and status-DB errors get here: run_ingest_isolated never raises.
             # One first try plus MAX_JOB_RETRIES retries.
             attempt, attempts = retry_count + 1, MAX_JOB_RETRIES + 1
             if retry_count < MAX_JOB_RETRIES:
@@ -243,8 +311,9 @@ class Worker:
                                  attempt, attempts, type(e).__name__, e)
                 content["retry_count"] = retry_count + 1
                 properties = pika.BasicProperties(delivery_mode=2, reply_to=header.reply_to)
-                # Republish on the same channel. If the channel is dead this raises
-                # into listen_for_jobs, which logs it and stops.
+                # Republish on the delivering channel and ack the original. Reconnecting here
+                # (as before) left the old delivery unacked and, with prefetch 1, froze the
+                # consumer on the replacement channel.
                 channel.basic_publish(exchange='',
                                       routing_key=self.rabbitmq_queue,
                                       properties=properties,
@@ -282,42 +351,63 @@ class Worker:
             logger.warning("could not record the discarded job in the database", exc_info=True)
 
     def listen_for_jobs(self):
-        logger.info("Worker connecting to RabbitMQ...")
-        if not self.is_connected():
-            logger.error("RabbitMQ is offline")
-            return
-
-        logger.info("Worker connected to RabbitMQ queue=%s", self.rabbitmq_queue)
-        self.consumer = self.channel.basic_consume(
-            queue=self.rabbitmq_queue,
-            on_message_callback=self.process_job,
-            auto_ack=False
-        )
-
-        # start listening
-        logger.info("Waiting for messages. To exit press CTRL+C")
-        worker_running.set()  # mark healthy
-
-        reason = "the channel closed or the consumer was cancelled"
+        """Consume until the process exits. A lost connection (broker restart, an idle time-out
+        at a load balancer, missed heartbeats) is logged and reconnected with back-off instead
+        of ending the thread, so ECS doesn't have to recycle the task to get a consumer back.
+        While disconnected, worker_running is clear and /api/healthcheck returns 500."""
+        delay = 1
         try:
-            # pylint: disable=protected-access
-            while self.channel and self.channel.is_open and self.channel._consumer_infos:
-                self.channel.connection.process_data_events(time_limit=1)  # 1 second
-        except (SystemExit, KeyboardInterrupt, GeneratorExit) as e:
-            reason = type(e).__name__
-            raise
-        except Exception as e:  # pylint: disable=broad-except
-            reason = "%s: %s" % (type(e).__name__, e)
-            logger.exception("Worker crashed/disconnected")
+            while not self._stop.is_set():
+                if not self.is_connected():
+                    logger.info("Worker connecting to RabbitMQ...")
+                    try:
+                        self.connect()
+                    except Exception:  # pylint: disable=broad-except
+                        logger.exception("RabbitMQ connect failed; retrying in %ss", delay)
+                        self.close()  # connect() may have opened the socket before queue_declare failed
+                        self._stop.wait(delay)
+                        delay = min(delay * 2, RECONNECT_MAX_DELAY)
+                        continue
+                lasted = self._consume_until_disconnected()
+                # Only a session that actually lasted resets the back-off: a consume that dies at
+                # once (queue deleted, permission lost) must not churn the broker once a second.
+                delay = 1 if lasted >= STABLE_SESSION else min(delay * 2, RECONNECT_MAX_DELAY)
+                self._stop.wait(delay)
         finally:
-            logger.warning("Stopped listening for messages: %s", reason)
+            worker_running.clear()
             self.close()
-            self.connection = None
+            logger.info("Worker exiting")
 
-        # final cleanup
-        worker_running.clear()
-        self.close()
-        logger.info("Worker exiting")
+    def stop(self):
+        """Ask listen_for_jobs to return after the current message (used on shutdown)."""
+        self._stop.set()
+
+    def _consume_until_disconnected(self):
+        """One connection's worth of consuming. Returns how long it lasted, in seconds, once the
+        connection or channel is gone or stop() was called."""
+        started = time.monotonic()
+        try:
+            self.consumer = self.channel.basic_consume(
+                queue=self.rabbitmq_queue,
+                on_message_callback=self.process_job,
+                auto_ack=False
+            )
+            logger.info("Worker connected to RabbitMQ queue=%s. Waiting for messages. To exit press CTRL+C",
+                        self.rabbitmq_queue)
+            worker_running.set()  # mark healthy
+            # pylint: disable=protected-access
+            while (self.channel and self.channel.is_open and self.channel._consumer_infos
+                   and not self._stop.is_set()):
+                self.channel.connection.process_data_events(time_limit=1)  # 1 second
+            if not self._stop.is_set():
+                logger.warning("RabbitMQ channel closed or consumer cancelled; reconnecting")
+        except Exception:  # pylint: disable=broad-except
+            logger.exception("Worker lost its RabbitMQ connection; reconnecting")
+        finally:
+            worker_running.clear()
+            logger.info("Stopped listening for messages.")
+            self.close()
+        return time.monotonic() - started
 
 
 @app.route('/api/healthcheck', methods=['GET'])
@@ -341,6 +431,7 @@ if __name__ == '__main__':
         # threaded=True lets Flask serve multiple requests while worker runs
         app.run(host='0.0.0.0', port=8001, threaded=True)
     finally:
-        # Graceful shutdown
+        # Graceful shutdown: let the current message finish, then stop consuming.
+        worker.stop()
         if worker_thread:
             worker_thread.join(timeout=10)

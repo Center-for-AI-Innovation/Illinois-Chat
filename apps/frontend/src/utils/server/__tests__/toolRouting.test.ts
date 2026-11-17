@@ -11,6 +11,7 @@ vi.mock('~/utils/redisClient', () => ({
 }))
 
 import { encryptKeyIfNeeded } from '~/utils/crypto'
+import { REDACTED_SECRET } from '~/utils/modelProviders/providerSecrets'
 import {
   OPENAI_ROUTER_MODEL_ID,
   callToolRouter,
@@ -174,6 +175,18 @@ describe('resolveToolRouter', () => {
       selectedModelId: 'Qwen/Qwen3.6-27B',
     })
     expect(result.source).toBe('offline')
+  })
+
+  it('skips a redacted placeholder and uses the stored project key', async () => {
+    storeProviders({
+      OpenAI: { provider: 'OpenAI', enabled: true, apiKey: 'sk-stored' },
+    })
+    const result = await resolveToolRouter({
+      projectName: PROJECT,
+      clientOpenAIKey: REDACTED_SECRET,
+      selectedModelId: 'Qwen/Qwen3.6-27B',
+    })
+    expect(result).toMatchObject({ source: 'custom', apiKey: 'sk-stored' })
   })
 
   it('falls to the NCSA default tier when no custom key resolves', async () => {

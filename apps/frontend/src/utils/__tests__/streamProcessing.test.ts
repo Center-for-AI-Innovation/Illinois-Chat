@@ -47,6 +47,7 @@ import { BedrockModelID } from '../modelProviders/types/bedrock'
 import { GeminiModelID } from '../modelProviders/types/gemini'
 import { SambaNovaModelID } from '../modelProviders/types/SambaNova'
 import { OllamaModelIDs } from '../modelProviders/ollama'
+import { REDACTED_SECRET } from '../modelProviders/providerSecrets'
 
 import {
   State,
@@ -762,6 +763,15 @@ describe('getOpenAIKey', () => {
       'user',
     )
     expect(key).toBe('user')
+  })
+
+  it('sends no key when the project key is only a redacted placeholder', () => {
+    const key = getOpenAIKey(
+      { OpenAI: { apiKey: REDACTED_SECRET, enabled: true } } as any,
+      {} as any,
+      'user',
+    )
+    expect(key).toBe('')
   })
 })
 

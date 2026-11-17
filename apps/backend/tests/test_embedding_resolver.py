@@ -162,3 +162,52 @@ def test_resolve_embedding_client_accepts_allowed_provider(monkeypatch):
     client, instr = svc._resolve_embedding_client("demo")
     assert client is not None
     assert instr == "test"
+
+
+def _api_key(client):
+    key = client.openai_api_key
+    return key.get_secret_value() if hasattr(key, "get_secret_value") else key
+
+
+def _svc_with_embedding_cfg(cfg):
+    svc = object.__new__(RetrievalService)
+    svc.embedding_model = "text-embedding-3-small"
+    svc.openai_api_key = "sk-env-secret"
+    svc.openai_api_base = "https://api.openai.com/v1"
+    svc.qwen_query_instruction = "test"
+    conn_manager = MagicMock()
+    conn_manager._get_decrypted_field.side_effect = lambda p, f: (
+        cfg if f == "embedding_config" else None
+    )
+    svc.conn_manager = conn_manager
+    return svc
+
+
+def test_resolve_embedding_client_never_sends_env_key_to_custom_api_base():
+    """A project api_base without its own api_key must not inherit the env key."""
+    svc = _svc_with_embedding_cfg(
+        {"provider": "openai", "model": "m", "api_base": "https://attacker.example/v1"}
+    )
+    with pytest.raises(ValueError, match="api_key is required"):
+        svc._resolve_embedding_client("demo")
+
+
+def test_resolve_embedding_client_uses_project_key_for_custom_api_base():
+    svc = _svc_with_embedding_cfg(
+        {
+            "provider": "openai",
+            "model": "m",
+            "api_base": "https://custom.example/v1",
+            "api_key": "sk-project",
+        }
+    )
+    client, _ = svc._resolve_embedding_client("demo")
+    assert _api_key(client) == "sk-project"
+
+
+def test_resolve_embedding_client_keeps_env_key_for_env_api_base():
+    svc = _svc_with_embedding_cfg(
+        {"provider": "openai", "model": "m", "api_base": "https://api.openai.com/v1/"}
+    )
+    client, _ = svc._resolve_embedding_client("demo")
+    assert _api_key(client) == "sk-env-secret"
