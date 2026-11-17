@@ -321,7 +321,7 @@ describe('authMiddleware', () => {
     expect(error).toHaveBeenCalledTimes(1)
     const line = error.mock.calls[0]![0] as string
     expect(line).toMatch(
-      / ERROR   api rid=\S+ path=\/api\/UIUC-api\/thing unhandled error in API route\nError: handler bug\n\s+at /,
+      / ERROR   api rid=\S+ path=\/api\/UIUC-api\/thing unhandled error in API route at=\S+:\d+\nError: handler bug\n\s+at /,
     )
     expect(line).not.toContain('JWT')
   })

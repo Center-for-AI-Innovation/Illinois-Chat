@@ -91,10 +91,24 @@ A line looks like this:
 
 ```text
 2026-11-02T14:03:01.050Z INFO    api.ingest rid=5f3a9c1e0b2d path=/api/UIUC-api/ingest course=ece120 submitted to ingest queue file=courses/ece120/5f3a9c1e-0b2d-4c1a-9e2f-3b7d6a8c1f04-lecture1.pdf status=200 task_id=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17
-2026-11-02T14:07:44.912Z ERROR   backendFetch rid=8c41d7a2e9f0 path=/api/UIUC-api/ingest course=ece120 backend 500 POST /ingest ms=812 body={"error":"..."}
+2026-11-02T14:07:44.912Z ERROR   backendFetch rid=8c41d7a2e9f0 path=/api/UIUC-api/ingest course=ece120 backend 500 POST /ingest ms=812 body={"error":"..."} at=src/utils/server/backendFetch.ts:59
 ```
 
 The fields are the same as in Python, with `path=` (the API route, without the query string) where Python has `job=`. An error follows on the next lines as `Name: message` and its stack frames. If the error has a `cause`, it follows as `Caused by: Name: message`. Newlines inside the message and the fields are written as `\n`.
+
+**Where an error comes from.** Every `ERROR` line ends with `at=<file>:<line>`: the line in the app that called `log.error`. The logger adds it, so do not pass `at` in the fields. `DEBUG`, `INFO` and `WARNING` lines do not have it. When an error object is logged, its stack frames name the line that threw:
+
+```text
+2026-11-02T14:05:12.337Z ERROR   api rid=8c41d7a2e9f0 path=/api/UIUC-api/getSimWorkflows course=ece120 project metadata store unavailable at=src/utils/server/routeContext.ts:28
+MetadataUnavailableError: could not read the metadata of project ece120
+    at src/server/authorization.ts:51:11
+    at src/server/authorization.ts:398:32
+    at src/utils/server/routeContext.ts:54:7
+    ...
+Caused by: Error: connect ECONNREFUSED 172.18.0.5:6379
+```
+
+The file and line are those of the source file, in `next dev` and in a production build. A production build is minified, so the logger reads the source maps that the build writes beside the server chunks (`experimental.serverSourceMaps` in `apps/frontend/next.config.mjs`) and rewrites each frame of the app as `at <file>:<line>:<column>`, without the function name. Frames of Node and of packages in `node_modules` stay as they are. Without the source maps, the frames and `at=` point into `.next/server/chunks/` instead. The maps are for the server only; the browser cannot fetch them.
 
 `log.debug`, `log.info`, `log.warn` and `log.error` write `DEBUG`, `INFO`, `WARNING` and `ERROR`. The level names mean the same as for Python (see "Levels" above). `LOG_LEVEL` sets the lowest level that is written; it is read on every call. A missing value means `INFO`. An unknown value also means `INFO`, and the logger writes one warning line (`unknown LOG_LEVEL=<value>, using INFO`). `CRITICAL` means errors only, because there is no `CRITICAL` writer. Every event is one `console` call with one string (`console.log` for `DEBUG` and `INFO`, `console.warn`, `console.error`), so a test can spy on `console.error`.
 

@@ -168,12 +168,12 @@ describe('UIUC-api/getAllCourseMetadata', () => {
 
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*error fetching the projects of a user\nError: redis down/,
+        /ERROR .*error fetching the projects of a user at=\S+:\d+\nError: redis down/,
       ),
     )
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*error fetching all course metadata\nError: redis down/,
+        /ERROR .*error fetching all course metadata at=\S+:\d+\nError: redis down/,
       ),
     )
     consoleError.mockRestore()

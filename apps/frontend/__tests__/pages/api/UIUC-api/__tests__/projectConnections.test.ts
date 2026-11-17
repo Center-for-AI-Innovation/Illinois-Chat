@@ -323,7 +323,7 @@ describe('projectConnections handler — failures', () => {
     expect(auditEntries[0]).toMatchObject({ outcome: 'failure' })
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*project connection upsert failed course=demo kind=s3\nError: upsert failed/,
+        /ERROR .*project connection upsert failed course=demo kind=s3 at=\S+:\d+\nError: upsert failed/,
       ),
     )
     consoleError.mockRestore()
@@ -346,7 +346,7 @@ describe('projectConnections handler — failures', () => {
     expect(res.statusCode).toBe(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*project connection delete failed course=demo\nError: delete failed/,
+        /ERROR .*project connection delete failed course=demo at=\S+:\d+\nError: delete failed/,
       ),
     )
     consoleError.mockRestore()
@@ -369,7 +369,7 @@ describe('projectConnections handler — failures', () => {
     expect(res.statusCode).toBe(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*project connections handler error method=GET\nError: select failed/,
+        /ERROR .*project connections handler error method=GET at=\S+:\d+\nError: select failed/,
       ),
     )
     consoleError.mockRestore()

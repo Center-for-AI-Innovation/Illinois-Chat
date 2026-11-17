@@ -50,7 +50,7 @@ describe('runPagesRoute', () => {
     )
     expect(error).toHaveBeenCalledTimes(1)
     expect(error.mock.calls[0]![0]).toMatch(
-      / ERROR   api rid=\S+ path=\/api\/boom unhandled error in API route\nError: kaput\n/,
+      / ERROR   api rid=\S+ path=\/api\/boom unhandled error in API route at=\S+:\d+\nError: kaput\n/,
     )
   })
 
@@ -65,7 +65,7 @@ describe('runPagesRoute', () => {
       expect.objectContaining({ error: 'Project metadata store unavailable' }),
     )
     expect(error.mock.calls[0]![0]).toMatch(
-      /project metadata store unavailable\nMetadataUnavailableError: .*ece120/,
+      /project metadata store unavailable at=\S+:\d+\nMetadataUnavailableError: .*ece120/,
     )
     expect(error.mock.calls[0]![0]).toContain('Caused by: Error: ECONNREFUSED')
   })
@@ -155,7 +155,7 @@ describe('runAppRoute', () => {
       error: 'Internal server error',
     })
     expect(error.mock.calls[0]![0]).toMatch(
-      / ERROR   api rid=r9 path=\/api\/chat unhandled error in API route\nError: kaput/,
+      / ERROR   api rid=r9 path=\/api\/chat unhandled error in API route at=\S+:\d+\nError: kaput/,
     )
   })
 

@@ -229,7 +229,7 @@ describe('UIUC-api chat-file-upload', () => {
     expect(res.status).toHaveBeenCalledWith(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*failed to create file_uploads record conversation=c1 file=file\.txt\nError: insert failed/,
+        /ERROR .*failed to create file_uploads record conversation=c1 file=file\.txt at=\S+:\d+\nError: insert failed/,
       ),
     )
     consoleError.mockRestore()
@@ -270,7 +270,7 @@ describe('UIUC-api chat-file-upload', () => {
     expect(res.status).toHaveBeenCalledWith(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*chat file upload failed\nError: db unavailable/,
+        /ERROR .*chat file upload failed at=\S+:\d+\nError: db unavailable/,
       ),
     )
     consoleError.mockRestore()

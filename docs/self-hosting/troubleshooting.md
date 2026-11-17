@@ -27,6 +27,7 @@ Every line has the same shape: the time in UTC, the level, the part of the code 
 - `job=` is the ingest job and `course=` the chatbot's project name. A field that is not known is left out.
 - `path=` is on frontend lines only: the API route that was called.
 - A failure is logged at `ERROR`. The line says what failed and why; when there is a traceback, it follows on the next lines.
+- A frontend `ERROR` line ends with `at=<file>:<line>`, the line of the frontend code that reported the failure. The lines that follow name the file and line where the error started.
 
 The web crawler's lines look a little different. The time has a space instead of `T` and no `Z`, the level names are short (`WARN` instead of `WARNING`), and the ids come first, followed by `:`:
 
@@ -101,9 +102,9 @@ What each level means is on [Logging](../contributing/logging.md).
 **Project settings cannot be loaded: API calls answer 503 "Project metadata store unavailable".** The frontend cannot read the project settings from Redis: Redis is down, or `REDIS_URL` does not reach it. Pages of the project then do not load. The frontend log has one `ERROR` line for each failed request, with the Redis error under `Caused by:`:
 
 ```text
-2026-11-02T14:05:12.337Z ERROR   api rid=8c41d7a2e9f0 path=/api/UIUC-api/ingest course=ece120 project metadata store unavailable
+2026-11-02T14:05:12.337Z ERROR   api rid=8c41d7a2e9f0 path=/api/UIUC-api/ingest course=ece120 project metadata store unavailable at=src/utils/server/routeContext.ts:28
 MetadataUnavailableError: could not read the metadata of project ece120
-    at getCourseMetadata (...)
+    at src/server/authorization.ts:51:11
     ...
 Caused by: Error: connect ECONNREFUSED 172.18.0.5:6379
 ```

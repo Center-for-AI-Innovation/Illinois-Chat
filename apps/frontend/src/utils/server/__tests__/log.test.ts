@@ -1,5 +1,8 @@
 /* @vitest-environment node */
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getLogger } from '../log'
 import { runWithLogContext } from '../requestContext'
@@ -90,7 +93,7 @@ describe('getLogger', () => {
     expect(c.warn).toHaveBeenCalledTimes(1)
     expect(c.warn.mock.calls[0]![0]).toMatch(/ WARNING s w$/)
     expect(c.error).toHaveBeenCalledTimes(1)
-    expect(c.error.mock.calls[0]![0]).toMatch(/ ERROR   s e$/)
+    expect(c.error.mock.calls[0]![0]).toMatch(/ ERROR   s e at=\S+:\d+$/)
   })
 
   it('drops DEBUG at the default level and honours higher thresholds', () => {
@@ -149,7 +152,9 @@ describe('getLogger', () => {
     getLogger('api').error('handler failed', { status: 500 }, err)
     expect(c.error).toHaveBeenCalledTimes(1)
     const lines = (c.error.mock.calls[0]![0] as string).split('\n')
-    expect(lines[0]).toMatch(/ ERROR   api handler failed status=500$/)
+    expect(lines[0]).toMatch(
+      / ERROR   api handler failed status=500 at=\S+:\d+$/,
+    )
     expect(lines[1]).toBe('TypeError: bad input')
     expect(lines.length).toBeGreaterThan(2)
     for (const frame of lines.slice(2)) expect(frame).toMatch(/^\s+at /)
@@ -159,7 +164,7 @@ describe('getLogger', () => {
     const c = spies()
     getLogger('api').error('failed', new Error('boom'))
     const lines = (c.error.mock.calls[0]![0] as string).split('\n')
-    expect(lines[0]).toMatch(/ ERROR   api failed$/)
+    expect(lines[0]).toMatch(/ ERROR   api failed at=\S+:\d+$/)
     expect(lines[1]).toBe('Error: boom')
   })
 
@@ -207,18 +212,80 @@ describe('getLogger', () => {
     const c = spies()
     getLogger('s').error('x', undefined, 'plain string')
     getLogger('s').error('y', undefined, { code: 7 })
-    expect(c.error.mock.calls[0]![0]).toMatch(/ x\nplain string$/)
-    expect(c.error.mock.calls[1]![0]).toMatch(/ y\n\{"code":7\}$/)
+    expect(c.error.mock.calls[0]![0]).toMatch(/ x at=\S+:\d+\nplain string$/)
+    expect(c.error.mock.calls[1]![0]).toMatch(/ y at=\S+:\d+\n\{"code":7\}$/)
   })
+
+  it('ends an ERROR line with the file and line that called log.error', () => {
+    process.env.LOG_LEVEL = 'debug'
+    const c = spies()
+    const log = getLogger('s')
+    log.error('e', { file: 'a.pdf' })
+    log.warn('w')
+    log.info('i')
+    expect(c.error.mock.calls[0]![0]).toMatch(
+      / ERROR   s e file=a\.pdf at=src\/utils\/server\/__tests__\/log\.test\.ts:\d+$/,
+    )
+    expect(c.warn.mock.calls[0]![0]).not.toContain(' at=')
+    expect(c.log.mock.calls[0]![0]).not.toContain(' at=')
+  })
+
+  // The logger reads a source map through process.getBuiltinModule, which
+  // older Node versions do not have; there the frames stay as they are.
+  it.skipIf(typeof process.getBuiltinModule !== 'function')(
+    'rewrites a frame of a built chunk to the source file and line',
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), 'log-test-'))
+      try {
+        const chunk = join(dir, 'chunk.js')
+        // One mapping: line 1, column 1 of the chunk is line 11, column 3 of
+        // the source file.
+        writeFileSync(
+          `${chunk}.map`,
+          JSON.stringify({
+            version: 3,
+            sources: ['webpack://app/./src/pages/api/demo.ts'],
+            names: [],
+            mappings: 'AAUE',
+          }),
+        )
+        const err = new Error('boom')
+        err.stack = [
+          'Error: boom',
+          `    at m (${chunk}:1:5)`,
+          `    at async ${join(dir, 'no-map.js')}:1:9`,
+          '    at async run (/app/node_modules/next/dist/server/next-server.js:700:9)',
+          '    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)',
+        ].join('\n')
+
+        const c = spies()
+        getLogger('api').error('failed', err)
+        const lines = (c.error.mock.calls[0]![0] as string).split('\n')
+        expect(lines.slice(1)).toEqual([
+          'Error: boom',
+          '    at src/pages/api/demo.ts:11:3',
+          `    at async ${join(dir, 'no-map.js')}:1:9`,
+          '    at async run (/app/node_modules/next/dist/server/next-server.js:700:9)',
+          '    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)',
+        ])
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
 
   it('works without a process object (browser)', () => {
     const c = spies()
     vi.stubGlobal('process', undefined)
     try {
       getLogger('s').info('in browser')
+      getLogger('s').error('failed in browser', new Error('boom'))
     } finally {
       vi.unstubAllGlobals()
     }
     expect(c.log.mock.calls[0]![0]).toMatch(/ INFO    s in browser$/)
+    expect(c.error.mock.calls[0]![0]).toMatch(
+      / ERROR   s failed in browser at=\S+:\d+\nError: boom\n/,
+    )
   })
 })

@@ -6,7 +6,9 @@
 //
 // rid, path and course come from the request context (requestContext.ts) when
 // one is open. An error is appended as "Name: message" plus its stack frames on
-// the following lines. Each event is exactly one console call with one string.
+// the following lines. An ERROR line ends with at=<file>:<line>, the place in
+// the app that called log.error. Each event is exactly one console call with
+// one string.
 //
 // Server-only by convention; harmless in the browser, where there is no
 // request context and the line is just a timestamped console message.
@@ -96,9 +98,116 @@ function formatError(err: unknown): string {
   const frames = (err.stack ?? '')
     .split('\n')
     .filter((line) => /^\s+at /.test(line))
+    .map(formatFrame)
   let text = [`${err.name}: ${errorMessage(err)}`, ...frames].join('\n')
   if (err.cause !== undefined) text += `\nCaused by: ${formatError(err.cause)}`
   return text
+}
+
+type SourceMapLike = {
+  findEntry(
+    line: number,
+    column: number,
+  ): { originalSource?: string; originalLine?: number; originalColumn?: number }
+}
+
+// One of Node's own modules, without an import: this file is also bundled for
+// the browser, where the module does not exist and the answer is undefined.
+function builtin<T>(name: string): T | undefined {
+  try {
+    const proc = process as { getBuiltinModule?: (id: string) => unknown }
+    return typeof proc.getBuiltinModule === 'function'
+      ? (proc.getBuiltinModule(name) as T)
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const sourceMaps = new Map<string, { mtimeMs: number; map: SourceMapLike }>()
+
+// The source map that the build wrote beside a server chunk (<chunk>.js.map,
+// from experimental.serverSourceMaps in next.config.mjs). Next.js leaves
+// err.stack unmapped, so the logger reads the map itself. A parsed map is kept
+// until its file changes.
+function sourceMapFor(file: string): SourceMapLike | undefined {
+  const fs = builtin<typeof import('node:fs')>('node:fs')
+  const mod = builtin<typeof import('node:module')>('node:module')
+  if (!fs || !mod?.SourceMap) return undefined
+  try {
+    const mapFile = `${file}.map`
+    const { mtimeMs } = fs.statSync(mapFile)
+    const cached = sourceMaps.get(file)
+    if (cached?.mtimeMs === mtimeMs) return cached.map
+    const map: SourceMapLike = new mod.SourceMap(
+      JSON.parse(fs.readFileSync(mapFile, 'utf8')),
+    )
+    sourceMaps.set(file, { mtimeMs, map })
+    return map
+  } catch {
+    return undefined
+  }
+}
+
+// "webpack://app/./src/pages/api/ingest.ts" and "/app/src/pages/api/ingest.ts"
+// both become "src/pages/api/ingest.ts". A path in node_modules stays whole.
+function tidyFile(file: string): string {
+  const path = file.replace(/\\/g, '/')
+  if (path.includes('/node_modules/')) return path
+  const src = path.lastIndexOf('/src/')
+  return src >= 0 ? path.slice(src + 1) : path
+}
+
+interface FramePosition {
+  file: string
+  line: number
+  column: number
+  mapped: boolean
+}
+
+// The file, line and column of one stack frame. For a frame in a built server
+// chunk, the position in the source file when the chunk has a source map.
+function framePosition(frame: string): FramePosition | undefined {
+  const match = /([^\s()]+):(\d+):(\d+)\)?$/.exec(frame.trim())
+  if (!match) return undefined
+  const file = match[1]!.replace(/^file:\/\//, '')
+  const line = Number(match[2])
+  const column = Number(match[3])
+  if (file.endsWith('.js') && !file.includes('node_modules')) {
+    const entry = sourceMapFor(file)?.findEntry(line - 1, column - 1)
+    if (entry?.originalSource && entry.originalLine !== undefined) {
+      return {
+        file: tidyFile(entry.originalSource),
+        line: entry.originalLine + 1,
+        column: (entry.originalColumn ?? 0) + 1,
+        mapped: true,
+      }
+    }
+  }
+  return { file: tidyFile(file), line, column, mapped: false }
+}
+
+// A mapped frame is rewritten as "    at src/file.ts:line:column". The function
+// name is left out because the chunk only has the minified one.
+function formatFrame(frame: string): string {
+  const position = framePosition(frame)
+  return position?.mapped
+    ? `    at ${position.file}:${position.line}:${position.column}`
+    : frame
+}
+
+// Where the caller of `below` is in the app. captureStackTrace leaves out
+// `below` and everything above it, so the first frame is the caller even when
+// the logger and the caller are in one minified chunk.
+function callSite(below: (...args: never[]) => unknown): string | undefined {
+  if (typeof Error.captureStackTrace !== 'function') return undefined
+  const holder: { stack?: string } = {}
+  Error.captureStackTrace(holder, below)
+  const frame = (holder.stack ?? '')
+    .split('\n')
+    .find((line) => /^\s+at /.test(line))
+  const position = frame ? framePosition(frame) : undefined
+  return position ? `${position.file}:${position.line}` : undefined
 }
 
 export function formatLine(
@@ -138,18 +247,25 @@ const WRITERS: Record<Level, (line: string) => void> = {
 }
 
 export function getLogger(scope: string): Logger {
-  const emit =
-    (level: Level) =>
-    (message: string, fields?: LogFields | Error, err?: unknown): void => {
+  const emit = (level: Level) =>
+    function write(
+      message: string,
+      fields?: LogFields | Error,
+      err?: unknown,
+    ): void {
       if (LEVEL_RANK[level]! < threshold()) return
       // Allow log.error('failed', err) as a shorthand for (message, undefined, err).
       if (fields instanceof Error && err === undefined) {
         err = fields
         fields = undefined
       }
-      WRITERS[level](
-        formatLine(level, scope, message, fields as LogFields | undefined, err),
-      )
+      let pairs = fields as LogFields | undefined
+      if (level === 'ERROR') {
+        // Only for errors: reading a stack is too slow for every line.
+        const at = callSite(write)
+        if (at) pairs = { ...pairs, at }
+      }
+      WRITERS[level](formatLine(level, scope, message, pairs, err))
     }
   return {
     debug: emit('DEBUG'),

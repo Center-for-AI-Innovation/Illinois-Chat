@@ -168,7 +168,7 @@ describe('UIUC-api/logConversation', () => {
     })
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*could not save the conversation to the database conversation=c1\nError: db down/,
+        /ERROR .*could not save the conversation to the database conversation=c1 at=\S+:\d+\nError: db down/,
       ),
     )
     fetchSpy.mockRestore()

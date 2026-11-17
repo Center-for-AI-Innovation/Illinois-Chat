@@ -152,7 +152,7 @@ describe('app/api authorization helpers', () => {
       error: 'Project metadata store unavailable',
     })
     expect(error.mock.calls[0]![0]).toMatch(
-      / ERROR   api rid=abc123 path=\/api\/chat course=CS101 project metadata store unavailable\n/,
+      / ERROR   api rid=abc123 path=\/api\/chat course=CS101 project metadata store unavailable at=\S+:\d+\n/,
     )
   })
 

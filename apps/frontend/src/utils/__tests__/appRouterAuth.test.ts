@@ -171,7 +171,7 @@ describe('withAppRouterAuth request context', () => {
     expect(error).toHaveBeenCalledTimes(1)
     const line = error.mock.calls[0]![0] as string
     expect(line).toMatch(
-      / ERROR   api rid=\S+ path=\/api\/chat\/openai unhandled error in API route\nError: handler bug\n/,
+      / ERROR   api rid=\S+ path=\/api\/chat\/openai unhandled error in API route at=\S+:\d+\nError: handler bug\n/,
     )
     expect(line).not.toContain('JWT')
   })

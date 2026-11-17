@@ -213,7 +213,7 @@ describe('authorization helpers', () => {
     )
     expect(error).toHaveBeenCalledTimes(1)
     expect(error.mock.calls[0]![0]).toMatch(
-      / ERROR   api rid=abc123 path=\/api\/UIUC-api\/getCourseMetadata course=CS101 project metadata store unavailable\n/,
+      / ERROR   api rid=abc123 path=\/api\/UIUC-api\/getCourseMetadata course=CS101 project metadata store unavailable at=\S+:\d+\n/,
     )
   })
 

@@ -86,7 +86,7 @@ describe('UIUC-api/deleteDocument', () => {
     expect(res.status).toHaveBeenCalledWith(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*error deleting document s3_path=courses\/CS101\/a\.pdf\nError: connect ECONNREFUSED/,
+        /ERROR .*error deleting document s3_path=courses\/CS101\/a\.pdf at=\S+:\d+\nError: connect ECONNREFUSED/,
       ),
     )
     fetchSpy.mockRestore()

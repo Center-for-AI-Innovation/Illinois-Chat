@@ -118,7 +118,7 @@ describe('UIUC-api/ingest', () => {
     expect(res.status).toHaveBeenCalledWith(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*ingest submission failed file=u\.pdf\nError: connect ECONNREFUSED/,
+        /ERROR .*ingest submission failed file=u\.pdf at=\S+:\d+\nError: connect ECONNREFUSED/,
       ),
     )
     fetchSpy.mockRestore()

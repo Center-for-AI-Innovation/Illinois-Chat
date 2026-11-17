@@ -66,7 +66,7 @@ describe('backendFetch', () => {
     const line = error.mock.calls[0]![0] as string
     expect(line).toMatch(
       new RegExp(
-        ` ERROR   backendFetch backend 502 POST /canvas_ingest ms=\\d+ body=x{500}$`,
+        ` ERROR   backendFetch backend 502 POST /canvas_ingest ms=\\d+ body=x{500} at=\\S+:\\d+$`,
       ),
     )
     expect(line).not.toContain('secret')
@@ -83,7 +83,7 @@ describe('backendFetch', () => {
     const res = await backendFetch('not a url?q=1')
     expect(res).toBe(broken)
     expect(error.mock.calls[0]![0]).toMatch(
-      / backend 500 GET not a url ms=\d+ body=<unreadable: stream gone>$/,
+      / backend 500 GET not a url ms=\d+ body=<unreadable: stream gone> at=\S+:\d+$/,
     )
 
     fetchMock.mockResolvedValue({
@@ -92,7 +92,9 @@ describe('backendFetch', () => {
       clone: () => ({ text: () => Promise.reject('nope') }),
     })
     await backendFetch('http://backend/x')
-    expect(error.mock.calls[1]![0]).toMatch(/body=<unreadable: nope>$/)
+    expect(error.mock.calls[1]![0]).toMatch(
+      /body=<unreadable: nope> at=\S+:\d+$/,
+    )
   })
 
   it('forwards the context request id on plain-object headers', async () => {

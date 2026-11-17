@@ -145,7 +145,7 @@ describe('projectConnections/active handler', () => {
     expect(auditEntries[0]).toMatchObject({ outcome: 'failure' })
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*setting the active project connection failed course=demo\nError: db down/,
+        /ERROR .*setting the active project connection failed course=demo at=\S+:\d+\nError: db down/,
       ),
     )
     consoleError.mockRestore()

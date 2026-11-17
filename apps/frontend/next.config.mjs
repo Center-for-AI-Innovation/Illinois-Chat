@@ -96,6 +96,14 @@ const config = {
   typescript: {
     tsconfigPath: 'tsconfig.build.json',
   },
+  // Write source maps beside the server chunks. The server logger
+  // (src/utils/server/log.ts) reads them, so the stack frames and the at=
+  // field of an ERROR line name the source file and line, not a position in a
+  // minified chunk. The maps stay in .next/server and are never served to the
+  // browser.
+  experimental: {
+    serverSourceMaps: true,
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

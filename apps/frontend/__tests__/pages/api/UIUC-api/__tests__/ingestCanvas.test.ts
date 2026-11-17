@@ -120,7 +120,7 @@ describe('UIUC-api/ingestCanvas', () => {
     expect(res.status).toHaveBeenCalledWith(500)
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*Canvas ingest submission failed canvas_url=http:\/\/canvas\nError: connect ECONNREFUSED/,
+        /ERROR .*Canvas ingest submission failed canvas_url=http:\/\/canvas at=\S+:\d+\nError: connect ECONNREFUSED/,
       ),
     )
     fetchSpy.mockRestore()

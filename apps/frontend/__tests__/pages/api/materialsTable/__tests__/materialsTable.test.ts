@@ -804,7 +804,7 @@ describe('materialsTable API handlers', () => {
 
     expect(consoleError).toHaveBeenCalledWith(
       expect.stringMatching(
-        /ERROR .*failed to fetch project materials\n.*boom/,
+        /ERROR .*failed to fetch project materials at=\S+:\d+\n.*boom/,
       ),
     )
     expect(hoisted.posthogCapture).not.toHaveBeenCalled()
