@@ -9,14 +9,15 @@ import {
 import { IconAlertTriangleFilled } from '@tabler/icons-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { XIcon } from 'lucide-react'
+import { CountryOfConcernNotice } from '../CountryOfConcern'
 
 interface CountryOfConcernModalProps {
-  opened: boolean
+  // Open while a flagged model is pending confirmation.
+  modelName: string | null
   onClose: () => void
   onConfirm: () => void
   title: string
   confirmLabel: string
-  children: React.ReactNode
 }
 
 /**
@@ -29,15 +30,17 @@ interface CountryOfConcernModalProps {
  * --dashboard-button pair.
  */
 export function CountryOfConcernModal({
-  opened,
+  modelName,
   onClose,
   onConfirm,
   title,
   confirmLabel,
-  children,
 }: CountryOfConcernModalProps) {
   return (
-    <Dialog open={opened} onOpenChange={(next) => !next && onClose()}>
+    <Dialog
+      open={modelName !== null}
+      onOpenChange={(next) => !next && onClose()}
+    >
       <DialogContent
         showCloseButton={false}
         className="gap-0 rounded-md border border-(--modal-border) bg-(--modal) p-0 text-(--modal-text)"
@@ -71,7 +74,9 @@ export function CountryOfConcernModal({
               className={`text-sm ${montserrat_paragraph.variable} font-montserratParagraph`}
               style={{ lineHeight: 1.5, color: 'var(--modal-text)' }}
             >
-              {children}
+              <CountryOfConcernNotice /> Please confirm that using{' '}
+              <strong>{modelName}</strong> is consistent with your
+              institution&apos;s policy.
             </p>
           </div>
 

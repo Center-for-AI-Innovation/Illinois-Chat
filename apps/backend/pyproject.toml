@@ -26,6 +26,7 @@ dependencies = [
   "sentry-sdk==2.21.0",
   "canvasapi==3.2.0",
   "yt-dlp==2024.7.16",
+  "brotli>=1.2.1",  # CVE-2026-111497; yt-dlp pulls brotli in unpinned
   "beautifulsoup4==4.12.2",
   # File parsing used by retrieval_service (chat uploads) and ingest.py.
   "PyMuPDF==1.23.6",
