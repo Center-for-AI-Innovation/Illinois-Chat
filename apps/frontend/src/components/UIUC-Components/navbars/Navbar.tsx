@@ -25,7 +25,20 @@ import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { AuthMenu } from './AuthMenu'
 import { NavbarBrandLink } from './NavbarBrand'
 
+export type NavbarVariant = 'application' | 'splash'
+
+/**
+ * How an application navbar lines up with the page below it. `workspace` spans
+ * the full width, `sidebar` matches the settings sidebar's inset, and `page`
+ * matches a constrained content column.
+ */
+export type NavbarContentWidth = 'workspace' | 'sidebar' | 'page'
+
 interface NavbarProps {
+  /** `splash` aligns with the landing hero column instead of app pages. */
+  variant?: NavbarVariant
+  /** Only applies to the `application` variant. */
+  contentWidth?: NavbarContentWidth
   isPlain?: boolean
   /** Lets a sticky sub-bar directly below own the divider instead. */
   hideBorder?: boolean
@@ -62,6 +75,20 @@ const navbarVariants = cva(
   },
 )
 
+const navbarHeaderVariants = cva(
+  'mx-auto flex h-(--navbar-height) w-full items-center gap-2 lg:gap-4',
+  {
+    variants: {
+      layout: {
+        splash: 'max-w-5xl px-4 sm:px-8',
+        workspace: 'px-4 sm:px-8',
+        sidebar: 'px-4',
+        page: 'max-w-6xl px-4 sm:px-6 lg:px-8',
+      },
+    },
+  },
+)
+
 const GLOBAL_NAV_ITEMS: readonly NavItem[] = [
   {
     label: 'Docs',
@@ -86,6 +113,8 @@ function externalLinkProps(item: NavItem) {
 }
 
 export default function Navbar({
+  variant = 'application',
+  contentWidth = 'workspace',
   isPlain = false,
   hideBorder = false,
 }: NavbarProps) {
@@ -110,10 +139,15 @@ export default function Navbar({
       ? [...GLOBAL_NAV_ITEMS, ADMIN_NAV_ITEM]
       : GLOBAL_NAV_ITEMS
   const activePath = router.asPath?.split('?')[0]
+  const layout = variant === 'splash' ? 'splash' : contentWidth
 
   return (
     <div className={navbarVariants({ bordered: !hideBorder })}>
-      <header className="mx-auto flex h-(--navbar-height) w-full max-w-[1680px] items-center gap-2 px-4 sm:px-8 lg:gap-4">
+      <header
+        data-variant={variant}
+        data-layout={layout}
+        className={navbarHeaderVariants({ layout })}
+      >
         <NavbarBrandLink />
 
         <div className="flex-1" />

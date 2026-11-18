@@ -148,4 +148,110 @@ describe('Navbar', () => {
 
     expect(screen.queryByText('AuthMenu')).not.toBeInTheDocument()
   })
+
+  it('defaults to the application layout spanning the workspace', async () => {
+    superAdminIs(false)
+    await renderNavbar()
+
+    expect(screen.getByRole('banner')).toHaveAttribute(
+      'data-variant',
+      'application',
+    )
+    expect(screen.getByRole('banner')).toHaveAttribute(
+      'data-layout',
+      'workspace',
+    )
+  })
+
+  it('aligns the splash variant with the hero column', async () => {
+    superAdminIs(false)
+    await renderNavbar({ variant: 'splash' })
+
+    expect(screen.getByRole('banner')).toHaveAttribute('data-variant', 'splash')
+    expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'splash')
+  })
+
+  it.each([
+    { contentWidth: 'page', layout: 'page' },
+    { contentWidth: 'sidebar', layout: 'sidebar' },
+  ] as const)(
+    'aligns application pages to the $contentWidth content width',
+    async ({ contentWidth, layout }) => {
+      superAdminIs(false)
+      await renderNavbar({ contentWidth })
+
+      expect(screen.getByRole('banner')).toHaveAttribute(
+        'data-variant',
+        'application',
+      )
+      expect(screen.getByRole('banner')).toHaveAttribute('data-layout', layout)
+    },
+  )
+
+  it('ignores contentWidth for the splash variant', async () => {
+    superAdminIs(false)
+    await renderNavbar({ variant: 'splash', contentWidth: 'page' })
+
+    expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'splash')
+  })
+
+  describe.each([
+    { name: 'application', props: {} },
+    { name: 'splash', props: { variant: 'splash' as const } },
+    { name: 'admin page', props: { contentWidth: 'page' as const } },
+  ])('shared behavior in the $name layout', ({ props }) => {
+    it('links the configured brand home', async () => {
+      brandingResponds({
+        primaryWord: 'OSC',
+        secondaryWord: 'Chat',
+        logoUrl: null,
+      })
+      superAdminIs(false)
+      await renderNavbar(props)
+
+      expect(
+        await screen.findByRole('link', { name: 'OSC Chat home' }),
+      ).toHaveAttribute('href', '/')
+    })
+
+    it('shows the same global links to every user', async () => {
+      superAdminIs(false)
+      await renderNavbar(props)
+
+      const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+      expect(
+        within(nav).getByRole('link', { name: /My Chatbots/ }),
+      ).toHaveAttribute('href', '/chatbots')
+      expect(
+        within(nav).getByRole('link', { name: /Create Your Own Bot/ }),
+      ).toHaveAttribute('href', '/new')
+      expect(
+        within(nav).queryByRole('link', { name: /Admin/ }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('adds the Admin link only for server-confirmed super admins', async () => {
+      superAdminIs(true)
+      await renderNavbar(props)
+
+      const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+      expect(
+        await within(nav).findByRole('link', { name: /Admin/ }),
+      ).toHaveAttribute('href', '/admin')
+    })
+
+    it('keeps the mobile menu in step with the desktop links', async () => {
+      const user = userEvent.setup()
+      superAdminIs(true)
+      await renderNavbar(props)
+
+      await user.click(screen.getByRole('button', { name: 'Toggle Menu' }))
+
+      const menu = await screen.findByRole('menu')
+      expect(
+        await within(menu).findByRole('menuitem', { name: /Admin/ }),
+      ).toHaveAttribute('href', '/admin')
+      expect(within(menu).getAllByRole('menuitem')).toHaveLength(4)
+    })
+  })
 })

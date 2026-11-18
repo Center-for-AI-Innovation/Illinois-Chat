@@ -191,7 +191,7 @@ const Home: NextPage<HomeProps> = () => {
         </style>
       </Head>
 
-      <Navbar />
+      <Navbar variant="splash" />
 
       <main
         id="main-content"

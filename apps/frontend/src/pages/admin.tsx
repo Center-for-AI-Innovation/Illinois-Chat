@@ -99,7 +99,7 @@ export default function AdminPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
-      <Navbar />
+      <Navbar contentWidth="page" />
 
       <main
         id="main-content"
