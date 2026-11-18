@@ -15,6 +15,27 @@ const redisState = vi.hoisted(() => {
     hDel: vi.fn(async (_hash: string, field: string) => {
       store.delete(field)
     }),
+    // Stands in for the Lua compare-and-set script. The real script is checked
+    // against a live Redis in the verification notes, not here.
+    eval: vi.fn(
+      async (
+        _script: string,
+        opts: { keys: string[]; arguments: string[] },
+      ) => {
+        const [field, absentFlag, expected, next] = opts.arguments as [
+          string,
+          string,
+          string,
+          string,
+        ]
+        const current = store.get(field)
+        const matches =
+          absentFlag === '1' ? current === undefined : current === expected
+        if (!matches) return 0
+        store.set(field, next)
+        return 1
+      },
+    ),
   }
 })
 
@@ -32,6 +53,7 @@ vi.mock('~/utils/redisClient', () => ({
     hGet: redisState.hGet,
     hSet: redisState.hSet,
     hDel: redisState.hDel,
+    eval: redisState.eval,
   })),
 }))
 
@@ -145,6 +167,81 @@ describe('writeCourseMetadata', () => {
     expect(dbState.insertFn).toHaveBeenCalledTimes(1)
     expect(redisState.hSet).toHaveBeenCalledTimes(1)
     expect(redisState.store.get('bot-a')).toBeDefined()
+  })
+
+  it('refuses a stale compare-and-set and keeps the concurrent Redis value', async () => {
+    const concurrent = JSON.stringify(
+      makeMetadata({ project_description: 'edited' }),
+    )
+    redisState.store.set('bot-c', concurrent)
+    const { writeCourseMetadata, CourseMetadataWriteError } =
+      await import('../courseMetadataStore')
+    const stale = JSON.stringify(
+      makeMetadata({ project_description: 'original' }),
+    )
+
+    const attempt = writeCourseMetadata('bot-c', makeMetadata(), {
+      expectedPriorRedisValue: stale,
+    })
+    await expect(attempt).rejects.toMatchObject({ stage: 'conflict' })
+    await expect(attempt).rejects.toThrow(CourseMetadataWriteError)
+    expect(redisState.store.get('bot-c')).toBe(concurrent)
+    // Postgres follows the current Redis value, not the caller's snapshot.
+    const lastUpsert = dbState.insertFn.mock.calls.at(-1)![1]
+    expect(lastUpsert.project_description).toBe('edited')
+  })
+
+  it('does not let a concurrent Redis write that lands mid-flight be overwritten', async () => {
+    const { writeCourseMetadata, CourseMetadataWriteError } =
+      await import('../courseMetadataStore')
+    const original = JSON.stringify(makeMetadata({ project_description: 'v1' }))
+    const concurrent = JSON.stringify(
+      makeMetadata({ project_description: 'v2-concurrent' }),
+    )
+    redisState.store.set('bot-g', original)
+    // Lands after our Postgres step and before our Redis compare-and-set.
+    dbState.insertFn.mockImplementationOnce(() => {
+      redisState.store.set('bot-g', concurrent)
+    })
+
+    await expect(
+      writeCourseMetadata('bot-g', makeMetadata({ is_frozen: true }), {
+        expectedPriorRedisValue: original,
+      }),
+    ).rejects.toThrow(CourseMetadataWriteError)
+    expect(redisState.store.get('bot-g')).toBe(concurrent)
+    expect(dbState.insertFn.mock.calls.at(-1)![1].project_description).toBe(
+      'v2-concurrent',
+    )
+  })
+
+  it('writes when the stored value still matches, storing the value exactly as given', async () => {
+    const current = JSON.stringify(
+      makeMetadata({ project_description: 'same' }),
+    )
+    redisState.store.set('bot-d', current)
+    const { writeCourseMetadata, readCourseMetadataRaw } =
+      await import('../courseMetadataStore')
+
+    expect(await readCourseMetadataRaw('bot-d')).toBe(current)
+    const next = { ...makeMetadata({ is_frozen: true }) } as Record<
+      string,
+      unknown
+    >
+    delete next.tags
+    next.legacy_key = { kept: true }
+    await writeCourseMetadata('bot-d', next as unknown as CourseMetadata, {
+      expectedPriorRedisValue: current,
+    })
+    const stored = JSON.parse(redisState.store.get('bot-d')!)
+    expect(stored).toEqual(next)
+    expect('tags' in stored).toBe(false)
+  })
+
+  it('still normalizes tags on an ordinary write without an expected value', async () => {
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+    await writeCourseMetadata('bot-e', makeMetadata())
+    expect(JSON.parse(redisState.store.get('bot-e')!).tags).toEqual([])
   })
 
   it('does not touch Redis if Postgres write throws', async () => {

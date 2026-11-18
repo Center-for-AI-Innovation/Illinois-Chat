@@ -357,16 +357,19 @@ durable.
 All of these are pre-existing. The super-admin bypass deliberately does not
 change them.
 
-- **Freezing a project is a one-way door, for everyone.** Two independent
+- **A frozen project is blocked for everyone until a super admin recovers it.** Two independent
   mechanisms combine. The `is_frozen` 403 fires ahead of the access check in
   every middleware, and each metadata-write route (`setCourseMetadata`,
   `upsertCourseMetadata`, `setCoursePublicOrPrivate`) is wrapped in
-  `withCourseOwnerOrAdminAccess` — so once frozen, no API route can unfreeze
-  it, not even for the owner. Separately, the listing filters drop frozen
-  entries above the role check in `getAllCourseMetadata`, so a role-level
-  bypass does not surface them either. Net effect: a frozen project disappears
-  from every list and can only be recovered by editing Redis and Postgres by
-  hand.
+  `withCourseOwnerOrAdminAccess` — so no ordinary route can unfreeze it, not
+  even for the owner. Separately, the listing filters drop frozen entries above
+  the role check in `getAllCourseMetadata`, so a role-level bypass does not
+  surface them either. Net effect: a frozen project disappears from every list
+  until a super admin recovers it. The only exception is the super-admin route
+  `/api/admin/frozenProjects` (POST), used by the Frozen projects tab on
+  `/admin`. It is guarded inside the handler by `withSuperAdminOnly`, changes
+  only `is_frozen`, and writes an `unfreeze` row to `project_connection_audit_log`
+  before the change. Ordinary frozen-project denials are unaffected.
 - **Super admins do not receive export emails.** `export_service.py` builds its
   recipient list from `course_admins`, which no longer contains platform
   admins. It appends `course_owner` and dedupes, so no project is left without

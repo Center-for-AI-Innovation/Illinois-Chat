@@ -11,6 +11,7 @@ import {
   LogIn,
   ShieldAlert,
   ShieldCheck,
+  Snowflake,
   SlidersHorizontal,
   Users,
 } from 'lucide-react'
@@ -50,6 +51,7 @@ import {
   adminTabsListClass,
   adminTabsTriggerClass,
 } from '~/components/UIUC-Components/super-admin/AdminCard'
+import { FrozenProjectsCard } from '~/components/UIUC-Components/super-admin/FrozenProjectsCard'
 import { PlatformSettingsForm } from '~/components/UIUC-Components/super-admin/PlatformSettingsForm'
 import { ProjectConnectionsTable } from '~/components/UIUC-Components/super-admin/ProjectConnectionsTable'
 import { SuperAdminsCard } from '~/components/UIUC-Components/super-admin/SuperAdminsCard'
@@ -146,12 +148,15 @@ export default function AdminPage() {
               {/* Sticky so the tab bar stays reachable while scrolling a long
                   connections table. */}
               <div className="sticky top-[calc(var(--navbar-height)+var(--announcement-banner-height))] z-20 -mx-4 mb-6 border-b border-[#e5e7eb] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#32517a] dark:bg-[#081735]/95">
+                {/* Four tabs do not fit at 390px. The list scrolls inside
+                    itself rather than pushing the page wider. Each tab is a
+                    focusable button, so keyboard users can reach every one. */}
                 <TabsList
-                  className={`h-10! w-full sm:w-fit ${adminTabsListClass}`}
+                  className={`h-10! w-full max-w-full justify-start overflow-x-auto sm:w-fit ${adminTabsListClass}`}
                 >
                   <TabsTrigger
                     value="platform"
-                    className={`gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
+                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
                   >
                     <SlidersHorizontal aria-hidden="true" />
                     Platform
@@ -167,14 +172,21 @@ export default function AdminPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="connections"
-                    className={`gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
+                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
                   >
                     <Database aria-hidden="true" />
                     Connections
                   </TabsTrigger>
                   <TabsTrigger
+                    value="frozen"
+                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
+                  >
+                    <Snowflake aria-hidden="true" />
+                    Frozen projects
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="users"
-                    className={`gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
+                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
                   >
                     <Users aria-hidden="true" />
                     Users
@@ -191,6 +203,10 @@ export default function AdminPage() {
 
               <TabsContent value="connections" className="mt-0">
                 <ProjectConnectionsTable />
+              </TabsContent>
+
+              <TabsContent value="frozen" className="mt-0">
+                <FrozenProjectsCard />
               </TabsContent>
 
               <TabsContent value="users" className="mt-0">
