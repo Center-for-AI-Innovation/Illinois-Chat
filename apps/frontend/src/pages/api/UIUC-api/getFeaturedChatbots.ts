@@ -5,6 +5,7 @@ import type { ChatbotCardData } from '~/components/UIUC-Components/chatbots-hub/
 import { db, courseMetadata } from '~/db/dbClient'
 import { sql } from 'drizzle-orm'
 import { toChatbotCardData } from '~/utils/chatbotCard'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 /**
  * Returns the curated set of chatbots shown on the default `/chatbots` page.
@@ -28,6 +29,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Resolved once per request so every featured card gets the same admin-tier
+    // view. Super admins are not necessarily project members, so without this
+    // they would not see settings controls on cards they can open directly.
+    const isPlatformSuperAdmin = await isSuperAdminAsync(userEmail)
+
     // Public, non-frozen chatbots only. App admins will narrow this further
     // once the curation feature lands.
     const rows = await db
@@ -47,6 +53,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         row.course_name,
         row.raw_metadata as CourseMetadata,
         userEmail,
+        isPlatformSuperAdmin,
       ),
     )
 
