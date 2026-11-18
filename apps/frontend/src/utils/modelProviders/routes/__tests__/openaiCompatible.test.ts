@@ -18,25 +18,29 @@ import {
 } from '../../LLMProvider'
 
 describe('getOpenAICompatibleModels', () => {
-  it('discovers Lumen chat models and aliases with capabilities and saved preferences', async () => {
+  it('discovers unprefixed chat models and aliases with capabilities and saved preferences', async () => {
     const catalog = [
-      ['nemotron-3-super-120b-a12b', 262144, false],
-      ['gemma-4-31b-it', 46790, true],
-      ['ornith-1.0-35b', 262138, false],
-      ['deepseek-v4-flash', 511994, false],
-      ['muse-glimmer-30b', 131066, true],
-      ['glm-5.3', 524282, false],
-      ['glm', 524282, false],
-      ['deepseek-v4.1-flash', 1048570, true],
-      ['deepseek', 1048570, true],
-      ['deepseek-v4.1', 1048570, true],
-      ['beam-1.0', 524282, false],
+      ['nemotron-3-super-120b-a12b', 262144, false, true],
+      ['gemma-4-31b-it', 46790, true, true],
+      ['ornith-1.0-35b', 262138, false, true],
+      ['deepseek-v4-flash', 511994, false, true],
+      ['muse-glimmer-30b', 131066, true, true],
+      ['glm-5.3', 524282, false, true],
+      ['glm', 524282, false, true],
+      ['deepseek-v4.1-flash', 1048570, true, true],
+      ['deepseek', 1048570, true, true],
+      ['deepseek-v4.1', 1048570, true, true],
+      ['beam-1.0', 524282, false, true],
+      ['qwen3-coder-next', 131066, false, false],
+      ['qwen3.6-35b-a3b', 262138, false, true],
+      ['qwen3.8-27b', 250542, true, true],
+      ['qwen3.8-flash', 262138, true, false],
     ] as const
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           data: [
-            ...catalog.map(([id]) => ({ id, owned_by: 'lumen' })),
+            ...catalog.map(([id]) => ({ id })),
             { id: 'granite-speech-4.1-2b-plus', input_modalities: ['audio'] },
           ],
         }),
@@ -46,7 +50,7 @@ describe('getOpenAICompatibleModels', () => {
       provider: ProviderNames.OpenAICompatible,
       enabled: true,
       apiKey: 'test-key',
-      baseUrl: 'https://lumen.ncsa.illinois.edu/v1',
+      baseUrl: 'https://api.example.com/v1',
       models: [
         {
           id: 'gemma-4-31b-it',
@@ -67,7 +71,7 @@ describe('getOpenAICompatibleModels', () => {
     const result = await getOpenAICompatibleModels(provider)
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://lumen.ncsa.illinois.edu/v1/models',
+      'https://api.example.com/v1/models',
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: 'Bearer dec:test-key',
@@ -76,14 +80,14 @@ describe('getOpenAICompatibleModels', () => {
     )
     expect(result.error).toBeUndefined()
     expect(result.models).toHaveLength(catalog.length)
-    for (const [id, tokenLimit, vision] of catalog) {
+    for (const [id, tokenLimit, vision, reasoning] of catalog) {
       expect(result.models?.find((model) => model.id === id)).toMatchObject({
         id,
         tokenLimit,
-        name: expect.stringMatching(/^Lumen:/),
+        name: expect.not.stringMatching(/lumen/i),
       })
       expect(ReasoningCapableModels.has(id as OpenAICompatibleModelID)).toBe(
-        true,
+        reasoning,
       )
       expect(VisionCapableModels.has(id as OpenAICompatibleModelID)).toBe(
         vision,
@@ -96,6 +100,10 @@ describe('getOpenAICompatibleModels', () => {
       result.models?.find((model) => model.id === 'deepseek'),
     ).toMatchObject({ enabled: true, default: true })
     for (const id of [
+      'qwen3-coder-next',
+      'qwen3.6-35b-a3b',
+      'qwen3.8-27b',
+      'qwen3.8-flash',
       'glm',
       'glm-5.3',
       'deepseek-v4-flash',
@@ -112,45 +120,7 @@ describe('getOpenAICompatibleModels', () => {
     ).toBe(true)
   })
 
-  it('discovers additional Lumen Qwen models with their reported capabilities', async () => {
-    const catalog = [
-      ['qwen3-coder-next', 131066, false, false],
-      ['qwen3.6-35b-a3b', 262138, false, true],
-      ['qwen3.8-27b', 250542, true, true],
-      ['qwen3.8-flash', 262138, true, false],
-    ] as const
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: catalog.map(([id]) => ({ id })) })),
-    )
-    const provider: OpenAICompatibleProvider = {
-      provider: ProviderNames.OpenAICompatible,
-      enabled: true,
-      apiKey: 'test-key',
-      baseUrl: 'https://lumen.ncsa.illinois.edu/v1',
-      models: [],
-    }
-
-    const result = await getOpenAICompatibleModels(provider)
-
-    expect(result.error).toBeUndefined()
-    expect(result.models).toHaveLength(catalog.length)
-    for (const [id, tokenLimit, vision, reasoning] of catalog) {
-      expect(result.models?.find((model) => model.id === id)).toMatchObject({
-        id,
-        tokenLimit,
-        enabled: false,
-        name: expect.stringMatching(/^Lumen:/),
-      })
-      expect(VisionCapableModels.has(id as OpenAICompatibleModelID)).toBe(
-        vision,
-      )
-      expect(ReasoningCapableModels.has(id as OpenAICompatibleModelID)).toBe(
-        reasoning,
-      )
-    }
-  })
-
-  it('only offers Lumen models available to the key', async () => {
+  it('only offers unprefixed models available to the key', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ data: [{ id: 'gemma-4-31b-it' }] })),
     )
@@ -158,7 +128,7 @@ describe('getOpenAICompatibleModels', () => {
       provider: ProviderNames.OpenAICompatible,
       enabled: true,
       apiKey: 'test-key',
-      baseUrl: 'https://lumen.ncsa.illinois.edu/v1',
+      baseUrl: 'https://api.example.com/v1',
       models: [],
     }
 
