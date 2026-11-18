@@ -103,8 +103,12 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
     // Anything else (no access, expired credentials, no network) is not expected: say so.
     // The upload below is still tried, as before.
     const name = headErr instanceof Error ? headErr.name : '';
-    if (name !== 'NotFound') {
-      clog.warning(`Could not check S3 for an earlier copy key=${s3Key}: ${oneLine(headErr)}`);
+    const status = (headErr as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (name !== 'NotFound' && status !== 404) {
+      // S3 answers 403 for a key that does not exist when the role cannot list the bucket.
+      // That would be one line for every new PDF, so it is a DEBUG line.
+      const say = status === 403 ? clog.debug.bind(clog) : clog.warning.bind(clog);
+      say(`Could not check S3 for an earlier copy key=${s3Key}: ${oneLine(headErr)}`);
     }
   }
 

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { log, LogLevel } from 'crawlee';
 import { execFile } from 'node:child_process';
 import { callSite, crawlContext, CrawlerLogger, finishLine, hidePasswords, installProcessHandlers, oneLine } from './logSetup.js';
@@ -43,31 +44,42 @@ describe('hidePasswords', () => {
         assert.equal(hidePasswords('amqp://u:p"ss@h https://user:p<a>ss@h https://u:8443@h/x'), 'amqp://***@h https://***@h https://***@h/x');
     });
 
-    it('leaves a URL alone when other text with an @ follows it', () => {
-        for (const text of [
+    it('hides a login whose user name has an @ or punctuation in it', () => {
+        assert.equal(hidePasswords('https://bob@uni.edu:hunter2@site.edu/'), 'https://***@site.edu/');
+        assert.equal(hidePasswords('ftp://bob@uni.edu:s3cret@ftp.host.edu/'), 'ftp://***@ftp.host.edu/');
+        for (const url of ["https://o'brien:secret@host/", 'https://user,x:secret@host/', 'https://us;er:secret@host/', 'https://user&co:secret@host/', 'https://user(1):secret@host/', 'http://CORP\\svc:secret@host/', 'http://user:123,x@host/']) {
+            assert.equal(hidePasswords(url), `${url.slice(0, url.indexOf('://'))}://***@host/`);
+        }
+    });
+
+    it('leaves a URL alone when it ends at " ? # or & and other text with an @ follows', () => {
+        for (const line of [
             'https://site.edu/login?next=https://a.edu&email=bob@x.edu',
             'redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu',
-            'http://a.edu;bob@x.edu',
-            'http://a.edu|bob@x.edu',
-            'see (http://a.edu):bob@c.edu',
-            // The \n that the logger writes for a newline.
-            'http://a.edu\\nbob@x.edu',
-            'http://backend:8001\\nbob@c.edu',
-        ]) assert.equal(hidePasswords(text), text);
+            'https://a.edu?email=x@y.edu',
+            'https://a.edu:8443#x@y',
+            '{"url":"http://x.com:80","mail":"u@v.edu"}',
+            // A real newline ends a URL: the login is looked for before it is escaped.
+            'http://backend:8001\nbob@c.edu',
+        ]) assert.equal(hidePasswords(line), line);
+    });
+
+    it('takes away text between a URL and a later @ when it cannot tell that there is no login', () => {
+        // The price of never showing a password. No secret is in these lines.
+        assert.equal(hidePasswords('http://a.edu;bob@x.edu'), 'http://***@x.edu');
+        assert.equal(hidePasswords('see https://a.edu:8443,contact:bob@y.edu'), 'see https://***@y.edu');
+    });
+
+    it('hides a login that a cut ended before its @', () => {
+        assert.equal(hidePasswords('http://user:topsecr...[cut 20 characters]'), 'http://***...[cut 20 characters]');
+        assert.equal(hidePasswords('https://user:secr...[truncated]'), 'https://***...[truncated]');
+        assert.equal(hidePasswords('https://a.edu/long/pa...[truncated]'), 'https://a.edu/long/pa...[truncated]');
     });
 
     it('is fast on a long text with many URLs', () => {
         const started = Date.now();
         for (const text of ['://'.repeat(100_000), 'a://b:'.repeat(50_000), `://u:${'x'.repeat(300_000)}`]) hidePasswords(text);
         assert.ok(Date.now() - started < 500);
-    });
-
-    it('does not eat text after a URL that has a port and no path', () => {
-        const json = '{"url":"http://x.com:80","mail":"u@v.edu"}';
-        assert.equal(hidePasswords(json), json);
-        assert.equal(hidePasswords('https://example.edu:8443?next=a@b'), 'https://example.edu:8443?next=a@b');
-        assert.equal(hidePasswords('see https://a.edu:8443,contact:bob@y.edu'), 'see https://a.edu:8443,contact:bob@y.edu');
-        assert.equal(hidePasswords('https://a.edu:8443#x@y'), 'https://a.edu:8443#x@y');
     });
 });
 
@@ -197,6 +209,12 @@ describe('the logger', () => {
         assert.match(warnings[1], / WARN {2}\[object Object\]$/);
     });
 
+    it('escapes every escape sequence when colours are off, and all but the colour codes when they are on', () => {
+        const error = 'ERROR head\n  a \u001b[31mred\u001b[0m \u001b[8mhidden';
+        assert.equal(finishLine(error, true), 'ERROR head\n  a \\x1b[31mred\\x1b[0m \\x1b[8mhidden');
+        assert.equal(finishLine(`\u001b[31mERROR\u001b[39m head\n  a \u001b[31mred\u001b[0m \u001b[8mhidden`, true), '\u001b[31mERROR\u001b[39m head\n  a \u001b[31mred\u001b[0m \\x1b[8mhidden');
+    });
+
     it('escapes an escape sequence in the text of an error, so it cannot fake a stack line', () => {
         const errors = capture('error');
         log.exception(new Error('a\n\u001b[31m at 2026-11-03 00:00:00.000 ERROR FORGED\u001b[8mhidden\u009b31m\u202egnp'), 'crawl failed');
@@ -240,6 +258,26 @@ describe('the logger', () => {
         assert.match(warnings[1], / WARN {2}rid=abc123 course=ece120: no prefix$/);
         assert.match(warnings[2], / WARN {2}rid=abc123 course=ece120: own prefix$/);
         assert.match(warnings[3], / WARN {2}BrowserPool: outside a crawl$/);
+    });
+
+    it('hides a login before the cut takes its @ away', () => {
+        const infos = capture('log');
+        log.info(`${'x'.repeat(9_980)} http://user:topsecretpassword@host.edu/`);
+        assert.doesNotMatch(infos[0], /topsecr|user:/);
+        assert.match(infos[0], / http:\/\/\*\*\*\S*\.\.\.\[cut 1 characters\]$/);
+    });
+
+    it('keeps a backslash and an n that are real text before a frame', () => {
+        const warnings = capture('warn');
+        log.warning('C:\\temp\\n\n\n    at x (y.js:1:2)\nmore\n\nlast\n');
+        assert.deepEqual(warnings[0].split('\n').slice(0, 2).map((line) => line.replace(/^.* WARN {2}/, '')), ['C:\\temp\\n', '    at x (y.js:1:2)\\nmore\\n\\nlast\\n']);
+    });
+
+    it('writes a value that cannot be turned into text', () => {
+        assert.equal(oneLine({ toString: 1 }), '[a value that cannot be written]');
+        const warnings = capture('warn');
+        log.warning({ toString: 1 } as unknown as string);
+        assert.match(warnings[0], / WARN {2}\[a value that cannot be written\]$/);
     });
 
     it('cuts a very long message', () => {
@@ -288,7 +326,9 @@ describe('installProcessHandlers', () => {
     // The real thing, in a process of its own: the line is written and the exit code is 1.
     const runAndCrash = (code: string) => new Promise<{ code: number | null; stderr: string }>((resolve) => {
         const script = `const m = await import('./src/logSetup.ts'); m.installProcessHandlers(); ${code}`;
-        const child = execFile(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { env: { ...process.env, FORCE_COLOR: '0', LOG_LEVEL: 'INFO' } }, (_error, _stdout, stderr) => {
+        // cwd: the script imports ./src/logSetup.ts. timeout: a child that does not exit must not hang the tests.
+        const options = { cwd: fileURLToPath(new URL('..', import.meta.url)), timeout: 20_000, env: { ...process.env, FORCE_COLOR: '0', LOG_LEVEL: 'INFO' } };
+        const child = execFile(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], options, (_error, _stdout, stderr) => {
             resolve({ code: child.exitCode, stderr });
         });
     });

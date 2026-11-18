@@ -35,23 +35,38 @@ function escapeControlCharacter(found: string): string {
 
 // Keep a value on one line, so text from a request or a web page cannot start a fake log line.
 export function oneLine(value: unknown): string {
-    return String(value).replace(CONTROL_CHARACTERS, escapeControlCharacter);
+    return text(value).replace(CONTROL_CHARACTERS, escapeControlCharacter);
 }
 
-// The login part of a URL: "://user:secret@host", "://:secret@host" and "://token@host".
-// It must not reach the log. The same pattern as LOGIN_IN_URL in the frontend log.ts.
-// - The user name ends at a character that a user name does not have (" ' < > , ? # & ; ) | \),
-//   so "(http://a.edu):bob@c.edu" is left alone.
-// - The password runs to the last @ before the next / or space. It can hold any other
-//   character, so "p,ss", "p?ss" and "p@ss" are hidden as a whole.
-// - "host:8001" followed by one of those characters is a port, not a password, so
-//   {"url":"http://backend:8001","email":"a@b.edu"} is left alone. The cost: a password of
-//   1 to 5 digits that is followed by such a character ("user:123,x@host") is not hidden.
-// A login without "://" in front ("user:secret@host") is not found.
-const LOGIN_IN_URL = /:\/\/[^/\s:@"'<>,?#&;)|\\]*(?::(?!\d{1,5}(?:[/\s"'<>,?#&;)|\\]|$))[^/\s]*)?@/g;
+// String(value) throws for some values of a request body ({"toString": 1}).
+function text(value: unknown): string {
+    try {
+        return String(value);
+    } catch {
+        return '[a value that cannot be written]';
+    }
+}
 
-export function hidePasswords(text: string): string {
-    return text.replace(LOGIN_IN_URL, '://***@');
+// The login part of a URL: "://user:secret@host", "://:secret@host", "://token@host" and
+// "://user@realm:secret@host". It must not reach the log. The same pattern as LOGIN_IN_URL
+// in the frontend log.ts. The rule is made so that a password is never shown; the cost is
+// that it can take away text that is not a login.
+// - The login is everything from "://" to the last @ before the next / or space. A user
+//   name or a password can hold any other character.
+// - One case is left alone: a host with a dot or a port (or "localhost") that is directly
+//   followed by " ? # or &. A URL ends there and what follows is other text:
+//   {"url":"http://backend:8001","email":"a@b.edu"}, "https://a.edu?email=a@b.edu".
+// - So "http://a.edu,bob@c.edu" loses "a.edu,bob" (no password is shown), and a login whose
+//   user name looks like such a host and is followed by one of those four characters
+//   ("first.last&x:secret@host") is not hidden.
+// A login without "://" in front ("user:secret@host") is not found.
+const LOGIN_IN_URL = /:\/\/(?!(?:[\w-]+(?:\.[\w-]+)+(?::\d{1,5})?|[\w.-]+:\d{1,5}|localhost)["?#&])[^/\s]*@/g;
+// A login that a cut ended before its @: "://user:secr...[cut 20 characters]" and the
+// "...[truncated]" of @apify/log.
+const LOGIN_BEFORE_CUT = /:\/\/[^/\s]*?(?=\.\.\.\[(?:cut|truncated))/g;
+
+export function hidePasswords(line: string): string {
+    return line.replace(LOGIN_IN_URL, '://***@').replace(LOGIN_BEFORE_CUT, '://***');
 }
 
 // The methods of the logger itself: CrawlerLogger below, and Log, Logger and LoggerText of
@@ -86,35 +101,42 @@ const MAX_MESSAGE_LENGTH = 10_000;
 
 // crawlee puts the stack of a failed page inside the message. Those frame lines keep their
 // own lines; every other line is joined to the line before it with a written \n, and every
-// control character is escaped. The result is cut after that, so the limit is on what is
-// written.
+// control character is escaped. A login in a URL is hidden first, while a newline still
+// ends a URL and before the cut can take its @ away. The result is cut last, so the limit
+// is on what is written.
 function messageOnOneLine(message: unknown): string {
     const out: string[] = [];
-    for (const line of String(message).split(/\r\n|\n|\r/)) {
-        if (out.length > 0 && /^[ \t]+at /.test(line)) {
-            // Empty lines between the text and its first frame are dropped.
-            let text = out[out.length - 1];
-            while (text.endsWith('\\n')) text = text.slice(0, -2);
-            out[out.length - 1] = text;
+    // Empty lines that were read and not yet written.
+    let empty = 0;
+    for (const line of hidePasswords(text(message)).split(/\r\n|\n|\r/)) {
+        if (out.length === 0) {
             out.push(oneLine(line));
-        } else if (out.length > 0) {
-            out[out.length - 1] += `\\n${oneLine(line)}`;
+        } else if (/^[ \t]+at /.test(line)) {
+            // Empty lines between the text and a frame are dropped.
+            empty = 0;
+            out.push(oneLine(line));
+        } else if (line === '') {
+            empty++;
         } else {
-            out.push(oneLine(line));
+            out[out.length - 1] += `${'\\n'.repeat(empty + 1)}${oneLine(line)}`;
+            empty = 0;
         }
     }
-    const text = out.join('\n');
-    return text.length > MAX_MESSAGE_LENGTH
-        ? `${text.slice(0, MAX_MESSAGE_LENGTH)}...[cut ${text.length - MAX_MESSAGE_LENGTH} characters]`
-        : text;
+    out[out.length - 1] += '\\n'.repeat(empty);
+    const joined = out.join('\n');
+    return joined.length > MAX_MESSAGE_LENGTH
+        ? `${joined.slice(0, MAX_MESSAGE_LENGTH)}...[cut ${joined.length - MAX_MESSAGE_LENGTH} characters]`
+        : joined;
 }
 
-// The colour codes that the logger itself puts around parts of a line (ansi-colors: reset,
-// the 8 colours and their bright forms). Any other escape sequence is escaped, also the
-// ones that hide text or move the cursor.
+// The colour codes that the logger itself puts around parts of a line when colours are on
+// (ansi-colors: reset, the 8 colours and their bright forms).
 const COLOUR_CODE = /\u001b\[(?:0|22|39|3[0-7]|9[0-7])m/g;
-// A control character that is not a newline and not the start of such a colour code.
-const STRAY_CONTROL_CHARACTERS = /\r|\u001b(?!\[(?:0|22|39|3[0-7]|9[0-7])m)|[\u0000-\u0009\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+// A control character that is not a newline. With colours on, the colour codes above stay;
+// any other escape sequence is escaped, also the ones that hide text or move the cursor.
+// With colours off (FORCE_COLOR=0, as in the Docker image), every ESC is escaped.
+const CONTROL_EXCEPT_COLOURS = /\r|\u001b(?!\[(?:0|22|39|3[0-7]|9[0-7])m)|[\u0000-\u0009\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+const CONTROL_EXCEPT_NEWLINE = /\r|[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 // Lines of an event that stay on their own line: a stack frame, the cause of an error, and
 // the note that @apify/log writes where it leaves out frames.
 const STACK_LINE = /^\s+(?:at |CAUSE: |\.\.\. \d+ lines matching cause stack trace)/;
@@ -124,7 +146,13 @@ const STACK_LINE = /^\s+(?:at |CAUSE: |\.\.\. \d+ lines matching cause stack tra
 // line of the output starts with a timestamp or with spaces, and with nothing else.
 export function finishLine(line: string, isError: boolean, at?: string): string {
     const kept: string[] = [];
-    line.split('\n').forEach((part, index) => {
+    const parts = line.split('\n');
+    // The head line has no ESC from input (the message is escaped, the data is JSON), so a
+    // colour code in it comes from the logger: colours are on.
+    const coloursOn = parts[0].search(COLOUR_CODE) >= 0;
+    parts.forEach((raw, index) => {
+        // Hide a login while a real newline still ends a URL.
+        const part = hidePasswords(raw);
         // A line that stays on its own must start with real spaces: @apify/log writes the
         // indent first and the colour code after it. Text that starts with a colour code
         // and then looks like a frame is joined to the line before it.
@@ -135,7 +163,7 @@ export function finishLine(line: string, isError: boolean, at?: string): string 
         else kept[kept.length - 1] += `\\n${part}`;
     });
     if (isError && at) kept[0] += ` at=${at}`;
-    return hidePasswords(kept.join('\n').replace(STRAY_CONTROL_CHARACTERS, escapeControlCharacter));
+    return kept.join('\n').replace(coloursOn ? CONTROL_EXCEPT_COLOURS : CONTROL_EXCEPT_NEWLINE, escapeControlCharacter);
 }
 
 // The "rid=<id> course=<name>" of the crawl that the running code belongs to. main.ts runs
@@ -155,7 +183,7 @@ export class CrawlerLogger extends LoggerText {
         // BrowserPool, Request, the Playwright utilities). Inside a crawl, their lines get
         // the "rid=<id> course=<name>" of that crawl in front of their own prefix.
         const crawl = crawlContext.getStore();
-        if (crawl && !String(opts?.prefix ?? '').includes(crawl)) {
+        if (crawl && !String(opts?.prefix ?? '').startsWith(crawl)) {
             opts = { ...opts, prefix: opts?.prefix ? `${crawl} ${opts.prefix}` : crawl };
         }
         const raw = super._log(level, message ? messageOnOneLine(message) : message, data, exception, opts);

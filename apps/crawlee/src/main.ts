@@ -19,6 +19,17 @@ const app = express();
 //     origin: 'https://uiuc.chat',
 // };
 
+function encodeField(value: string): string {
+    return value.replace(/[^\w.~-]/gu, (character) => {
+        try {
+            return encodeURIComponent(character);
+        } catch {
+            // Half of a surrogate pair.
+            return '%3F';
+        }
+    });
+}
+
 // Request ids come from the caller (X-Request-ID) or are minted here. Anything that does not
 // match this pattern is replaced, so a header value cannot break the log line.
 // This is the first middleware, so every reply has the id: also the reply to OPTIONS, and
@@ -57,9 +68,11 @@ app.post('/crawl', async (req: Request, res: Response) => {
         res.status(400).json({ error: 'Bad request', errorTitle: 'BadRequest', errorMessage: 'The request body must be JSON with a "params" object.' });
         return;
     }
-    // The course name is on every line of the crawl. A space in it would let a caller add a
-    // fake field ("course=x rid=other"), so spaces are written as %20, and it is cut.
-    const course = params.courseName ? oneLine(params.courseName).replace(/ /g, '%20').slice(0, 200) : '';
+    // The course name is on every line of the crawl. A space (or a character that looks
+    // like one) in it would let a caller add a fake field ("course=x rid=other"). So it is
+    // cut, and every character that is not a letter, a digit or one of . _ ~ - is written
+    // as %XX. A usual project name stays as it is.
+    const course = params.courseName ? encodeField(oneLine(params.courseName).slice(0, 200)) : '';
     const prefix = course ? `rid=${rid} course=${course}` : `rid=${rid}`;
     const clog = log.child({ prefix });
     const started = Date.now();
