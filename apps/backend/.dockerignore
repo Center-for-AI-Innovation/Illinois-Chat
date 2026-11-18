@@ -1,0 +1,28 @@
+# Secrets: images get their config from the compose/ECS environment, never from a baked-in .env.
+**/.env
+**/.env.*
+!**/.env.template
+
+# Local environments and caches. Patterns are matched from the build-context
+# root, so they need **/ to also catch nested environments such as
+# ai_ta_backend/rabbitmq/.venv from the old per-directory worker setup.
+**/.venv/
+**/venv/
+**/venv-*/
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache/
+
+# Not needed at runtime
+.git/
+.github/
+.gitbook/
+.trunk/
+.vscode/
+.infisical.json
+tests/
+test-docs/
+docs/
+media/
+misc/
+**/*.md
