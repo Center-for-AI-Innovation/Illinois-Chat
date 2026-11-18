@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { eq } from 'drizzle-orm'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { REQUEST_ID_HEADER, requestIdFromHeaders } from '~/utils/requestId'
 
 type ChatFileUploadResponse = {
   success?: boolean
@@ -116,12 +117,17 @@ const handler = async (
 
     const backendUrl = getBackendUrl()
 
+    // One id for the browser, this route and the backend.
+    const requestId = requestIdFromHeaders(req.headers)
+    res.setHeader(REQUEST_ID_HEADER, requestId)
+
     const response = await fetch(`${backendUrl}/process-chat-file`, {
       method: 'POST',
       headers: {
         Accept: '*/*',
         'Accept-Encoding': 'gzip, deflate',
         'Content-Type': 'application/json',
+        [REQUEST_ID_HEADER]: requestId,
       },
       body: JSON.stringify({
         conversation_id: conversationId,
@@ -134,7 +140,7 @@ const handler = async (
 
     if (!response.ok) {
       console.error(
-        `Flask backend error: ${response.status} ${response.statusText}`,
+        `Flask backend error rid=${requestId}: ${response.status} ${response.statusText}`,
       )
       const errorText = await response.text()
       console.error('Backend response:', errorText.substring(0, 500))

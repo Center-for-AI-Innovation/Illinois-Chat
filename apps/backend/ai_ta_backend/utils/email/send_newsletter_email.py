@@ -100,7 +100,6 @@ def send_html_email(subject: str, html_text: str, sender: str, receipients: list
 
   print(len(emails), "emails to send to")
 
-  print("Emails to send to: ", emails)
   with open("emails_to_be_sent.txt", "a") as file:
     for r in emails:
       file.write(r + "\n")
@@ -159,7 +158,7 @@ def send_email_safely(sender, recipients: str, message):
     * Maximum send rate: 14 emails per second
     * Daily sending quota: 50,000 emails per 24-hour period
   """
-  print("receipient in safe-send", recipients)
+  print("safe-send: sending one email")
 
   with smtplib.SMTP_SSL(os.getenv('SES_HOST'), os.getenv('SES_PORT')) as server:  # type: ignore
     server.login(os.getenv('USERNAME_SMTP'), os.getenv('PASSWORD_SMTP'))  # type: ignore

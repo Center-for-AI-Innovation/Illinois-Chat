@@ -128,7 +128,7 @@ aws logs tail /ecs/<service> --follow
 aws ecs update-service --cluster <cluster> --service <service> --force-new-deployment
 ```
 
-- **Logs** — CloudWatch, one log group per ECS service.
+- **Logs** — CloudWatch, one log group per ECS service. Set `LOG_LEVEL` (default `INFO`) per container in the task definition. In each container's `logConfiguration.options`, `"mode": "non-blocking"` with `"max-buffer-size": "25m"` keeps a slow log stream from blocking the app, and `"awslogs-datetime-format": "%Y-%m-%dT%H:%M:%S"` keeps a traceback in one event with its line. Set the datetime format only where every line starts with the time (the backend and the worker). How to read the lines: "Reading the logs" on [Troubleshooting](troubleshooting.md#reading-the-logs).
 - **Service events** — ECS console › Cluster › Service › Events.
 - **Workflow runs** — the Actions tab.
 

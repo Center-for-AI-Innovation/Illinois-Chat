@@ -95,7 +95,8 @@ def _decrypt_config(stored: dict) -> Optional[dict]:
         return None
     key = os.environ.get('ENCRYPTION_MASTER_KEY', '')
     if not key:
-        logger.warning("ENCRYPTION_MASTER_KEY not set; cannot decrypt external config")
+        # ERROR: the job then runs on the host defaults, not on the project's own connection.
+        logger.error("ENCRYPTION_MASTER_KEY is not set: cannot decrypt the project's external connection")
         return None
     plaintext = _decrypt(encrypted_str, key)
     return json.loads(plaintext)
@@ -170,7 +171,9 @@ class WorkerConnectionResolver:
         try:
             return _decrypt_config(encrypted_blob)
         except Exception as e:
-            logger.error("Failed to decrypt %s for project %s: %s", field, project_name, e)
+            # Only the type: the text of a decrypt or JSON error can hold the decrypted config.
+            logger.error("cannot decrypt %s course=%s (%s); using the host default for it", field, project_name,
+                         type(e).__name__)
             return None
 
     # ── Public API ──
@@ -219,7 +222,7 @@ class WorkerConnectionResolver:
             self._resolve_embedding(result, project_name, emb_cfg)
 
         if result.has_overrides:
-            logger.info(
+            logger.debug(
                 "Resolved external connections for project: %s (engine=%s)",
                 project_name, result.engine_kind,
             )
@@ -265,7 +268,7 @@ class WorkerConnectionResolver:
 
     @staticmethod
     def _create_qdrant(project_name: str, qdrant_config: dict) -> QdrantClient:
-        logger.info("Creating external Qdrant client for project: %s", project_name)
+        logger.debug("Creating external Qdrant client for project: %s", project_name)
         return QdrantClient(
             url=qdrant_config["url"],
             api_key=qdrant_config["api_key"],
@@ -285,14 +288,14 @@ class WorkerConnectionResolver:
         database pooler's job (the documented setup is a Supabase transaction
         pooler), and this matches the worker's host engine in rmsql.py.
         """
-        logger.info("Creating external SQL engine for project: %s", project_name)
-        return create_engine(db_config["connection_uri"], poolclass=NullPool)
+        logger.debug("Creating external SQL engine for project: %s", project_name)
+        return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
 
     # ── S3 ──
 
     @staticmethod
     def _create_s3(project_name: str, s3_config: dict):
-        logger.info("Creating external S3 client for project: %s", project_name)
+        logger.debug("Creating external S3 client for project: %s", project_name)
         endpoint_url = s3_config.get("endpoint_url")
         region = s3_config.get("region")
         client_kwargs = dict(
