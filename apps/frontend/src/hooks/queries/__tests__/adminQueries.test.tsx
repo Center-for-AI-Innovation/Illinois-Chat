@@ -274,14 +274,18 @@ describe('platform settings queries', () => {
 
     const { queryClient, Wrapper } = createClient()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
-    fetchSpy.mockResolvedValueOnce(
-      jsonResponse({
-        saved: true,
-        revalidated: false,
-        updatedAt: '2026-09-24T00:00:00.000Z',
-        updatedBy: 'admin@illinois.edu',
-      }),
-    )
+    fetchSpy
+      .mockResolvedValueOnce(
+        jsonResponse({
+          saved: true,
+          revalidated: false,
+          updatedAt: '2026-09-24T00:00:00.000Z',
+          updatedBy: 'admin@illinois.edu',
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ announcementBanner: null, isMaintenanceMode: true }),
+      )
     const { result } = renderHook(() => useUpdatePlatformSettings(), {
       wrapper: Wrapper,
     })
@@ -290,7 +294,17 @@ describe('platform settings queries', () => {
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: PLATFORM_SETTINGS_QUERY_KEY,
     })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['siteStatus'] })
+    // The shared status is refreshed directly from the origin, not through an
+    // invalidation that would refetch the cacheable URL.
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['siteStatus'] })
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^\/api\/UIUC-api\/siteStatus\?fresh=.+$/),
+      expect.objectContaining({ cache: 'no-store' }),
+    )
+    expect(queryClient.getQueryData(['siteStatus'])).toEqual({
+      announcementBanner: null,
+      isMaintenanceMode: true,
+    })
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: ['maintenanceDetails'],
     })

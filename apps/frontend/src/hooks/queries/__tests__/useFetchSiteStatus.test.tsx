@@ -93,7 +93,7 @@ describe('useFetchSiteStatus', () => {
 
     await settle()
     expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(fetchSpy).toHaveBeenCalledWith('/api/UIUC-api/siteStatus')
+    expect(fetchSpy.mock.calls[0][0]).toBe('/api/UIUC-api/siteStatus')
 
     await settle(POLL_MS)
     expect(fetchSpy).toHaveBeenCalledTimes(2)

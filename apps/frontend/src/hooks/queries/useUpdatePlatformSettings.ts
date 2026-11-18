@@ -5,7 +5,7 @@ import {
   PLATFORM_SETTINGS_QUERY_KEY,
   type PlatformSettingsResponse,
 } from './useFetchPlatformSettings'
-import { SITE_STATUS_QUERY_KEY } from './useFetchSiteStatus'
+import { refreshSiteStatusAfterSave } from './useFetchSiteStatus'
 import { toRequestError } from './requestError'
 
 export interface UpdatePlatformSettingsResponse {
@@ -61,18 +61,20 @@ export function useUpdatePlatformSettings() {
 
   return useMutation({
     mutationFn: updatePlatformSettings,
-    onSuccess: () => {
-      // The app-wide maintenance gate and the banner both read the shared site
-      // status, so it has to be dropped or the operator who just enabled
-      // maintenance keeps browsing as if it were off.
+    onSuccess: async () => {
       void queryClient.invalidateQueries({
         queryKey: PLATFORM_SETTINGS_QUERY_KEY,
       })
-      void queryClient.invalidateQueries({ queryKey: SITE_STATUS_QUERY_KEY })
       void queryClient.invalidateQueries({ queryKey: ['maintenanceDetails'] })
       void queryClient.invalidateQueries({
         queryKey: NAVBAR_BRANDING_QUERY_KEY,
       })
+      // The app-wide maintenance gate and the banner both read the shared site
+      // status. An invalidation would refetch the ordinary URL, which the shared
+      // cache can answer with a copy from before the save, so the saving tab
+      // reads the origin directly. A failed refresh leaves the last good status
+      // in place and does not fail the save.
+      await refreshSiteStatusAfterSave(queryClient)
     },
   })
 }

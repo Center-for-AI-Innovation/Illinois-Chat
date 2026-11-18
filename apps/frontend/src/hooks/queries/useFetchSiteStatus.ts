@@ -1,7 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import {
+  isCancelledError,
+  useQuery,
+  type QueryClient,
+} from '@tanstack/react-query'
 import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
+import { SITE_STATUS_FRESH_PARAM } from '~/utils/siteStatusCache'
 
 export const SITE_STATUS_QUERY_KEY = ['siteStatus'] as const
+const SITE_STATUS_ENDPOINT = '/api/UIUC-api/siteStatus'
 
 /**
  * Two separate policies over the one status query, because the gate and the
@@ -41,14 +47,59 @@ export interface SiteStatus {
   isMaintenanceMode?: boolean
 }
 
-export async function fetchSiteStatus(): Promise<SiteStatus> {
-  const response = await fetch('/api/UIUC-api/siteStatus')
-
+async function parseSiteStatus(response: Response): Promise<SiteStatus> {
   if (!response.ok) {
     throw new Error(`Error fetching site status: ${response.status}`)
   }
 
   return (await response.json()) as SiteStatus
+}
+
+/** An ordinary poll on the bare URL, so the shared cache may answer it. */
+export async function fetchSiteStatus(signal?: AbortSignal): Promise<SiteStatus> {
+  return parseSiteStatus(await fetch(SITE_STATUS_ENDPOINT, { signal }))
+}
+
+let refreshCount = 0
+
+/**
+ * The explicit refresh after a save. The URL carries a nonce no earlier
+ * request used, so no cache can match it, and `no-store` keeps the browser
+ * from reusing an earlier answer. The nonce is per call, so rapid saves never
+ * share a URL.
+ */
+export async function fetchFreshSiteStatus(
+  signal?: AbortSignal,
+): Promise<SiteStatus> {
+  refreshCount += 1
+  const nonce = `${Date.now()}-${refreshCount}`
+  const url = `${SITE_STATUS_ENDPOINT}?${SITE_STATUS_FRESH_PARAM}=${nonce}`
+  return parseSiteStatus(await fetch(url, { cache: 'no-store', signal }))
+}
+
+/**
+ * Refresh the shared query after a durable save, bypassing cached GETs.
+ * Cancel older fetches so late responses cannot replace the fresh status.
+ * Follow-up failure must not fail the save or clear the last-good data.
+ */
+export async function refreshSiteStatusAfterSave(
+  queryClient: QueryClient,
+): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: SITE_STATUS_QUERY_KEY })
+  try {
+    // One attempt, no backoff: the save should not wait on a retry. If it
+    // fails, the next scheduled poll is the recovery.
+    await queryClient.fetchQuery<SiteStatus>({
+      queryKey: SITE_STATUS_QUERY_KEY,
+      queryFn: ({ signal }) => fetchFreshSiteStatus(signal),
+      staleTime: 0,
+      retry: false,
+    })
+  } catch (error) {
+    // Superseded by a newer save. The newer refresh owns the data now.
+    if (isCancelledError(error)) return
+    console.warn('[siteStatus] refresh after settings save failed')
+  }
 }
 
 /**
@@ -62,7 +113,7 @@ export async function fetchSiteStatus(): Promise<SiteStatus> {
 export function useFetchSiteStatus({ enabled = true } = {}) {
   return useQuery<SiteStatus>({
     queryKey: SITE_STATUS_QUERY_KEY,
-    queryFn: fetchSiteStatus,
+    queryFn: ({ signal }) => fetchSiteStatus(signal),
     enabled,
     retry: 1,
     staleTime: 30 * 1000,

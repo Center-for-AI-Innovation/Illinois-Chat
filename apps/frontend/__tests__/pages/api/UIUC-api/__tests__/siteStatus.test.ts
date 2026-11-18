@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import handler, {
-  SITE_STATUS_CACHE_CONTROL,
-} from '~/pages/api/UIUC-api/siteStatus'
+import handler from '~/pages/api/UIUC-api/siteStatus'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { SITE_STATUS_CACHE_CONTROL } from '~/utils/siteStatusCache'
 
 vi.mock('~/utils/redisClient', () => ({
   ensureRedisConnected: vi.fn(),
@@ -158,6 +157,56 @@ describe('GET /api/UIUC-api/siteStatus', () => {
     expect(res.status).toHaveBeenCalledWith(503)
     expect(res.json).not.toHaveBeenCalledWith(
       expect.objectContaining({ isMaintenanceMode: false }),
+    )
+  })
+
+  it('answers an explicit post-save refresh with no-store and the same public payload', async () => {
+    storeState({ banner: CONFIGURED_BANNER, maintenance: 'true' })
+
+    const res = createRes()
+    await handler(
+      { method: 'GET', query: { fresh: '1789000000000' } } as any,
+      res,
+    )
+
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(res.json).toHaveBeenCalledWith({
+      announcementBanner: {
+        enabled: true,
+        message: 'Scheduled downtime tonight',
+        linkText: 'Details',
+        linkUrl: 'https://status.illinois.edu',
+      },
+      isMaintenanceMode: true,
+    })
+    const body = JSON.stringify(res.json.mock.calls[0][0])
+    expect(body).not.toContain('admin@illinois.edu')
+    expect(body).not.toContain('updatedAt')
+  })
+
+  it('never caches a failed explicit refresh either', async () => {
+    mockedRedis.mockRejectedValue(new Error('redis down'))
+
+    const res = createRes()
+    await handler(
+      { method: 'GET', query: { fresh: '1789000000000' } } as any,
+      res,
+    )
+
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
+    expect(res.status).toHaveBeenCalledWith(503)
+  })
+
+  it('treats other query parameters as an ordinary poll, with the shared-cache policy', async () => {
+    storeState({ banner: CONFIGURED_BANNER, maintenance: 'false' })
+
+    const res = createRes()
+    await handler({ method: 'GET', query: { utm: 'x' } } as any, res)
+
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Cache-Control',
+      SITE_STATUS_CACHE_CONTROL,
     )
   })
 })
