@@ -151,6 +151,7 @@ The crawler (`apps/crawlee`) uses crawlee's own logger (`import { log } from 'cr
 ```text
 2026-11-03 00:16:29.261 INFO  rid=3c9e51b07a24 course=ece120: crawl started url=https://ece.illinois.edu/ strategy=same-hostname maxPages=50
 2026-11-03 00:16:41.907 WARN  rid=3c9e51b07a24 course=ece120: Page failed after all retries url=https://ece.illinois.edu/old-page: Error: ...
+2026-11-03 00:16:42.118 ERROR rid=3c9e51b07a24 course=ece120: Ingest request failed url=https://ece.illinois.edu/about status=500 body={"error":"..."} at=src/api/crawlee.ts:121
 ```
 
 It differs from the other services:
@@ -159,7 +160,45 @@ It differs from the other services:
 - The level names are short (`DEBUG`, `INFO`, `WARN`, `ERROR`) and padded to 5 characters.
 - There is no logger name. Each crawl gets a child logger whose prefix is `rid=<id> course=<name>`; the prefix ends with `:`.
 
-`POST /crawl` takes the `X-Request-ID` header under the same rule as the other services, or makes a 12-character id, and sends the id back in the `X-Request-ID` response header. It writes one `INFO` line when a crawl starts (`crawl started`) and one when it ends (`crawl done pages=<n> ms=<n>`). A failed crawl gives one `ERROR` line `crawl failed ms=<n>` with the stack (for invalid parameters, only the message), and a 500 reply with `error`, `errorTitle` and `errorMessage`; `scrapeWeb.ts` shows `errorMessage` to the user. A page that still fails after its retries gives a `WARN` line (`Page failed after all retries`). Before it, crawlee itself writes a `WARN` line `Reclaiming failed request back to the list or queue.` for each retry and one `ERROR` line `Request failed and reached maximum retries.`, with a stack, for the page; crawlee always writes these. A page the backend's `/ingest` refuses gives an `ERROR` with the URL, the status and the first 500 characters of the reply. Lines for each page are `DEBUG`. Values from requests and web pages are kept on one line (`oneLine()` in `logSetup.ts`).
+`POST /crawl` takes the `X-Request-ID` header under the same rule as the other services, or makes a 12-character id, and sends the id back in the `X-Request-ID` response header. It writes one `INFO` line when a crawl starts (`crawl started`) and one line when it ends (`crawl done result=<name> status=<n> pages_loaded=<n> ... ms=<n>`). The table below gives the level and the status of that line. A crawl that throws gives one `ERROR` line `crawl failed ms=<n>` with the stack (for invalid parameters, only the message), and a 500 reply with `error`, `errorTitle` and `errorMessage`; `scrapeWeb.ts` shows `errorMessage` to the user. A page that still fails after its retries gives a `WARN` line (`Page failed after all retries`). Before it, crawlee itself writes a `WARN` line `Reclaiming failed request back to the list or queue.` for each retry and one `ERROR` line `Request failed and reached maximum retries.`, with a stack, for the page; crawlee always writes these. A page the backend's `/ingest` refuses gives an `ERROR` with the URL, the status and the first 500 characters of the reply. Lines for each page are `DEBUG`. Values from requests and web pages are kept on one line (`oneLine()` in `logSetup.ts`).
+
+**What `/crawl` answers.** A crawl is a success only when the backend's `/ingest` accepted at least one document. Before, `/crawl` answered 200 whenever the crawler did not throw, also when every page failed. The rules are in `apps/crawlee/src/crawlOutcome.ts`:
+
+| What the crawl did | `result=` | Status | Level |
+|---|---|---|---|
+| At least one page or PDF was accepted, nothing failed | `ok` | 200 | `INFO` |
+| At least one was accepted, and some pages or PDFs failed | `partial` | 200 | `WARN` |
+| No page could be loaded (no connection, timeout, bad host) | `NoPageLoaded` | 502 | `ERROR` |
+| Pages were read, but `/ingest` refused each one, or each PDF failed | `IngestRefused` | 502 | `ERROR` |
+| Each page was empty or an error page, or there was no page (an empty sitemap) | `NothingToIngest` | 422 | `WARN` |
+| `NO_CRAWL=true` | `CrawlDisabled` | 503 | `WARN` |
+| `INGEST_URL` is not set, invalid parameters, or the crawler throws | (line `crawl failed`) | 500 | `ERROR` |
+
+The `crawl done` line has the same fields in each case: `pages_loaded`, `pages_failed`, `pages_skipped`, `pages_ingested`, `pages_refused`, `pdfs_found`, `pdfs_ingested`, `pdfs_skipped`, `pdfs_failed`. To find the crawls that gave no documents, search for `crawl done` with a `result=` that is not `ok` or `partial`. A reply that is not 200 has `error`, `errorTitle` (the `result` name) and `errorMessage`, with the first error of the crawl, and the counts. A 200 reply is an object with `message` and the counts; before, it was a string.
+
+`/crawl` answers after each ingest request and each PDF of the crawl has an answer, so the counts are final and no line of a crawl comes after its `crawl done` line. An ingest request that gets no answer in 60 seconds counts as refused. A page counts as loaded when its handler ends, so a page that is tried again is counted once. A PDF that many pages link to is handled once for each crawl.
+
+`logSetup.ts` turns crawlee's text logger into a `CrawlerLogger`, a small subclass. It changes the root logger object in place, because crawlee makes some loggers when it is imported (`BrowserPool`, `Request`, the Playwright utilities), and each of them keeps a reference to that object. So the changes apply to every line, also the lines that crawlee and Playwright write themselves:
+
+- **Where an error comes from.** An `ERROR` line ends with `at=<file>:<line>`, the line of the crawler code that called `log.error` or `log.exception`, for example `at=src/main.ts:82`. A line that crawlee writes itself has no `at=`, because no line of the app logged it. For an error that nothing caught, `at=` is the line of the handler in `logSetup.ts`; the stack below it says where the error started. The image starts the crawler with `node --enable-source-maps` (`start:prod` in `package.json`), so `at=` and the stack frames name the TypeScript file in `src/`. Without that flag they name the built file in `dist/`.
+- **One event, one line, then its stack.** Newlines and the other control characters (NUL, ESC, the Unicode line separators and direction marks) in a message or in the message of an error are written as `\n`, `\x00` and so on. The Docker image has colours off (`FORCE_COLOR=0`), and then every escape sequence is written out. With colours on, only the colour codes of the logger stay as they are. Playwright puts a "Call log" of several lines in its error messages; it stays on the line of its event. After the first line of an event, every line starts with a space: it is the message of the error, a stack frame or a `CAUSE:` line. Text from a request or a web page cannot start a line that looks like a new event.
+- **URLs.** The crawler prints the URLs that it works on: the crawl URL and the URL of each page and PDF. A crawl log is of no use without them. The logger does not look for a login in a URL, so a URL of the form `https://user:password@site` shows as it is.
+- **Length.** A message of more than 10,000 characters is cut, with a note of how many characters were left out. A stack is cut at 5,000 characters, and the stack of a cause at 2,500. The loggers that crawlee makes when it is imported keep its own limit of 500 characters for a stack.
+- **The request id on every line of a crawl.** `main.ts` runs each crawl inside `crawlContext.run(...)`. Lines from crawlee loggers that do not come from the logger of the crawl (`RequestQueue`, `BrowserPool`, `Request`, the Playwright utilities) get the `rid=<id> course=<name>` of that crawl in front of their own prefix. The project name is cut at 200 characters, and every character in it that is not an ASCII letter, a digit or one of `. _ ~ -` is written as `%XX`, so the name cannot add a fake field. A usual project name stays as it is; a name with a space reads `my%20project` here and `my project` in the frontend lines.
+
+Output that used to bypass the logger and now goes through it:
+
+- A request that fails before the `/crawl` handler runs gives one `WARN` line `request refused method=<m> path=<p> status=<n>: <reason>` with the request id, and a JSON reply with `error`, `errorTitle` and `errorMessage`. For a body that is not valid JSON, the reason is the fixed text `the body is not valid JSON`: the parser's own message quotes a piece of the body. A body with no `params` object gets the same `WARN` line and a 400; before, it was a 500 with a stack. A failure with a 5xx status gives an `ERROR` line `request failed ...` with the stack. Before, express printed the stack with no timestamp and answered with an HTML page.
+- An error that nothing caught gives one `ERROR` line `uncaught exception, the crawler stops` or `unhandled promise rejection, the crawler stops`, with the stack. The process then exits with code 1, as it did before, and the container starts again. The exit waits until the line is written, for 2 seconds at most.
+- A Node process warning (for example the one for `NODE_TLS_REJECT_UNAUTHORIZED`) gives a `WARN` line with the warning's name and code. With `--trace-warnings` the stack of the warning follows.
+- An S3 check that fails for a reason other than "not found" gives a line `Could not check S3 for an earlier copy`: `WARN`, or `DEBUG` for a 403, because S3 answers 403 for a new file when the role cannot list the bucket. Before, it gave no line.
+- A value of the request body that cannot be turned into text (`{"toString": 1}`) is written as `[a value that cannot be written]`. Before, it stopped the crawler.
+
+Every request gets a request id, not only `POST /crawl`: the id is made first, before the CORS reply to `OPTIONS` and before the body is read, and it is sent back in the `X-Request-ID` header of every reply. A request for a path that does not exist gets express's own 404 reply and no log line.
+
+Some lines still have no timestamp, because they are written before the logger exists or by other programs: the lines of `npm` and of `start_xvfb_and_run_cmd.sh` when the container starts, and a notice that a dependency prints while it loads (`[baseline-browser-mapping] ...`).
+
+The tests for the logger are in `apps/crawlee/src/logSetup.test.ts`. Run them with `npm test` in `apps/crawlee`. They are not part of the CI checks.
 
 `logSetup.ts` maps `LOG_LEVEL` to crawlee's own level setting (`APIFY_LOG_LEVEL`). An unknown value falls back to `INFO` with one warning line. In Compose the crawler gets `LOG_LEVEL` from `.env` through `env_file`, not from its `environment:` list like the other services. On the dev stack, put it in `apps/crawlee/.env`. The Docker image sets `FORCE_COLOR=0`, so the container output has no colour codes.
 

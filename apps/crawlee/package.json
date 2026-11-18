@@ -24,10 +24,10 @@
     },
     "scripts": {
         "start": "npm run start:dev",
-        "start:prod": "node --expose-gc dist/main.js",
+        "start:prod": "node --enable-source-maps --expose-gc dist/main.js",
         "start:dev": "tsx src/main.ts",
         "build": "tsc",
-        "test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1",
+        "test": "tsx --test src/*.test.ts",
         "postinstall": "npx crawlee install-playwright-browsers"
     },
     "author": "Kastan Day",
