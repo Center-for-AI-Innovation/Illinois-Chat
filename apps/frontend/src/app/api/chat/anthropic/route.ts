@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
 import { getModels } from '~/pages/api/models'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('api.chat.anthropic')
 
@@ -96,18 +97,24 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
 
       if (isThinking) {
         log.debug('using Claude with reasoning enabled', { model: modelId })
-        const response = result.toDataStreamResponse({
-          sendReasoning: true,
-          getErrorMessage: () => {
-            return `An error occurred while streaming the response.`
-          },
-        })
+        const response = logStreamFailure(
+          result.toDataStreamResponse({
+            sendReasoning: true,
+            getErrorMessage: () => {
+              return `An error occurred while streaming the response.`
+            },
+          }),
+          log,
+          { model: modelId },
+        )
         return new NextResponse(response.body, {
           status: response.status,
           headers: response.headers,
         })
       } else {
-        const response = result.toTextStreamResponse()
+        const response = logStreamFailure(result.toTextStreamResponse(), log, {
+          model: modelId,
+        })
         return new NextResponse(response.body, {
           status: response.status,
           headers: response.headers,

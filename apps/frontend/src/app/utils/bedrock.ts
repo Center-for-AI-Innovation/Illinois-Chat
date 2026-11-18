@@ -5,6 +5,7 @@ import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { type CoreMessage, generateText, streamText } from 'ai'
 import { NextResponse } from 'next/server'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.bedrock')
 
@@ -71,7 +72,9 @@ export async function runBedrockChat(
             error,
           ),
       })
-      return result.toTextStreamResponse()
+      return logStreamFailure(result.toTextStreamResponse(), log, {
+        model: conversation.model.id,
+      })
     } else {
       const result = await generateText(commonParams)
       const choices = [{ message: { content: result.text } }]

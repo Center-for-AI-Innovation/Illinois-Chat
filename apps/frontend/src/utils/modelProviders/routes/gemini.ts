@@ -10,6 +10,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { NextResponse } from 'next/server'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.gemini')
 
@@ -123,7 +124,9 @@ export async function runGeminiChat(
             error,
           ),
       })
-      return result.toTextStreamResponse()
+      return logStreamFailure(result.toTextStreamResponse(), log, {
+        model: conversation.model.id,
+      })
     } else {
       const result = await generateText(commonParams)
       return NextResponse.json({

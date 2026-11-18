@@ -5,6 +5,7 @@ import { convertConversationToCoreMessagesWithoutSystem } from '~/utils/apiUtils
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('api.chat.vlm')
 
@@ -42,7 +43,9 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
             error,
           ),
       })
-      const response = result.toTextStreamResponse()
+      const response = logStreamFailure(result.toTextStreamResponse(), log, {
+        model: conversation.model.id,
+      })
       return new NextResponse(response.body, {
         status: response.status,
         headers: response.headers,

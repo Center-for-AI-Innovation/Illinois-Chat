@@ -59,20 +59,24 @@ function threshold(): number {
 
 // The login part of a URL: "://user:secret@host", "://:secret@host",
 // "://token@host" and "://user@realm:secret@host". It must not reach the log.
-// The rule is made so that a password is never shown; the cost is that it can
-// take away text that is not a login.
-// - The login is everything from "://" to the last @ before the next / or
-//   space. A user name or a password can hold any other character.
-// - One case is left alone: a host with a dot or a port (or "localhost") that
-//   is directly followed by " ? # or &. A URL ends there and what follows is
-//   other text: {"url":"http://backend:8001","email":"a@b.edu"},
-//   "https://a.edu?email=a@b.edu", "http://localhost:3000&login_hint=a@b.edu".
-// - So "http://a.edu,bob@c.edu" loses "a.edu,bob" (no password is shown), and
-//   a login whose user name looks like such a host and is followed by one of
-//   those four characters ("first.last&x:secret@host") is not hidden.
-// A login without "://" in front ("user:secret@host") is not found.
-const LOGIN_IN_URL =
-  /:\/\/(?!(?:[\w-]+(?:\.[\w-]+)+(?::\d{1,5})?|[\w.-]+:\d{1,5}|localhost)["?#&])[^/\s]*@/g
+// One rule, with no exceptions, so that a password is not shown: the login is
+// everything from "://" (or more slashes) to the last @ before the next /,
+// space or double quote. A user name or a password can hold any other
+// character. The double quote ends it because a URL in JSON ends there:
+// {"url":"http://backend:8001","email":"a@b.edu"} is left as it is.
+// The cost: text that is not a login can be lost. "https://a.edu?email=a@b.edu"
+// is written as "https://***@b.edu". A URL with a path is not touched.
+// Not found: a login without "://" in front ("user:secret@host"), and a
+// password that has a /, a space or a double quote in it.
+const LOGIN_IN_URL = /:\/{2,}[^/\s"]*@/g
+// A login that a cut ended before its @: "://user:secr...[cut]".
+const LOGIN_BEFORE_CUT = /:\/{2,}[^/\s"]*?(?=\.\.\.\[cut\])/g
+
+export function hideLogins(text: string): string {
+  return text
+    .replace(LOGIN_IN_URL, '://***@')
+    .replace(LOGIN_BEFORE_CUT, '://***')
+}
 
 // Characters that can break or forge a log line: the C0 and C1 control
 // characters (newline, NUL, ESC and the others), DEL, the Unicode line
@@ -90,17 +94,15 @@ const SHORT_ESCAPES: Record<string, string> = {
 // hidden, and a value must not be able to start a new log line. The login is
 // looked for first, while a newline is still a character that ends a URL.
 function escapeNewlines(text: string): string {
-  return text
-    .replace(LOGIN_IN_URL, '://***@')
-    .replace(CONTROL_CHARACTERS, (found) => {
-      const code = found.charCodeAt(0)
-      return (
-        SHORT_ESCAPES[found] ??
-        (code < 0x100
-          ? `\\x${code.toString(16).padStart(2, '0')}`
-          : `\\u${code.toString(16).padStart(4, '0')}`)
-      )
-    })
+  return hideLogins(text).replace(CONTROL_CHARACTERS, (found) => {
+    const code = found.charCodeAt(0)
+    return (
+      SHORT_ESCAPES[found] ??
+      (code < 0x100
+        ? `\\x${code.toString(16).padStart(2, '0')}`
+        : `\\u${code.toString(16).padStart(4, '0')}`)
+    )
+  })
 }
 
 // JSON.stringify turns an Error into {}, so an Error anywhere in a field value
@@ -124,7 +126,7 @@ function formatPairs(fields: LogFields): string[] {
   const pairs: string[] = []
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined || value === null) continue
-    pairs.push(`${key}=${escapeNewlines(stringify(value))}`)
+    pairs.push(`${escapeNewlines(key)}=${escapeNewlines(stringify(value))}`)
   }
   return pairs
 }
@@ -132,11 +134,14 @@ function formatPairs(fields: LogFields): string[] {
 // Drizzle puts the bound values of a failed query into the error message
 // ("Failed query: ...\nparams: a,b,c"). They can hold emails, keys and whole
 // documents, so they are cut off; the query text stays.
+function withoutQueryParams(text: string): string {
+  return text.replace(/\nparams: [\s\S]*$/, '\nparams: <omitted>')
+}
+
+// The login is hidden before the cut: a cut inside a login would take its @
+// away, and then the login could not be found.
 function errorMessage(err: Error): string {
-  const message = String(err.message).replace(
-    /\nparams: [\s\S]*$/,
-    '\nparams: <omitted>',
-  )
+  const message = hideLogins(withoutQueryParams(String(err.message)))
   return message.length > MAX_ERROR_MESSAGE_LENGTH
     ? `${message.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...[cut]`
     : message
@@ -164,7 +169,7 @@ function stackFrames(err: Error): string[] {
   }
   return lines
     .filter((line) => /^\s+at /.test(line))
-    .map((line) => formatFrame(escapeNewlines(line)))
+    .map((line) => escapeNewlines(formatFrame(line)))
 }
 
 // How many of the errors inside an AggregateError are written.
@@ -375,8 +380,11 @@ export function formatLine(
     ? { rid: ctx.rid, path: ctx.path, course: ctx.course }
     : {}
   parts.push(...formatPairs(bound))
-  parts.push(escapeNewlines(String(message)))
-  if (fields) {
+  // An error that is written into the message can be one of Drizzle.
+  parts.push(escapeNewlines(withoutQueryParams(String(message))))
+  // Fields must be an object with names: a string or an array would be
+  // written as 0=a 1=b.
+  if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
     // A field the context already printed with the same value is not repeated
     // (a handler that passes course= inside a course-wrapped route).
     const extra = Object.fromEntries(

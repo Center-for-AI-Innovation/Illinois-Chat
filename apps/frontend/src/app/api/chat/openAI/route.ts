@@ -6,6 +6,7 @@ import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { decrypt } from '~/utils/crypto'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('api.chat.openAI')
 
@@ -106,7 +107,9 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
         onError: ({ error }: { error: unknown }) =>
           log.error('LLM stream failed', { model }, error),
       })
-      const response = result.toTextStreamResponse()
+      const response = logStreamFailure(result.toTextStreamResponse(), log, {
+        model,
+      })
       return new NextResponse(response.body, {
         status: response.status,
         headers: response.headers,
