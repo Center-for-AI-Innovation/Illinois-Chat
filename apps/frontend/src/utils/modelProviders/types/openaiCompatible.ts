@@ -262,7 +262,7 @@ export const OpenAICompatibleModels: Record<
   [OpenAICompatibleModelID.DeepSeek_V4_Flash]: {
     id: OpenAICompatibleModelID.DeepSeek_V4_Flash,
     name: 'DeepSeek V4 Flash',
-    tokenLimit: 511994,
+    tokenLimit: 1048570,
     enabled: true,
   },
   [OpenAICompatibleModelID.DeepSeek_V4_1_Flash]: {
@@ -352,7 +352,7 @@ export const OpenAICompatibleModels: Record<
   [OpenAICompatibleModelID.Qwen3_8_27B]: {
     id: OpenAICompatibleModelID.Qwen3_8_27B,
     name: 'Qwen3.8 27B',
-    tokenLimit: 250542,
+    tokenLimit: 262138,
     enabled: true,
   },
   [OpenAICompatibleModelID.Qwen3_8_Flash]: {
@@ -448,7 +448,7 @@ export const OpenAICompatibleModels: Record<
   [OpenAICompatibleModelID.Gemma_4_31B]: {
     id: OpenAICompatibleModelID.Gemma_4_31B,
     name: 'Gemma 4 31B IT',
-    tokenLimit: 46790,
+    tokenLimit: 136737,
     enabled: true,
   },
   [OpenAICompatibleModelID.Ornith_1_0_35B]: {

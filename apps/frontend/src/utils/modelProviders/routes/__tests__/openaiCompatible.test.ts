@@ -21,9 +21,9 @@ describe('getOpenAICompatibleModels', () => {
   it('discovers unprefixed chat models and aliases with capabilities and saved preferences', async () => {
     const catalog = [
       ['nemotron-3-super-120b-a12b', 262144, false, true],
-      ['gemma-4-31b-it', 46790, true, true],
+      ['gemma-4-31b-it', 136737, true, true],
       ['ornith-1.0-35b', 262138, false, true],
-      ['deepseek-v4-flash', 511994, false, true],
+      ['deepseek-v4-flash', 1048570, false, true],
       ['muse-glimmer-30b', 131066, true, true],
       ['glm-5.3', 524282, false, true],
       ['glm', 524282, false, true],
@@ -32,9 +32,9 @@ describe('getOpenAICompatibleModels', () => {
       ['deepseek-v4.1', 1048570, true, true],
       ['beam-1.0', 524282, false, true],
       ['qwen3-coder-next', 131066, false, false],
-      ['qwen3.6-35b-a3b', 262138, false, true],
-      ['qwen3.8-27b', 250542, true, true],
-      ['qwen3.8-flash', 262138, true, false],
+      ['qwen3.6-35b-a3b', 262138, true, true],
+      ['qwen3.8-27b', 262138, true, true],
+      ['qwen3.8-flash', 262138, true, true],
     ] as const
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(

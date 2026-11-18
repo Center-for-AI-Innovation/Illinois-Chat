@@ -200,6 +200,7 @@ export const VisionCapableModels: Set<
   SambaNovaModelID.Llama_3_2_90B_Vision_Instruct,
 
   // OpenAI-compatible vision-capable models
+  OpenAICompatibleModelID.Qwen3_6_35B_A3B,
   OpenAICompatibleModelID.Qwen3_8_27B,
   OpenAICompatibleModelID.Qwen3_8_Flash,
   OpenAICompatibleModelID.Gemma_4_31B,
@@ -314,6 +315,7 @@ export const ReasoningCapableModels: Set<
   OpenAICompatibleModelID.DeepSeek_V3_2,
   OpenAICompatibleModelID.DeepSeek_V3_2_Speciale,
   // Qwen reasoning models
+  OpenAICompatibleModelID.Qwen3_8_Flash,
   OpenAICompatibleModelID.Qwen3_6_35B_A3B,
   OpenAICompatibleModelID.Qwen3_8_27B,
   OpenAICompatibleModelID.Qwen3_32B,
