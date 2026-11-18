@@ -97,9 +97,9 @@ export async function listFrozenProjects(): Promise<FrozenProjectSummary[]> {
       const metadata = parseStoredCourseMetadata(value)
       if (!metadata) {
         // One bad record must not take down the whole list.
-        console.error(
-          `[frozenProjects] skipping malformed metadata for ${field}`,
-        )
+        console.error('[frozenProjects] skipping malformed metadata', {
+          courseName: field,
+        })
         continue
       }
       if (metadata.is_frozen !== true) continue
@@ -208,7 +208,8 @@ export async function recoverFrozenProject(args: {
       await closeAuditEntry(auditId, 'failure', reason)
     } catch (auditErr) {
       console.error(
-        `[frozenProjects] audit row ${auditId} for ${courseName} could not be marked failed; it remains pending`,
+        '[frozenProjects] audit row could not be marked failed; it remains pending',
+        { auditId, courseName },
         auditErr,
       )
     }
@@ -219,7 +220,8 @@ export async function recoverFrozenProject(args: {
     await closeAuditEntry(auditId, 'success', null)
   } catch (err) {
     console.error(
-      `CRITICAL: ${courseName} was unfrozen but audit row ${auditId} could not be marked success. Reconcile the audit log.`,
+      'CRITICAL: project was unfrozen but its audit row could not be marked success. Reconcile the audit log.',
+      { auditId, courseName },
       err,
     )
     throw new FrozenProjectRecoveryError(

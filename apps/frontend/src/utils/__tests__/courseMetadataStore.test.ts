@@ -6,6 +6,9 @@ const redisState = vi.hoisted(() => {
   const store = new Map<string, string>()
   return {
     store,
+    // 'fail' rejects before the write. 'applyThenFail' writes, then rejects,
+    // as if the reply was lost. Reset to 'ok' after one call.
+    evalMode: 'ok' as 'ok' | 'fail' | 'applyThenFail',
     hGet: vi.fn(
       async (_hash: string, field: string) => store.get(field) ?? null,
     ),
@@ -28,11 +31,15 @@ const redisState = vi.hoisted(() => {
           string,
           string,
         ]
+        const mode = redisState.evalMode
+        redisState.evalMode = 'ok'
+        if (mode === 'fail') throw new Error('redis unavailable')
         const current = store.get(field)
         const matches =
           absentFlag === '1' ? current === undefined : current === expected
         if (!matches) return 0
         store.set(field, next)
+        if (mode === 'applyThenFail') throw new Error('reply lost')
         return 1
       },
     ),
@@ -152,6 +159,7 @@ function makeMetadata(overrides: Partial<CourseMetadata> = {}): CourseMetadata {
 
 beforeEach(() => {
   redisState.store.clear()
+  redisState.evalMode = 'ok'
   redisState.hGet.mockClear()
   redisState.hSet.mockClear()
   redisState.hDel.mockClear()
@@ -319,6 +327,123 @@ describe('writeCourseMetadata', () => {
     ).rejects.toThrow(CourseMetadataWriteError)
     expect(consoleError).toHaveBeenCalled()
     consoleError.mockRestore()
+  })
+})
+
+describe('compare-and-set failure boundaries', () => {
+  const STALE = JSON.stringify(makeMetadata({ project_description: 'stale' }))
+
+  it('logs a reconcile failure with a static message, treating a %-containing name as data', async () => {
+    // A name with format specifiers must not be interpreted by console.error.
+    const name = 'bot-%s-%j-%o'
+    redisState.store.set(
+      name,
+      JSON.stringify(makeMetadata({ project_description: 'concurrent' })),
+    )
+    // Our own upsert succeeds; the reconcile upsert that follows fails.
+    dbState.insertFn
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('pg down')
+      })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata(name, makeMetadata(), {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).rejects.toMatchObject({ stage: 'rollback' })
+    expect(consoleError).toHaveBeenCalledWith(
+      'CRITICAL: Postgres row could not be reconciled to Redis. Manual reconciliation required.',
+      { courseName: name },
+      expect.any(Error),
+    )
+    consoleError.mockRestore()
+  })
+
+  it('deletes the Postgres row when Redis has no record at reconcile time', async () => {
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata('bot-gone', makeMetadata(), {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).rejects.toMatchObject({ stage: 'conflict' })
+    expect(dbState.deleteFn).toHaveBeenCalledTimes(1)
+    expect(redisState.store.has('bot-gone')).toBe(false)
+  })
+
+  it('reports rollback when the value Redis holds is not a JSON object', async () => {
+    redisState.store.set('bot-array', '[]')
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata('bot-array', makeMetadata(), {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).rejects.toMatchObject({ stage: 'rollback' })
+    expect(consoleError).toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it('reports rollback when Redis cannot be read back after a failed compare-and-set', async () => {
+    redisState.evalMode = 'fail'
+    redisState.hGet.mockRejectedValueOnce(new Error('read down'))
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata('bot-blind', makeMetadata(), {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).rejects.toMatchObject({ stage: 'rollback' })
+  })
+
+  it('reports redis, with Postgres back at the expected value, when the reply is lost before any change', async () => {
+    redisState.store.set('bot-unchanged', STALE)
+    redisState.evalMode = 'fail'
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata('bot-unchanged', makeMetadata({ is_frozen: true }), {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).rejects.toMatchObject({ stage: 'redis' })
+    expect(redisState.store.get('bot-unchanged')).toBe(STALE)
+    expect(dbState.insertFn.mock.calls.at(-1)![1].project_description).toBe(
+      'stale',
+    )
+  })
+
+  it('reports conflict when a lost reply is followed by a different concurrent value', async () => {
+    const concurrent = JSON.stringify(
+      makeMetadata({ project_description: 'someone else' }),
+    )
+    redisState.store.set('bot-raced', concurrent)
+    redisState.evalMode = 'fail'
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata('bot-raced', makeMetadata(), {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).rejects.toMatchObject({ stage: 'conflict' })
+    expect(redisState.store.get('bot-raced')).toBe(concurrent)
+  })
+
+  it('treats a lost reply as applied when Redis already holds the new value', async () => {
+    const next = makeMetadata({ is_frozen: true })
+    redisState.store.set('bot-applied', STALE)
+    redisState.evalMode = 'applyThenFail'
+    const { writeCourseMetadata } = await import('../courseMetadataStore')
+
+    await expect(
+      writeCourseMetadata('bot-applied', next, {
+        expectedPriorRedisValue: STALE,
+      }),
+    ).resolves.toBeUndefined()
+    expect(JSON.parse(redisState.store.get('bot-applied')!)).toEqual(next)
   })
 })
 

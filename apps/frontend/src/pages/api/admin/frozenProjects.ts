@@ -133,9 +133,11 @@ async function handleRecover(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     }
 
-    console.log(
-      `[admin/frozenProjects] ${actorEmail} unfroze ${courseName} (audit ${outcome.auditId})`,
-    )
+    console.log('[admin/frozenProjects] project unfrozen', {
+      actorEmail,
+      courseName,
+      auditId: outcome.auditId,
+    })
     return res.status(200).json({
       recovered: true,
       course_name: courseName,

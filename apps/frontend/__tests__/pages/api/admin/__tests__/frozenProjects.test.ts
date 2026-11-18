@@ -24,6 +24,8 @@ const state = vi.hoisted(() => ({
   concurrentWriteAfterRead: null as null | { field: string; value: string },
   // The next compare-and-set applies, then throws as if the reply was lost.
   replyLostAfterApply: false,
+  // The audit insert succeeds without returning a row.
+  auditInsertReturnsNothing: false,
 }))
 
 vi.mock('~/utils/redisClient', () => {
@@ -108,7 +110,7 @@ vi.mock('~/db/dbClient', async () => {
             state.events.push('audit:insert')
             if (state.failures.auditInsert) throw state.failures.auditInsert
             state.auditInserts.push(row)
-            return [{ id: 42 }]
+            return state.auditInsertReturnsNothing ? [] : [{ id: 42 }]
           },
         }),
       })),
@@ -202,6 +204,7 @@ beforeEach(() => {
   state.failures = {}
   state.concurrentWriteAfterRead = null
   state.replyLostAfterApply = false
+  state.auditInsertReturnsNothing = false
   state.currentUser = SUPER_ADMIN
   state.isSuperAdmin = true
 })
@@ -632,6 +635,58 @@ describe('malformed stored records', () => {
     expect(
       res.body.projects.map((p: { course_name: string }) => p.course_name),
     ).toEqual(['Good'])
+  })
+})
+
+describe('remaining failure paths', () => {
+  it('lists a frozen project with a wrong-typed owner or visibility using safe defaults', async () => {
+    seed('Odd', { ...FROZEN_RECORD, course_owner: 42, is_private: 'yes' })
+    const handler = await loadHandler()
+    const res = makeRes()
+    await handler({ method: 'GET', headers: {} } as any, res)
+
+    expect(res.body.projects).toEqual([
+      { course_name: 'Odd', course_owner: null, is_private: false },
+    ])
+  })
+
+  it('refuses to unfreeze when the audit insert returns no row, and changes nothing', async () => {
+    seed('CS101', FROZEN_RECORD)
+    state.auditInsertReturnsNothing = true
+    const handler = await loadHandler()
+    const res = makeRes()
+    await handler(
+      { method: 'POST', headers: {}, body: { course_name: 'CS101' } } as any,
+      res,
+    )
+
+    expect(res.statusCode).toBe(503)
+    expect(state.events).toEqual(['audit:insert'])
+    expect(storedRecord('CS101').is_frozen).toBe(true)
+  })
+
+  it('still reports the write failure when the audit row cannot be marked failed', async () => {
+    seed('CS101', FROZEN_RECORD)
+    state.failures.upsert = new Error('pg timeout')
+    state.failures.auditUpdate = new Error('audit down')
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const handler = await loadHandler()
+    const res = makeRes()
+    await handler(
+      { method: 'POST', headers: {}, body: { course_name: 'CS101' } } as any,
+      res,
+    )
+
+    // The caller still hears about the failed write, not a success.
+    expect(res.statusCode).toBe(503)
+    expect(res.body.error).toContain('Nothing was changed')
+    expect(storedRecord('CS101').is_frozen).toBe(true)
+    expect(consoleError).toHaveBeenCalledWith(
+      '[frozenProjects] audit row could not be marked failed; it remains pending',
+      { auditId: 42, courseName: 'CS101' },
+      expect.any(Error),
+    )
+    consoleError.mockRestore()
   })
 })
 
