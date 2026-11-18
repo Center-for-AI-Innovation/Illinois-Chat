@@ -35,7 +35,11 @@ export type NavbarVariant = 'application' | 'splash'
 export type NavbarContentWidth = 'workspace' | 'sidebar' | 'page'
 
 interface NavbarProps {
-  /** `splash` aligns with the landing hero column instead of app pages. */
+  /**
+   * `splash` is the landing page header: no divider, and the page must set
+   * `--navbar-height` to its 72px row, since the header and content offset
+   * both read that token.
+   */
   variant?: NavbarVariant
   /** Only applies to the `application` variant. */
   contentWidth?: NavbarContentWidth
@@ -142,7 +146,11 @@ export default function Navbar({
   const layout = variant === 'splash' ? 'splash' : contentWidth
 
   return (
-    <div className={navbarVariants({ bordered: !hideBorder })}>
+    <div
+      className={navbarVariants({
+        bordered: !hideBorder && variant !== 'splash',
+      })}
+    >
       <header
         data-variant={variant}
         data-layout={layout}
