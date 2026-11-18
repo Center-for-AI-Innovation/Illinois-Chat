@@ -7,7 +7,9 @@ vi.mock('~/components/UIUC-Components/GlobalFooter', () => ({
 }))
 
 vi.mock('~/components/UIUC-Components/navbars/Navbar', () => ({
-  default: () => <header data-testid="header" />,
+  default: ({ variant }: { variant?: string }) => (
+    <header data-testid="header" data-variant={variant ?? 'application'} />
+  ),
 }))
 
 import Home from '~/pages/index'
@@ -27,5 +29,14 @@ describe('Landing page (src/pages/index.tsx)', () => {
     renderPage()
 
     expect(screen.getByRole('main')).toBeTruthy()
+  })
+
+  it('opts into the splash navbar layout', () => {
+    renderPage()
+
+    expect(screen.getByTestId('header')).toHaveAttribute(
+      'data-variant',
+      'splash',
+    )
   })
 })

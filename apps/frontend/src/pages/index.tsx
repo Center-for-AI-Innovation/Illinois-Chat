@@ -181,6 +181,12 @@ const Home: NextPage<HomeProps> = () => {
               box-sizing: border-box;
               max-width: 100vw;
             }
+            /* The splash header is a 72px row with no divider. Its navbar
+               and content offset both read this token, and next/head drops
+               the override when leaving the page. */
+            :root {
+              --navbar-height: 72px;
+            }
             body, html {
               overflow-x: clip;
               width: 100%;
@@ -191,7 +197,7 @@ const Home: NextPage<HomeProps> = () => {
         </style>
       </Head>
 
-      <Navbar />
+      <Navbar variant="splash" />
 
       <main
         id="main-content"
