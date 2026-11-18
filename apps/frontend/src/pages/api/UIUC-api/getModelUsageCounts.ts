@@ -1,7 +1,7 @@
 import { withAuth } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
-import { getLogger } from '~/utils/server/log'
+import { cutForLog, getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.getModelUsageCounts')
 
@@ -31,7 +31,7 @@ async function handler(req: any, res: any) {
       const errorText = await response.text()
       log.error('backend getModelUsageCounts failed', {
         status: response.status,
-        body: errorText.slice(0, 500),
+        body: cutForLog(errorText),
       })
       return res.status(response.status).json({
         error: `Failed to fetch data: ${response.status} - ${errorText}`,
@@ -61,7 +61,7 @@ export async function getModelUsageCounts(project_name: string) {
       log.error('getModelUsageCounts request failed', {
         course: project_name,
         status: response.status,
-        body: (await response.text()).slice(0, 500),
+        body: cutForLog(await response.text()),
       })
       return {
         status: response.status,

@@ -565,7 +565,11 @@ export async function handleStreamingResponse(
     await updateConversationInDatabase(conversation, course_name, req)
   } catch (error) {
     console.error('Error processing streaming response:', error)
-    res.status(500).json({ error: 'Error processing streaming response' })
+    // When the reply has started, its status cannot change: a second status
+    // would throw, and that throw would be logged as a new error of the route.
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error processing streaming response' })
+    }
   } finally {
     res.end()
   }

@@ -4,7 +4,12 @@ import fs, { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MAX_CACHED_MAP_BYTES, MAX_MAP_BYTES, getLogger } from '../log'
+import {
+  MAX_CACHED_MAP_BYTES,
+  MAX_MAP_BYTES,
+  cutForLog,
+  getLogger,
+} from '../log'
 import { runWithLogContext } from '../requestContext'
 
 const TS = '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z'
@@ -508,6 +513,13 @@ describe('getLogger', () => {
     getLogger('s').info(
       'redis://default:1234&abcd@cache.internal:6379 mongodb://root:99?x@mongo postgres://user:1#x@h http:///user:SECRETB@127.0.0.1:9/',
     )
+    // Backslashes count as slashes for a browser.
+    getLogger('s').info(
+      'http://\\/user:SECRETA@host/ http:\\\\user:SECRETA@host/',
+    )
+    expect(c.log.mock.calls[1]![0]).toMatch(
+      / s http:\/\/\*\*\*@host\/ http:\/\/\*\*\*@host\/$/,
+    )
     expect(c.log.mock.calls[0]![0]).toMatch(
       / redis:\/\/\*\*\*@cache\.internal:6379 mongodb:\/\/\*\*\*@mongo postgres:\/\/\*\*\*@h http:\/\/\*\*\*@127\.0\.0\.1:9\/$/,
     )
@@ -555,6 +567,41 @@ describe('getLogger', () => {
     const text = c.error.mock.calls[0]![0] as string
     expect(text).not.toMatch(/SECRET|user:/)
     expect(text).toMatch(/ postgres:\/\/\*\*\*\S*\.\.\.\[cut\]$/)
+  })
+
+  it('cutForLog hides a login before it cuts', () => {
+    const text = `${'x'.repeat(480)} postgres://admin:SuperSecretPw@db.internal/app and more`
+    expect(cutForLog(text)).toHaveLength(500)
+    expect(cutForLog(text)).not.toMatch(/admin|Super/)
+    expect(cutForLog(text).endsWith(' postgres://***@db.i')).toBe(true)
+    expect(cutForLog('short', 3)).toBe('sho')
+  })
+
+  it('omits the params of a failed query in a field and in a thrown value, and leaves other text with "params:" alone', () => {
+    const c = spies()
+    const log = getLogger('s')
+    log.warn('step', { detail: 'Failed query: select 1\nparams: sk-SECRET' })
+    log.error('step', undefined, 'Failed query: select 2\nparams: sk-SECRET')
+    log.info('user said:\nparams: are these right?\nyes')
+    expect(c.warn.mock.calls[0]![0]).toMatch(
+      / detail=Failed query: select 1\\nparams: <omitted>$/,
+    )
+    expect(c.error.mock.calls[0]![0]).toMatch(
+      /\nFailed query: select 2\\nparams: <omitted>$/,
+    )
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / user said:\\nparams: are these right\?\\nyes$/,
+    )
+  })
+
+  it('hides a login in the code of an error before the code is cut', () => {
+    const c = spies()
+    const err = Object.assign(new Error('x'), {
+      code: `${'c'.repeat(80)} redis://:SuperSecretPassword@h`,
+    })
+    err.stack = undefined
+    getLogger('s').error('failed', err)
+    expect(c.error.mock.calls[0]![0]).not.toContain('SuperSecre')
   })
 
   it('escapes the name of a field, and takes fields only from an object', () => {
