@@ -285,8 +285,8 @@ function createReasoningFetchMiddleware(
             }
           }
         } catch (error) {
-          // The reply has started, so no caller can catch this any more.
-          log.error('LLM stream failed', undefined, error)
+          // No log line here: the AI SDK passes this error on as a part of
+          // its stream, and handleStreamingResponse or the caller logs it.
           if (isThinkingOpen) controller.enqueue(encoder.encode('</think>\n'))
           controller.error(error)
         }

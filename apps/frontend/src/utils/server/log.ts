@@ -57,19 +57,22 @@ function threshold(): number {
   return LEVEL_RANK.INFO!
 }
 
-// The login part of a URL: "://user:secret@host", "://:secret@host" and
-// "://token@host". It must not reach the log.
-// - The user name ends at a character that a user name does not have
-//   (" ' < > , ? # & ; ) | \), so "(http://a.edu):bob@c.edu" is left alone.
-// - The password runs to the last @ before the next / or space. It can hold
-//   any other character, so "p,ss", "p?ss" and "p@ss" are hidden as a whole.
-// - "host:8001" followed by one of those characters is a port, not a
-//   password, so {"url":"http://backend:8001","email":"a@b.edu"} is left alone.
-//   The cost: a password of 1 to 5 digits that is followed by such a character
-//   ("user:123,x@host") is not hidden.
+// The login part of a URL: "://user:secret@host", "://:secret@host",
+// "://token@host" and "://user@realm:secret@host". It must not reach the log.
+// The rule is made so that a password is never shown; the cost is that it can
+// take away text that is not a login.
+// - The login is everything from "://" to the last @ before the next / or
+//   space. A user name or a password can hold any other character.
+// - One case is left alone: a host with a dot or a port (or "localhost") that
+//   is directly followed by " ? # or &. A URL ends there and what follows is
+//   other text: {"url":"http://backend:8001","email":"a@b.edu"},
+//   "https://a.edu?email=a@b.edu", "http://localhost:3000&login_hint=a@b.edu".
+// - So "http://a.edu,bob@c.edu" loses "a.edu,bob" (no password is shown), and
+//   a login whose user name looks like such a host and is followed by one of
+//   those four characters ("first.last&x:secret@host") is not hidden.
 // A login without "://" in front ("user:secret@host") is not found.
 const LOGIN_IN_URL =
-  /:\/\/[^/\s:@"'<>,?#&;)|\\]*(?::(?!\d{1,5}(?:[/\s"'<>,?#&;)|\\]|$))[^/\s]*)?@/g
+  /:\/\/(?!(?:[\w-]+(?:\.[\w-]+)+(?::\d{1,5})?|[\w.-]+:\d{1,5}|localhost)["?#&])[^/\s]*@/g
 
 // Characters that can break or forge a log line: the C0 and C1 control
 // characters (newline, NUL, ESC and the others), DEL, the Unicode line
@@ -83,17 +86,21 @@ const SHORT_ESCAPES: Record<string, string> = {
   '\t': '\\t',
 }
 
-// A value must not be able to start a new log line.
+// Every value goes through here before it is written: a login in a URL is
+// hidden, and a value must not be able to start a new log line. The login is
+// looked for first, while a newline is still a character that ends a URL.
 function escapeNewlines(text: string): string {
-  return text.replace(CONTROL_CHARACTERS, (found) => {
-    const code = found.charCodeAt(0)
-    return (
-      SHORT_ESCAPES[found] ??
-      (code < 0x100
-        ? `\\x${code.toString(16).padStart(2, '0')}`
-        : `\\u${code.toString(16).padStart(4, '0')}`)
-    )
-  })
+  return text
+    .replace(LOGIN_IN_URL, '://***@')
+    .replace(CONTROL_CHARACTERS, (found) => {
+      const code = found.charCodeAt(0)
+      return (
+        SHORT_ESCAPES[found] ??
+        (code < 0x100
+          ? `\\x${code.toString(16).padStart(2, '0')}`
+          : `\\u${code.toString(16).padStart(4, '0')}`)
+      )
+    })
 }
 
 // JSON.stringify turns an Error into {}, so an Error anywhere in a field value
@@ -126,10 +133,13 @@ function formatPairs(fields: LogFields): string[] {
 // ("Failed query: ...\nparams: a,b,c"). They can hold emails, keys and whole
 // documents, so they are cut off; the query text stays.
 function errorMessage(err: Error): string {
-  return String(err.message).replace(
+  const message = String(err.message).replace(
     /\nparams: [\s\S]*$/,
     '\nparams: <omitted>',
   )
+  return message.length > MAX_ERROR_MESSAGE_LENGTH
+    ? `${message.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...[cut]`
+    : message
 }
 
 // The stack frames of an error. V8 writes "Name: message" and then the frames;
@@ -144,9 +154,13 @@ function stackFrames(err: Error): string[] {
   if (stack.startsWith(header)) {
     lines = stack.slice(header.length).split('\n')
   } else {
-    let first = lines.length
+    // Lines after the last frame (an empty line, a note of a library) do not
+    // count.
+    let end = lines.length
+    while (end > 0 && !/^\s+at /.test(lines[end - 1]!)) end--
+    let first = end
     while (first > 0 && /^\s+at /.test(lines[first - 1]!)) first--
-    lines = lines.slice(first)
+    lines = lines.slice(first, end)
   }
   return lines
     .filter((line) => /^\s+at /.test(line))
@@ -155,13 +169,16 @@ function stackFrames(err: Error): string[] {
 
 // How many of the errors inside an AggregateError are written.
 const MAX_INNER_ERRORS = 3
+// The message of an error can be the whole reply of another service.
+const MAX_ERROR_MESSAGE_LENGTH = 4000
+const MAX_CODE_LENGTH = 100
 
 // "ECONNREFUSED" and the like: Node puts the reason of a failed system call in
 // err.code, and the message can be empty.
 function errorCode(err: Error): string {
   const code = (err as { code?: unknown }).code
   return typeof code === 'string' || typeof code === 'number'
-    ? ` (code=${escapeNewlines(String(code))})`
+    ? ` (code=${escapeNewlines(String(code).slice(0, MAX_CODE_LENGTH))})`
     : ''
 }
 
@@ -188,8 +205,10 @@ function formatError(err: unknown, depth = 0): string {
   const lines = [errorHead(err), ...stackFrames(err)]
   // fetch gives "AggregateError" with an empty message when a host has more
   // than one address: the reasons are in err.errors.
+  // Only for an AggregateError: other errors can have an "errors" list with
+  // values of a request in it (a validation error).
   const inner = (err as { errors?: unknown }).errors
-  if (Array.isArray(inner)) {
+  if (err.name === 'AggregateError' && Array.isArray(inner)) {
     inner.slice(0, MAX_INNER_ERRORS).forEach((item, index) => {
       const text =
         item instanceof Error
@@ -252,9 +271,11 @@ function sourceMapFor(file: string): SourceMapLike | undefined {
   if (!fs || !mod?.SourceMap) return undefined
   try {
     const mapFile = `${file}.map`
-    const { mtimeMs, size } = fs.statSync(mapFile)
     const cached = sourceMaps.get(file)
+    // Taken out here, and put back below when it is still good: an entry does
+    // not stay when its file is gone.
     sourceMaps.delete(file)
+    const { mtimeMs, size } = fs.statSync(mapFile)
     if (cached?.mtimeMs === mtimeMs) {
       sourceMaps.set(file, cached)
       return cached.map
@@ -354,7 +375,7 @@ export function formatLine(
     ? { rid: ctx.rid, path: ctx.path, course: ctx.course }
     : {}
   parts.push(...formatPairs(bound))
-  parts.push(escapeNewlines(message))
+  parts.push(escapeNewlines(String(message)))
   if (fields) {
     // A field the context already printed with the same value is not repeated
     // (a handler that passes course= inside a course-wrapped route).
@@ -367,7 +388,7 @@ export function formatLine(
   }
   let line = parts.join(' ')
   if (err !== undefined) line += `\n${formatError(err)}`
-  return line.replace(LOGIN_IN_URL, '://***@')
+  return line
 }
 
 const WRITERS: Record<Level, (line: string) => void> = {
@@ -384,28 +405,38 @@ export function getLogger(scope: string): Logger {
       fields?: LogFields | Error,
       err?: unknown,
     ): void {
-      if (LEVEL_RANK[level]! < threshold()) return
-      // Allow log.error('failed', err) as a shorthand for (message, undefined, err).
-      if (fields instanceof Error && err === undefined) {
-        err = fields
-        fields = undefined
-      }
-      let line: string
+      // The logger is called from catch blocks and from stream callbacks, so
+      // it must not throw.
       try {
-        let pairs = fields as LogFields | undefined
-        if (level === 'ERROR') {
-          // Only for errors: reading a stack is too slow for every line.
-          const at = callSite(write)
-          if (at) pairs = { ...pairs, at }
+        if (LEVEL_RANK[level]! < threshold()) return
+        // Allow log.error('failed', err) as a shorthand for (message, undefined, err).
+        if (fields instanceof Error && err === undefined) {
+          err = fields
+          fields = undefined
         }
-        line = formatLine(level, scope, message, pairs, err)
-      } catch (failure) {
-        // The logger is called from catch blocks and from stream callbacks, so
-        // it must not throw: a field or an error that cannot be read (a getter
-        // that throws) gives the line without its details.
-        line = `${formatLine(level, scope, String(message))} (the details of this line could not be written: ${escapeNewlines(String(failure))})`
+        let line: string
+        try {
+          let pairs = fields as LogFields | undefined
+          if (level === 'ERROR') {
+            // Only for errors: reading a stack is too slow for every line.
+            const at = callSite(write)
+            if (at) pairs = { ...pairs, at }
+          }
+          line = formatLine(level, scope, message, pairs, err)
+        } catch (failure) {
+          // A field or an error that cannot be read (a getter that throws)
+          // gives the line without its details.
+          line = `${formatLine(level, scope, message)} (the details of this line could not be written: ${escapeNewlines(String(failure))})`
+        }
+        WRITERS[level](line)
+      } catch {
+        // Not even the message can be read. Say that a line was lost.
+        try {
+          console.error(`${level} ${scope} a log line could not be written`)
+        } catch {
+          // Nothing more can be done.
+        }
       }
-      WRITERS[level](line)
     }
   return {
     debug: emit('DEBUG'),

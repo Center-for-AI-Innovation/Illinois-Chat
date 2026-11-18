@@ -290,6 +290,82 @@ describe('getLogger', () => {
     )
   })
 
+  it('reads the frames when lines follow the last frame', () => {
+    const c = spies()
+    const err = new Error('first')
+    err.message = 'changed'
+    err.stack =
+      'Error: first\n    at real (/app/a.js:2:3)\n\nnote of a library\n'
+    getLogger('s').error('failed', err)
+    expect((c.error.mock.calls[0]![0] as string).split('\n').slice(1)).toEqual([
+      'Error: changed',
+      '    at real (/app/a.js:2:3)',
+    ])
+  })
+
+  it('cuts a very long error message and a very long code', () => {
+    const c = spies()
+    const err = Object.assign(new Error('m'.repeat(9000)), {
+      code: 'C'.repeat(3000),
+    })
+    err.stack = undefined
+    getLogger('s').error('failed', err)
+    const head = (c.error.mock.calls[0]![0] as string).split('\n')[1]!
+    expect(head).toBe(
+      `Error: ${'m'.repeat(4000)}...[cut] (code=${'C'.repeat(100)})`,
+    )
+  })
+
+  it('writes the errors list of an AggregateError only', () => {
+    const c = spies()
+    const validation = Object.assign(new Error('invalid input'), {
+      errors: [{ field: 'api_key', value: 'sk-SECRETSECRET' }],
+    })
+    getLogger('s').error('failed', validation)
+    expect(c.error.mock.calls[0]![0]).not.toContain('SECRET')
+    expect(c.error.mock.calls[0]![0]).not.toContain('error 1 of')
+  })
+
+  it('writes a line when the message is not a string', () => {
+    const c = spies()
+    getLogger('s').error(new Error('real') as unknown as string, { a: 1 })
+    expect(c.error.mock.calls[0]![0]).toMatch(
+      / ERROR   s Error: real a=1 at=\S+:\d+$/,
+    )
+  })
+
+  it('says that a line was lost when nothing of it can be read', () => {
+    const c = spies()
+    const unreadable = {
+      toString() {
+        throw new Error('no text')
+      },
+    }
+    expect(() =>
+      getLogger('s').warn(unreadable as unknown as string),
+    ).not.toThrow()
+    expect(c.error).toHaveBeenCalledWith(
+      'WARNING s a log line could not be written',
+    )
+    // A failure that itself cannot be turned into text.
+    const fields = {
+      get broken(): string {
+        throw Object.create(null)
+      },
+    }
+    expect(() => getLogger('s').info('step', fields)).not.toThrow()
+    expect(c.error).toHaveBeenLastCalledWith(
+      'INFO s a log line could not be written',
+    )
+    // Even the console can fail.
+    c.error.mockImplementation(() => {
+      throw new Error('console is gone')
+    })
+    expect(() =>
+      getLogger('s').warn(unreadable as unknown as string),
+    ).not.toThrow()
+  })
+
   it('still writes the line when a field cannot be read', () => {
     const c = spies()
     const fields = {
@@ -410,18 +486,35 @@ describe('getLogger', () => {
     )
   })
 
-  it('leaves a URL with a port alone when other text with an @ follows it', () => {
+  it('hides a login whose user name has an @ or punctuation in it', () => {
+    const c = spies()
+    const urls = [
+      'smtp://rashmil@example.com:Sup3rSecret@smtp.example.com:587',
+      'postgres://admin@myserver:S3cret@myserver.postgres.database.azure.com:5432/db',
+      'imap://a@b.edu:pw@mail',
+      'http://CORP\\svc:S3cret@proxy:8080',
+      'http://us,er:pw@host',
+      'http://u&x:secret@h',
+      'http://user:123,x@host/',
+    ]
+    getLogger('s').info(urls.join(' '))
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / smtp:\/\/\*\*\*@smtp\.example\.com:587 postgres:\/\/\*\*\*@myserver\.postgres\.database\.azure\.com:5432\/db imap:\/\/\*\*\*@mail http:\/\/\*\*\*@proxy:8080 http:\/\/\*\*\*@host http:\/\/\*\*\*@h http:\/\/\*\*\*@host\/$/,
+    )
+  })
+
+  it('leaves a URL alone when it ends at " ? # or & and other text with an @ follows', () => {
     const c = spies()
     const texts = [
       'redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu',
-      'see (http://a.edu):bob@c.edu',
-      'http://a.edu;bob@x.edu',
-      'http://a.edu|bob@x.edu',
       'https://site.edu/login?next=https://a.edu&email=bob@x.edu',
-      'see https://a.edu:8443,contact:bob@y.edu',
+      'https://a.edu?email=x@y.edu',
+      'https://a.edu:8443#x@y',
+      '{"url":"http://x.com:80","mail":"u@v.edu"}',
     ]
     for (const text of texts) getLogger('s').info(text)
-    // A newline is escaped before the login is looked for.
+    // The login is looked for before a newline is escaped, so a newline ends
+    // the URL.
     getLogger('s').info('http://backend:8001\nbob@c.edu')
     texts.forEach((text, index) => {
       expect(c.log.mock.calls[index]![0]).toContain(` s ${text}`)
@@ -429,6 +522,15 @@ describe('getLogger', () => {
     expect(c.log.mock.calls[texts.length]![0]).toContain(
       ' s http://backend:8001\\nbob@c.edu',
     )
+  })
+
+  it('takes away text between a URL and a later @ when it cannot tell that there is no login', () => {
+    // The price of never showing a password. No secret is in these lines.
+    const c = spies()
+    getLogger('s').info('see https://a.edu:8443,contact:bob@y.edu')
+    getLogger('s').info('http://a.edu;bob@x.edu')
+    expect(c.log.mock.calls[0]![0]).toContain(' s see https://***@y.edu')
+    expect(c.log.mock.calls[1]![0]).toContain(' s http://***@x.edu')
   })
 
   it('does not eat the text after a URL that has a port and no path', () => {

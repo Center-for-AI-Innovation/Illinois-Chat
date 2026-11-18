@@ -10,6 +10,7 @@ import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { ncsaHostedAuthHeaders } from '~/utils/ncsaHostedAuth'
 import { NextResponse } from 'next/server'
 import { getLogger } from '~/utils/server/log'
+import { isClosedStreamError } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.ollama')
 
@@ -115,8 +116,15 @@ async function handleOllamaReasoningStream(
           }
         }
       } catch (error) {
-        // The reply has started, so no caller can catch this any more.
-        log.error('LLM stream failed', { model: conversation.model.id }, error)
+        // The reply has started, so no caller can catch this any more. A
+        // reader that went away is not a failure.
+        if (!isClosedStreamError(error)) {
+          log.error(
+            'LLM stream failed',
+            { model: conversation.model.id },
+            error,
+          )
+        }
         if (isThinkingOpen) controller.enqueue(encoder.encode('</think>\n'))
         controller.error(error)
       }

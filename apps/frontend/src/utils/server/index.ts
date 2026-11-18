@@ -28,6 +28,7 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '../crypto'
 import { getLogger } from './log'
+import { isClosedStreamError } from './streamErrors'
 
 const log = getLogger('openai')
 
@@ -221,7 +222,10 @@ export const OpenAIStream = async (
               }
             } catch (e) {
               // The reply has started, so no caller can catch this any more.
-              log.error('LLM stream failed', { model: model.id }, e)
+              // A reader that went away is not a failure.
+              if (!isClosedStreamError(e)) {
+                log.error('LLM stream failed', { model: model.id }, e)
+              }
               if (!isStreamClosed) {
                 controller.error(e)
                 isStreamClosed = true // Update the flag if an error occurs
@@ -240,7 +244,9 @@ export const OpenAIStream = async (
             }
           }
         } catch (e) {
-          log.error('LLM stream failed', { model: model.id }, e)
+          if (!isClosedStreamError(e)) {
+            log.error('LLM stream failed', { model: model.id }, e)
+          }
           if (!isStreamClosed) {
             controller.error(e)
             isStreamClosed = true
