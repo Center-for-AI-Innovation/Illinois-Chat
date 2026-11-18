@@ -48,22 +48,20 @@ function text(value: unknown): string {
 }
 
 // The login part of a URL: "://user:secret@host", "://:secret@host", "://token@host" and
-// "://user@realm:secret@host". It must not reach the log. The same pattern as LOGIN_IN_URL
-// in the frontend log.ts. The rule is made so that a password is never shown; the cost is
-// that it can take away text that is not a login.
-// - The login is everything from "://" to the last @ before the next / or space. A user
-//   name or a password can hold any other character.
-// - One case is left alone: a host with a dot or a port (or "localhost") that is directly
-//   followed by " ? # or &. A URL ends there and what follows is other text:
-//   {"url":"http://backend:8001","email":"a@b.edu"}, "https://a.edu?email=a@b.edu".
-// - So "http://a.edu,bob@c.edu" loses "a.edu,bob" (no password is shown), and a login whose
-//   user name looks like such a host and is followed by one of those four characters
-//   ("first.last&x:secret@host") is not hidden.
-// A login without "://" in front ("user:secret@host") is not found.
-const LOGIN_IN_URL = /:\/\/(?!(?:[\w-]+(?:\.[\w-]+)+(?::\d{1,5})?|[\w.-]+:\d{1,5}|localhost)["?#&])[^/\s]*@/g;
+// "://user@realm:secret@host". It must not reach the log. The same rule as LOGIN_IN_URL in
+// the frontend log.ts, with no exceptions, so that a password is not shown: the login is
+// everything from "://" (or more slashes: a browser reads "http:///user:pw@host" as a URL
+// with a login) to the last @ before the next /, space or double quote. The double quote
+// ends it because a URL in JSON ends there: {"url":"http://a.edu:80","mail":"b@c.edu"} is
+// left as it is.
+// The cost: text that is not a login can be lost. "https://a.edu?email=a@b.edu" is written
+// as "https://***@b.edu". A URL with a path is not touched.
+// Not found: a login without "://" in front ("user:secret@host"), and a password that has
+// a /, a space or a double quote in it.
+const LOGIN_IN_URL = /:\/{2,}[^/\s"]*@/g;
 // A login that a cut ended before its @: "://user:secr...[cut 20 characters]" and the
 // "...[truncated]" of @apify/log.
-const LOGIN_BEFORE_CUT = /:\/\/[^/\s]*?(?=\.\.\.\[(?:cut|truncated))/g;
+const LOGIN_BEFORE_CUT = /:\/{2,}[^/\s"]*?(?=\.\.\.\[(?:cut|truncated))/g;
 
 export function hidePasswords(line: string): string {
     return line.replace(LOGIN_IN_URL, '://***@').replace(LOGIN_BEFORE_CUT, '://***');
@@ -101,8 +99,8 @@ const MAX_MESSAGE_LENGTH = 10_000;
 
 // crawlee puts the stack of a failed page inside the message. Those frame lines keep their
 // own lines; every other line is joined to the line before it with a written \n, and every
-// control character is escaped. A login in a URL is hidden first, while a newline still
-// ends a URL and before the cut can take its @ away. The result is cut last, so the limit
+// control character is escaped. A login in a URL is hidden first, before the cut can take
+// its @ away. The result is cut last, so the limit
 // is on what is written.
 function messageOnOneLine(message: unknown): string {
     const out: string[] = [];
@@ -151,12 +149,14 @@ export function finishLine(line: string, isError: boolean, at?: string): string 
     // colour code in it comes from the logger: colours are on.
     const coloursOn = parts[0].search(COLOUR_CODE) >= 0;
     parts.forEach((raw, index) => {
-        // Hide a login while a real newline still ends a URL.
+        // The message was done in messageOnOneLine; this is for the data and the error text.
         const part = hidePasswords(raw);
         // A line that stays on its own must start with real spaces: @apify/log writes the
         // indent first and the colour code after it. Text that starts with a colour code
         // and then looks like a frame is joined to the line before it.
-        const indented = /^[ \t]/.test(part);
+        // A tab does not count: it is written as \t below, and the line would then start
+        // with text.
+        const indented = /^ /.test(part);
         const plain = part.replace(COLOUR_CODE, '');
         // The first line after the head is the message of the error, when it is indented.
         if (index === 0 || (indented && (STACK_LINE.test(plain) || index === 1))) kept.push(part);
@@ -183,7 +183,9 @@ export class CrawlerLogger extends LoggerText {
         // BrowserPool, Request, the Playwright utilities). Inside a crawl, their lines get
         // the "rid=<id> course=<name>" of that crawl in front of their own prefix.
         const crawl = crawlContext.getStore();
-        if (crawl && !String(opts?.prefix ?? '').startsWith(crawl)) {
+        const own = String(opts?.prefix ?? '');
+        // The logger of the crawl has exactly this prefix, and its children start with it.
+        if (crawl && own !== crawl && !own.startsWith(`${crawl}:`) && !own.startsWith(`${crawl} `)) {
             opts = { ...opts, prefix: opts?.prefix ? `${crawl} ${opts.prefix}` : crawl };
         }
         const raw = super._log(level, message ? messageOnOneLine(message) : message, data, exception, opts);

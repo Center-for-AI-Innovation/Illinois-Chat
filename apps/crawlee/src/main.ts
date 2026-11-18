@@ -70,7 +70,7 @@ app.post('/crawl', async (req: Request, res: Response) => {
     }
     // The course name is on every line of the crawl. A space (or a character that looks
     // like one) in it would let a caller add a fake field ("course=x rid=other"). So it is
-    // cut, and every character that is not a letter, a digit or one of . _ ~ - is written
+    // cut, and every character that is not an ASCII letter, a digit or one of . _ ~ - is written
     // as %XX. A usual project name stays as it is.
     const course = params.courseName ? encodeField(oneLine(params.courseName).slice(0, 200)) : '';
     const prefix = course ? `rid=${rid} course=${course}` : `rid=${rid}`;
@@ -107,7 +107,7 @@ app.post('/crawl', async (req: Request, res: Response) => {
         } else {
             clog.exception(e, `crawl failed ms=${Date.now() - started}`);
         }
-        res.status(500).json({ error: 'An error occurred during the upload', errorTitle: e.name, errorMessage: e.message });
+        res.status(500).json({ error: 'An error occurred during the upload', errorTitle: e?.name ?? 'Error', errorMessage: e?.message ?? String(e) });
     } finally {
         if (global.gc) {
             global.gc();

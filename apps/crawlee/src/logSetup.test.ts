@@ -41,7 +41,12 @@ describe('hidePasswords', () => {
         assert.equal(hidePasswords('https://u:p,w@example.edu/'), 'https://***@example.edu/');
         assert.equal(hidePasswords("https://user:it's@host.edu/"), 'https://***@host.edu/');
         assert.equal(hidePasswords('redis://:p?ss@cache:6379 redis://:p#ss@cache:6379'), 'redis://***@cache:6379 redis://***@cache:6379');
-        assert.equal(hidePasswords('amqp://u:p"ss@h https://user:p<a>ss@h https://u:8443@h/x'), 'amqp://***@h https://***@h https://***@h/x');
+        assert.equal(hidePasswords('https://user:p<a>ss@h https://u:8443@h/x'), 'https://***@h https://***@h/x');
+        // A password that starts with digits is not read as a port.
+        assert.equal(hidePasswords('postgres://admin:2024#Winter@db:5432/app redis://default:1234&abcd@cache:6379'), 'postgres://***@db:5432/app redis://***@cache:6379');
+        // A browser reads this as a URL with a login.
+        assert.equal(hidePasswords('http:///user:SECRETB@127.0.0.1:9/'), 'http://***@127.0.0.1:9/');
+        assert.equal(hidePasswords('http:////user:SECR...[truncated]'), 'http://***...[truncated]');
     });
 
     it('hides a login whose user name has an @ or punctuation in it', () => {
@@ -52,22 +57,21 @@ describe('hidePasswords', () => {
         }
     });
 
-    it('leaves a URL alone when it ends at " ? # or & and other text with an @ follows', () => {
+    it('leaves a URL in JSON, a URL with a path, and a URL before a newline alone', () => {
         for (const line of [
-            'https://site.edu/login?next=https://a.edu&email=bob@x.edu',
-            'redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu',
-            'https://a.edu?email=x@y.edu',
-            'https://a.edu:8443#x@y',
             '{"url":"http://x.com:80","mail":"u@v.edu"}',
-            // A real newline ends a URL: the login is looked for before it is escaped.
+            'https://site.edu/login?email=bob@x.edu',
             'http://backend:8001\nbob@c.edu',
         ]) assert.equal(hidePasswords(line), line);
     });
 
-    it('takes away text between a URL and a later @ when it cannot tell that there is no login', () => {
-        // The price of never showing a password. No secret is in these lines.
+    it('takes away the text between a URL with no path and a later @', () => {
+        // The price of a rule that does not show a password. No secret is in these lines.
+        assert.equal(hidePasswords('https://a.edu?email=x@y.edu'), 'https://***@y.edu');
+        assert.equal(hidePasswords('redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu'), 'redirect_uri=http://***@illinois.edu');
         assert.equal(hidePasswords('http://a.edu;bob@x.edu'), 'http://***@x.edu');
-        assert.equal(hidePasswords('see https://a.edu:8443,contact:bob@y.edu'), 'see https://***@y.edu');
+        // Also after the logger has written a newline as \n.
+        assert.equal(hidePasswords('http://a.edu\\nbob@c.edu'), 'http://***@c.edu');
     });
 
     it('hides a login that a cut ended before its @', () => {
@@ -315,6 +319,23 @@ describe('the logger', () => {
 });
 
 describe('finishLine', () => {
+    it('does not keep a line that starts with a tab on its own line', () => {
+        assert.equal(finishLine('ERROR head\n\tat forged (x:1:1)', true), 'ERROR head\\n\\tat forged (x:1:1)');
+        assert.equal(finishLine('ERROR head\n  message\n\tat forged (x:1:1)\n    at real (y:2:2)', true), 'ERROR head\n  message\\n\\tat forged (x:1:1)\n    at real (y:2:2)');
+    });
+
+    it('puts the crawl prefix in front of a logger of another crawl once, and not in front of its own children', () => {
+        const warnings = capture('warn');
+        crawlContext.run('rid=abc course=x', () => {
+            log.child({ prefix: 'rid=abc course=x' }).warning('own');
+            log.child({ prefix: 'rid=abc course=x:Child' }).warning('child');
+            log.child({ prefix: 'rid=abc course=xy' }).warning('other');
+        });
+        assert.match(warnings[0], / WARN {2}rid=abc course=x: own$/);
+        assert.match(warnings[1], / WARN {2}rid=abc course=x:Child: child$/);
+        assert.match(warnings[2], / WARN {2}rid=abc course=x rid=abc course=xy: other$/);
+    });
+
     it('keeps stack lines, folds every other line, and puts at= on the first line', () => {
         const line = ['ERROR head', '  Error message', 'second message line', '      at run (/app/a.js:1:2)', '    CAUSE: inner', 'stray'].join('\n');
         assert.equal(finishLine(line, true, 'src/main.ts:5'), ['ERROR head at=src/main.ts:5', '  Error message\\nsecond message line', '      at run (/app/a.js:1:2)', '    CAUSE: inner\\nstray'].join('\n'));
