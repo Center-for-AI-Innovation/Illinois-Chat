@@ -28,4 +28,14 @@ describe('UIUC-Components basics', () => {
     renderWithProviders(<LoadingPlaceholderForAdminPages />)
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0)
   })
+
+  it('LoadingPlaceholderForAdminPages leaves the navbar to the site header', () => {
+    // The loading state of settings routes is covered by SiteHeader, so the
+    // placeholder must not add a second navbar on top of it.
+    renderWithProviders(<LoadingPlaceholderForAdminPages />)
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('navigation', { name: 'Main navigation' }),
+    ).not.toBeInTheDocument()
+  })
 })

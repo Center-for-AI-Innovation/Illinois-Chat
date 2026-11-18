@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import Navbar from './navbars/Navbar'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import React from 'react'
 import { useRouter } from 'next/router'
@@ -34,11 +33,10 @@ export const CanViewOnlyCourse = ({
 
   return (
     <>
-      <Navbar />
       <main
         id="main-content"
         tabIndex={-1}
-        className="justify-center; course-page-main flex min-h-(--viewport-height) flex-col items-center pt-(--navbar-height)"
+        className="justify-center; course-page-main flex min-h-(--page-viewport-height) flex-col items-center"
       >
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-8">
           <Link href="/">
