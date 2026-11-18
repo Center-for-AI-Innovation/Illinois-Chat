@@ -253,7 +253,8 @@ export const buildPrompt = async ({
 
       // Check if encoding is initialized
       if (!encoding) {
-        log.error('token encoding is not initialized')
+        // The caller logs the ERROR with the stack; this line names the step.
+        log.warn('token encoding is not initialized')
         throw new Error('Encoding initialization failed.')
       }
 

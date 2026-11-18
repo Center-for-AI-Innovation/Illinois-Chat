@@ -121,6 +121,8 @@ function normalizeVLLMStreamResponse(response: Response): Response {
 
           emit(output)
         } catch (error) {
+          // The reply has started, so no caller can catch this any more.
+          log.error('LLM stream failed', undefined, error)
           controller.error(error)
         }
       }
@@ -143,6 +145,7 @@ function normalizeVLLMStreamResponse(response: Response): Response {
           parser.feed(decodedChunk)
         }
       } catch (error) {
+        log.error('LLM stream failed', undefined, error)
         controller.error(error)
       }
     },

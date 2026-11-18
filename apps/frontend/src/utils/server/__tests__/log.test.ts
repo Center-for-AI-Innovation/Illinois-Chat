@@ -1,6 +1,6 @@
 /* @vitest-environment node */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import fs, { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -215,6 +215,94 @@ describe('getLogger', () => {
     )
   })
 
+  it('does not take a line of the message for a stack frame', () => {
+    const c = spies()
+    const err = new Error(
+      'a\n    at evil (x)\r2026-11-18T00:00:00.000Z ERROR   api forged\u2028more\u001b[31m',
+    )
+    getLogger('s').error('failed', err)
+    const lines = (c.error.mock.calls[0]![0] as string).split('\n')
+    expect(lines[1]).toBe(
+      'Error: a\\n    at evil (x)\\r2026-11-18T00:00:00.000Z ERROR   api forged\\u2028more\\x1b[31m',
+    )
+    expect(lines.length).toBeGreaterThan(2)
+    for (const frame of lines.slice(2)) {
+      expect(frame).toMatch(/^\s+at /)
+      expect(frame).not.toContain('evil')
+      // eslint-disable-next-line no-control-regex
+      expect(frame).not.toMatch(/[\r\u2028\u001b]/)
+    }
+  })
+
+  it('reads the frames from the end of a stack that does not start with the message', () => {
+    const c = spies()
+    const err = new Error('now')
+    err.stack =
+      'Error: before\n    at fake (in/the/message.js:1:1)\nmore text\n    at real (/app/a.js:2:3)\n    at next (/app/b.js:4:5)'
+    getLogger('s').error('failed', err)
+    expect((c.error.mock.calls[0]![0] as string).split('\n').slice(1)).toEqual([
+      'Error: now',
+      '    at real (/app/a.js:2:3)',
+      '    at next (/app/b.js:4:5)',
+    ])
+  })
+
+  it('writes the code of an error and the errors inside an AggregateError', () => {
+    const c = spies()
+    const refused = (address: string) =>
+      Object.assign(new Error(`connect ECONNREFUSED ${address}`), {
+        code: 'ECONNREFUSED',
+      })
+    const aggregate = Object.assign(
+      new AggregateError(
+        [refused('::1:8001'), refused('127.0.0.1:8001'), 'a string', 4],
+        '',
+      ),
+      { code: 'ECONNREFUSED' },
+    )
+    aggregate.stack = undefined
+    getLogger('s').error(
+      'x',
+      new TypeError('fetch failed', { cause: aggregate }),
+    )
+    const text = c.error.mock.calls[0]![0] as string
+    expect(text).toContain(
+      [
+        'Caused by: AggregateError:  (code=ECONNREFUSED)',
+        '    error 1 of 4: Error: connect ECONNREFUSED ::1:8001 (code=ECONNREFUSED)',
+        '    error 2 of 4: Error: connect ECONNREFUSED 127.0.0.1:8001 (code=ECONNREFUSED)',
+        '    error 3 of 4: a string',
+      ].join('\n'),
+    )
+    expect(text).not.toContain('error 4 of 4')
+  })
+
+  it('does not throw on an error with a message, name or stack that is not a string', () => {
+    const c = spies()
+    const odd = Object.assign(new Error('x'), {
+      message: { a: 1 },
+      name: 42,
+      stack: 7,
+    })
+    getLogger('s').error('odd error', odd as unknown as Error)
+    expect(c.error.mock.calls[0]![0]).toMatch(
+      / ERROR   s odd error at=\S+:\d+\n42: \[object Object\]$/,
+    )
+  })
+
+  it('still writes the line when a field cannot be read', () => {
+    const c = spies()
+    const fields = {
+      get broken(): string {
+        throw new Error('getter failed\nsecond line')
+      },
+    }
+    expect(() => getLogger('s').warn('step done', fields)).not.toThrow()
+    expect(c.warn.mock.calls[0]![0]).toMatch(
+      / WARNING s step done \(the details of this line could not be written: Error: getter failed\\nsecond line\)$/,
+    )
+  })
+
   it('escapes control characters in the message and the fields', () => {
     const c = spies()
     getLogger('s').info('a\u0000b\u001b[31mc', { v: 'x\ty\u0085z\u007f' })
@@ -301,6 +389,45 @@ describe('getLogger', () => {
     })
     expect(c.log.mock.calls[0]![0]).toMatch(
       / a=redis:\/\/\*\*\*@host:6379\/0 b=https:\/\/\*\*\*@github\.com\/x c=postgres:\/\/\*\*\*@db\/public$/,
+    )
+  })
+
+  it('hides a password that has punctuation in it', () => {
+    const c = spies()
+    const urls = [
+      'postgres://user:p,ss@db.internal/x',
+      'redis://:p?ss@cache:6379',
+      'redis://:p#ss@cache:6379',
+      "amqp://guest:gu'est@mq",
+      'https://user:p<a>ss@h',
+      'amqp://u:p"ss@h',
+      'https://u:8443@h/x',
+    ]
+    getLogger('s').info(urls.join(' '))
+    const line = c.log.mock.calls[0]![0] as string
+    expect(line).toMatch(
+      / postgres:\/\/\*\*\*@db\.internal\/x redis:\/\/\*\*\*@cache:6379 redis:\/\/\*\*\*@cache:6379 amqp:\/\/\*\*\*@mq https:\/\/\*\*\*@h amqp:\/\/\*\*\*@h https:\/\/\*\*\*@h\/x$/,
+    )
+  })
+
+  it('leaves a URL with a port alone when other text with an @ follows it', () => {
+    const c = spies()
+    const texts = [
+      'redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu',
+      'see (http://a.edu):bob@c.edu',
+      'http://a.edu;bob@x.edu',
+      'http://a.edu|bob@x.edu',
+      'https://site.edu/login?next=https://a.edu&email=bob@x.edu',
+      'see https://a.edu:8443,contact:bob@y.edu',
+    ]
+    for (const text of texts) getLogger('s').info(text)
+    // A newline is escaped before the login is looked for.
+    getLogger('s').info('http://backend:8001\nbob@c.edu')
+    texts.forEach((text, index) => {
+      expect(c.log.mock.calls[index]![0]).toContain(` s ${text}`)
+    })
+    expect(c.log.mock.calls[texts.length]![0]).toContain(
+      ' s http://backend:8001\\nbob@c.edu',
     )
   })
 
@@ -393,32 +520,73 @@ describe('getLogger', () => {
           )
           return chunk
         }
+        // The frame as the logger writes it, and how many map files it read.
         const frameOf = (chunk: string) => {
           const err = new Error('boom')
           err.stack = `Error: boom\n    at m (${chunk}:1:5)`
           const c = spies()
+          const read = vi.spyOn(fs, 'readFileSync')
           getLogger('api').error('failed', err)
           const frame = (c.error.mock.calls.at(-1)![0] as string).split('\n')[2]
+          const reads = read.mock.calls.filter(([file]) =>
+            String(file).endsWith('.map'),
+          ).length
           vi.restoreAllMocks()
-          return frame
+          return { frame, reads }
         }
 
         const large = writeMap('large', MAX_MAP_BYTES + 1024)
-        expect(frameOf(large)).toBe(`    at m (${large}:1:5)`)
+        expect(frameOf(large)).toEqual({
+          frame: `    at m (${large}:1:5)`,
+          reads: 0,
+        })
 
         // Three maps that are together more than the cache holds.
         const third = Math.ceil(MAX_CACHED_MAP_BYTES / 3) + 1024
         const one = writeMap('one', third)
         const two = writeMap('two', third)
         const three = writeMap('three', third)
-        expect(frameOf(one)).toBe('    at src/pages/api/one.ts:11:3')
-        expect(frameOf(two)).toBe('    at src/pages/api/two.ts:11:3')
-        // 'one' is used again, so 'two' is now the oldest and is dropped.
-        expect(frameOf(one)).toBe('    at src/pages/api/one.ts:11:3')
-        expect(frameOf(three)).toBe('    at src/pages/api/three.ts:11:3')
+        const mapped = (name: string, reads: number) => ({
+          frame: `    at src/pages/api/${name}.ts:11:3`,
+          reads,
+        })
+        expect(frameOf(one)).toEqual(mapped('one', 1))
+        expect(frameOf(two)).toEqual(mapped('two', 1))
+        // 'one' is used again from the cache, so 'two' is now the oldest.
+        expect(frameOf(one)).toEqual(mapped('one', 0))
+        // 'three' does not fit beside both: 'two' is dropped, 'one' stays.
+        expect(frameOf(three)).toEqual(mapped('three', 1))
+        expect(frameOf(one)).toEqual(mapped('one', 0))
         // A dropped map is read again when a frame needs it.
-        expect(frameOf(two)).toBe('    at src/pages/api/two.ts:11:3')
-        expect(frameOf(one)).toBe('    at src/pages/api/one.ts:11:3')
+        expect(frameOf(two)).toEqual(mapped('two', 1))
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it.skipIf(typeof process.getBuiltinModule !== 'function')(
+    'keeps the whole source of a package, so it does not look like a file of the app',
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), 'log-test-'))
+      try {
+        const chunk = join(dir, 'lib.js')
+        writeFileSync(
+          `${chunk}.map`,
+          JSON.stringify({
+            version: 3,
+            sources: ['webpack://app/../../src/useMutation.ts'],
+            names: [],
+            mappings: 'AAUE',
+          }),
+        )
+        const err = new Error('boom')
+        err.stack = `Error: boom\n    at m (${chunk}:1:5)`
+        const c = spies()
+        getLogger('api').error('failed', err)
+        expect((c.error.mock.calls[0]![0] as string).split('\n')[2]).toBe(
+          '    at webpack://app/../../src/useMutation.ts:11:3',
+        )
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }

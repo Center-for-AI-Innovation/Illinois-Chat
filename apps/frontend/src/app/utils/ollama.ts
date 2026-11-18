@@ -115,6 +115,8 @@ async function handleOllamaReasoningStream(
           }
         }
       } catch (error) {
+        // The reply has started, so no caller can catch this any more.
+        log.error('LLM stream failed', { model: conversation.model.id }, error)
         if (isThinkingOpen) controller.enqueue(encoder.encode('</think>\n'))
         controller.error(error)
       }
