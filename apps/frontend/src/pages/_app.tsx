@@ -28,7 +28,7 @@ import { Analytics } from '@vercel/analytics/next'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import {
-  isSiteStatusExempt,
+  isMaintenanceBypassRoute,
   SITE_STATUS_QUERY_KEY,
   useFetchSiteStatus,
   type SiteStatus,
@@ -53,17 +53,19 @@ import { Toaster } from '@/components/shadcn/ui/sonner'
  *
  * Routes that must stay reachable while maintenance is on — `/admin` (where an
  * operator turns it back off) and `/silent-renew` (the OIDC renewal target) —
- * are exempt via `isSiteStatusExempt`, which the banner shares.
+ * are bypassed via `isMaintenanceBypassRoute`. The gate's own observer is
+ * disabled there, but the banner may still enable the same shared query on
+ * `/admin`; the bypass check below holds regardless of what the cache says.
  *
  * Fails open: while the check is in flight or errored, content renders. That
  * matches the previous `useState(false)` default.
  */
 function MaintenanceGate({ children }: { children: ReactNode }) {
   const router = useRouter()
-  const isExempt = isSiteStatusExempt(router.pathname)
-  const { data: status } = useFetchSiteStatus({ enabled: !isExempt })
+  const isBypass = isMaintenanceBypassRoute(router.pathname)
+  const { data: status } = useFetchSiteStatus({ enabled: !isBypass })
 
-  if (!isExempt && status?.isMaintenanceMode === true) {
+  if (!isBypass && status?.isMaintenanceMode === true) {
     return <Maintenance />
   }
   return <>{children}</>

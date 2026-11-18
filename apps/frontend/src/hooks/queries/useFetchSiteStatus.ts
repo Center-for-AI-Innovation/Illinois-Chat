@@ -4,17 +4,32 @@ import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
 export const SITE_STATUS_QUERY_KEY = ['siteStatus'] as const
 
 /**
- * Pages that must not show site-wide status: /admin previews the banner and
- * is where maintenance is turned off, and /silent-renew is the hidden Keycloak
- * iframe. Both the maintenance gate and the banner read this list, so they
- * cannot disagree about a page.
+ * Two separate policies over the one status query, because the gate and the
+ * banner need different things from the same page:
+ *
+ * - Maintenance bypass: the gate never replaces these pages. /admin is where
+ *   an operator turns maintenance back off, and /silent-renew is the OIDC
+ *   renewal target. Gating either makes maintenance unrecoverable.
+ * - Status polling: pages that make no status request at all. /silent-renew is
+ *   a hidden iframe. /admin is not on this list: it shows the saved live
+ *   announcement, so its tab must poll like any other page.
  */
-export const SITE_STATUS_EXEMPT_PREFIXES = ['/admin', '/silent-renew'] as const
+export const MAINTENANCE_BYPASS_PREFIXES = ['/admin', '/silent-renew'] as const
+export const STATUS_POLL_EXEMPT_PREFIXES = ['/silent-renew'] as const
 
-export function isSiteStatusExempt(pathname: string): boolean {
-  return SITE_STATUS_EXEMPT_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix),
-  )
+function startsWithAnyPrefix(
+  pathname: string,
+  prefixes: readonly string[],
+): boolean {
+  return prefixes.some((prefix) => pathname.startsWith(prefix))
+}
+
+export function isMaintenanceBypassRoute(pathname: string): boolean {
+  return startsWithAnyPrefix(pathname, MAINTENANCE_BYPASS_PREFIXES)
+}
+
+export function isStatusPollExempt(pathname: string): boolean {
+  return startsWithAnyPrefix(pathname, STATUS_POLL_EXEMPT_PREFIXES)
 }
 
 export interface SiteStatus {

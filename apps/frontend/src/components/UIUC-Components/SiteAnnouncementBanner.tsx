@@ -1,9 +1,10 @@
 import { useRouter } from 'next/router'
 import { useLayoutEffect, useRef } from 'react'
 import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
-import { useFetchSiteStatus } from '~/hooks/queries/useFetchSiteStatus'
-
-const BANNER_EXEMPT_PREFIXES = ['/silent-renew']
+import {
+  isStatusPollExempt,
+  useFetchSiteStatus,
+} from '~/hooks/queries/useFetchSiteStatus'
 
 const HEIGHT_VARIABLE = '--announcement-banner-height'
 
@@ -17,9 +18,9 @@ const HEIGHT_VARIABLE = '--announcement-banner-height'
  */
 export function SiteAnnouncementBanner() {
   const router = useRouter()
-  const isExempt = BANNER_EXEMPT_PREFIXES.some((prefix) =>
-    router.pathname.startsWith(prefix),
-  )
+  // /admin is not exempt: its tab shows the saved live announcement and polls
+  // for it. Only the hidden silent-renew iframe makes no status request.
+  const isExempt = isStatusPollExempt(router.pathname)
   const { data: status } = useFetchSiteStatus({ enabled: !isExempt })
   const banner = status?.announcementBanner ?? null
   const containerRef = useRef<HTMLDivElement>(null)

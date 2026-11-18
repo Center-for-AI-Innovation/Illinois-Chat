@@ -14,11 +14,11 @@ const query = vi.hoisted(() => ({
 }))
 
 vi.mock('~/hooks/queries/useFetchSiteStatus', async () => {
-  const actual = await vi.importActual<{
-    isSiteStatusExempt: (pathname: string) => boolean
-  }>('~/hooks/queries/useFetchSiteStatus')
+  const actual = await vi.importActual<Record<string, unknown>>(
+    '~/hooks/queries/useFetchSiteStatus',
+  )
   return {
-    isSiteStatusExempt: actual.isSiteStatusExempt,
+    ...actual,
     useFetchSiteStatus: () => ({
       data:
         query.data === undefined

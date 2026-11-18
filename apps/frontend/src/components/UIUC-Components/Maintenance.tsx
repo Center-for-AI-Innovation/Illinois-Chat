@@ -1,4 +1,5 @@
-// Rendered by MaintenanceGate in _app.tsx in place of every non-exempt page.
+// Rendered by MaintenanceGate in _app.tsx in place of every page except the
+// maintenance bypass routes (/admin and /silent-renew).
 // noindex for this state lives in _document.tsx so search results are not
 // replaced by the maintenance notice.
 

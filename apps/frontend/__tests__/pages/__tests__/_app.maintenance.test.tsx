@@ -69,10 +69,6 @@ const announcement = vi.hoisted(() => ({
   } | null,
 }))
 
-vi.mock('~/hooks/queries/useFetchAnnouncementBanner', () => ({
-  useFetchAnnouncementBanner: () => ({ data: announcement.value }),
-}))
-
 vi.mock('~/components/Layout/SiteHeader', async () => {
   const { SiteAnnouncementBanner } = await import(
     '~/components/UIUC-Components/SiteAnnouncementBanner'
@@ -99,18 +95,23 @@ const maintenanceQuery = vi.hoisted(() => ({
 }))
 
 vi.mock('~/hooks/queries/useFetchSiteStatus', async () => {
-  const actual = await vi.importActual<{
-    isSiteStatusExempt: (pathname: string) => boolean
-  }>('~/hooks/queries/useFetchSiteStatus')
+  const actual = await vi.importActual<Record<string, unknown>>(
+    '~/hooks/queries/useFetchSiteStatus',
+  )
   return {
-    isSiteStatusExempt: actual.isSiteStatusExempt,
+    ...actual,
     useFetchSiteStatus: ({ enabled }: { enabled?: boolean } = {}) => {
       maintenanceQuery.enabledCalls.push(enabled)
+      // Like React Query, a disabled observer still reads the shared cache, so
+      // the gate's bypass has to hold even when the cache says maintenance is on.
       return {
         data:
-          enabled === false || maintenanceQuery.value === undefined
+          maintenanceQuery.value === undefined
             ? undefined
-            : { announcementBanner: null, isMaintenanceMode: maintenanceQuery.value },
+            : {
+                announcementBanner: announcement.value,
+                isMaintenanceMode: maintenanceQuery.value,
+              },
       }
     },
   }
@@ -300,6 +301,11 @@ describe('_app maintenance and the saved announcement', () => {
     expect(
       screen.queryByText('Site is under maintenance'),
     ).not.toBeInTheDocument()
+    // The gate's observer stays off on /admin while the banner's is on, so the
+    // page makes one shared poll and the gate never acts on it.
+    expect(maintenanceQuery.enabledCalls).toEqual(
+      expect.arrayContaining([false, true]),
+    )
   })
 
   it('shows no announcement strip on /admin when the saved banner is inactive', async () => {
@@ -331,5 +337,14 @@ describe('_app maintenance and the saved announcement', () => {
       screen.queryByRole('region', { name: 'Site announcement' }),
     ).not.toBeInTheDocument()
     expect(screen.getByText('Home page content')).toBeInTheDocument()
+  })
+
+  it('makes no status request from /silent-renew: the gate and the banner are both disabled', async () => {
+    await renderApp({ pathname: '/silent-renew', isMaintenanceMode: true })
+
+    expect(maintenanceQuery.enabledCalls.length).toBeGreaterThan(0)
+    expect(maintenanceQuery.enabledCalls.every((enabled) => enabled === false)).toBe(
+      true,
+    )
   })
 })

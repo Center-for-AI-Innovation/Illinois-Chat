@@ -15,7 +15,8 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query'
 import {
-  isSiteStatusExempt,
+  isMaintenanceBypassRoute,
+  isStatusPollExempt,
   SITE_STATUS_QUERY_KEY,
   useFetchSiteStatus,
   type SiteStatus,
@@ -131,12 +132,58 @@ describe('useFetchSiteStatus', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('exempts /admin and /silent-renew and their subpaths only', () => {
-    expect(isSiteStatusExempt('/admin')).toBe(true)
-    expect(isSiteStatusExempt('/admin/platform')).toBe(true)
-    expect(isSiteStatusExempt('/silent-renew')).toBe(true)
-    expect(isSiteStatusExempt('/')).toBe(false)
-    expect(isSiteStatusExempt('/chatbots')).toBe(false)
+  it('bypasses maintenance on /admin and /silent-renew, and their subpaths only', () => {
+    expect(isMaintenanceBypassRoute('/admin')).toBe(true)
+    expect(isMaintenanceBypassRoute('/admin/platform')).toBe(true)
+    expect(isMaintenanceBypassRoute('/silent-renew')).toBe(true)
+    expect(isMaintenanceBypassRoute('/')).toBe(false)
+    expect(isMaintenanceBypassRoute('/chatbots')).toBe(false)
+  })
+
+  it('makes no status request on silent-renew, but does poll on /admin', () => {
+    expect(isStatusPollExempt('/silent-renew')).toBe(true)
+    expect(isStatusPollExempt('/admin')).toBe(false)
+    expect(isStatusPollExempt('/admin/platform')).toBe(false)
+    expect(isStatusPollExempt('/chatbots')).toBe(false)
+  })
+
+  it('makes one request per interval on /admin: the gate is disabled, the banner polls', async () => {
+    const queryClient = createClient()
+    const Wrapper = createWrapper(queryClient)
+
+    // Mirrors _app on /admin: the gate observer is bypassed, the banner's is
+    // enabled, and both observe the one shared query.
+    renderHook(() => useFetchSiteStatus({ enabled: false }), {
+      wrapper: Wrapper,
+    })
+    renderHook(() => useFetchSiteStatus({ enabled: true }), {
+      wrapper: Wrapper,
+    })
+
+    await settle()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+
+    await settle(POLL_MS)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+
+    await settle(POLL_MS)
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it('makes no status request at all on silent-renew, however long it stays open', async () => {
+    const queryClient = createClient()
+    const Wrapper = createWrapper(queryClient)
+
+    // On silent-renew both the gate and the banner are disabled.
+    renderHook(() => useFetchSiteStatus({ enabled: false }), {
+      wrapper: Wrapper,
+    })
+    renderHook(() => useFetchSiteStatus({ enabled: false }), {
+      wrapper: Wrapper,
+    })
+
+    await settle(POLL_MS * 3)
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('keeps the last good status when a refresh fails, then recovers on the next poll', async () => {
