@@ -107,7 +107,8 @@ describe('site header route config', () => {
   describe('other routes', () => {
     it.each([
       ['/', { variant: 'splash' }],
-      ['/admin', { contentWidth: 'page' }],
+      // Full-width navbar on admin (#421); the admin body is centred in admin.tsx.
+      ['/admin', {}],
       ['/chatbots', { hideBorder: true }],
       ['/explore', {}],
       ['/new', {}],

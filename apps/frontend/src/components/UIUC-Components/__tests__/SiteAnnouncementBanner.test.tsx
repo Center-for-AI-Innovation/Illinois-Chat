@@ -63,12 +63,13 @@ describe('SiteAnnouncementBanner', () => {
     expect(screen.getByText('Downtime Saturday 8pm.')).toBeInTheDocument()
   })
 
-  it('skips /admin, which has its own live preview', () => {
+  it('shows the saved announcement on /admin, so operators see what visitors see', () => {
     query.data = ENABLED
     renderAt('/admin')
 
-    expect(screen.queryByText('Downtime Saturday 8pm.')).not.toBeInTheDocument()
-    expect(bannerHeightVariable()).toBe('0px')
+    expect(
+      screen.getByRole('region', { name: 'Site announcement' }),
+    ).toHaveTextContent('Downtime Saturday 8pm.')
   })
 
   it('skips the silent-renew iframe', () => {
@@ -76,12 +77,19 @@ describe('SiteAnnouncementBanner', () => {
     renderAt('/silent-renew')
 
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
+    expect(bannerHeightVariable()).toBe('0px')
   })
 
-  it.each(['/admin', '/silent-renew'])('does not poll on %s', (pathname) => {
-    renderAt(pathname)
+  it('does not poll on the silent-renew iframe', () => {
+    renderAt('/silent-renew')
 
     expect(query.options?.enabled).toBe(false)
+  })
+
+  it('polls on /admin, so an open admin tab follows the saved banner', () => {
+    renderAt('/admin')
+
+    expect(query.options?.enabled).toBe(true)
   })
 
   it('polls on regular pages', () => {

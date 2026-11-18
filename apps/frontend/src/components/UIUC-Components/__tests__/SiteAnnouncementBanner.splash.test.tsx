@@ -177,16 +177,35 @@ describe('application pages', () => {
     expect(screen.queryByText(/rebranded to Illinois Chat/)).not.toBeInTheDocument()
   })
 
-  it.each(['/admin', '/silent-renew'])(
-    '%s is exempt: no strip, no landmark, height 0 even on the splash rule',
-    (pathname) => {
-      query.data = DISABLED
-      const { container } = renderAt(pathname)
+  it('/silent-renew is exempt: no strip, no landmark, height 0', () => {
+    query.data = DISABLED
+    const { container } = renderAt('/silent-renew')
 
-      expect(container).toBeEmptyDOMElement()
-      expect(publishedHeight()).toBe('0px')
-    },
-  )
+    expect(container).toBeEmptyDOMElement()
+    expect(publishedHeight()).toBe('0px')
+  })
+
+  it('/admin shows an inactive banner as no strip and no space', () => {
+    query.data = DISABLED
+    const { container } = renderAt('/admin')
+
+    // The measured wrapper stays, but nothing is inside it: the admin page has
+    // no decorative strip, only the splash page does.
+    expect(container.firstElementChild).toBeEmptyDOMElement()
+    resizeTo(0)
+    expect(publishedHeight()).toBe('0px')
+  })
+
+  it('/admin shows an active banner and publishes its height, so sticky tabs clear it', () => {
+    query.data = ENABLED
+    renderAt('/admin')
+
+    expect(
+      screen.getByRole('region', { name: 'Site announcement' }),
+    ).toBeInTheDocument()
+    resizeTo(44)
+    expect(publishedHeight()).toBe('44px')
+  })
 })
 
 describe('client navigation and live updates', () => {

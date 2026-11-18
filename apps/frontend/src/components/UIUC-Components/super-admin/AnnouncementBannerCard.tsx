@@ -48,7 +48,7 @@ export function AnnouncementBannerCard() {
   return (
     <AdminCard
       title="Announcement banner"
-      blastRadius="Shows to everyone at the top of every page except this console. Open tabs pick up changes within a minute."
+      blastRadius="Shows a site-wide announcement, including at the top of this console. Open tabs pick up changes within a minute."
       icon={<Megaphone className="size-5" aria-hidden="true" />}
       headerAside={
         <Controller

@@ -86,6 +86,22 @@ describe('SiteHeader', () => {
     expect(bannerWrapper.querySelector('[aria-hidden="true"]')).toBeNull()
   })
 
+  it('shows the saved announcement above the full-width admin navbar', () => {
+    query.data = ENABLED
+    const { container } = renderAt('/admin')
+
+    const header = container.firstElementChild as HTMLElement
+    expect(
+      within(header).getByRole('region', { name: 'Site announcement' }),
+    ).toHaveTextContent('Downtime Saturday 8pm.')
+    // Workspace alignment: the navbar spans the page, unlike the constrained
+    // `page` width. The admin body itself is centred in admin.tsx.
+    expect(within(header).getByRole('banner')).toHaveAttribute(
+      'data-layout',
+      'workspace',
+    )
+  })
+
   it('renders the splash navbar on the home page', () => {
     query.data = ENABLED
     renderAt('/')

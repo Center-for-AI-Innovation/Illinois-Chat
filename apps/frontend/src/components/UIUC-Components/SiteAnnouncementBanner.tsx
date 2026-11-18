@@ -5,10 +5,11 @@ import { useFetchAnnouncementBanner } from '~/hooks/queries/useFetchAnnouncement
 import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
 
 /**
- * /admin renders its own live preview, and /silent-renew is the hidden
- * Keycloak iframe.
+ * Only /silent-renew, the hidden Keycloak iframe, is exempt. /admin shows the
+ * saved announcement like every other page; its live preview of unsaved draft
+ * text is separate and does not depend on this list.
  */
-const BANNER_EXEMPT_PREFIXES = ['/admin', '/silent-renew']
+const BANNER_EXEMPT_PREFIXES = ['/silent-renew']
 
 const HEIGHT_VARIABLE = '--announcement-banner-height'
 

@@ -45,7 +45,9 @@ const SETTINGS_NAVBAR: SiteNavbarOptions = { contentWidth: 'sidebar' }
  */
 const SITE_NAVBAR_BY_ROUTE: Record<string, SiteNavbarOptions> = {
   '/': { variant: 'splash' },
-  '/admin': { contentWidth: 'page' },
+  // Workspace alignment, as before the header moved: the page body is centred
+  // in admin.tsx, while the navbar spans the full width (#421).
+  '/admin': {},
   '/chatbots': { hideBorder: true },
   '/explore': {},
   '/new': {},

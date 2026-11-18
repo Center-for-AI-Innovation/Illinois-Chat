@@ -10,7 +10,7 @@
 
 import { render, screen } from '@testing-library/react'
 import React from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next-i18next', () => ({
   appWithTranslation: (component: unknown) => component,
@@ -58,9 +58,35 @@ vi.mock('~/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn() }),
 }))
 
-vi.mock('~/components/Layout/SiteHeader', () => ({
-  SiteHeader: () => React.createElement('div', null, 'Site header'),
+// The real announcement bar, fed a controllable saved banner, sits inside the
+// header. That lets the tests see whether the maintenance gate hides it.
+const announcement = vi.hoisted(() => ({
+  value: null as {
+    enabled: boolean
+    message: string
+    linkText: string
+    linkUrl: string
+  } | null,
 }))
+
+vi.mock('~/hooks/queries/useFetchAnnouncementBanner', () => ({
+  useFetchAnnouncementBanner: () => ({ data: announcement.value }),
+}))
+
+vi.mock('~/components/Layout/SiteHeader', async () => {
+  const { SiteAnnouncementBanner } = await import(
+    '~/components/UIUC-Components/SiteAnnouncementBanner'
+  )
+  return {
+    SiteHeader: () =>
+      React.createElement(
+        'div',
+        null,
+        'Site header',
+        React.createElement(SiteAnnouncementBanner),
+      ),
+  }
+})
 
 vi.mock('~/components/UIUC-Components/Maintenance', () => ({
   default: () =>
@@ -137,6 +163,9 @@ describe('_app maintenance gate', () => {
     await renderApp({ pathname: '/admin', isMaintenanceMode: true })
 
     expect(screen.getByText('Home page content')).toBeInTheDocument()
+    // Exempt from the maintenance gate, but the site header (saved announcement
+    // and navbar) still renders above it, so the console is not a bare page.
+    expect(screen.getByText('Site header')).toBeInTheDocument()
     expect(
       screen.queryByText('Site is under maintenance'),
     ).not.toBeInTheDocument()
@@ -230,5 +259,66 @@ describe('_app page viewport height', () => {
     expect(
       appRoot(container).style.getPropertyValue('--page-viewport-height'),
     ).toBe('var(--viewport-height)')
+  })
+})
+
+describe('_app maintenance and the saved announcement', () => {
+  const ENABLED = {
+    enabled: true,
+    message: 'Downtime Saturday 8pm.',
+    linkText: '',
+    linkUrl: '',
+  }
+
+  beforeEach(() => {
+    announcement.value = null
+  })
+
+  afterEach(() => {
+    announcement.value = null
+  })
+
+  it('shows an active announcement on /admin while maintenance is on, and the console stays reachable', async () => {
+    announcement.value = ENABLED
+    await renderApp({ pathname: '/admin', isMaintenanceMode: true })
+
+    expect(
+      screen.getByRole('region', { name: 'Site announcement' }),
+    ).toHaveTextContent('Downtime Saturday 8pm.')
+    expect(screen.getByText('Home page content')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Site is under maintenance'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows no announcement strip on /admin when the saved banner is inactive', async () => {
+    announcement.value = { ...ENABLED, enabled: false }
+    await renderApp({ pathname: '/admin', isMaintenanceMode: true })
+
+    expect(
+      screen.queryByRole('region', { name: 'Site announcement' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Home page content')).toBeInTheDocument()
+  })
+
+  it('hides the announcement and header on ordinary pages while maintenance is on', async () => {
+    announcement.value = ENABLED
+    await renderApp({ pathname: '/chatbots', isMaintenanceMode: true })
+
+    expect(
+      screen.queryByRole('region', { name: 'Site announcement' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Site header')).not.toBeInTheDocument()
+    expect(screen.getByText('Site is under maintenance')).toBeInTheDocument()
+  })
+
+  it('keeps /silent-renew free of the announcement even when one is active', async () => {
+    announcement.value = ENABLED
+    await renderApp({ pathname: '/silent-renew', isMaintenanceMode: true })
+
+    expect(
+      screen.queryByRole('region', { name: 'Site announcement' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('Home page content')).toBeInTheDocument()
   })
 })
