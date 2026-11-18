@@ -385,7 +385,9 @@ async function chat(req: NextApiRequest, res: NextApiResponse): Promise<void> {
 
   // Handle errors from the chat handler API
   if (!apiResponse.ok) {
-    log.error('chat model request failed', {
+    // The provider code has written the ERROR with the stack; this line adds
+    // the project and the status that the caller gets.
+    log.warn('chat model request failed', {
       course: course_name,
       model,
       status: apiResponse.status,

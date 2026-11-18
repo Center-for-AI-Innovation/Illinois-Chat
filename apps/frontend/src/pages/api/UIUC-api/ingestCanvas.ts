@@ -90,8 +90,13 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
       },
     )
 
-    const responseBody = await response.json()
-    // A failure status was already logged by backendFetch with its body.
+    // A failure status was already logged by backendFetch with its body. Its
+    // reply is not always JSON (a 502 page of a proxy): do not fail on it.
+    const responseBody = response.ok
+      ? await response.json()
+      : await response
+          .json()
+          .catch(() => ({ error: 'The ingest service refused the request.' }))
     if (response.ok) {
       log.info('submitted to Canvas ingest queue', {
         canvas_url,

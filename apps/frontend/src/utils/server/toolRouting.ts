@@ -26,7 +26,7 @@ import { REDACTED_SECRET } from '~/utils/modelProviders/providerSecrets'
 import { CURRENT_NCSA_DEFAULT_MODEL_ID } from '~/utils/modelProviders/types/NCSAHostedVLM'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { ensureRedisConnected } from '~/utils/redisClient'
-import { getLogger } from './log'
+import { cutForLog, getLogger } from './log'
 
 const log = getLogger('toolRouting')
 
@@ -70,7 +70,11 @@ async function tryDecrypt(key: string, tier: string): Promise<string | null> {
   try {
     return await decryptKeyIfNeeded(key)
   } catch (error) {
-    log.warn('could not decrypt the tool router key; skipping tier', { tier }, error)
+    log.warn(
+      'could not decrypt the tool router key; skipping tier',
+      { tier },
+      error,
+    )
     return null
   }
 }
@@ -272,7 +276,7 @@ export async function callToolRouter(params: {
         provider: router.provider,
         model: router.modelId,
         status: response.status,
-        body: errorBody.slice(0, 500),
+        body: cutForLog(errorBody),
       })
       return {
         ok: false,

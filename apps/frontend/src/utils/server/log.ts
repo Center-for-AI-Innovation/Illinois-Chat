@@ -72,6 +72,12 @@ const LOGIN_IN_URL = /:\/{2,}[^/\s"]*@/g
 // A login that a cut ended before its @: "://user:secr...[cut]".
 const LOGIN_BEFORE_CUT = /:\/{2,}[^/\s"]*?(?=\.\.\.\[cut\])/g
 
+// Text of another service for a log field: the login of a URL is hidden first,
+// because a cut inside a login would take its @ away, and then the text is cut.
+export function cutForLog(text: string, length = 500): string {
+  return hideLogins(text).slice(0, length)
+}
+
 export function hideLogins(text: string): string {
   return text
     .replace(LOGIN_IN_URL, '://***@')
@@ -94,15 +100,18 @@ const SHORT_ESCAPES: Record<string, string> = {
 // hidden, and a value must not be able to start a new log line. The login is
 // looked for first, while a newline is still a character that ends a URL.
 function escapeNewlines(text: string): string {
-  return hideLogins(text).replace(CONTROL_CHARACTERS, (found) => {
-    const code = found.charCodeAt(0)
-    return (
-      SHORT_ESCAPES[found] ??
-      (code < 0x100
-        ? `\\x${code.toString(16).padStart(2, '0')}`
-        : `\\u${code.toString(16).padStart(4, '0')}`)
-    )
-  })
+  return hideLogins(withoutQueryParams(text)).replace(
+    CONTROL_CHARACTERS,
+    (found) => {
+      const code = found.charCodeAt(0)
+      return (
+        SHORT_ESCAPES[found] ??
+        (code < 0x100
+          ? `\\x${code.toString(16).padStart(2, '0')}`
+          : `\\u${code.toString(16).padStart(4, '0')}`)
+      )
+    },
+  )
 }
 
 // JSON.stringify turns an Error into {}, so an Error anywhere in a field value
@@ -134,8 +143,13 @@ function formatPairs(fields: LogFields): string[] {
 // Drizzle puts the bound values of a failed query into the error message
 // ("Failed query: ...\nparams: a,b,c"). They can hold emails, keys and whole
 // documents, so they are cut off; the query text stays.
+// Only for the message of a failed query ("Failed query: ...\nparams: ..."):
+// other text that has a line "params:" in it is left as it is.
 function withoutQueryParams(text: string): string {
-  return text.replace(/\nparams: [\s\S]*$/, '\nparams: <omitted>')
+  return text.replace(
+    /(Failed query: [\s\S]*?)\nparams: [\s\S]*$/,
+    '$1\nparams: <omitted>',
+  )
 }
 
 // The login is hidden before the cut: a cut inside a login would take its @
@@ -183,7 +197,7 @@ const MAX_CODE_LENGTH = 100
 function errorCode(err: Error): string {
   const code = (err as { code?: unknown }).code
   return typeof code === 'string' || typeof code === 'number'
-    ? ` (code=${escapeNewlines(String(code).slice(0, MAX_CODE_LENGTH))})`
+    ? ` (code=${escapeNewlines(String(code)).slice(0, MAX_CODE_LENGTH)})`
     : ''
 }
 
@@ -380,8 +394,7 @@ export function formatLine(
     ? { rid: ctx.rid, path: ctx.path, course: ctx.course }
     : {}
   parts.push(...formatPairs(bound))
-  // An error that is written into the message can be one of Drizzle.
-  parts.push(escapeNewlines(withoutQueryParams(String(message))))
+  parts.push(escapeNewlines(String(message)))
   // Fields must be an object with names: a string or an array would be
   // written as 0=a 1=b.
   if (fields && typeof fields === 'object' && !Array.isArray(fields)) {

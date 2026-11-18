@@ -4,7 +4,7 @@
 // status. Returns the response unchanged; callers still decide what to do.
 // No timeout on purpose: scrape and Canvas calls run for minutes.
 // Server-only by convention.
-import { getLogger, hideLogins } from './log'
+import { cutForLog, getLogger } from './log'
 import { getLogContext } from './requestContext'
 
 const log = getLogger('backendFetch')
@@ -52,9 +52,7 @@ export async function backendFetch(
   // Read a copy so the caller can still read the body.
   let body: string
   try {
-    // The login of a URL is hidden before the cut: a cut inside it would take
-    // its @ away.
-    body = hideLogins(await response.clone().text()).slice(0, 500)
+    body = cutForLog(await response.clone().text())
   } catch (err) {
     body = `<unreadable: ${err instanceof Error ? err.message : String(err)}>`
   }
