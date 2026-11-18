@@ -5,6 +5,9 @@ import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { connectionManager } from '~/utils/connectionManager'
 import { getPresignedUrlClient, normalizeS3Key } from '~/utils/s3Client'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.download')
 
 export async function generatePresignedUrl(
   filePath: string,
@@ -63,11 +66,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
   } catch (error) {
     const e = error as { name: string }
+    const { filePath } = (req.body ?? {}) as { filePath?: string }
     if (e.name === 'NoSuchKey') {
-      console.error('File does not exist:', error)
+      log.warn('file does not exist', { file: filePath }, error)
       res.status(404).json({ message: 'File does not exist' })
     } else {
-      console.error('Error generating presigned URL:', error)
+      log.error('could not generate a presigned URL', { file: filePath }, error)
       res.status(500).json({ message: 'Error generating presigned URL', error })
     }
   }

@@ -270,9 +270,11 @@ describe('conversation API', () => {
     expect(conv.updatedAt).toBe('2026-03-10T00:28:25.124Z')
   })
 
-  it('convertDBToChatConversation warns when first message is missing metadata', () => {
-    const warnSpy = vi
-      .spyOn(console, 'warn')
+  it('convertDBToChatConversation logs a DEBUG line when first message is missing metadata', () => {
+    const oldLevel = process.env.LOG_LEVEL
+    process.env.LOG_LEVEL = 'DEBUG'
+    const logSpy = vi
+      .spyOn(console, 'log')
       .mockImplementation(() => undefined)
 
     convertDBToChatConversation(
@@ -301,8 +303,12 @@ describe('conversation API', () => {
       ] as any,
     )
 
-    expect(warnSpy).toHaveBeenCalled()
-    warnSpy.mockRestore()
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('no valid first message found in conversation'),
+    )
+    logSpy.mockRestore()
+    if (oldLevel === undefined) delete process.env.LOG_LEVEL
+    else process.env.LOG_LEVEL = oldLevel
   })
 
   it('convertChatToDBConversation fills created_at when missing', () => {

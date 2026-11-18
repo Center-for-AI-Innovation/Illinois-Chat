@@ -6,6 +6,10 @@ import { checkCourseExists } from './getCourseExists'
 import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import type { CourseMetadata } from '~/types/courseMetadata'
+import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
+
+const log = getLogger('api.createProject')
 
 const MIRROR_ATTEMPTS = 3
 
@@ -55,7 +59,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     }
   } catch (error) {
-    console.error('Error checking project name availability:', error)
+    log.error(
+      'could not check whether the project name is free',
+      { course: project_name },
+      error,
+    )
     // If Redis check fails, we must fail the request to prevent data inconsistency
     // Allowing project creation when Redis is down would lead to out-of-sync data
     return res.status(503).json({
@@ -72,7 +80,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const response = await fetch(`${getBackendUrl()}/createProject`, {
+    const response = await backendFetch(`${getBackendUrl()}/createProject`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,10 +89,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
 
     if (!response.ok) {
-      console.error(
-        'Failed to create the project. Err status:',
-        response.status,
-      )
+      log.error('backend failed to create the project', {
+        course: project_name,
+        status: response.status,
+      })
       // Forward the backend's JSON error body when it has one; Flask abort()
       // responses are HTML, so parse defensively and keep the status either way.
       const backendBody = (await response.json().catch(() => null)) as {
@@ -109,20 +117,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         // The hub's Your Bots reads Postgres, so retry before accepting drift.
         await withRetry(() => writeCourseMetadata(project_name, seeded))
       } else {
-        console.warn(
-          `createProject: Redis metadata missing for ${project_name} after backend create; Postgres not mirrored`,
+        log.warn(
+          'Redis metadata missing after backend create; Postgres not mirrored',
+          { course: project_name },
         )
       }
     } catch (pgErr) {
-      console.error(
-        `createProject: failed to mirror ${project_name} to Postgres after retries; search and the hub may miss it until backfill runs`,
+      log.error(
+        'failed to mirror the project to Postgres after retries; search and the hub may miss it until backfill runs',
+        { course: project_name },
         pgErr,
       )
     }
 
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error creating project:', error)
+    log.error('error creating project', { course: project_name }, error)
     return res.status(500).json({
       error: 'Internal server error while creating project',
     })

@@ -2,6 +2,9 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { db, chatbotTags } from '~/db/dbClient'
 import { sql } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.searchTags')
 
 const VALID_CATEGORIES = new Set(['general', 'organization', 'projectType'])
 const DEFAULT_CATEGORY = 'general'
@@ -77,10 +80,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ results })
   } catch (error) {
-    console.error(
-      'Error in searchTags:',
-      error instanceof Error ? error.message : String(error),
-    )
+    log.error('error searching tags', undefined, error)
     return res.status(500).json({ error: 'Failed to search tags' })
   }
 }

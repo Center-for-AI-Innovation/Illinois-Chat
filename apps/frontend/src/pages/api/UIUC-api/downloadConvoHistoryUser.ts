@@ -2,6 +2,10 @@ import { getBackendUrl } from '~/utils/apiUtils'
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
+
+const log = getLogger('api.downloadConvoHistoryUser')
 
 export default withCourseAccessFromRequest('any')(handler)
 
@@ -44,15 +48,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Invalid project name format' })
   }
 
-  console.log(
-    `Starting download for user: ${userEmail}, project: ${projectName}`,
-  )
+  // No email in the log: the project comes from the request context.
+  log.info('starting conversation history download for the signed-in user')
 
   try {
     const backendUrl = getBackendUrl()
     const url = `${backendUrl}/export-convo-history-user?user_email=${encodeURIComponent(userEmail)}&project_name=${encodeURIComponent(projectName)}`
 
-    const response = await fetch(url, {
+    const response = await backendFetch(url, {
       method: 'GET',
       headers: {
         Accept: 'application/zip, application/json, */*',
@@ -62,17 +65,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
 
     if (!response.ok) {
-      console.error(`Backend responded with status: ${response.status}`)
+      log.error('backend conversation history export failed', {
+        status: response.status,
+      })
       return res.status(response.status).json({
         error: `Backend error: ${response.status} ${response.statusText}`,
       })
     }
 
-    console.log(
-      'Received response:',
-      response.status,
-      response.headers.get('content-type'),
-    )
+    log.debug('received backend export response', {
+      status: response.status,
+      content_type: response.headers.get('content-type'),
+    })
 
     const contentType =
       response.headers.get('content-type') || 'application/octet-stream'
@@ -103,7 +107,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       res.status(500).json({ error: 'No response body received' })
     }
   } catch (error) {
-    console.error('Error exporting documents:', error)
+    log.error('error exporting conversation history', undefined, error)
 
     if (error instanceof Error) {
       if (error.name === 'TimeoutError') {

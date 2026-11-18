@@ -8,6 +8,9 @@ import {
   SimListError,
   type SimDiscoveryResult,
 } from '~/utils/simDiscovery'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('simConfig')
 
 /** Resolved credentials. `api_key` is guaranteed present on the success path. */
 export interface SimCredentials {
@@ -114,10 +117,12 @@ async function reencryptLegacySimApiKey(
         ),
       )
   } catch (err) {
-    console.warn(
-      '[resolveStoredSimApiKey] could not re-encrypt legacy Sim API key',
-      { course_name, error: err instanceof Error ? err.message : String(err) },
-    )
+    // Name and code only: the message of a failed query can hold the key it filtered on.
+    log.warn('could not re-encrypt the legacy Sim API key', {
+      course: course_name,
+      error: err instanceof Error ? err.name : 'unknown',
+      code: (err as { code?: unknown })?.code,
+    })
   }
 }
 
@@ -177,7 +182,11 @@ export async function resolveSimCredentials(
         .limit(1)
       row = rows[0] ?? null
     } catch (err) {
-      console.error('[resolveSimCredentials] DB query failed', err)
+      log.error(
+        'could not read the Sim settings',
+        { course: course_name, reason: 'db_error' },
+        err,
+      )
       return { ok: false, reason: 'db_error' }
     }
 
@@ -187,7 +196,13 @@ export async function resolveSimCredentials(
         ? await resolveStoredSimApiKey(course_name, row.sim_api_key)
         : null
     } catch (err) {
-      console.error('[resolveSimCredentials] could not read Sim API key', err)
+      // These errors come from our own code and do not quote the key or the
+      // stored envelope; the message names the migration to apply.
+      log.error(
+        'could not read the Sim API key',
+        { course: course_name, reason: 'decrypt_failed' },
+        err,
+      )
       return { ok: false, reason: 'decrypt_failed' }
     }
 

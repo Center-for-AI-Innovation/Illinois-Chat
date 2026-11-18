@@ -1,6 +1,10 @@
 import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
+import { backendFetch } from '~/utils/server/backendFetch'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getNomicMapForQueries')
 
 interface NomicMapData {
   map_id: string
@@ -14,9 +18,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const { course_name, map_type } = req.query
 
     // Example response:  {'map_id': 'iframef4967ad7-ff37-4098-ad06-7e1e1a93dd93', 'map_link': 'https://atlas.nomic.ai/map/ed222613-97d9-46a9-8755-12bbc8a06e3a/f4967ad7-ff37-4098-ad06-7e1e1a93dd93'}
-    const response = await fetch(
+    const response = await backendFetch(
       `${getBackendUrl()}/getNomicMap?course_name=${course_name}&map_type=${map_type}`,
     )
+    // backendFetch already logged one ERROR with the status and body.
+    if (!response.ok) {
+      return res.status(502).json({ success: false })
+    }
     const data = await response.json()
 
     const parsedData: NomicMapData = {
@@ -25,7 +33,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
     return res.status(200).json(parsedData)
   } catch (error) {
-    console.error('getNomicMapForQueries - Error fetching nomic map:', error)
+    log.error(
+      'could not fetch the nomic map',
+      { course: req.query.course_name },
+      error,
+    )
     return res.status(500).json({ success: false })
   }
 }

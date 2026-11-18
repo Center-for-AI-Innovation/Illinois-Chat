@@ -7,6 +7,9 @@ import {
 import { simUpstreamErrorResponse } from '~/utils/simDiscovery'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getSimWorkflows')
 
 /**
  * GET /api/UIUC-api/getSimWorkflows?course_name=X
@@ -50,7 +53,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       case 'invalid_base_url':
         return res.status(400).json({ error: 'Invalid Sim base URL' })
       case 'list_failed': {
-        console.error('[getSimWorkflows] list failed', {
+        log.error('Sim workflow list failed', {
+          course: course_name,
           status: result.status,
         })
         const mapped = simUpstreamErrorResponse(result.status)
@@ -59,9 +63,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       default: {
         const error =
           result.reason === 'request_failed' ? result.error : result.reason
-        console.error('[getSimWorkflows] error', {
-          error: error instanceof Error ? error.message : String(error),
-        })
+        log.error(
+          'Sim workflow discovery failed',
+          { course: course_name },
+          error,
+        )
         return res.status(500).json({ error: 'Failed to fetch Sim workflows' })
       }
     }
@@ -70,7 +76,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { workflows, failed } = result
 
   if (failed.length > 0) {
-    console.error('[getSimWorkflows] could not describe workflows', failed)
+    log.error('could not describe Sim workflows', {
+      course: course_name,
+      failed,
+    })
   }
 
   // Every workflow failed to describe: report it rather than returning an
@@ -82,7 +91,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     })
   }
 
-  console.debug('[getSimWorkflows]', workflows.length, 'workflows discovered')
+  log.debug('Sim workflows discovered', {
+    course: course_name,
+    count: workflows.length,
+  })
   return res.status(200).json({ workflows, failed })
 }
 

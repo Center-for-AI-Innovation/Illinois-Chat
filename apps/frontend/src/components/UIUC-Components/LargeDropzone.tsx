@@ -9,6 +9,7 @@ import SupportedFileUploadTypes from './SupportedFileUploadTypes'
 import { LoadingSpinner } from './LoadingSpinner'
 import { useMediaQuery } from '@/components/shadcn/hooks/use-media-query'
 import { callSetCourseMetadata } from '~/utils/apiUtils'
+import { fetchErrorText } from '~/utils/requestRef'
 import {
   isActiveUpload,
   useGatedIngestPoller,
@@ -123,13 +124,18 @@ export function LargeDropzone({
 
   const interactionDisabled = isDisabled || uploadInProgress
 
-  const uploadToS3 = async (file: File | null, uniqueFileName: string) => {
+  const uploadToS3 = async (
+    file: File | null,
+    uniqueFileName: string,
+    requestId: string,
+  ) => {
     if (!file) return
 
     const requestObject = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Request-ID': requestId,
       },
       body: JSON.stringify({
         uniqueFileName: uniqueFileName,
@@ -219,16 +225,23 @@ export function LargeDropzone({
         const nameWithoutExtension = file.name
           .slice(0, file.name.lastIndexOf('.'))
           .replace(/[^a-zA-Z0-9]/g, '-')
-        const uniqueFileName = `${uuidv4()}-${nameWithoutExtension}${extension}`
+        const fileId = uuidv4()
+        const uniqueFileName = `${fileId}-${nameWithoutExtension}${extension}`
         const uniqueReadableFileName = `${nameWithoutExtension}${extension}`
+        // One id per file, sent to our own API routes only (never to the
+        // presigned bucket POST: a custom header there triggers a CORS
+        // preflight the bucket rejects).
+        const requestId = fileId.replace(/-/g, '').slice(0, 12)
+        let failureText: string | undefined
 
         try {
-          await uploadToS3(file, uniqueFileName)
+          await uploadToS3(file, uniqueFileName, requestId)
 
           const response = await fetch(`/api/UIUC-api/ingest`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'X-Request-ID': requestId,
             },
             body: JSON.stringify({
               uniqueFileName: uniqueFileName,
@@ -236,6 +249,13 @@ export function LargeDropzone({
               readableFilename: uniqueReadableFileName,
             }),
           })
+          if (!response.ok) {
+            failureText = await fetchErrorText(
+              response,
+              `Ingest request failed with status ${response.status}`,
+            )
+            throw new Error(failureText)
+          }
           const res = await response.json()
           console.debug('Ingest submitted...', res)
         } catch (error) {
@@ -243,7 +263,13 @@ export function LargeDropzone({
           // Update file status to error so it doesn't block navigation
           setUploadFiles((prev) =>
             prev.map((f) =>
-              f.name === uniqueReadableFileName ? { ...f, status: 'error' } : f,
+              f.name === uniqueReadableFileName
+                ? {
+                    ...f,
+                    status: 'error',
+                    ...(failureText ? { error: failureText } : {}),
+                  }
+                : f,
             ),
           )
         }

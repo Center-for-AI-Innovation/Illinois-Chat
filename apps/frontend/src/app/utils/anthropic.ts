@@ -7,6 +7,10 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { type AnthropicModel } from '~/utils/modelProviders/types/anthropic'
+import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
+
+const log = getLogger('llm.anthropic')
 export const dynamic = 'force-dynamic'
 
 /**
@@ -92,10 +96,21 @@ async function handleStreamingResponse(
         chunking: 'word',
       }),
     ],
+    // streamText does not throw when the provider fails: the error comes as a
+    // part of the stream, and the reply is an empty 200. onError is the one
+    // place that sees it.
+    onError: ({ error }) =>
+      log.error(
+        'LLM stream failed',
+        { model: commonParams.model?.modelId },
+        error,
+      ),
   })
 
   if (!isThinkingEnabled) {
-    return result.toTextStreamResponse()
+    return logStreamFailure(result.toTextStreamResponse(), log, {
+      model: commonParams.model?.modelId,
+    })
   }
 
   // Get the original stream response
@@ -251,7 +266,15 @@ async function handleStreamingResponse(
             }
           }
         } catch (error) {
-          console.error('Error processing stream:', error)
+          log.error(
+            'Anthropic stream failed',
+            {
+              provider: 'Anthropic',
+              model: commonParams.model?.modelId,
+              status: (error as { statusCode?: number })?.statusCode,
+            },
+            error,
+          )
           controller.error(error)
         }
       },

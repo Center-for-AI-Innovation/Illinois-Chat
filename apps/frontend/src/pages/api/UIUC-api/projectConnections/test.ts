@@ -29,6 +29,9 @@ import type {
   ConnectionKind,
   TestSuppliedBody,
 } from '~/utils/projectConnections/validation'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.projectConnections.test')
 
 const KIND_COLUMN: Record<ConnectionKind, string> = {
   s3: 's3_config',
@@ -145,8 +148,9 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   // aws_secret_access_key, or full connection_uri. Mirrors the DB audit row
   // written below but goes to stdout for live debugging.
   const summary = summarizeForLog(probeBody)
-  console.log(
-    `[projectConnections/test] probe kind=${probeBody.kind} mode=${storedProjectName ? 'stored' : 'supplied'} actor=${actorEmail} ${summary}`,
+  // No actor email in the log line; the audit row records the actor.
+  log.info(
+    `probe kind=${probeBody.kind} mode=${storedProjectName ? 'stored' : 'supplied'} ${summary}`,
   )
 
   let result: TestResult
@@ -163,15 +167,17 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       code: 'unknown',
       message: 'Probe threw unexpectedly',
     }
-    console.error('[projectConnections/test] threw:', e)
+    log.error('connection probe threw', { kind: probeBody.kind }, e)
   }
 
   if (result.ok) {
-    console.log(`[projectConnections/test] ok kind=${probeBody.kind}`)
+    log.info('probe ok', { kind: probeBody.kind })
   } else {
-    console.warn(
-      `[projectConnections/test] fail kind=${probeBody.kind} code=${result.code} message=${result.message}`,
-    )
+    log.warn('probe failed', {
+      kind: probeBody.kind,
+      code: result.code,
+      message: result.message,
+    })
   }
 
   // Audit the test attempt. The connection_uri / api_key / etc. are NOT

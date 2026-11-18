@@ -9,6 +9,9 @@ import type { NextApiResponse } from 'next'
 import type { AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withSuperAdminOnly } from '~/utils/superAdminGuard'
 import { listConnections } from '~/db/projectConnectionsRepo'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.projectConnections.list')
 
 // Exported for unit tests — see projectConnections.ts for the same pattern.
 export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -33,7 +36,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })),
     })
   } catch (e) {
-    console.error('[projectConnections/list] failed:', e)
+    log.error('listing the project connections failed', undefined, e)
     return res.status(500).json({ error: 'Failed to list connections' })
   }
 }

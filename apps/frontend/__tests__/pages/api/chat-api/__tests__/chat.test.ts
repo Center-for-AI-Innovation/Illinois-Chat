@@ -48,8 +48,8 @@ vi.mock('~/utils/superAdmins.server', () => ({
   isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
-vi.mock('~/pages/api/chat-api/util/fetchCourseMetadataServer', () => ({
-  default: hoisted.fetchCourseMetadataServer,
+vi.mock('~/pages/api/UIUC-api/getCourseMetadata', () => ({
+  readCourseMetadata: hoisted.fetchCourseMetadataServer,
 }))
 vi.mock('~/server/determineAndValidateModelServer', () => ({
   determineAndValidateModelServer: hoisted.determineAndValidateModelServer,
@@ -143,6 +143,19 @@ describe('chat-api/chat', () => {
       res as Parameters<typeof chat>[1],
     )
     expect(res.status).toHaveBeenCalledWith(405)
+  })
+
+  it('echoes the X-Request-ID header', async () => {
+    const res = createMockRes()
+    await chat(
+      createMockReq({
+        method: 'GET',
+        headers: { 'x-request-id': 'chat1' },
+        socket: { remoteAddress: '127.0.0.1' } as unknown,
+      }) as Parameters<typeof chat>[0],
+      res as Parameters<typeof chat>[1],
+    )
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'chat1')
   })
 
   it('returns 400 when validateRequestBody throws', async () => {

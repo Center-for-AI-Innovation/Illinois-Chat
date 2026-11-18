@@ -6,7 +6,11 @@ import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
 import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
-import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import {
+  PermissionGate,
+  getPermissionGateError,
+  type PermissionGateErrorType,
+} from '~/components/UIUC-Components/PermissionGate'
 import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -30,7 +34,10 @@ const CourseMain: NextPage = () => {
     useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const [metadata, setMetadata] = useState<CourseMetadata | null>()
   const [isLoading, setIsLoading] = useState(true)
-  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+  const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
+    null,
+  )
+  const [errorRequestId, setErrorRequestId] = useState<string>()
 
   useEffect(() => {
     if (!router.isReady || auth.isLoading) return
@@ -56,10 +63,10 @@ const CourseMain: NextPage = () => {
         console.error(error)
         // alert('An error occurred while fetching course metadata. Please try again later.')
 
-        const errorWithStatus = error as Error & { status?: number }
-        const status = errorWithStatus.status
-        if (status === 401 || status === 403 || status === 404) {
-          setErrorType(status as 401 | 403 | 404)
+        const gateError = getPermissionGateError(error)
+        if (gateError) {
+          setErrorType(gateError.errorType)
+          setErrorRequestId(gateError.requestId)
         }
       } finally {
         setIsLoading(false)
@@ -100,6 +107,7 @@ const CourseMain: NextPage = () => {
       <PermissionGate
         course_name={courseName ? (courseName as string) : 'new'}
         errorType={errorType}
+        requestId={errorRequestId}
       />
     )
   }

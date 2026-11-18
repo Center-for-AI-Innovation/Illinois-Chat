@@ -41,7 +41,12 @@ async function postStatus(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.warn(
+        `Ingest status poll failed: endpoint=${endpoint} status=${response.status}`,
+      )
+      return null
+    }
     const data = await response.json()
     return data?.documents ?? []
   } catch (error) {

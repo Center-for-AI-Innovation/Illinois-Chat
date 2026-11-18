@@ -32,6 +32,8 @@ const config = {
       net: { browser: './empty-module.js' },
       tls: { browser: './empty-module.js' },
       perf_hooks: { browser: './empty-module.js' },
+      // Bare `async_hooks` import in src/utils/server/requestContext.ts.
+      async_hooks: { browser: './empty-module.js' },
       // package.json's `browser` field stubs these for webpack; Turbopack
       // doesn't honor it, so they're restated here.
       fs: { browser: './empty-module.js' },
@@ -62,6 +64,9 @@ const config = {
         tls: false,
         net: false,
         perf_hooks: false,
+        // src/utils/server/requestContext.ts (AsyncLocalStorage); it falls
+        // back to no request context when the stub is empty.
+        async_hooks: false,
       }
 
       // mathjax-full falls back to eval('require') for its version unless this is defined.
@@ -90,6 +95,14 @@ const config = {
   // production build; tests are still checked against tsconfig.json.
   typescript: {
     tsconfigPath: 'tsconfig.build.json',
+  },
+  // Write source maps beside the server chunks. The server logger
+  // (src/utils/server/log.ts) reads them, so the stack frames and the at=
+  // field of an ERROR line name the source file and line, not a position in a
+  // minified chunk. The maps stay in .next/server and are never served to the
+  // browser.
+  experimental: {
+    serverSourceMaps: true,
   },
   images: {
     unoptimized: true,

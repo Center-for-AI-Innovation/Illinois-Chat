@@ -8,7 +8,11 @@ import {
   LoadingPlaceholderForAdminPages,
   MainPageBackground,
 } from '~/components/UIUC-Components/MainPageBackground'
-import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import {
+  PermissionGate,
+  getPermissionGateError,
+  type PermissionGateErrorType,
+} from '~/components/UIUC-Components/PermissionGate'
 
 import MakeToolsPage from '~/components/UIUC-Components/SimPage'
 import posthog from 'posthog-js'
@@ -26,7 +30,10 @@ const ToolsPage: NextPage = () => {
 
   const [courseData, setCourseData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+  const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
+    null,
+  )
+  const [errorRequestId, setErrorRequestId] = useState<string>()
 
   const getCurrentPageName = () => {
     const raw = router.query.course_name
@@ -48,9 +55,14 @@ const ToolsPage: NextPage = () => {
           `/api/UIUC-api/getCourseExists?course_name=${courseName}`,
         )
         if (!exsitResponse.ok) {
-          const s = exsitResponse.status
-          if (s === 401 || s === 403 || s === 404)
-            setErrorType(s as 401 | 403 | 404)
+          const gateError = getPermissionGateError({
+            status: exsitResponse.status,
+            requestId: exsitResponse.headers.get('x-request-id'),
+          })
+          if (gateError) {
+            setErrorType(gateError.errorType)
+            setErrorRequestId(gateError.requestId)
+          }
           return
         }
 
@@ -63,9 +75,14 @@ const ToolsPage: NextPage = () => {
             `/api/UIUC-api/getAllCourseData?course_name=${courseName}`,
           )
           if (!dataResponse.ok) {
-            const s = dataResponse.status
-            if (s === 401 || s === 403 || s === 404)
-              setErrorType(s as 401 | 403 | 404)
+            const gateError = getPermissionGateError({
+              status: dataResponse.status,
+              requestId: dataResponse.headers.get('x-request-id'),
+            })
+            if (gateError) {
+              setErrorType(gateError.errorType)
+              setErrorRequestId(gateError.requestId)
+            }
             return
           }
           const data = await dataResponse.json()
@@ -75,10 +92,10 @@ const ToolsPage: NextPage = () => {
       } catch (error) {
         console.error(error)
 
-        const errorWithStatus = error as Error & { status?: number }
-        const status = errorWithStatus.status
-        if (status === 401 || status === 403 || status === 404) {
-          setErrorType(status as 401 | 403 | 404)
+        const gateError = getPermissionGateError(error)
+        if (gateError) {
+          setErrorType(gateError.errorType)
+          setErrorRequestId(gateError.requestId)
         }
       } finally {
         setIsLoading(false)
@@ -133,6 +150,7 @@ const ToolsPage: NextPage = () => {
       <PermissionGate
         course_name={courseName ? (courseName as string) : 'new'}
         errorType={errorType}
+        requestId={errorRequestId}
       />
     )
   }

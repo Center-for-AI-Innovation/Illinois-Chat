@@ -2,6 +2,10 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { backendFetch } from '~/utils/server/backendFetch'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.deleteDocument')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
@@ -40,7 +44,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (s3Path) params.append('s3_path', s3Path)
     if (urlParam) params.append('url', urlParam)
 
-    const response = await fetch(
+    const response = await backendFetch(
       `${getBackendUrl()}/delete?${params.toString()}`,
       {
         method: 'DELETE',
@@ -48,7 +52,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
 
     if (!response.ok) {
-      console.error('Failed to delete document. Err status:', response.status)
+      // backendFetch already logged one ERROR with the status and body.
+      log.warn('document not deleted', {
+        status: response.status,
+        s3_path: s3Path,
+        url: urlParam,
+      })
       return res.status(response.status).json({
         error: `Failed to delete document. Status: ${response.status}`,
       })
@@ -57,7 +66,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const data = await response.json()
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error deleting document:', error)
+    log.error(
+      'error deleting document',
+      { s3_path: s3Path, url: urlParam },
+      error,
+    )
     return res.status(500).json({
       error: 'Internal server error while deleting document',
     })

@@ -14,6 +14,9 @@ import {
 import { formatZodError } from '~/utils/projectConnections/handlerShared'
 import { withSuperAdminOnly } from '~/utils/superAdminGuard'
 import { isSuperAdmin } from '~/utils/superAdmins'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.admin.superAdmins')
 import {
   addSuperAdminGrant,
   readSuperAdminRoster,
@@ -36,7 +39,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return res.status(405).json({ error: 'Method not allowed' })
     }
   } catch (err) {
-    console.error('[admin/superAdmins] handler error:', err)
+    log.error('handler error', undefined, err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -61,19 +64,18 @@ async function handlePost(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     await addSuperAdminGrant(email)
   } catch (err) {
-    console.error('[admin/superAdmins] grant failed:', err)
-    return res
-      .status(503)
-      .json({
-        error: 'Could not add the grant. The settings store is unreachable.',
-      })
+    log.error('grant failed', undefined, err)
+    return res.status(503).json({
+      error: 'Could not add the grant. The settings store is unreachable.',
+    })
   }
 
-  console.log(
-    `[admin/superAdmins] ${
-      req.user?.email ?? 'unknown'
-    } granted super-admin to ${email}`,
-  )
+  // An audit line: who gave the grant to whom. The two addresses are the
+  // content of the line, so they are kept.
+  log.info('super admin granted', {
+    actor: req.user?.email ?? 'unknown',
+    email,
+  })
   return res.status(200).json(await readSuperAdminRoster())
 }
 
@@ -116,25 +118,22 @@ async function handleDelete(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     if ((await removeSuperAdminGrant(email)) === false) {
-      return res
-        .status(400)
-        .json({
-          error:
-            'Cannot remove the last super admin. Add another admin first, or set SUPER_ADMIN_EMAILS.',
-        })
+      return res.status(400).json({
+        error:
+          'Cannot remove the last super admin. Add another admin first, or set SUPER_ADMIN_EMAILS.',
+      })
     }
   } catch (err) {
-    console.error('[admin/superAdmins] revoke failed:', err)
+    log.error('revoke failed', undefined, err)
     return res.status(503).json({
       error: 'Could not remove the grant. The settings store is unreachable.',
     })
   }
 
-  console.log(
-    `[admin/superAdmins] ${
-      req.user?.email ?? 'unknown'
-    } revoked super-admin from ${email}`,
-  )
+  log.info('super admin revoked', {
+    actor: req.user?.email ?? 'unknown',
+    email,
+  })
   return res.status(200).json(await readSuperAdminRoster())
 }
 

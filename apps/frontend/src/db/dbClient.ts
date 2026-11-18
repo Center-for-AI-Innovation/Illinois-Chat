@@ -1,6 +1,9 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('dbClient')
 
 /** Max connections per pool. Keep low to avoid "too many clients" on Postgres. */
 const POOL_MAX = Number(process.env.POSTGRES_POOL_MAX) || 10
@@ -22,6 +25,7 @@ function resolvePostgresSsl(ssl: string | undefined, endpoint: string) {
 }
 
 function createPostgresClient(
+  name: string,
   username?: string,
   password?: string,
   endpoint?: string,
@@ -30,6 +34,16 @@ function createPostgresClient(
   ssl?: string,
 ) {
   if (!username || !password || !endpoint || !port || !database) {
+    // Say so: without this line a missing setting shows up much later as
+    // "connection refused" on localhost.
+    log.warn('database settings are incomplete; using the localhost default', {
+      database: name,
+      has_username: Boolean(username),
+      has_password: Boolean(password),
+      has_endpoint: Boolean(endpoint),
+      has_port: Boolean(port),
+      has_database: Boolean(database),
+    })
     return postgres('postgres://postgres:postgres@localhost:5432/postgres', {
       max: 2,
       idle_timeout: 20,
@@ -59,6 +73,7 @@ const globalForDb = globalThis as unknown as {
 export const client: PgClient =
   globalForDb.__illinoisChatHostPg ??
   createPostgresClient(
+    'app',
     process.env.POSTGRES_USERNAME,
     process.env.POSTGRES_PASSWORD,
     process.env.POSTGRES_ENDPOINT,
@@ -71,6 +86,7 @@ globalForDb.__illinoisChatHostPg = client
 const keycloakClient: PgClient =
   globalForDb.__illinoisChatKeycloakPg ??
   createPostgresClient(
+    'keycloak',
     process.env.KEYCLOAK_DB_USERNAME,
     process.env.KEYCLOAK_DB_PASSWORD,
     process.env.KEYCLOAK_DB_ENDPOINT,

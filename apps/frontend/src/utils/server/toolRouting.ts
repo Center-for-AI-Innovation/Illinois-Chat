@@ -26,6 +26,9 @@ import { REDACTED_SECRET } from '~/utils/modelProviders/providerSecrets'
 import { CURRENT_NCSA_DEFAULT_MODEL_ID } from '~/utils/modelProviders/types/NCSAHostedVLM'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { getLogger } from './log'
+
+const log = getLogger('toolRouting')
 
 export const OPENAI_ROUTER_MODEL_ID = 'gpt-4.1'
 
@@ -67,8 +70,9 @@ async function tryDecrypt(key: string, tier: string): Promise<string | null> {
   try {
     return await decryptKeyIfNeeded(key)
   } catch (error) {
-    console.error(
-      `Tool router: failed to decrypt ${tier} key, skipping tier:`,
+    log.warn(
+      'could not decrypt the tool router key; skipping tier',
+      { tier },
       error,
     )
     return null
@@ -106,8 +110,8 @@ function compatProviderConfigured(llmProviders: AllLLMProviders | null) {
   if (!baseUrl || !apiKey) return null
   const parsed = parseHttpUrl(baseUrl)
   if (!parsed) {
-    console.warn(
-      'Tool router: OpenAI-compatible base URL is not an http(s) URL, skipping tier',
+    log.warn(
+      'tool router OpenAI-compatible base URL is not an http(s) URL; skipping tier',
     )
     return null
   }
@@ -268,12 +272,12 @@ export async function callToolRouter(params: {
       try {
         errorBody = await response.text()
       } catch {}
-      console.error(
-        `Tool router error (${router.provider}):`,
-        response.status,
-        response.statusText,
-        errorBody,
-      )
+      log.error('tool router request failed', {
+        provider: router.provider,
+        model: router.modelId,
+        status: response.status,
+        body: errorBody.slice(0, 500),
+      })
       return {
         ok: false,
         error: `Tool router error: ${response.status}`,
@@ -298,7 +302,11 @@ export async function callToolRouter(params: {
     if (signal?.aborted) {
       return { ok: false, error: 'Tool router request aborted' }
     }
-    console.error(`Tool router request failed (${router.provider}):`, error)
+    log.error(
+      'tool router request failed',
+      { provider: router.provider, model: router.modelId },
+      error,
+    )
     return {
       ok: false,
       error:

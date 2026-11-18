@@ -11,6 +11,9 @@ import {
   extractRequestMeta,
   formatZodError,
 } from '~/utils/projectConnections/handlerShared'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.projectConnections.active')
 
 // Exported for unit tests — see projectConnections.ts for the same pattern.
 export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -62,7 +65,11 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .status(200)
       .json({ success: true, project_name, is_active: result.is_active })
   } catch (e) {
-    console.error('[projectConnections/active] failed:', e)
+    log.error(
+      'setting the active project connection failed',
+      { course: project_name },
+      e,
+    )
     await writeAuditEntry({
       actor_email: actorEmail,
       action: 'set_active',

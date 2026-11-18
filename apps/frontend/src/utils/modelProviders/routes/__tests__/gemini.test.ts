@@ -105,6 +105,17 @@ describe('runGeminiChat', () => {
     const res = await runGeminiChat(conversation, { apiKey: 'k' } as any, true)
     expect(res).toBeInstanceOf(Response)
     await expect(res.text()).resolves.toBe('stream')
+
+    // streamText does not throw when the provider fails; it calls onError.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { onError } = aiHoisted.streamText.mock.calls.at(-1)![0] as any
+    onError({ error: new Error('429 rate limited') })
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        / ERROR   llm\.gemini LLM stream failed model=\S+ at=src\/utils\/modelProviders\/routes\/gemini\.ts:\d+\nError: 429 rate limited/,
+      ),
+    )
+    consoleError.mockRestore()
   })
 
   it('converts conversation messages to CoreMessage format', async () => {

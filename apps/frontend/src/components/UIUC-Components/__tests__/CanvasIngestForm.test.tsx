@@ -134,10 +134,20 @@ describe('CanvasIngestForm', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
       const url = String(input?.url ?? input)
       if (url.includes('/api/UIUC-api/ingestCanvas')) {
-        return new Response(JSON.stringify({ error: 'nope' }), {
-          status: 500,
-          headers: { 'content-type': 'application/json' },
-        })
+        return new Response(
+          JSON.stringify({
+            error: 'Canvas rejected the configured access token',
+            upstream: 'canvas',
+            upstream_status: 401,
+          }),
+          {
+            status: 502,
+            headers: {
+              'content-type': 'application/json',
+              'x-request-id': 'rid-canvas1',
+            },
+          },
+        )
       }
       return new Response(JSON.stringify({}), {
         status: 200,
@@ -172,6 +182,8 @@ describe('CanvasIngestForm', () => {
       const filesJson = screen.getByTestId('files').textContent ?? ''
       expect(filesJson).toContain('"status":"error"')
     })
-    expect(alertSpy).toHaveBeenCalled()
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Canvas rejected the configured access token (ref: rid-canvas1)',
+    )
   }, 20_000)
 })

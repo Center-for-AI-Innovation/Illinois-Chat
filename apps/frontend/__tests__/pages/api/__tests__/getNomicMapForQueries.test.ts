@@ -43,6 +43,22 @@ describe('getNomicMapForQueries API', () => {
     })
   })
 
+  it('returns 502 when the backend answers with an error status', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('map not found', { status: 404 }),
+    )
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'GET',
+        query: { course_name: 'CS101', map_type: 'all' },
+      }) as any,
+      res as any,
+    )
+    expect(res.status).toHaveBeenCalledWith(502)
+    expect(res.json).toHaveBeenCalledWith({ success: false })
+  })
+
   it('returns 500 when fetch fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('boom'))
     const res = createMockRes()

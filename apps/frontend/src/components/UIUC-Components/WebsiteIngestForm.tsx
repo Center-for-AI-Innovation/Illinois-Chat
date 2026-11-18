@@ -30,6 +30,7 @@ import { montserrat_heading } from 'fonts'
 import { showToast } from '~/utils/toastUtils'
 import axios from 'axios'
 import { type FileUpload } from './UploadNotification'
+import { axiosErrorText } from '~/utils/requestRef'
 import { type QueryClient } from '@tanstack/react-query'
 import { useGatedIngestPoller } from '~/hooks/useGatedIngestPoller'
 
@@ -374,7 +375,7 @@ export default function WebsiteIngestForm({
 
       showToast({
         title: 'Error during web scraping. Please try again.',
-        message: error.message,
+        message: axiosErrorText(error),
         type: 'error',
         autoClose: 12000,
       })

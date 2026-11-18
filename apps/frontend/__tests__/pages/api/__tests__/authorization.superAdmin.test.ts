@@ -50,6 +50,8 @@ function makeRes() {
     res.body = body
     return res
   })
+  // withCourseAccessFromRequest sets X-Request-ID before the handler runs.
+  res.setHeader = vi.fn()
   return res
 }
 

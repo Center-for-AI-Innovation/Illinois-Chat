@@ -5,9 +5,11 @@
 // project by ConnectionManager.resolveVectorEngine.
 import { and, eq, or, sql } from 'drizzle-orm'
 import { type CourseDocument } from '~/types/courseMaterials'
-import posthog from 'posthog-js'
 import { connectionManager } from '~/utils/connectionManager'
 import { embeddings } from '~/db/schema'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('vectorUtils')
 
 export interface UpdateDocGroupsResponse {
   status: 'completed'
@@ -31,19 +33,23 @@ export async function updateDocGroupsInVectorStore(
     }
     return { status: 'completed' }
   } catch (error) {
-    console.error('Error in updateDocGroupsInVectorStore:', error)
-    posthog.capture('add_doc_group', {
-      course_name: courseName,
-      doc_readable_filename: doc.readable_filename,
-      doc_unique_identifier:
-        doc.url && doc.url !== ''
-          ? doc.url
-          : doc.s3_path && doc.s3_path !== ''
-            ? doc.s3_path
-            : null,
-      doc_groups: doc.doc_groups,
-      error_logs: error,
-    })
+    // Server-side PostHog never sends (posthog-js is browser-only), so the
+    // failure goes to the log instead.
+    log.error(
+      'could not update doc groups in the vector store',
+      {
+        course: courseName,
+        file: doc.readable_filename,
+        doc:
+          doc.url && doc.url !== ''
+            ? doc.url
+            : doc.s3_path && doc.s3_path !== ''
+              ? doc.s3_path
+              : null,
+        groups: doc.doc_groups,
+      },
+      error,
+    )
     throw error
   }
 }

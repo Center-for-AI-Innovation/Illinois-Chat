@@ -4,6 +4,9 @@ import type {
   GenericSupportedModel,
 } from '~/utils/modelProviders/LLMProvider'
 import { webLLMModels } from '~/utils/modelProviders/WebLLM'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('server.models')
 
 /**
  * Server-side function to fetch course metadata.
@@ -29,7 +32,10 @@ export async function determineAndValidateModelServer(
   ) as GenericSupportedModel
 
   if (!activeModel) {
-    console.error(`Model with ID ${modelId} not found in available models.`)
+    log.warn('requested model is not enabled in this project', {
+      course: projectName,
+      model: modelId,
+    })
     throw new Error(
       `The requested model '${modelId}' is not available in this project. It has likely been restricted by the project's admins. You can enable this model on the admin page here: https://uiuc.chat/${projectName}/dashboard. These models are available to use: ${Array.from(
         availableModels,

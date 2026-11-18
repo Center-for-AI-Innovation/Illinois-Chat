@@ -34,6 +34,9 @@ import {
   type StoredAnnouncementBanner,
   type StoredNavbarBranding,
 } from '~/utils/platformSettings.schema'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('platformSettings')
 
 export const PLATFORM_SETTINGS_KEY = 'platform:settings'
 export const ANNOUNCEMENT_BANNER_FIELD = 'announcement_banner'
@@ -86,7 +89,7 @@ function parseStoredJson<T>(
     parsedJson = JSON.parse(raw)
   } catch (error) {
     const reason = `${field} is not valid JSON: ${describeError(error)}`
-    console.error('[platformSettings]', reason)
+    log.error('stored platform setting is not valid', { reason })
     return { state: 'invalid', reason }
   }
 
@@ -95,10 +98,7 @@ function parseStoredJson<T>(
     const reason = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || field}: ${issue.message}`)
       .join('; ')
-    console.error(
-      `[platformSettings] Stored ${field} failed validation:`,
-      reason,
-    )
+    log.error('stored platform setting failed validation', { field, reason })
     return { state: 'invalid', reason }
   }
 
@@ -122,10 +122,7 @@ async function readJsonField<T>(
     raw = await redis.hGet(PLATFORM_SETTINGS_KEY, field)
   } catch (error) {
     const reason = describeError(error)
-    console.error(
-      `[platformSettings] Redis unavailable reading ${field}:`,
-      reason,
-    )
+    log.error('Redis unavailable reading a platform setting', { field, reason })
     return { state: 'unavailable', reason }
   }
 
@@ -156,7 +153,10 @@ export async function readNavbarLogo(): Promise<AvailabilityRead<string>> {
     return { state: 'configured', value: raw ?? '' }
   } catch (error) {
     const reason = describeError(error)
-    console.error('[platformSettings] Redis unavailable reading logo:', reason)
+    log.error('Redis unavailable reading a platform setting', {
+      field: 'logo',
+      reason,
+    })
     return { state: 'unavailable', reason }
   }
 }
@@ -228,10 +228,10 @@ export async function readMaintenanceSettings(): Promise<
     }
   } catch (error) {
     const reason = describeError(error)
-    console.error(
-      '[platformSettings] Redis unavailable reading maintenance settings:',
+    log.error('Redis unavailable reading a platform setting', {
+      field: 'maintenance',
       reason,
-    )
+    })
     return { state: 'unavailable', reason }
   }
 }
@@ -513,10 +513,10 @@ export async function readSuperAdminGrants(): Promise<
     }
   } catch (error) {
     const reason = describeError(error)
-    console.error(
-      '[platformSettings] Redis unavailable reading super-admin grants:',
+    log.error('Redis unavailable reading a platform setting', {
+      field: 'super_admin_grants',
       reason,
-    )
+    })
     return { state: 'unavailable', reason }
   }
 }
