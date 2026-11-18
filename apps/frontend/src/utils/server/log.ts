@@ -7,8 +7,9 @@
 // rid, path and course come from the request context (requestContext.ts) when
 // one is open. An error is appended as "Name: message" plus its stack frames on
 // the following lines. An ERROR line ends with at=<file>:<line>, the place in
-// the app that called log.error. Each event is exactly one console call with
-// one string.
+// the app that called log.error. A password in a URL (://user:secret@host) is
+// written as ://***@, also in an error message. Each event is exactly one
+// console call with one string.
 //
 // Server-only by convention; harmless in the browser, where there is no
 // request context and the line is just a timestamped console message.
@@ -54,6 +55,10 @@ function threshold(): number {
   }
   return LEVEL_RANK.INFO!
 }
+
+// "://user:secret@host" in a URL. The password must not reach the log; the same
+// rule as _PASSWORD_IN_URL in the Python log_setup.py.
+const PASSWORD_IN_URL = /:\/\/[^/@\s]+:[^/@\s]+@/g
 
 // A value must not be able to start a new log line.
 function escapeNewlines(text: string): string {
@@ -234,7 +239,7 @@ export function formatLine(
   }
   let line = parts.join(' ')
   if (err !== undefined) line += `\n${formatError(err)}`
-  return line
+  return line.replace(PASSWORD_IN_URL, '://***@')
 }
 
 const WRITERS: Record<Level, (line: string) => void> = {

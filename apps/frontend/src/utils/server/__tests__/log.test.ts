@@ -216,6 +216,33 @@ describe('getLogger', () => {
     expect(c.error.mock.calls[1]![0]).toMatch(/ y at=\S+:\d+\n\{"code":7\}$/)
   })
 
+  it('hides the password of a URL in the message, the fields and the error', () => {
+    const c = spies()
+    const err = new Error(
+      'connect failed for postgres://app:hunter2@db.internal:5432/public',
+      { cause: new Error('auth failed redis://default:s3cret@redis:6379') },
+    )
+    getLogger('db').error(
+      'cannot reach amqp://guest:guest@rabbit:5672/',
+      {
+        url: 'https://user:pa55@example.edu/path?x=1',
+        plain: 'https://a.edu/b',
+      },
+      err,
+    )
+    const line = c.error.mock.calls[0]![0] as string
+    expect(line).toContain('cannot reach amqp://***@rabbit:5672/')
+    expect(line).toContain('url=https://***@example.edu/path?x=1')
+    expect(line).toContain('plain=https://a.edu/b')
+    expect(line).toContain('postgres://***@db.internal:5432/public')
+    expect(line).toContain(
+      'Caused by: Error: auth failed redis://***@redis:6379',
+    )
+    for (const secret of ['hunter2', 's3cret', 'guest:guest', 'pa55']) {
+      expect(line).not.toContain(secret)
+    }
+  })
+
   it('ends an ERROR line with the file and line that called log.error', () => {
     process.env.LOG_LEVEL = 'debug'
     const c = spies()
