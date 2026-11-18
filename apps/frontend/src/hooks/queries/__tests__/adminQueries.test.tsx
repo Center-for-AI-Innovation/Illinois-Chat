@@ -295,16 +295,19 @@ describe('platform settings queries', () => {
       queryKey: PLATFORM_SETTINGS_QUERY_KEY,
     })
     // The shared status is refreshed directly from the origin, not through an
-    // invalidation that would refetch the cacheable URL.
+    // invalidation that would refetch the cacheable URL. The refresh runs in
+    // the background, so wait for it to land.
     expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['siteStatus'] })
+    await waitFor(() =>
+      expect(queryClient.getQueryData(['siteStatus'])).toEqual({
+        announcementBanner: null,
+        isMaintenanceMode: true,
+      }),
+    )
     expect(fetchSpy).toHaveBeenLastCalledWith(
       expect.stringMatching(/^\/api\/UIUC-api\/siteStatus\?fresh=.+$/),
       expect.objectContaining({ cache: 'no-store' }),
     )
-    expect(queryClient.getQueryData(['siteStatus'])).toEqual({
-      announcementBanner: null,
-      isMaintenanceMode: true,
-    })
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: ['maintenanceDetails'],
     })

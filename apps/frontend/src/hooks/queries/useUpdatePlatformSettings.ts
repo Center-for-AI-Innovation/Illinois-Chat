@@ -61,7 +61,7 @@ export function useUpdatePlatformSettings() {
 
   return useMutation({
     mutationFn: updatePlatformSettings,
-    onSuccess: async () => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: PLATFORM_SETTINGS_QUERY_KEY,
       })
@@ -72,9 +72,9 @@ export function useUpdatePlatformSettings() {
       // The app-wide maintenance gate and the banner both read the shared site
       // status. An invalidation would refetch the ordinary URL, which the shared
       // cache can answer with a copy from before the save, so the saving tab
-      // reads the origin directly. A failed refresh leaves the last good status
-      // in place and does not fail the save.
-      await refreshSiteStatusAfterSave(queryClient)
+      // reads the origin directly. It runs in the background: the save is
+      // already durable, so a slow or failed refresh must not hold it open.
+      void refreshSiteStatusAfterSave(queryClient)
     },
   })
 }

@@ -85,8 +85,8 @@ export async function fetchFreshSiteStatus(
 export async function refreshSiteStatusAfterSave(
   queryClient: QueryClient,
 ): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: SITE_STATUS_QUERY_KEY })
   try {
+    await queryClient.cancelQueries({ queryKey: SITE_STATUS_QUERY_KEY })
     // One attempt, no backoff: the save should not wait on a retry. If it
     // fails, the next scheduled poll is the recovery.
     await queryClient.fetchQuery<SiteStatus>({
