@@ -66,8 +66,10 @@ const navLinkVariants = cva(
   },
 )
 
+// Laid out in normal flow. The SiteHeader around it owns sticky positioning, so
+// the navbar never needs to know how tall the announcement bar is.
 const navbarVariants = cva(
-  'fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-white/95 backdrop-blur-xs dark:bg-[#13294b]',
+  'relative w-full bg-white/95 backdrop-blur-xs dark:bg-[#13294b]',
   {
     variants: {
       bordered: {

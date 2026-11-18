@@ -233,7 +233,9 @@ describe('MakeNewCoursePage', () => {
       ).not.toBeInTheDocument()
     })
 
-    it('renders the Navbar and wizard navigation', async () => {
+    it('leaves the navbar to SiteHeader and still renders wizard navigation', async () => {
+      // /new gets its navbar from the site header (see site-header-routes), so
+      // the page must not mount a second one.
       setIllinoisConfig('False')
       const MakeNewCoursePage = await importComponent()
 
@@ -244,7 +246,7 @@ describe('MakeNewCoursePage', () => {
         />,
       )
 
-      expect(screen.getByTestId('navbar')).toBeInTheDocument()
+      expect(screen.queryByTestId('navbar')).not.toBeInTheDocument()
       expect(
         screen.getByRole('navigation', { name: /Wizard navigation/i }),
       ).toBeInTheDocument()

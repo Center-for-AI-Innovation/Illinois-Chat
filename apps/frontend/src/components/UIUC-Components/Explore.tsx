@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { Card } from '@/components/shadcn/ui/card'
 import router from 'next/router'
 import { createProject } from '~/utils/apiUtils'
-import Navbar from './navbars/Navbar'
 
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 
@@ -93,7 +92,6 @@ const Dashboard = ({
 
   return (
     <>
-      <Navbar isPlain={false} />
       <Head>
         <title>Explore — Illinois Chat</title>
         <meta name="description" content="My projects on UIUC.chat." />
@@ -102,9 +100,9 @@ const Dashboard = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main mt-(--navbar-height)"
+        className="course-page-main"
         style={{
-          minHeight: 'var(--viewport-height)',
+          minHeight: 'var(--page-viewport-height)',
           padding: '1rem',
         }}
       >

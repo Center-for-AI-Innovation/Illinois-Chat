@@ -9,7 +9,6 @@ import { IconArrowNarrowRight, IconExternalLink } from '@tabler/icons-react'
 
 import { doto_font, montserrat_heading, montserrat_paragraph } from 'fonts'
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
-import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
 import router from 'next/router'
 import type {
@@ -197,12 +196,10 @@ const Home: NextPage<HomeProps> = () => {
         </style>
       </Head>
 
-      <Navbar variant="splash" />
-
       <main
         id="main-content"
         tabIndex={-1}
-        className={`illinois-blue-gradient-bg flex min-h-(--viewport-height) flex-col items-center justify-center overflow-hidden pt-(--navbar-height) ${montserrat_paragraph.variable} font-montserratParagraph`}
+        className={`illinois-blue-gradient-bg flex min-h-(--page-viewport-height) flex-col items-center justify-center overflow-hidden ${montserrat_paragraph.variable} font-montserratParagraph`}
       >
         <div className="container flex w-full max-w-5xl flex-col items-center justify-center gap-4 px-4 py-8 sm:px-8 sm:py-20">
           <div className="flex w-full max-w-3xl flex-col items-start justify-center gap-8 sm:flex-row">

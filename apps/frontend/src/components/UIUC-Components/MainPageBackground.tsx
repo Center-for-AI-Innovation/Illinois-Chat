@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import Head from 'next/head'
 import React, { type ReactNode } from 'react'
-import Navbar from './navbars/Navbar'
 import { useRouter } from 'next/router'
 import { LoadingSpinner } from './LoadingSpinner'
 import { montserrat_heading } from 'fonts'
@@ -18,7 +17,7 @@ export const MainPageBackground: React.FC<MainPageBackgroundProps> = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="items-left justify-left course-page-main flex min-h-(--viewport-height) flex-col"
+        className="items-left justify-left course-page-main flex min-h-(--page-viewport-height) flex-col"
       >
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-5 pt-20">
           <Link href="/">
@@ -67,12 +66,11 @@ export const LoadingPlaceholderForAdminPages = ({}) => {
       <main
         id="main-content"
         tabIndex={-1}
-        className="items-left justify-left course-page-main flex min-h-(--viewport-height) flex-col"
+        className="items-left justify-left course-page-main flex min-h-(--page-viewport-height) flex-col"
       >
         <h1 className="sr-only">
           {courseName ? `Loading ${courseName}` : 'Loading'}
         </h1>
-        <Navbar />
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-5">
           <div className="pt-4" />
           <LoadingSpinner />

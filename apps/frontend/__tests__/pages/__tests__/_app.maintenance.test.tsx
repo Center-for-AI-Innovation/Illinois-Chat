@@ -58,8 +58,8 @@ vi.mock('~/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn() }),
 }))
 
-vi.mock('~/components/UIUC-Components/SiteAnnouncementBanner', () => ({
-  SiteAnnouncementBanner: () => null,
+vi.mock('~/components/Layout/SiteHeader', () => ({
+  SiteHeader: () => React.createElement('div', null, 'Site header'),
 }))
 
 vi.mock('~/components/UIUC-Components/Maintenance', () => ({
@@ -111,12 +111,15 @@ describe('_app maintenance gate', () => {
     expect(screen.getByTestId('keycloak-provider')).toBeInTheDocument()
     expect(screen.getByText('Site is under maintenance')).toBeInTheDocument()
     expect(screen.queryByText('Home page content')).not.toBeInTheDocument()
+    // The header carries the announcement and navbar, which stay hidden too.
+    expect(screen.queryByText('Site header')).not.toBeInTheDocument()
   })
 
   it('renders the page normally when maintenance is off', async () => {
     await renderApp({ pathname: '/', isMaintenanceMode: false })
 
     expect(screen.getByText('Home page content')).toBeInTheDocument()
+    expect(screen.getByText('Site header')).toBeInTheDocument()
     expect(
       screen.queryByText('Site is under maintenance'),
     ).not.toBeInTheDocument()
@@ -147,5 +150,38 @@ describe('_app maintenance gate', () => {
 
     expect(screen.getByText('Home page content')).toBeInTheDocument()
     expect(maintenanceQuery.enabledCalls).toContain(false)
+  })
+})
+
+describe('_app page viewport height', () => {
+  // `--page-viewport-height` is what full-height page content uses below the
+  // site header. It must subtract the navbar only on routes that render one;
+  // MainPageBackground pages without a navbar keep the full banner-adjusted
+  // viewport.
+  function appRoot(container: HTMLElement) {
+    return container.querySelector<HTMLElement>('[data-testid="keycloak-provider"]')
+      ?.parentElement as HTMLElement
+  }
+
+  it('subtracts the navbar on a route that renders one', async () => {
+    const { container } = await renderApp({
+      pathname: '/[course_name]/dashboard',
+      isMaintenanceMode: false,
+    })
+
+    expect(
+      appRoot(container).style.getPropertyValue('--page-viewport-height'),
+    ).toBe('calc(var(--viewport-height) - var(--navbar-height))')
+  })
+
+  it('keeps the banner-adjusted viewport on a route without a navbar', async () => {
+    const { container } = await renderApp({
+      pathname: '/terms',
+      isMaintenanceMode: false,
+    })
+
+    expect(
+      appRoot(container).style.getPropertyValue('--page-viewport-height'),
+    ).toBe('var(--viewport-height)')
   })
 })

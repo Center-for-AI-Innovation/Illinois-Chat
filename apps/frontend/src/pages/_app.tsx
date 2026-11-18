@@ -2,8 +2,9 @@ import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
+import { SiteHeader } from '~/components/Layout/SiteHeader'
+import { routeHasSiteNavbar } from '~/components/Layout/site-header-routes'
 import Maintenance from '~/components/UIUC-Components/Maintenance'
-import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import '~/styles/citation-tooltips.css'
 import '~/styles/globals.css'
 
@@ -12,7 +13,12 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useRouter } from 'next/router'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 
 // import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
@@ -134,8 +140,18 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
     }
   }, [])
 
+  // Full-height page content sits below the site header only on routes that
+  // render a navbar, so the header's height is subtracted only there.
+  // Derived from the route on the server too, so the first paint is correct.
+  const pageViewportHeight = routeHasSiteNavbar(router.pathname)
+    ? 'calc(var(--viewport-height) - var(--navbar-height))'
+    : 'var(--viewport-height)'
+
   return (
     <div
+      style={
+        { '--page-viewport-height': pageViewportHeight } as CSSProperties
+      }
       onKeyDownCapture={(event) => {
         if (event.key === 'Tab') {
           document.documentElement.dataset.inputModality = 'keyboard'
@@ -180,7 +196,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               <ThemeProvider>
               <Toaster position="bottom-center" />
               <MaintenanceGate>
-                <SiteAnnouncementBanner
+                <SiteHeader
                   initialBanner={
                     (pageProps as SiteBannerPageProps).announcementBanner
                   }

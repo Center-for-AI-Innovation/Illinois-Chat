@@ -20,10 +20,11 @@ interface SiteAnnouncementBannerProps {
 }
 
 /**
- * The announcement bar on every page. Sticky and in normal flow, so it never
- * overlaps content before hydration; its measured height is published as
- * `--announcement-banner-height` for the fixed navbars and viewport-height
- * layouts that would otherwise sit underneath it.
+ * The announcement bar on every page. Rendered inside `SiteHeader`, which
+ * makes it sticky together with the navbar, so the two can't overlap.
+ *
+ * Its measured height is published as `--announcement-banner-height`. Only
+ * fixed sidebars and sticky sub-bars read that variable; the navbar does not.
  */
 export function SiteAnnouncementBanner({
   initialBanner,
@@ -63,7 +64,7 @@ export function SiteAnnouncementBanner({
   if (isExempt) return null
 
   return (
-    <div ref={containerRef} className="sticky top-0 z-40">
+    <div ref={containerRef}>
       <AnnouncementBanner
         banner={banner ?? null}
         legacyFallback={router.pathname === '/'}

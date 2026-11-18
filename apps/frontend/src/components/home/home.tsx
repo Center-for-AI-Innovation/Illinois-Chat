@@ -36,7 +36,6 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import { type FolderType, type FolderWithConversation } from '~/types/folder'
 import { selectBestModel } from '~/utils/modelProviders/LLMProvider'
 
-import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 
 const Home = ({
   current_email,
@@ -593,10 +592,8 @@ const Home = ({
         </Head>
         {selectedConversation && (
           <div
-            className={`flex h-(--viewport-height) w-screen flex-col pt-(--navbar-height) text-sm text-white dark:text-white`}
+            className={`flex h-(--page-viewport-height) w-screen flex-col text-sm text-white dark:text-white`}
           >
-            <Navbar isPlain={false} />
-
             <main
               id="main-content"
               tabIndex={-1}

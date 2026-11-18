@@ -5,10 +5,10 @@ import { Card } from '@/components/shadcn/ui/card'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import router from 'next/router'
 import { createProject } from '~/utils/apiUtils'
-import Navbar from './navbars/Navbar'
 
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import ProjectTable from '~/components/UIUC-Components/ProjectTable'
+import Navbar from './navbars/Navbar'
 
 const Dashboard = ({
   project_name,
@@ -104,7 +104,7 @@ const Dashboard = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main mt-(--navbar-height)"
+        className="course-page-main"
         style={{
           minHeight: 'var(--viewport-height)',
           padding: '1rem',
