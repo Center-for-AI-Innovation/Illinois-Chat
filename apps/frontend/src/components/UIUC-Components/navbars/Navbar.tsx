@@ -80,7 +80,7 @@ const navbarHeaderVariants = cva(
   {
     variants: {
       layout: {
-        splash: 'max-w-5xl px-4 sm:px-8',
+        splash: 'max-w-[1680px] px-4 sm:px-8',
         workspace: 'px-4 sm:px-8',
         sidebar: 'px-4',
         page: 'max-w-6xl px-4 sm:px-6 lg:px-8',

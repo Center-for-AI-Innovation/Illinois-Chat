@@ -163,7 +163,7 @@ describe('Navbar', () => {
     )
   })
 
-  it('aligns the splash variant with the hero column', async () => {
+  it('uses the splash layout for the landing page', async () => {
     superAdminIs(false)
     await renderNavbar({ variant: 'splash' })
 
