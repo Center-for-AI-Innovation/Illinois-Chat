@@ -26,7 +26,7 @@ import { REDACTED_SECRET } from '~/utils/modelProviders/providerSecrets'
 import { CURRENT_NCSA_DEFAULT_MODEL_ID } from '~/utils/modelProviders/types/NCSAHostedVLM'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { ensureRedisConnected } from '~/utils/redisClient'
-import { cutForLog, getLogger } from './log'
+import { getLogger } from './log'
 
 const log = getLogger('toolRouting')
 
@@ -276,7 +276,7 @@ export async function callToolRouter(params: {
         provider: router.provider,
         model: router.modelId,
         status: response.status,
-        body: cutForLog(errorBody),
+        body: errorBody.slice(0, 500),
       })
       return {
         ok: false,

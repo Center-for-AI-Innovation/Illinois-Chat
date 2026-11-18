@@ -15,7 +15,7 @@ import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { AllSupportedModels } from '~/utils/modelProviders/LLMProvider'
 import { eq } from 'drizzle-orm'
-import { cutForLog, getLogger } from '~/utils/server/log'
+import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.logConversation')
 
@@ -241,7 +241,7 @@ const logConversation = async (
 
     if (!response.ok) {
       failedStep = failedStep ?? 'llm-monitor'
-      const body = cutForLog(await response.text().catch(() => ''))
+      const body = (await response.text().catch(() => '')).slice(0, 500)
       log.error('backend llm-monitor-message failed', {
         conversation: conversationId,
         status: response.status,

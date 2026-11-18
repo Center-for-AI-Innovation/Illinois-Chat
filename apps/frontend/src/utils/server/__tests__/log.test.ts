@@ -4,12 +4,7 @@ import fs, { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  MAX_CACHED_MAP_BYTES,
-  MAX_MAP_BYTES,
-  cutForLog,
-  getLogger,
-} from '../log'
+import { MAX_CACHED_MAP_BYTES, MAX_MAP_BYTES, getLogger } from '../log'
 import { runWithLogContext } from '../requestContext'
 
 const TS = '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z'
@@ -434,149 +429,6 @@ describe('getLogger', () => {
     expect(c.error.mock.calls[1]![0]).toMatch(/ y at=\S+:\d+\n\{"code":7\}$/)
   })
 
-  it('hides the password of a URL in the message, the fields and the error', () => {
-    const c = spies()
-    const err = new Error(
-      'connect failed for postgres://app:hunter2@db.internal:5432/public',
-      { cause: new Error('auth failed redis://default:s3cret@redis:6379') },
-    )
-    getLogger('db').error(
-      'cannot reach amqp://guest:guest@rabbit:5672/',
-      {
-        url: 'https://user:pa55@example.edu/path?x=1',
-        plain: 'https://a.edu/b',
-      },
-      err,
-    )
-    const line = c.error.mock.calls[0]![0] as string
-    expect(line).toContain('cannot reach amqp://***@rabbit:5672/')
-    expect(line).toContain('url=https://***@example.edu/path?x=1')
-    expect(line).toContain('plain=https://a.edu/b')
-    expect(line).toContain('postgres://***@db.internal:5432/public')
-    expect(line).toContain(
-      'Caused by: Error: auth failed redis://***@redis:6379',
-    )
-    for (const secret of ['hunter2', 's3cret', 'guest:guest', 'pa55']) {
-      expect(line).not.toContain(secret)
-    }
-  })
-
-  it('hides a login with no user, a token as the user and a password with an @', () => {
-    const c = spies()
-    getLogger('s').info('urls', {
-      a: 'redis://:onlypass@host:6379/0',
-      b: 'https://token123@github.com/x',
-      c: 'postgres://user:p@ss@db/public',
-    })
-    expect(c.log.mock.calls[0]![0]).toMatch(
-      / a=redis:\/\/\*\*\*@host:6379\/0 b=https:\/\/\*\*\*@github\.com\/x c=postgres:\/\/\*\*\*@db\/public$/,
-    )
-  })
-
-  it('hides a password that has punctuation in it', () => {
-    const c = spies()
-    const urls = [
-      'postgres://user:p,ss@db.internal/x',
-      'redis://:p?ss@cache:6379',
-      'redis://:p#ss@cache:6379',
-      "amqp://guest:gu'est@mq",
-      'https://user:p<a>ss@h',
-      'postgres://admin:2024#Winter@db.internal:5432/app',
-      'https://u:8443@h/x',
-    ]
-    getLogger('s').info(urls.join(' '))
-    const line = c.log.mock.calls[0]![0] as string
-    expect(line).toMatch(
-      / postgres:\/\/\*\*\*@db\.internal\/x redis:\/\/\*\*\*@cache:6379 redis:\/\/\*\*\*@cache:6379 amqp:\/\/\*\*\*@mq https:\/\/\*\*\*@h postgres:\/\/\*\*\*@db\.internal:5432\/app https:\/\/\*\*\*@h\/x$/,
-    )
-  })
-
-  it('hides a login whose user name has an @ or punctuation in it', () => {
-    const c = spies()
-    const urls = [
-      'smtp://rashmil@example.com:Sup3rSecret@smtp.example.com:587',
-      'postgres://admin@myserver:S3cret@myserver.postgres.database.azure.com:5432/db',
-      'imap://a@b.edu:pw@mail',
-      'http://CORP\\svc:S3cret@proxy:8080',
-      'http://us,er:pw@host',
-      'http://u&x:secret@h',
-      'http://user:123,x@host/',
-    ]
-    getLogger('s').info(urls.join(' '))
-    expect(c.log.mock.calls[0]![0]).toMatch(
-      / smtp:\/\/\*\*\*@smtp\.example\.com:587 postgres:\/\/\*\*\*@myserver\.postgres\.database\.azure\.com:5432\/db imap:\/\/\*\*\*@mail http:\/\/\*\*\*@proxy:8080 http:\/\/\*\*\*@host http:\/\/\*\*\*@h http:\/\/\*\*\*@host\/$/,
-    )
-  })
-
-  it('hides a password that starts with digits, and a login after more than two slashes', () => {
-    const c = spies()
-    getLogger('s').info(
-      'redis://default:1234&abcd@cache.internal:6379 mongodb://root:99?x@mongo postgres://user:1#x@h http:///user:SECRETB@127.0.0.1:9/',
-    )
-    // Backslashes count as slashes for a browser.
-    getLogger('s').info(
-      'http://\\/user:SECRETA@host/ http:\\\\user:SECRETA@host/',
-    )
-    expect(c.log.mock.calls[1]![0]).toMatch(
-      / s http:\/\/\*\*\*@host\/ http:\/\/\*\*\*@host\/$/,
-    )
-    expect(c.log.mock.calls[0]![0]).toMatch(
-      / redis:\/\/\*\*\*@cache\.internal:6379 mongodb:\/\/\*\*\*@mongo postgres:\/\/\*\*\*@h http:\/\/\*\*\*@127\.0\.0\.1:9\/$/,
-    )
-  })
-
-  it('leaves a URL in JSON, a URL with a path, and a URL before a newline alone', () => {
-    const c = spies()
-    getLogger('s').info('reply', {
-      body: { url: 'http://backend:8001', email: 'alice@illinois.edu' },
-      page: 'https://site.edu/login?email=bob@x.edu',
-    })
-    // The login is looked for before a newline is escaped, so a newline ends
-    // the URL.
-    getLogger('s').info('http://backend:8001\nbob@c.edu')
-    expect(c.log.mock.calls[0]![0]).toMatch(
-      / body=\{"url":"http:\/\/backend:8001","email":"alice@illinois\.edu"\} page=https:\/\/site\.edu\/login\?email=bob@x\.edu$/,
-    )
-    expect(c.log.mock.calls[1]![0]).toContain(
-      ' s http://backend:8001\\nbob@c.edu',
-    )
-  })
-
-  it('takes away the text between a URL with no path and a later @', () => {
-    // The price of a rule that does not show a password. No secret is in
-    // these lines.
-    const c = spies()
-    const log = getLogger('s')
-    log.info('https://a.edu?email=x@y.edu')
-    log.info('redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu')
-    log.info('see https://a.edu:8443,contact:bob@y.edu')
-    expect(c.log.mock.calls[0]![0]).toContain(' s https://***@y.edu')
-    expect(c.log.mock.calls[1]![0]).toContain(
-      ' s redirect_uri=http://***@illinois.edu',
-    )
-    expect(c.log.mock.calls[2]![0]).toContain(' s see https://***@y.edu')
-  })
-
-  it('hides the login before a long error message is cut', () => {
-    const c = spies()
-    const err = new Error(
-      `${'x'.repeat(3985)} postgres://user:SECRETPASS@host/db and more text`,
-    )
-    err.stack = undefined
-    getLogger('s').error('failed', err)
-    const text = c.error.mock.calls[0]![0] as string
-    expect(text).not.toMatch(/SECRET|user:/)
-    expect(text).toMatch(/ postgres:\/\/\*\*\*\S*\.\.\.\[cut\]$/)
-  })
-
-  it('cutForLog hides a login before it cuts', () => {
-    const text = `${'x'.repeat(480)} postgres://admin:SuperSecretPw@db.internal/app and more`
-    expect(cutForLog(text)).toHaveLength(500)
-    expect(cutForLog(text)).not.toMatch(/admin|Super/)
-    expect(cutForLog(text).endsWith(' postgres://***@db.i')).toBe(true)
-    expect(cutForLog('short', 3)).toBe('sho')
-  })
-
   it('omits the params of a failed query in a field and in a thrown value, and leaves other text with "params:" alone', () => {
     const c = spies()
     const log = getLogger('s')
@@ -592,16 +444,6 @@ describe('getLogger', () => {
     expect(c.log.mock.calls[0]![0]).toMatch(
       / user said:\\nparams: are these right\?\\nyes$/,
     )
-  })
-
-  it('hides a login in the code of an error before the code is cut', () => {
-    const c = spies()
-    const err = Object.assign(new Error('x'), {
-      code: `${'c'.repeat(80)} redis://:SuperSecretPassword@h`,
-    })
-    err.stack = undefined
-    getLogger('s').error('failed', err)
-    expect(c.error.mock.calls[0]![0]).not.toContain('SuperSecre')
   })
 
   it('escapes the name of a field, and takes fields only from an object', () => {

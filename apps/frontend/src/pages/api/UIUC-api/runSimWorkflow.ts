@@ -15,7 +15,7 @@ import {
 } from '~/utils/simDiscovery'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { cutForLog, getLogger } from '~/utils/server/log'
+import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.runSimWorkflow')
 
@@ -150,7 +150,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         course: course_name,
         workflow_id,
         status: simResponse.status,
-        message: cutForLog(errMessage),
+        message: errMessage.slice(0, 500),
       })
       // Sim's own 401/403 mean the project's key was rejected, not that this
       // caller failed to authenticate here — forwarding them verbatim reads
