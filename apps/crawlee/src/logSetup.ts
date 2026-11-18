@@ -50,18 +50,20 @@ function text(value: unknown): string {
 // The login part of a URL: "://user:secret@host", "://:secret@host", "://token@host" and
 // "://user@realm:secret@host". It must not reach the log. The same rule as LOGIN_IN_URL in
 // the frontend log.ts, with no exceptions, so that a password is not shown: the login is
-// everything from "://" (or more slashes: a browser reads "http:///user:pw@host" as a URL
-// with a login) to the last @ before the next /, space or double quote. The double quote
+// everything from ":" and two or more slashes or backslashes (a browser reads
+// "http:///user:pw@host" and "http:\\user:pw@host" as a URL with a login) to the last @
+// before the next /, space or double quote. main.ts puts the URL of a crawl into its
+// standard form first, so the other forms that a browser accepts do not get here. The double quote
 // ends it because a URL in JSON ends there: {"url":"http://a.edu:80","mail":"b@c.edu"} is
 // left as it is.
 // The cost: text that is not a login can be lost. "https://a.edu?email=a@b.edu" is written
 // as "https://***@b.edu". A URL with a path is not touched.
 // Not found: a login without "://" in front ("user:secret@host"), and a password that has
 // a /, a space or a double quote in it.
-const LOGIN_IN_URL = /:\/{2,}[^/\s"]*@/g;
+const LOGIN_IN_URL = /:[/\\]{2,}[^/\s"]*@/g;
 // A login that a cut ended before its @: "://user:secr...[cut 20 characters]" and the
 // "...[truncated]" of @apify/log.
-const LOGIN_BEFORE_CUT = /:\/{2,}[^/\s"]*?(?=\.\.\.\[(?:cut|truncated))/g;
+const LOGIN_BEFORE_CUT = /:[/\\]{2,}[^/\s"]*?(?=\.\.\.\[(?:cut|truncated))/g;
 
 export function hidePasswords(line: string): string {
     return line.replace(LOGIN_IN_URL, '://***@').replace(LOGIN_BEFORE_CUT, '://***');
@@ -163,7 +165,10 @@ export function finishLine(line: string, isError: boolean, at?: string): string 
         else kept[kept.length - 1] += `\\n${part}`;
     });
     if (isError && at) kept[0] += ` at=${at}`;
-    return kept.join('\n').replace(coloursOn ? CONTROL_EXCEPT_COLOURS : CONTROL_EXCEPT_NEWLINE, escapeControlCharacter);
+    const written = kept.join('\n').replace(coloursOn ? CONTROL_EXCEPT_COLOURS : CONTROL_EXCEPT_NEWLINE, escapeControlCharacter);
+    // Once more: a tab inside a login in the text of an error ended the match above, and is
+    // now written as \t.
+    return hidePasswords(written);
 }
 
 // The "rid=<id> course=<name>" of the crawl that the running code belongs to. main.ts runs

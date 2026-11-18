@@ -47,6 +47,9 @@ describe('hidePasswords', () => {
         // A browser reads this as a URL with a login.
         assert.equal(hidePasswords('http:///user:SECRETB@127.0.0.1:9/'), 'http://***@127.0.0.1:9/');
         assert.equal(hidePasswords('http:////user:SECR...[truncated]'), 'http://***...[truncated]');
+        // Backslashes count as slashes for a browser.
+        assert.equal(hidePasswords('http://\\/user:SECRETA@127.0.0.1:9/'), 'http://***@127.0.0.1:9/');
+        assert.equal(hidePasswords('http:\\\\user:SECRETA@host/'), 'http://***@host/');
     });
 
     it('hides a login whose user name has an @ or punctuation in it', () => {
@@ -319,6 +322,12 @@ describe('the logger', () => {
 });
 
 describe('finishLine', () => {
+    it('hides a login that has a tab in it in the text of an error', () => {
+        const out = finishLine('ERROR head\n  navigation failed for http://user:SEC\tRET@host.edu/ and http://\tuser:SECRET2@host.edu/', true);
+        assert.doesNotMatch(out, /SEC|RET|user/);
+        assert.match(out, /navigation failed for http:\/\/\*\*\*@host\.edu\/ and http:\/\/\*\*\*@host\.edu\/$/);
+    });
+
     it('does not keep a line that starts with a tab on its own line', () => {
         assert.equal(finishLine('ERROR head\n\tat forged (x:1:1)', true), 'ERROR head\\n\\tat forged (x:1:1)');
         assert.equal(finishLine('ERROR head\n  message\n\tat forged (x:1:1)\n    at real (y:2:2)', true), 'ERROR head\n  message\\n\\tat forged (x:1:1)\n    at real (y:2:2)');

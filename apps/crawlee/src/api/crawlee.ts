@@ -8,7 +8,7 @@ import {
 } from "crawlee";
 import { Page } from "playwright";
 
-import { oneLine } from "../logSetup.js";
+import { hidePasswords, oneLine } from "../logSetup.js";
 import { Config, configSchema } from "./configValidation.js";
 import { ingestPdf, uploadPdfToS3 } from "./uploadToS3.js";
 
@@ -24,7 +24,7 @@ export async function crawl(
   let pageCounter = 0;
 
   if (config.url) {
-    clog.debug(`Crawling URL: ${config.url}`);
+    clog.debug(`Crawling URL: ${oneLine(config.url)}`);
     if (process.env.NO_CRAWL !== "true") {
       // PlaywrightCrawler crawls the web using a headless
       // browser controlled by the Playwright library.
@@ -85,7 +85,7 @@ export async function crawl(
                 if (skipReason) {
                   log.warning(
                     `SKIP-INGEST (${skipReason}): status=${response?.status() ?? "n/a"} ` +
-                      `base_url=${config.url} url=${request.loadedUrl} title=${JSON.stringify(title)}`,
+                      `base_url=${oneLine(config.url)} url=${oneLine(request.loadedUrl)} title=${JSON.stringify(title)}`,
                   );
                 } else {
                   const ingestUrl = process.env.INGEST_URL;
@@ -120,7 +120,7 @@ export async function crawl(
                       if (!response.ok) {
                         log.error(
                           `Ingest request failed url=${pageUrl} status=${response.status} ` +
-                            `body=${oneLine(text.slice(0, 500))}`,
+                            `body=${oneLine(hidePasswords(text).slice(0, 500))}`,
                         );
                       }
                     })

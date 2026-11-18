@@ -2,7 +2,7 @@
 import * as path from 'path';
 import axios from 'axios';
 import { Log, log as rootLog } from 'crawlee';
-import { oneLine } from '../logSetup.js';
+import { hidePasswords, oneLine } from '../logSetup.js';
 import { S3Client, PutObjectCommand, HeadObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
 
 function createS3Client(): S3Client {
@@ -87,6 +87,8 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   }
 
   const s3Key = `courses/${courseName}/${filename}`;
+  // For log lines: the course name comes from the request.
+  const key = oneLine(s3Key);
 
   // Dedup across crawls: a popular PDF (e.g. a site-wide handbook) is linked from many pages,
   // so many separate crawl jobs target the SAME s3 key. Without dedup, the duplicate ingest
@@ -96,7 +98,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // it, so skip ingest (return null) instead of enqueuing a duplicate job.
   try {
     await s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }));
-    clog.debug(`SKIP-PDF (dup, already in S3): key=${s3Key}, url=${url}`);
+    clog.debug(`SKIP-PDF (dup, already in S3): key=${key}, url=${oneLine(url)}`);
     return null;
   } catch (headErr) {
     // NotFound → first crawl to see this PDF; fall through to upload + ingest.
@@ -108,7 +110,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
       // S3 answers 403 for a key that does not exist when the role cannot list the bucket.
       // That would be one line for every new PDF, so it is a DEBUG line.
       const say = status === 403 ? clog.debug.bind(clog) : clog.warning.bind(clog);
-      say(`Could not check S3 for an earlier copy key=${s3Key}: ${oneLine(headErr)}`);
+      say(`Could not check S3 for an earlier copy key=${key}: ${oneLine(headErr)}`);
     }
   }
 
@@ -118,7 +120,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
       Key: s3Key,
       Body: pdfBuffer,
     }));
-    clog.debug(`PDF uploaded to S3 at key: ${s3Key}`);
+    clog.debug(`PDF uploaded to S3 at key: ${key}`);
   } catch (error) {
     if (error instanceof Error && error.name === 'NoSuchBucket') {
       clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
@@ -131,7 +133,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
           Key: s3Key,
           Body: pdfBuffer,
         }));
-        clog.debug(`PDF uploaded to S3 at key: ${s3Key}`);
+        clog.debug(`PDF uploaded to S3 at key: ${key}`);
       } catch (createError) {
         if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
           clog.debug(`Bucket ${s3BucketName} already owned by you.`);
@@ -141,7 +143,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
             Key: s3Key,
             Body: pdfBuffer,
           }));
-          clog.debug(`PDF uploaded to S3 at key: ${s3Key}`);
+          clog.debug(`PDF uploaded to S3 at key: ${key}`);
         } else {
           throw createError;
         }
@@ -182,12 +184,12 @@ export async function ingestPdf(s3Key: string, courseName: string, base_url: str
       .then(async response => {
         const text = await response.text();
         if (!response.ok) {
-          clog.error(`PDF ingest request failed url=${url} key=${s3Key} status=${response.status} body=${oneLine(text.slice(0, 500))}`);
+          clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)} status=${response.status} body=${oneLine(hidePasswords(text).slice(0, 500))}`);
         }
       })
-      .catch(err => clog.error(`PDF ingest request failed url=${url} key=${s3Key}: ${oneLine(err)}` + (err?.cause ? ` (cause: ${oneLine(err.cause)})` : '')));
+      .catch(err => clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(err)}` + (err?.cause ? ` (cause: ${oneLine(err.cause)})` : '')));
   } catch (error) {
     // Only reached if fetch() throws before sending (for example an invalid INGEST_URL).
-    clog.error(`Could not send PDF ingest request url=${url} key=${s3Key}: ${oneLine(error)}`);
+    clog.error(`Could not send PDF ingest request url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(error)}`);
   }
 }
