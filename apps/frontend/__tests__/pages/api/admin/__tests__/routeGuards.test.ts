@@ -74,8 +74,27 @@ function makeRes() {
   return res
 }
 
+vi.mock('~/utils/frozenProjects.server', () => ({
+  listFrozenProjects: vi.fn(async () => [{ course_name: 'leaked-project' }]),
+  recoverFrozenProject: vi.fn(async () => ({
+    status: 'recovered',
+    auditId: 1,
+  })),
+  FrozenProjectRecoveryError: class extends Error {},
+}))
+
 const PROTECTED_ROUTES = [
   { name: 'GET /api/admin/settings', module: '~/pages/api/admin/settings', method: 'GET' },
+  {
+    name: 'GET /api/admin/frozenProjects',
+    module: '~/pages/api/admin/frozenProjects',
+    method: 'GET',
+  },
+  {
+    name: 'POST /api/admin/frozenProjects',
+    module: '~/pages/api/admin/frozenProjects',
+    method: 'POST',
+  },
   { name: 'PUT /api/admin/settings', module: '~/pages/api/admin/settings', method: 'PUT' },
   { name: 'GET /api/admin/superAdmins', module: '~/pages/api/admin/superAdmins', method: 'GET' },
   {

@@ -3,7 +3,12 @@
 
 import type { ConnectionKind } from '~/utils/projectConnections/validation'
 
-export const ADMIN_TABS = ['platform', 'connections', 'users'] as const
+export const ADMIN_TABS = [
+  'platform',
+  'connections',
+  'frozen',
+  'users',
+] as const
 export type AdminTab = (typeof ADMIN_TABS)[number]
 
 export function isAdminTab(value: string): value is AdminTab {

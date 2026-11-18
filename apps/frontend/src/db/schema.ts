@@ -539,7 +539,8 @@ export const projectExternalConnections = pgTable(
   },
 )
 
-// Append-only audit trail for super-admin CRUD on project_external_connections.
+// Append-only audit trail for super-admin CRUD on project_external_connections,
+// and for super-admin frozen-project recovery (action 'unfreeze').
 // Never store values from the configs themselves — only field NAMES go in
 // `changed_fields`. See docs/external-connections.md.
 //
@@ -553,10 +554,12 @@ export const projectConnectionAuditLog = pgTable(
       .defaultNow()
       .notNull(),
     actor_email: text('actor_email').notNull(),
-    action: text('action').notNull(), // 'upsert' | 'delete' | 'set_active' | 'test'
+    action: text('action').notNull(), // 'upsert' | 'delete' | 'set_active' | 'test' | 'unfreeze'
     project_name: text('project_name'),
     kind: text('kind'), // 's3' | 'database' | 'qdrant' | 'embedding' | null
-    outcome: text('outcome').notNull(), // 'success' | 'failure'
+    // 'pending' is written before a recovery mutates anything and replaced by
+    // 'success' or 'failure'. A row still 'pending' means the outcome is unknown.
+    outcome: text('outcome').notNull(), // 'pending' | 'success' | 'failure'
     failure_reason: text('failure_reason'),
     changed_fields: text('changed_fields').array(),
     source_ip: text('source_ip'),
