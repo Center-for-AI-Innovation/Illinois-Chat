@@ -6,7 +6,6 @@ import { useFetchAllCourseNames } from '../queries/useFetchAllCourseNames'
 import { useFetchCourseExists } from '../queries/useFetchCourseExists'
 import { useFetchCourseMetadata } from '../queries/useFetchCourseMetadata'
 import { useFetchMaintenanceDetails } from '../queries/useFetchMaintenanceDetails'
-import { useFetchMaintenanceMode } from '../queries/useFetchMaintenanceMode'
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
@@ -117,34 +116,22 @@ describe('course + maintenance query hooks', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('useFetchMaintenanceMode and useFetchMaintenanceDetails fetch and return expected fields', async () => {
+  it('useFetchMaintenanceDetails fetches and returns expected fields', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
     const Wrapper = createWrapper(queryClient)
 
-    vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ isMaintenanceMode: false }), {
-          status: 200,
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          isMaintenanceMode: true,
+          maintenanceBodyText: 'body',
+          maintenanceTitleText: 'title',
         }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            isMaintenanceMode: true,
-            maintenanceBodyText: 'body',
-            maintenanceTitleText: 'title',
-          }),
-          { status: 200 },
-        ),
-      )
-
-    const { result: mode } = renderHook(() => useFetchMaintenanceMode(), {
-      wrapper: Wrapper,
-    })
-    await waitFor(() => expect(mode.current.isSuccess).toBe(true))
-    expect(mode.current.data).toBe(false)
+        { status: 200 },
+      ),
+    )
 
     const { result: details } = renderHook(() => useFetchMaintenanceDetails(), {
       wrapper: Wrapper,
@@ -155,24 +142,6 @@ describe('course + maintenance query hooks', () => {
       maintenanceBodyText: 'body',
       maintenanceTitleText: 'title',
     })
-  })
-
-  it('useFetchMaintenanceMode surfaces errors when response is non-ok', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false, retryDelay: 0 } },
-    })
-    const Wrapper = createWrapper(queryClient)
-
-    vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response('no', { status: 500 }))
-      .mockResolvedValueOnce(new Response('no', { status: 500 }))
-
-    const { result } = renderHook(() => useFetchMaintenanceMode(), {
-      wrapper: Wrapper,
-    })
-
-    await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(result.current.error).toBeInstanceOf(Error)
   })
 
   it('useFetchAllCourseNames returns array and respects enabled=false', async () => {

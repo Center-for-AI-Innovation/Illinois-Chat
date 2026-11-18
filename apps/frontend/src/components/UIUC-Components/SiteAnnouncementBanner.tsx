@@ -1,24 +1,12 @@
 import { useRouter } from 'next/router'
 import { useLayoutEffect, useRef } from 'react'
 import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
-import { useFetchAnnouncementBanner } from '~/hooks/queries/useFetchAnnouncementBanner'
-import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
-
-/**
- * Only /silent-renew, the hidden Keycloak iframe, is exempt. /admin shows the
- * saved announcement like every other page; its live preview of unsaved draft
- * text is separate and does not depend on this list.
- */
-const BANNER_EXEMPT_PREFIXES = ['/silent-renew']
+import {
+  isStatusPollExempt,
+  useFetchSiteStatus,
+} from '~/hooks/queries/useFetchSiteStatus'
 
 const HEIGHT_VARIABLE = '--announcement-banner-height'
-
-interface SiteAnnouncementBannerProps {
-  /** The page's statically generated banner, when it has one (home only). */
-  initialBanner?: AnnouncementBannerValue | null
-  /** Epoch ms at which `initialBanner` was read from Redis. */
-  initialBannerReadAt?: number
-}
 
 /**
  * The announcement bar on every page. Rendered inside `SiteHeader`, which
@@ -26,20 +14,15 @@ interface SiteAnnouncementBannerProps {
  *
  * Its measured height is published as `--announcement-banner-height`. Only
  * fixed sidebars and sticky sub-bars read that variable; the navbar does not.
+ * The banner comes from the shared site-status query seeded by `_app`.
  */
-export function SiteAnnouncementBanner({
-  initialBanner,
-  initialBannerReadAt,
-}: SiteAnnouncementBannerProps) {
+export function SiteAnnouncementBanner() {
   const router = useRouter()
-  const isExempt = BANNER_EXEMPT_PREFIXES.some((prefix) =>
-    router.pathname.startsWith(prefix),
-  )
-  const { data: banner } = useFetchAnnouncementBanner({
-    initialBanner,
-    initialBannerReadAt,
-    enabled: !isExempt,
-  })
+  // /admin is not exempt: its tab shows the saved live announcement and polls
+  // for it. Only the hidden silent-renew iframe makes no status request.
+  const isExempt = isStatusPollExempt(router.pathname)
+  const { data: status } = useFetchSiteStatus({ enabled: !isExempt })
+  const banner = status?.announcementBanner ?? null
   const containerRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -72,7 +55,7 @@ export function SiteAnnouncementBanner({
   return (
     <div ref={containerRef}>
       <AnnouncementBanner
-        banner={banner ?? null}
+        banner={banner}
         legacyFallback={isSplash}
         preserveEmptySpace={isSplash}
       />

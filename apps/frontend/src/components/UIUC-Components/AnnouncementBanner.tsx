@@ -25,8 +25,9 @@ interface AnnouncementBannerProps {
   banner?: AnnouncementBannerValue | null
   /**
    * Renders the bar without the `Site announcement` landmark, for the /admin
-   * live preview — the real page already owns that landmark, and a second one
-   * inside the admin console is a duplicate label for screen readers.
+   * live preview of unsaved edits. The saved announcement, when active, is the
+   * site-wide bar above the admin body and owns that landmark; a second one
+   * inside the admin console would duplicate the label for screen readers.
    */
   preview?: boolean
   /**
