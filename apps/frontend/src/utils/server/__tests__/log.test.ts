@@ -513,6 +513,13 @@ describe('getLogger', () => {
     getLogger('s').info(
       'redis://default:1234&abcd@cache.internal:6379 mongodb://root:99?x@mongo postgres://user:1#x@h http:///user:SECRETB@127.0.0.1:9/',
     )
+    // Backslashes count as slashes for a browser.
+    getLogger('s').info(
+      'http://\\/user:SECRETA@host/ http:\\\\user:SECRETA@host/',
+    )
+    expect(c.log.mock.calls[1]![0]).toMatch(
+      / s http:\/\/\*\*\*@host\/ http:\/\/\*\*\*@host\/$/,
+    )
     expect(c.log.mock.calls[0]![0]).toMatch(
       / redis:\/\/\*\*\*@cache\.internal:6379 mongodb:\/\/\*\*\*@mongo postgres:\/\/\*\*\*@h http:\/\/\*\*\*@127\.0\.0\.1:9\/$/,
     )

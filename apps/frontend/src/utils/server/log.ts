@@ -60,17 +60,18 @@ function threshold(): number {
 // The login part of a URL: "://user:secret@host", "://:secret@host",
 // "://token@host" and "://user@realm:secret@host". It must not reach the log.
 // One rule, with no exceptions, so that a password is not shown: the login is
-// everything from "://" (or more slashes) to the last @ before the next /,
-// space or double quote. A user name or a password can hold any other
+// everything from ":" and two or more slashes or backslashes (a browser reads
+// "http:///user:pw@host" and "http:\\user:pw@host" as a URL with a login) to
+// the last @ before the next /, space or double quote. A user name or a password can hold any other
 // character. The double quote ends it because a URL in JSON ends there:
 // {"url":"http://backend:8001","email":"a@b.edu"} is left as it is.
 // The cost: text that is not a login can be lost. "https://a.edu?email=a@b.edu"
 // is written as "https://***@b.edu". A URL with a path is not touched.
 // Not found: a login without "://" in front ("user:secret@host"), and a
 // password that has a /, a space or a double quote in it.
-const LOGIN_IN_URL = /:\/{2,}[^/\s"]*@/g
+const LOGIN_IN_URL = /:[/\\]{2,}[^/\s"]*@/g
 // A login that a cut ended before its @: "://user:secr...[cut]".
-const LOGIN_BEFORE_CUT = /:\/{2,}[^/\s"]*?(?=\.\.\.\[cut\])/g
+const LOGIN_BEFORE_CUT = /:[/\\]{2,}[^/\s"]*?(?=\.\.\.\[cut\])/g
 
 // Text of another service for a log field: the login of a URL is hidden first,
 // because a cut inside a login would take its @ away, and then the text is cut.
