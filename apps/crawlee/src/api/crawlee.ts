@@ -8,7 +8,7 @@ import {
 } from "crawlee";
 import { Page } from "playwright";
 
-import { hidePasswords, oneLine } from "../logSetup.js";
+import { oneLine } from "../logSetup.js";
 import { Config, configSchema } from "./configValidation.js";
 import { ingestPdf, uploadPdfToS3 } from "./uploadToS3.js";
 
@@ -120,7 +120,7 @@ export async function crawl(
                       if (!response.ok) {
                         log.error(
                           `Ingest request failed url=${pageUrl} status=${response.status} ` +
-                            `body=${oneLine(hidePasswords(text).slice(0, 500))}`,
+                            `body=${oneLine(text.slice(0, 500))}`,
                         );
                       }
                     })

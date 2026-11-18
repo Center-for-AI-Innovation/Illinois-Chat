@@ -2,7 +2,7 @@
 import * as path from 'path';
 import axios from 'axios';
 import { Log, log as rootLog } from 'crawlee';
-import { hidePasswords, oneLine } from '../logSetup.js';
+import { oneLine } from '../logSetup.js';
 import { S3Client, PutObjectCommand, HeadObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
 
 function createS3Client(): S3Client {
@@ -184,7 +184,7 @@ export async function ingestPdf(s3Key: string, courseName: string, base_url: str
       .then(async response => {
         const text = await response.text();
         if (!response.ok) {
-          clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)} status=${response.status} body=${oneLine(hidePasswords(text).slice(0, 500))}`);
+          clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)} status=${response.status} body=${oneLine(text.slice(0, 500))}`);
         }
       })
       .catch(err => clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(err)}` + (err?.cause ? ` (cause: ${oneLine(err.cause)})` : '')));

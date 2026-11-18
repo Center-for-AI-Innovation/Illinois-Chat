@@ -19,25 +19,6 @@ const app = express();
 //     origin: 'https://uiuc.chat',
 // };
 
-// A browser accepts forms of a URL that hide a login from the pattern in logSetup.ts:
-// "http://\/user:pw@host", and a URL with a tab or a newline in it, which the browser
-// takes out. Such a URL, and every URL with a login, is put into its standard form
-// ("http://user:pw@host/") before it is logged and crawled, so the login is found on every
-// line. A usual URL is passed on as the caller gave it: the same text goes to the backend
-// as base_url, and it must not change between two crawls of one site.
-function standardUrl(value: unknown): unknown {
-    if (typeof value !== 'string') return value;
-    try {
-        const url = new URL(value);
-        // eslint-disable-next-line no-control-regex
-        const unusual = url.username !== '' || url.password !== '' || /[\\\u0000-\u0020]/.test(value);
-        return unusual ? url.href : value;
-    } catch {
-        // Not a URL: the crawl fails on it and says so.
-        return value;
-    }
-}
-
 function encodeField(value: string): string {
     return value.replace(/[^\w.~-]/gu, (character) => {
         try {
@@ -87,7 +68,6 @@ app.post('/crawl', async (req: Request, res: Response) => {
         res.status(400).json({ error: 'Bad request', errorTitle: 'BadRequest', errorMessage: 'The request body must be JSON with a "params" object.' });
         return;
     }
-    params.url = standardUrl(params.url);
     // The course name is on every line of the crawl. A space (or a character that looks
     // like one) in it would let a caller add a fake field ("course=x rid=other"). So it is
     // cut, and every character that is not an ASCII letter, a digit or one of . _ ~ - is written

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { log, LogLevel } from 'crawlee';
 import { execFile } from 'node:child_process';
-import { callSite, crawlContext, CrawlerLogger, finishLine, hidePasswords, installProcessHandlers, oneLine } from './logSetup.js';
+import { callSite, crawlContext, CrawlerLogger, finishLine, installProcessHandlers, oneLine } from './logSetup.js';
 
 // The tests read WARN and INFO lines, so they must not depend on LOG_LEVEL (logSetup.ts
 // reads it from the environment and from apps/crawlee/.env).
@@ -22,73 +22,6 @@ function capture(method: 'log' | 'warn' | 'error'): string[] {
 }
 
 afterEach(() => mock.restoreAll());
-
-describe('hidePasswords', () => {
-    it('hides the password of a URL and leaves other URLs as they are', () => {
-        assert.equal(hidePasswords('url=https://user:secret@example.edu/a?b=1'), 'url=https://***@example.edu/a?b=1');
-        assert.equal(hidePasswords('redis://default:pw@redis:6379 and amqp://g:g@mq/'), 'redis://***@redis:6379 and amqp://***@mq/');
-        assert.equal(hidePasswords('url=https://example.edu:8443/a@b'), 'url=https://example.edu:8443/a@b');
-        assert.equal(hidePasswords('mail=a.b@illinois.edu at=src/main.ts:82'), 'mail=a.b@illinois.edu at=src/main.ts:82');
-    });
-
-    it('hides a login with no user, a token as the user, and a password with an @ in it', () => {
-        assert.equal(hidePasswords('redis://:secret@redis:6379/0'), 'redis://***@redis:6379/0');
-        assert.equal(hidePasswords('https://token123@github.com/x'), 'https://***@github.com/x');
-        assert.equal(hidePasswords('https://user:p@ss@host/x'), 'https://***@host/x');
-    });
-
-    it('hides a password that has punctuation in it', () => {
-        assert.equal(hidePasswords('https://u:p,w@example.edu/'), 'https://***@example.edu/');
-        assert.equal(hidePasswords("https://user:it's@host.edu/"), 'https://***@host.edu/');
-        assert.equal(hidePasswords('redis://:p?ss@cache:6379 redis://:p#ss@cache:6379'), 'redis://***@cache:6379 redis://***@cache:6379');
-        assert.equal(hidePasswords('https://user:p<a>ss@h https://u:8443@h/x'), 'https://***@h https://***@h/x');
-        // A password that starts with digits is not read as a port.
-        assert.equal(hidePasswords('postgres://admin:2024#Winter@db:5432/app redis://default:1234&abcd@cache:6379'), 'postgres://***@db:5432/app redis://***@cache:6379');
-        // A browser reads this as a URL with a login.
-        assert.equal(hidePasswords('http:///user:SECRETB@127.0.0.1:9/'), 'http://***@127.0.0.1:9/');
-        assert.equal(hidePasswords('http:////user:SECR...[truncated]'), 'http://***...[truncated]');
-        // Backslashes count as slashes for a browser.
-        assert.equal(hidePasswords('http://\\/user:SECRETA@127.0.0.1:9/'), 'http://***@127.0.0.1:9/');
-        assert.equal(hidePasswords('http:\\\\user:SECRETA@host/'), 'http://***@host/');
-    });
-
-    it('hides a login whose user name has an @ or punctuation in it', () => {
-        assert.equal(hidePasswords('https://bob@uni.edu:hunter2@site.edu/'), 'https://***@site.edu/');
-        assert.equal(hidePasswords('ftp://bob@uni.edu:s3cret@ftp.host.edu/'), 'ftp://***@ftp.host.edu/');
-        for (const url of ["https://o'brien:secret@host/", 'https://user,x:secret@host/', 'https://us;er:secret@host/', 'https://user&co:secret@host/', 'https://user(1):secret@host/', 'http://CORP\\svc:secret@host/', 'http://user:123,x@host/']) {
-            assert.equal(hidePasswords(url), `${url.slice(0, url.indexOf('://'))}://***@host/`);
-        }
-    });
-
-    it('leaves a URL in JSON, a URL with a path, and a URL before a newline alone', () => {
-        for (const line of [
-            '{"url":"http://x.com:80","mail":"u@v.edu"}',
-            'https://site.edu/login?email=bob@x.edu',
-            'http://backend:8001\nbob@c.edu',
-        ]) assert.equal(hidePasswords(line), line);
-    });
-
-    it('takes away the text between a URL with no path and a later @', () => {
-        // The price of a rule that does not show a password. No secret is in these lines.
-        assert.equal(hidePasswords('https://a.edu?email=x@y.edu'), 'https://***@y.edu');
-        assert.equal(hidePasswords('redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu'), 'redirect_uri=http://***@illinois.edu');
-        assert.equal(hidePasswords('http://a.edu;bob@x.edu'), 'http://***@x.edu');
-        // Also after the logger has written a newline as \n.
-        assert.equal(hidePasswords('http://a.edu\\nbob@c.edu'), 'http://***@c.edu');
-    });
-
-    it('hides a login that a cut ended before its @', () => {
-        assert.equal(hidePasswords('http://user:topsecr...[cut 20 characters]'), 'http://***...[cut 20 characters]');
-        assert.equal(hidePasswords('https://user:secr...[truncated]'), 'https://***...[truncated]');
-        assert.equal(hidePasswords('https://a.edu/long/pa...[truncated]'), 'https://a.edu/long/pa...[truncated]');
-    });
-
-    it('is fast on a long text with many URLs', () => {
-        const started = Date.now();
-        for (const text of ['://'.repeat(100_000), 'a://b:'.repeat(50_000), `://u:${'x'.repeat(300_000)}`]) hidePasswords(text);
-        assert.ok(Date.now() - started < 500);
-    });
-});
 
 describe('callSite', () => {
     const LOGGER_FRAMES = [
@@ -158,16 +91,6 @@ describe('the logger', () => {
         assert.ok(lines.length > 2);
         assert.match(lines[1], /boom/);
         assert.match(lines[2], /^\s+at /);
-    });
-
-    it('hides a URL password in the message, the data and the error', () => {
-        const errors = capture('error');
-        const infos = capture('log');
-        log.info('crawl started url=https://user:secret@example.edu/', { next: 'http://a:b@c.edu/x' });
-        log.exception(new Error('page.goto failed at http://user:secret@example.edu/'), 'page failed');
-        assert.match(infos[0], /url=https:\/\/\*\*\*@example\.edu\/ \{"next":"http:\/\/\*\*\*@c\.edu\/x"\}$/);
-        assert.match(errors[0], /http:\/\/\*\*\*@example\.edu\//);
-        assert.doesNotMatch(infos[0] + errors[0], /secret|a:b@/);
     });
 
     it('keeps a message on one line, but leaves stack frames in a message on their own lines', () => {
@@ -267,13 +190,6 @@ describe('the logger', () => {
         assert.match(warnings[3], / WARN {2}BrowserPool: outside a crawl$/);
     });
 
-    it('hides a login before the cut takes its @ away', () => {
-        const infos = capture('log');
-        log.info(`${'x'.repeat(9_980)} http://user:topsecretpassword@host.edu/`);
-        assert.doesNotMatch(infos[0], /topsecr|user:/);
-        assert.match(infos[0], / http:\/\/\*\*\*\S*\.\.\.\[cut 1 characters\]$/);
-    });
-
     it('keeps a backslash and an n that are real text before a frame', () => {
         const warnings = capture('warn');
         log.warning('C:\\temp\\n\n\n    at x (y.js:1:2)\nmore\n\nlast\n');
@@ -301,12 +217,12 @@ describe('the logger', () => {
         const onLine = (line: string) => seen.push(line.replace(/\u001b\[[0-9;]*m/g, ''));
         logger.on('line', onLine);
         try {
-            log.error('failed url=http://u:pw@h/');
+            log.error('failed url=https://site.edu/a\nsecond line');
         } finally {
             logger.off('line', onLine);
         }
         assert.equal(seen[0], errors[0]);
-        assert.match(seen[0], /url=http:\/\/\*\*\*@h\/ at=src\/logSetup\.test\.ts:\d+$/);
+        assert.match(seen[0], /url=https:\/\/site\.edu\/a\\nsecond line at=src\/logSetup\.test\.ts:\d+$/);
     });
 
     it('also formats the loggers that crawlee made when it was imported', () => {
@@ -316,18 +232,12 @@ describe('the logger', () => {
         const { log: browserPoolLog } = require(require.resolve('@crawlee/browser-pool').replace(/index\.js$/, 'logger.js'));
         assert.ok(browserPoolLog.getOptions().logger instanceof CrawlerLogger);
         const errors = capture('error');
-        browserPoolLog.error('Could not close browser\nCause: x http://u:pw@h/');
-        assert.match(errors[0], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ERROR BrowserPool: Could not close browser\\nCause: x http:\/\/\*\*\*@h\/ at=src\/logSetup\.test\.ts:\d+$/);
+        browserPoolLog.error('Could not close browser\nCause: x');
+        assert.match(errors[0], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ERROR BrowserPool: Could not close browser\\nCause: x at=src\/logSetup\.test\.ts:\d+$/);
     });
 });
 
 describe('finishLine', () => {
-    it('hides a login that has a tab in it in the text of an error', () => {
-        const out = finishLine('ERROR head\n  navigation failed for http://user:SEC\tRET@host.edu/ and http://\tuser:SECRET2@host.edu/', true);
-        assert.doesNotMatch(out, /SEC|RET|user/);
-        assert.match(out, /navigation failed for http:\/\/\*\*\*@host\.edu\/ and http:\/\/\*\*\*@host\.edu\/$/);
-    });
-
     it('does not keep a line that starts with a tab on its own line', () => {
         assert.equal(finishLine('ERROR head\n\tat forged (x:1:1)', true), 'ERROR head\\n\\tat forged (x:1:1)');
         assert.equal(finishLine('ERROR head\n  message\n\tat forged (x:1:1)\n    at real (y:2:2)', true), 'ERROR head\n  message\\n\\tat forged (x:1:1)\n    at real (y:2:2)');

@@ -47,28 +47,6 @@ function text(value: unknown): string {
     }
 }
 
-// The login part of a URL: "://user:secret@host", "://:secret@host", "://token@host" and
-// "://user@realm:secret@host". It must not reach the log. The same rule as LOGIN_IN_URL in
-// the frontend log.ts, with no exceptions, so that a password is not shown: the login is
-// everything from ":" and two or more slashes or backslashes (a browser reads
-// "http:///user:pw@host" and "http:\\user:pw@host" as a URL with a login) to the last @
-// before the next /, space or double quote. main.ts puts the URL of a crawl into its
-// standard form first, so the other forms that a browser accepts do not get here. The double quote
-// ends it because a URL in JSON ends there: {"url":"http://a.edu:80","mail":"b@c.edu"} is
-// left as it is.
-// The cost: text that is not a login can be lost. "https://a.edu?email=a@b.edu" is written
-// as "https://***@b.edu". A URL with a path is not touched.
-// Not found: a login without "://" in front ("user:secret@host"), and a password that has
-// a /, a space or a double quote in it.
-const LOGIN_IN_URL = /:[/\\]{2,}[^/\s"]*@/g;
-// A login that a cut ended before its @: "://user:secr...[cut 20 characters]" and the
-// "...[truncated]" of @apify/log.
-const LOGIN_BEFORE_CUT = /:[/\\]{2,}[^/\s"]*?(?=\.\.\.\[(?:cut|truncated))/g;
-
-export function hidePasswords(line: string): string {
-    return line.replace(LOGIN_IN_URL, '://***@').replace(LOGIN_BEFORE_CUT, '://***');
-}
-
 // The methods of the logger itself: CrawlerLogger below, and Log, Logger and LoggerText of
 // @apify/log (their classes are named _Log, _Logger and _LoggerText inside the package).
 // Both the name and the file must match. The file alone is not enough to find where the
@@ -101,14 +79,13 @@ const MAX_MESSAGE_LENGTH = 10_000;
 
 // crawlee puts the stack of a failed page inside the message. Those frame lines keep their
 // own lines; every other line is joined to the line before it with a written \n, and every
-// control character is escaped. A login in a URL is hidden first, before the cut can take
-// its @ away. The result is cut last, so the limit
+// control character is escaped. The result is cut last, so the limit
 // is on what is written.
 function messageOnOneLine(message: unknown): string {
     const out: string[] = [];
     // Empty lines that were read and not yet written.
     let empty = 0;
-    for (const line of hidePasswords(text(message)).split(/\r\n|\n|\r/)) {
+    for (const line of text(message).split(/\r\n|\n|\r/)) {
         if (out.length === 0) {
             out.push(oneLine(line));
         } else if (/^[ \t]+at /.test(line)) {
@@ -150,9 +127,7 @@ export function finishLine(line: string, isError: boolean, at?: string): string 
     // The head line has no ESC from input (the message is escaped, the data is JSON), so a
     // colour code in it comes from the logger: colours are on.
     const coloursOn = parts[0].search(COLOUR_CODE) >= 0;
-    parts.forEach((raw, index) => {
-        // The message was done in messageOnOneLine; this is for the data and the error text.
-        const part = hidePasswords(raw);
+    parts.forEach((part, index) => {
         // A line that stays on its own must start with real spaces: @apify/log writes the
         // indent first and the colour code after it. Text that starts with a colour code
         // and then looks like a frame is joined to the line before it.
@@ -165,10 +140,7 @@ export function finishLine(line: string, isError: boolean, at?: string): string 
         else kept[kept.length - 1] += `\\n${part}`;
     });
     if (isError && at) kept[0] += ` at=${at}`;
-    const written = kept.join('\n').replace(coloursOn ? CONTROL_EXCEPT_COLOURS : CONTROL_EXCEPT_NEWLINE, escapeControlCharacter);
-    // Once more: a tab inside a login in the text of an error ended the match above, and is
-    // now written as \t.
-    return hidePasswords(written);
+    return kept.join('\n').replace(coloursOn ? CONTROL_EXCEPT_COLOURS : CONTROL_EXCEPT_NEWLINE, escapeControlCharacter);
 }
 
 // The "rid=<id> course=<name>" of the crawl that the running code belongs to. main.ts runs
@@ -178,7 +150,6 @@ export const crawlContext = new AsyncLocalStorage<string>();
 // crawlee's text logger, with these changes to every line:
 // - one event is one line, with its stack on the lines that follow (crawlee and Playwright
 //   put newlines in their messages)
-// - the login part of a URL is written as ://***@
 // - an ERROR line ends with at=<file>:<line>, the line of this app that logged it
 export class CrawlerLogger extends LoggerText {
     private lastLine?: string;
