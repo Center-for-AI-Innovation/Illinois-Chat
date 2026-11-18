@@ -56,6 +56,36 @@ describe('SiteHeader', () => {
     )
   })
 
+  it('keeps the empty strip above the splash navbar when the banner is off', () => {
+    query.data = { ...ENABLED, enabled: false }
+    const { container } = renderAt('/')
+
+    // header > [announcement wrapper > strip, navbar]
+    const header = container.firstElementChild as HTMLElement
+    const [bannerWrapper, navbarWrapper] = Array.from(header.children)
+    const strip = bannerWrapper.firstElementChild as HTMLElement
+    expect(strip).toHaveAttribute('aria-hidden', 'true')
+    expect(strip).toBeEmptyDOMElement()
+    expect(navbarWrapper).toContainElement(screen.getByRole('banner'))
+    expect(strip).not.toContainElement(screen.getByRole('banner'))
+    expect(
+      screen.queryByRole('region', { name: 'Site announcement' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('has no strip above the application navbar when the banner is off', () => {
+    query.data = { ...ENABLED, enabled: false }
+    const { container } = renderAt('/chatbots')
+
+    // header > [announcement wrapper (empty), navbar]: no strip anywhere.
+    const header = container.firstElementChild as HTMLElement
+    const [bannerWrapper, navbarWrapper] = Array.from(header.children)
+    expect(bannerWrapper).toBeEmptyDOMElement()
+    expect(navbarWrapper).toContainElement(screen.getByRole('banner'))
+    // Scoped to the announcement wrapper: navbar icons are aria-hidden too.
+    expect(bannerWrapper.querySelector('[aria-hidden="true"]')).toBeNull()
+  })
+
   it('renders the splash navbar on the home page', () => {
     query.data = ENABLED
     renderAt('/')

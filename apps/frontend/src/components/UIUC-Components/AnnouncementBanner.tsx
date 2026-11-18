@@ -27,13 +27,21 @@ interface AnnouncementBannerProps {
    * chain. Only the home page opts in; elsewhere "no banner" means no bar.
    */
   legacyFallback?: boolean
+  /**
+   * Keeps an empty, decorative orange strip when there is no active message
+   * (disabled, cleared, or no legacy fallback). Only the splash page opts in,
+   * so its navbar keeps the bar above it. The strip has no text and no
+   * `Site announcement` landmark. Off by default: elsewhere no message means
+   * no bar and no occupied space.
+   */
+  preserveEmptySpace?: boolean
 }
 
 /**
  * Resolves what the bar should contain, in strict precedence order.
  *
- * Returning `null` means the bar itself is not rendered at all, so the page
- * has no empty orange strip.
+ * Returning `null` means there is no message to show. Whether an empty strip
+ * is kept in that case is decided by the caller (`preserveEmptySpace`).
  */
 function resolveBannerContent(
   banner: AnnouncementBannerValue | null,
@@ -95,9 +103,22 @@ export function AnnouncementBanner({
   banner = null,
   preview = false,
   legacyFallback = true,
+  preserveEmptySpace = false,
 }: AnnouncementBannerProps) {
   const content = resolveBannerContent(banner, legacyFallback)
-  if (!content) return null
+
+  const className = 'relative w-full py-2 text-center'
+  const style = {
+    background: 'var(--illinois-orange)',
+    color: 'var(--illinois-white)',
+  }
+
+  if (!content) {
+    // Empty decorative strip: same orange and padding, no text line, hidden
+    // from assistive tech. Nothing is announced, so there is no landmark.
+    if (!preserveEmptySpace) return null
+    return <div aria-hidden="true" className={className} style={style} />
+  }
 
   const inner = (
     <div
@@ -106,12 +127,6 @@ export function AnnouncementBanner({
       <span className="text-lg font-bold">{content}</span>
     </div>
   )
-
-  const className = 'relative w-full py-2 text-center'
-  const style = {
-    background: 'var(--illinois-orange)',
-    color: 'var(--illinois-white)',
-  }
 
   if (preview) {
     return (

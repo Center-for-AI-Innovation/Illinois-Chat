@@ -177,7 +177,7 @@ export function AnnouncementBannerCard() {
               >
                 {banner?.enabled
                   ? 'Add a message to preview the banner.'
-                  : 'Hidden — no page shows an announcement bar.'}
+                  : 'Hidden — no announcement is shown. The home page keeps an empty orange strip; other pages show no bar.'}
               </p>
             )}
           </div>

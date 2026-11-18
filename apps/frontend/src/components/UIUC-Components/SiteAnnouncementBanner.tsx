@@ -63,11 +63,17 @@ export function SiteAnnouncementBanner({
 
   if (isExempt) return null
 
+  // The splash page keeps its orange strip even with no message, so its navbar
+  // sits below the same bar as when a message is active. Other pages show no
+  // bar without a message.
+  const isSplash = router.pathname === '/'
+
   return (
     <div ref={containerRef}>
       <AnnouncementBanner
         banner={banner ?? null}
-        legacyFallback={router.pathname === '/'}
+        legacyFallback={isSplash}
+        preserveEmptySpace={isSplash}
       />
     </div>
   )
