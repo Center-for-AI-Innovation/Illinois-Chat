@@ -66,7 +66,7 @@ describe('SiteHeader', () => {
   })
 
   it('keeps the empty strip above the splash navbar when the banner is off', () => {
-    query.data = { ...ENABLED, enabled: false }
+    query.banner = { ...ENABLED, enabled: false }
     const { container } = renderAt('/')
 
     // header > [announcement wrapper > strip, navbar]
@@ -83,7 +83,7 @@ describe('SiteHeader', () => {
   })
 
   it('has no strip above the application navbar when the banner is off', () => {
-    query.data = { ...ENABLED, enabled: false }
+    query.banner = { ...ENABLED, enabled: false }
     const { container } = renderAt('/chatbots')
 
     // header > [announcement wrapper (empty), navbar]: no strip anywhere.

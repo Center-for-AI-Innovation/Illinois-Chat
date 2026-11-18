@@ -13,9 +13,20 @@ const query = vi.hoisted(() => ({
   data: undefined as AnnouncementBanner | null | undefined,
 }))
 
-vi.mock('~/hooks/queries/useFetchAnnouncementBanner', () => ({
-  useFetchAnnouncementBanner: () => ({ data: query.data }),
-}))
+vi.mock('~/hooks/queries/useFetchSiteStatus', async () => {
+  const actual = await vi.importActual<{
+    isSiteStatusExempt: (pathname: string) => boolean
+  }>('~/hooks/queries/useFetchSiteStatus')
+  return {
+    isSiteStatusExempt: actual.isSiteStatusExempt,
+    useFetchSiteStatus: () => ({
+      data:
+        query.data === undefined
+          ? undefined
+          : { announcementBanner: query.data },
+    }),
+  }
+})
 
 const ENABLED: AnnouncementBanner = {
   enabled: true,
@@ -30,8 +41,11 @@ const DISABLED: AnnouncementBanner = { ...ENABLED, enabled: false }
 let resizeCallbacks: Array<() => void> = []
 let measuredHeight = 0
 const savedResizeObserver = globalThis.ResizeObserver
-const savedUseIllinoisChatConfig =
-  process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG
+const ENV_KEYS = [
+  'NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG',
+  'NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT',
+] as const
+const savedEnv: Record<string, string | undefined> = {}
 
 class FakeResizeObserver {
   private readonly callback: () => void
@@ -65,6 +79,7 @@ function renderAt(pathname: string) {
 }
 
 beforeEach(() => {
+  for (const key of ENV_KEYS) savedEnv[key] = process.env[key]
   query.data = undefined
   measuredHeight = 0
   resizeCallbacks = []
@@ -82,10 +97,11 @@ afterEach(() => {
   vi.restoreAllMocks()
   document.documentElement.style.removeProperty('--announcement-banner-height')
   globalThis.__TEST_ROUTER__ = undefined
-  if (savedUseIllinoisChatConfig === undefined) {
-    delete process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG
-  } else {
-    process.env.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG = savedUseIllinoisChatConfig
+  // Restore both keys this file's setup touches, so later suites see the
+  // environment they started with.
+  for (const key of ENV_KEYS) {
+    if (savedEnv[key] === undefined) delete process.env[key]
+    else process.env[key] = savedEnv[key]
   }
 })
 
