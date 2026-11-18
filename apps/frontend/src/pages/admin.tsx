@@ -148,50 +148,51 @@ export default function AdminPage() {
               {/* Sticky so the tab bar stays reachable while scrolling a long
                   connections table. */}
               <div className="sticky top-[calc(var(--navbar-height)+var(--announcement-banner-height))] z-20 -mx-4 mb-6 border-b border-[#e5e7eb] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#32517a] dark:bg-[#081735]/95">
-                {/* Four tabs do not fit at 390px. The list scrolls inside
-                    itself rather than pushing the page wider. Each tab is a
-                    focusable button, so keyboard users can reach every one. */}
-                <TabsList
-                  className={`h-10! w-full max-w-full justify-start overflow-x-auto sm:w-fit ${adminTabsListClass}`}
-                >
-                  <TabsTrigger
-                    value="platform"
-                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
+                {/* Keep native scrollbars outside the 40px row so they cannot
+                    shrink its buttons. Default tabs do not need an underline. */}
+                <div className="flex max-w-full overflow-x-auto overflow-y-hidden">
+                  <TabsList
+                    className={`h-10! w-full min-w-max justify-start sm:w-fit ${adminTabsListClass}`}
                   >
-                    <SlidersHorizontal aria-hidden="true" />
-                    Platform
-                    {isPlatformDirty && (
-                      <>
-                        <span
-                          aria-hidden="true"
-                          className="size-1.5 rounded-full bg-(--illinois-orange)"
-                        />
-                        <span className="sr-only">(unsaved changes)</span>
-                      </>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="connections"
-                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
-                  >
-                    <Database aria-hidden="true" />
-                    Connections
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="frozen"
-                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
-                  >
-                    <Snowflake aria-hidden="true" />
-                    Frozen projects
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="users"
-                    className={`flex-none gap-2 px-3 sm:px-4 ${adminTabsTriggerClass}`}
-                  >
-                    <Users aria-hidden="true" />
-                    Users
-                  </TabsTrigger>
-                </TabsList>
+                    <TabsTrigger
+                      value="platform"
+                      className={`gap-2 px-3 after:hidden sm:px-4 ${adminTabsTriggerClass}`}
+                    >
+                      <SlidersHorizontal aria-hidden="true" />
+                      Platform
+                      {isPlatformDirty && (
+                        <>
+                          <span
+                            aria-hidden="true"
+                            className="size-1.5 rounded-full bg-(--illinois-orange)"
+                          />
+                          <span className="sr-only">(unsaved changes)</span>
+                        </>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="connections"
+                      className={`gap-2 px-3 after:hidden sm:px-4 ${adminTabsTriggerClass}`}
+                    >
+                      <Database aria-hidden="true" />
+                      Connections
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="frozen"
+                      className={`gap-2 px-3 after:hidden sm:px-4 ${adminTabsTriggerClass}`}
+                    >
+                      <Snowflake aria-hidden="true" />
+                      Frozen projects
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="users"
+                      className={`gap-2 px-3 after:hidden sm:px-4 ${adminTabsTriggerClass}`}
+                    >
+                      <Users aria-hidden="true" />
+                      Users
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
               </div>
 
               <TabsContent
