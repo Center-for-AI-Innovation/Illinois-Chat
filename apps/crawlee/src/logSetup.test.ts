@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 import { createRequire } from 'node:module';
 import { log, LogLevel } from 'crawlee';
-import { callSite, CrawlerLogger, finishLine, hidePasswords, installProcessHandlers, oneLine } from './logSetup.js';
+import { execFile } from 'node:child_process';
+import { callSite, crawlContext, CrawlerLogger, finishLine, hidePasswords, installProcessHandlers, oneLine } from './logSetup.js';
 
 // The tests read WARN and INFO lines, so they must not depend on LOG_LEVEL (logSetup.ts
 // reads it from the environment and from apps/crawlee/.env).
@@ -33,6 +34,32 @@ describe('hidePasswords', () => {
         assert.equal(hidePasswords('redis://:secret@redis:6379/0'), 'redis://***@redis:6379/0');
         assert.equal(hidePasswords('https://token123@github.com/x'), 'https://***@github.com/x');
         assert.equal(hidePasswords('https://user:p@ss@host/x'), 'https://***@host/x');
+    });
+
+    it('hides a password that has punctuation in it', () => {
+        assert.equal(hidePasswords('https://u:p,w@example.edu/'), 'https://***@example.edu/');
+        assert.equal(hidePasswords("https://user:it's@host.edu/"), 'https://***@host.edu/');
+        assert.equal(hidePasswords('redis://:p?ss@cache:6379 redis://:p#ss@cache:6379'), 'redis://***@cache:6379 redis://***@cache:6379');
+        assert.equal(hidePasswords('amqp://u:p"ss@h https://user:p<a>ss@h https://u:8443@h/x'), 'amqp://***@h https://***@h https://***@h/x');
+    });
+
+    it('leaves a URL alone when other text with an @ follows it', () => {
+        for (const text of [
+            'https://site.edu/login?next=https://a.edu&email=bob@x.edu',
+            'redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu',
+            'http://a.edu;bob@x.edu',
+            'http://a.edu|bob@x.edu',
+            'see (http://a.edu):bob@c.edu',
+            // The \n that the logger writes for a newline.
+            'http://a.edu\\nbob@x.edu',
+            'http://backend:8001\\nbob@c.edu',
+        ]) assert.equal(hidePasswords(text), text);
+    });
+
+    it('is fast on a long text with many URLs', () => {
+        const started = Date.now();
+        for (const text of ['://'.repeat(100_000), 'a://b:'.repeat(50_000), `://u:${'x'.repeat(300_000)}`]) hidePasswords(text);
+        assert.ok(Date.now() - started < 500);
     });
 
     it('does not eat text after a URL that has a port and no path', () => {
@@ -162,6 +189,59 @@ describe('the logger', () => {
         assert.equal(errors[1].includes('\n'), false);
     });
 
+    it('writes a message that is not a string', () => {
+        const warnings = capture('warn');
+        log.warning(123 as unknown as string);
+        log.warning({ a: 1 } as unknown as string);
+        assert.match(warnings[0], / WARN {2}123$/);
+        assert.match(warnings[1], / WARN {2}\[object Object\]$/);
+    });
+
+    it('escapes an escape sequence in the text of an error, so it cannot fake a stack line', () => {
+        const errors = capture('error');
+        log.exception(new Error('a\n\u001b[31m at 2026-11-03 00:00:00.000 ERROR FORGED\u001b[8mhidden\u009b31m\u202egnp'), 'crawl failed');
+        const lines = errors[0].split('\n');
+        // The forged text is part of the line of the error message, with its codes written out.
+        // (capture() takes the colour code \u001b[31m out; the code that hides text stays, written out.)
+        assert.match(lines[1], /^\s+a\\n at 2026-11-03 00:00:00\.000 ERROR FORGED\\x1b\[8mhidden\\x9b31m\\u202egnp/);
+        for (const line of lines.slice(1)) assert.match(line, /^ /);
+    });
+
+    it('is fast on a message with thousands of empty lines', () => {
+        const warnings = capture('warn');
+        const started = Date.now();
+        // 9002 characters when written, so under the cut at 10,000.
+        log.warning(`a${'\n'.repeat(3_000)}b${'\r\n'.repeat(1_500)}    at x (y.js:1:2)`);
+        assert.ok(Date.now() - started < 100);
+        assert.equal(warnings[0].split('\n').length, 2);
+    });
+
+    it('keeps 5000 characters of a stack', () => {
+        const errors = capture('error');
+        const error = new Error('deep');
+        error.stack = `Error: deep\n${Array.from({ length: 200 }, (_, n) => `    at frame${n} (/app/node_modules/pkg/file.js:${n}:1)`).join('\n')}`;
+        log.exception(error, 'failed');
+        assert.ok(errors[0].length > 4_500 && errors[0].length < 5_600, `length ${errors[0].length}`);
+    });
+
+    it('puts the rid and course of the crawl on the lines of other crawlee loggers', () => {
+        const require = createRequire(import.meta.url);
+        const { log: browserPoolLog } = require(require.resolve('@crawlee/browser-pool').replace(/index\.js$/, 'logger.js'));
+        const warnings = capture('warn');
+        const prefix = 'rid=abc123 course=ece120';
+        const crawlLog = log.child({ prefix });
+        crawlContext.run(prefix, () => {
+            browserPoolLog.warning('browser closed');
+            log.warning('no prefix');
+            crawlLog.warning('own prefix');
+        });
+        browserPoolLog.warning('outside a crawl');
+        assert.match(warnings[0], / WARN {2}rid=abc123 course=ece120 BrowserPool: browser closed$/);
+        assert.match(warnings[1], / WARN {2}rid=abc123 course=ece120: no prefix$/);
+        assert.match(warnings[2], / WARN {2}rid=abc123 course=ece120: own prefix$/);
+        assert.match(warnings[3], / WARN {2}BrowserPool: outside a crawl$/);
+    });
+
     it('cuts a very long message', () => {
         const infos = capture('log');
         log.info(`url=${'a'.repeat(50_000)}`);
@@ -205,6 +285,24 @@ describe('finishLine', () => {
 });
 
 describe('installProcessHandlers', () => {
+    // The real thing, in a process of its own: the line is written and the exit code is 1.
+    const runAndCrash = (code: string) => new Promise<{ code: number | null; stderr: string }>((resolve) => {
+        const script = `const m = await import('./src/logSetup.ts'); m.installProcessHandlers(); ${code}`;
+        const child = execFile(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script], { env: { ...process.env, FORCE_COLOR: '0', LOG_LEVEL: 'INFO' } }, (_error, _stdout, stderr) => {
+            resolve({ code: child.exitCode, stderr });
+        });
+    });
+
+    it('stops the process with code 1 after an uncaught error and after an unhandled rejection', async () => {
+        const thrown = await runAndCrash("setTimeout(() => { throw new Error('kaput'); }, 10);");
+        assert.equal(thrown.code, 1);
+        assert.match(thrown.stderr, / ERROR uncaught exception, the crawler stops at=src\/logSetup\.ts:\d+\n\s+kaput\n\s+at /);
+
+        const rejected = await runAndCrash("Promise.reject(new Error('nobody waits')); setInterval(() => {}, 1000);");
+        assert.equal(rejected.code, 1);
+        assert.match(rejected.stderr, / ERROR unhandled promise rejection, the crawler stops at=src\/logSetup\.ts:\d+\n\s+nobody waits\n/);
+    });
+
     it('writes a warning and an uncaught error through the logger, then stops with code 1', async () => {
         const before = {
             warning: process.listeners('warning'),

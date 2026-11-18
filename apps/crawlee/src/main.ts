@@ -1,6 +1,6 @@
 // uploadToS3.ts
 // logSetup must stay the first import: it configures the logger before other modules log.
-import { installProcessHandlers, oneLine } from './logSetup.js';
+import { crawlContext, installProcessHandlers, oneLine } from './logSetup.js';
 import { randomBytes } from 'crypto';
 import express, { NextFunction, Request, Response } from 'express';
 import { log } from 'crawlee';
@@ -19,6 +19,19 @@ const app = express();
 //     origin: 'https://uiuc.chat',
 // };
 
+// Request ids come from the caller (X-Request-ID) or are minted here. Anything that does not
+// match this pattern is replaced, so a header value cannot break the log line.
+// This is the first middleware, so every reply has the id: also the reply to OPTIONS, and
+// the reply to a request with a bad body.
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+app.use((req, res, next) => {
+    const incomingId = req.get('x-request-id');
+    const rid = incomingId && REQUEST_ID_PATTERN.test(incomingId) ? incomingId : randomBytes(6).toString('hex');
+    res.locals.rid = rid;
+    res.set('X-Request-ID', rid);
+    next();
+});
+
 // app.use(cors()); // Enable CORS for all routes and origins
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -32,18 +45,6 @@ app.use((req, res, next) => {
 });
 // app.use(cors(corsOptions)); // only certain routes
 
-// Request ids come from the caller (X-Request-ID) or are minted here. Anything that does not
-// match this pattern is replaced, so a header value cannot break the log line.
-// This runs before the body is parsed, so a request with a bad body has an id too.
-const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-app.use((req, res, next) => {
-    const incomingId = req.get('x-request-id');
-    const rid = incomingId && REQUEST_ID_PATTERN.test(incomingId) ? incomingId : randomBytes(6).toString('hex');
-    res.locals.rid = rid;
-    res.set('X-Request-ID', rid);
-    next();
-});
-
 app.use(express.json());
 
 app.post('/crawl', async (req: Request, res: Response) => {
@@ -56,7 +57,10 @@ app.post('/crawl', async (req: Request, res: Response) => {
         res.status(400).json({ error: 'Bad request', errorTitle: 'BadRequest', errorMessage: 'The request body must be JSON with a "params" object.' });
         return;
     }
-    const prefix = params.courseName ? `rid=${rid} course=${oneLine(params.courseName)}` : `rid=${rid}`;
+    // The course name is on every line of the crawl. A space in it would let a caller add a
+    // fake field ("course=x rid=other"), so spaces are written as %20, and it is cut.
+    const course = params.courseName ? oneLine(params.courseName).replace(/ /g, '%20').slice(0, 200) : '';
+    const prefix = course ? `rid=${rid} course=${course}` : `rid=${rid}`;
     const clog = log.child({ prefix });
     const started = Date.now();
     clog.info(`crawl started url=${oneLine(params.url)} strategy=${oneLine(params.scrapeStrategy)} maxPages=${oneLine(params.maxPagesToCrawl)}`);
@@ -78,7 +82,8 @@ app.post('/crawl', async (req: Request, res: Response) => {
         //     maxRequestsPerMinute: params.maxRequestsPerMinute,
         // };
 
-        const results = await crawl(req.body.params, clog, rid);
+        // Inside the context, the lines of crawlee loggers that are not clog get the prefix too.
+        const results = await crawlContext.run(prefix, () => crawl(req.body.params, clog, rid));
         clog.info(`crawl done pages=${results} ms=${Date.now() - started}`);
         res.status(200).json(`Crawl completed successfully. Number of results: ${results}`);
     } catch (error) {

@@ -1,5 +1,6 @@
 // Configures crawlee's own logger once, before any other module logs.
 // main.ts imports this file first, so module-level lines in other files are formatted too.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { configDotenv } from 'dotenv';
 import { log, LoggerText, LogLevel } from 'crawlee';
 
@@ -20,9 +21,10 @@ const requested = (process.env.LOG_LEVEL || 'INFO').toUpperCase();
 const level = LEVELS[requested] ?? LogLevel.INFO;
 process.env.APIFY_LOG_LEVEL = LogLevel[level];
 
-// Characters that can break or forge a log line: the C0 control characters (newline, NUL,
-// ESC and the others), DEL, and the Unicode line separators.
-const CONTROL_CHARACTERS = /\r\n|[\u0000-\u001f\u007f\u0085\u2028\u2029]/g;
+// Characters that can break or forge a log line: the C0 and C1 control characters (newline,
+// NUL, ESC and the others), DEL, the Unicode line separators, and the characters that
+// change the direction of the text.
+const CONTROL_CHARACTERS = /\r\n|[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
 function escapeControlCharacter(found: string): string {
     if (found === '\r\n' || found === '\n' || found === '\r') return '\\n';
@@ -37,11 +39,16 @@ export function oneLine(value: unknown): string {
 }
 
 // The login part of a URL: "://user:secret@host", "://:secret@host" and "://token@host".
-// It must not reach the log. The match stops at the characters that end the host part of a
-// URL or a JSON value, so "http://a.edu:80","mail":"b@c.edu" is left as it is, and it runs
-// to the last @ before them, so a password with an @ in it is hidden as a whole.
+// It must not reach the log. The same pattern as LOGIN_IN_URL in the frontend log.ts.
+// - The user name ends at a character that a user name does not have (" ' < > , ? # & ; ) | \),
+//   so "(http://a.edu):bob@c.edu" is left alone.
+// - The password runs to the last @ before the next / or space. It can hold any other
+//   character, so "p,ss", "p?ss" and "p@ss" are hidden as a whole.
+// - "host:8001" followed by one of those characters is a port, not a password, so
+//   {"url":"http://backend:8001","email":"a@b.edu"} is left alone. The cost: a password of
+//   1 to 5 digits that is followed by such a character ("user:123,x@host") is not hidden.
 // A login without "://" in front ("user:secret@host") is not found.
-const LOGIN_IN_URL = /:\/\/[^/\s"'<>,?#]*@/g;
+const LOGIN_IN_URL = /:\/\/[^/\s:@"'<>,?#&;)|\\]*(?::(?!\d{1,5}(?:[/\s"'<>,?#&;)|\\]|$))[^/\s]*)?@/g;
 
 export function hidePasswords(text: string): string {
     return text.replace(LOGIN_IN_URL, '://***@');
@@ -78,18 +85,36 @@ export function callSite(stack: string): string | undefined {
 const MAX_MESSAGE_LENGTH = 10_000;
 
 // crawlee puts the stack of a failed page inside the message. Those frame lines keep their
-// own lines; every other control character in a message is escaped.
-function messageOnOneLine(message: string): string {
-    const text = message.length > MAX_MESSAGE_LENGTH
-        ? `${message.slice(0, MAX_MESSAGE_LENGTH)}...[cut ${message.length - MAX_MESSAGE_LENGTH} characters]`
-        : message;
-    return text.split(/(?:\r?\n)+(?=[ \t]+at )/).map(oneLine).join('\n');
+// own lines; every other line is joined to the line before it with a written \n, and every
+// control character is escaped. The result is cut after that, so the limit is on what is
+// written.
+function messageOnOneLine(message: unknown): string {
+    const out: string[] = [];
+    for (const line of String(message).split(/\r\n|\n|\r/)) {
+        if (out.length > 0 && /^[ \t]+at /.test(line)) {
+            // Empty lines between the text and its first frame are dropped.
+            let text = out[out.length - 1];
+            while (text.endsWith('\\n')) text = text.slice(0, -2);
+            out[out.length - 1] = text;
+            out.push(oneLine(line));
+        } else if (out.length > 0) {
+            out[out.length - 1] += `\\n${oneLine(line)}`;
+        } else {
+            out.push(oneLine(line));
+        }
+    }
+    const text = out.join('\n');
+    return text.length > MAX_MESSAGE_LENGTH
+        ? `${text.slice(0, MAX_MESSAGE_LENGTH)}...[cut ${text.length - MAX_MESSAGE_LENGTH} characters]`
+        : text;
 }
 
-// The colour codes that the logger itself puts around parts of a line.
-const COLOUR_CODE = /\u001b\[[0-9;]*m/g;
-// A control character that is not a newline and not the start of a colour code.
-const STRAY_CONTROL_CHARACTERS = /\r|\u001b(?!\[[0-9;]*m)|[\u0000-\u0009\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f\u0085\u2028\u2029]/g;
+// The colour codes that the logger itself puts around parts of a line (ansi-colors: reset,
+// the 8 colours and their bright forms). Any other escape sequence is escaped, also the
+// ones that hide text or move the cursor.
+const COLOUR_CODE = /\u001b\[(?:0|22|39|3[0-7]|9[0-7])m/g;
+// A control character that is not a newline and not the start of such a colour code.
+const STRAY_CONTROL_CHARACTERS = /\r|\u001b(?!\[(?:0|22|39|3[0-7]|9[0-7])m)|[\u0000-\u0009\u000b\u000c\u000e-\u001a\u001c-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 // Lines of an event that stay on their own line: a stack frame, the cause of an error, and
 // the note that @apify/log writes where it leaves out frames.
 const STACK_LINE = /^\s+(?:at |CAUSE: |\.\.\. \d+ lines matching cause stack trace)/;
@@ -100,16 +125,24 @@ const STACK_LINE = /^\s+(?:at |CAUSE: |\.\.\. \d+ lines matching cause stack tra
 export function finishLine(line: string, isError: boolean, at?: string): string {
     const kept: string[] = [];
     line.split('\n').forEach((part, index) => {
+        // A line that stays on its own must start with real spaces: @apify/log writes the
+        // indent first and the colour code after it. Text that starts with a colour code
+        // and then looks like a frame is joined to the line before it.
+        const indented = /^[ \t]/.test(part);
         const plain = part.replace(COLOUR_CODE, '');
         // The first line after the head is the message of the error, when it is indented.
-        if (index === 0 || STACK_LINE.test(plain) || (index === 1 && /^\s/.test(plain))) kept.push(part);
+        if (index === 0 || (indented && (STACK_LINE.test(plain) || index === 1))) kept.push(part);
         else kept[kept.length - 1] += `\\n${part}`;
     });
     if (isError && at) kept[0] += ` at=${at}`;
     return hidePasswords(kept.join('\n').replace(STRAY_CONTROL_CHARACTERS, escapeControlCharacter));
 }
 
-// crawlee's text logger, with three changes to every line:
+// The "rid=<id> course=<name>" of the crawl that the running code belongs to. main.ts runs
+// each crawl inside crawlContext.run(prefix, ...).
+export const crawlContext = new AsyncLocalStorage<string>();
+
+// crawlee's text logger, with these changes to every line:
 // - one event is one line, with its stack on the lines that follow (crawlee and Playwright
 //   put newlines in their messages)
 // - the login part of a URL is written as ://***@
@@ -118,6 +151,13 @@ export class CrawlerLogger extends LoggerText {
     private lastLine?: string;
 
     override _log(level: LogLevel, message: string, data?: any, exception?: unknown, opts?: Record<string, any>): string {
+        // Some loggers of crawlee do not come from the logger of the crawl (RequestQueue,
+        // BrowserPool, Request, the Playwright utilities). Inside a crawl, their lines get
+        // the "rid=<id> course=<name>" of that crawl in front of their own prefix.
+        const crawl = crawlContext.getStore();
+        if (crawl && !String(opts?.prefix ?? '').includes(crawl)) {
+            opts = { ...opts, prefix: opts?.prefix ? `${crawl} ${opts.prefix}` : crawl };
+        }
         const raw = super._log(level, message ? messageOnOneLine(message) : message, data, exception, opts);
         // super._log has sent the line through _outputWithConsole below. Return that line,
         // not the raw one, so a listener of the 'line' event gets the same text as the console.
@@ -131,23 +171,22 @@ export class CrawlerLogger extends LoggerText {
     }
 }
 
-// @apify/log cuts a stack at maxStringLength characters. Its default of 1000 keeps about
-// 4 frames, fewer with --enable-source-maps, where the paths are longer.
-const MAX_STACK_LENGTH = 5000;
+// @apify/log cuts a text inside an error at half of maxStringLength for each level of
+// nesting: the stack of an error at a half, the stack of its cause at a quarter. Its
+// default of 1000 keeps about 2 frames of a stack. With 10,000, a stack keeps 5,000
+// characters and the stack of a cause 2,500.
+const MAX_STRING_LENGTH = 10_000;
 
 // crawlee makes some loggers when it is imported (BrowserPool, Request, the Playwright
 // utilities, the memory storage). Each took a reference to the root logger object of that
 // moment. So that object is changed in place: a new logger object would not reach them.
+// This also holds when APIFY_LOG_FORMAT asked for the JSON logger: the crawler writes text.
+// Those early loggers keep the maxStringLength and the level that they read at import.
 const rootLogger = log.getOptions().logger;
-if (rootLogger instanceof LoggerText) {
-    Object.setPrototypeOf(rootLogger, CrawlerLogger.prototype);
-    // skipTime: false puts a UTC timestamp at the start of every line.
-    rootLogger.setOptions({ skipTime: false });
-    log.setOptions({ level, maxStringLength: MAX_STACK_LENGTH });
-} else {
-    // APIFY_LOG_FORMAT asked for another logger (JSON). The crawler writes text lines.
-    log.setOptions({ logger: new CrawlerLogger({ skipTime: false }), level, maxStringLength: MAX_STACK_LENGTH });
-}
+Object.setPrototypeOf(rootLogger, CrawlerLogger.prototype);
+// skipTime: false puts a UTC timestamp at the start of every line.
+rootLogger.setOptions({ skipTime: false });
+log.setOptions({ level, maxStringLength: MAX_STRING_LENGTH });
 
 if (!(requested in LEVELS)) {
     log.warning(`Unknown LOG_LEVEL=${requested}, using INFO`);
