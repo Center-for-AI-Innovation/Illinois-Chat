@@ -2,9 +2,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  APP_NAVBAR_HEIGHT,
+  getSiteNavbarHeight,
   getSiteNavbarOptions,
   routeHasSiteNavbar,
   SETTINGS_LAYOUT_ROUTES,
+  SPLASH_NAVBAR_HEIGHT,
 } from '~/components/Layout/site-header-routes'
 
 // Vitest runs from apps/frontend, so `src/` is a stable base for the file checks.
@@ -76,6 +79,29 @@ describe('site header route config', () => {
         expect(reachesLayout).toBe(true)
       },
     )
+  })
+
+  describe('navbar row height token', () => {
+    it('is 72px on the splash page, the row without a divider', () => {
+      expect(getSiteNavbarHeight('/')).toBe(SPLASH_NAVBAR_HEIGHT)
+      expect(SPLASH_NAVBAR_HEIGHT).toBe('72px')
+    })
+
+    it.each([
+      '/chatbots',
+      '/admin',
+      '/explore',
+      '/new',
+      '/chat',
+      '/[course_name]/chat',
+      '/[course_name]/dashboard',
+      '/[course_name]/api',
+      '/terms',
+      '/silent-renew',
+    ])('%s is the 80px application row with its divider', (pathname) => {
+      expect(getSiteNavbarHeight(pathname)).toBe(APP_NAVBAR_HEIGHT)
+      expect(APP_NAVBAR_HEIGHT).toBe('80px')
+    })
   })
 
   describe('other routes', () => {

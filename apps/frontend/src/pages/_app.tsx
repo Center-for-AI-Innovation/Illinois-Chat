@@ -3,7 +3,10 @@ import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
 import { SiteHeader } from '~/components/Layout/SiteHeader'
-import { routeHasSiteNavbar } from '~/components/Layout/site-header-routes'
+import {
+  getSiteNavbarHeight,
+  routeHasSiteNavbar,
+} from '~/components/Layout/site-header-routes'
 import Maintenance from '~/components/UIUC-Components/Maintenance'
 import '~/styles/citation-tooltips.css'
 import '~/styles/globals.css'
@@ -140,18 +143,23 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
     }
   }, [])
 
-  // Full-height page content sits below the site header only on routes that
-  // render a navbar, so the header's height is subtracted only there.
-  // Derived from the route on the server too, so the first paint is correct.
+  // Layout tokens for the whole app, set from the route here (not in a head
+  // style) so the header and page offsets are right on the first render, and a
+  // splash-only value cannot leak into application routes.
+  //  - `--navbar-height`: 72px on the splash page, 80px elsewhere.
+  //  - `--page-viewport-height`: full-height page content below the header. It
+  //    subtracts the navbar only on routes that render one.
   const pageViewportHeight = routeHasSiteNavbar(router.pathname)
     ? 'calc(var(--viewport-height) - var(--navbar-height))'
     : 'var(--viewport-height)'
+  const layoutTokens = {
+    '--navbar-height': getSiteNavbarHeight(router.pathname),
+    '--page-viewport-height': pageViewportHeight,
+  } as CSSProperties
 
   return (
     <div
-      style={
-        { '--page-viewport-height': pageViewportHeight } as CSSProperties
-      }
+      style={layoutTokens}
       onKeyDownCapture={(event) => {
         if (event.key === 'Tab') {
           document.documentElement.dataset.inputModality = 'keyboard'

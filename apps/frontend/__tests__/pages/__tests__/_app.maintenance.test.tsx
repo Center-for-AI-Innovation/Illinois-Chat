@@ -174,6 +174,53 @@ describe('_app page viewport height', () => {
     ).toBe('calc(var(--viewport-height) - var(--navbar-height))')
   })
 
+  it('gives the splash page the 72px navbar token and every other route 80px', async () => {
+    const { container } = await renderApp({
+      pathname: '/',
+      isMaintenanceMode: false,
+    })
+    expect(appRoot(container).style.getPropertyValue('--navbar-height')).toBe(
+      '72px',
+    )
+
+    const application = await renderApp({
+      pathname: '/chatbots',
+      isMaintenanceMode: false,
+    })
+    expect(
+      appRoot(application.container).style.getPropertyValue('--navbar-height'),
+    ).toBe('80px')
+  })
+
+  it('switches both tokens on client navigation between splash and application routes', async () => {
+    const { container, rerender } = await renderApp({
+      pathname: '/',
+      isMaintenanceMode: false,
+    })
+    const MyApp = (await import('~/pages/_app')).default as React.ComponentType<{
+      Component: React.ComponentType
+      pageProps: Record<string, unknown>
+      router: unknown
+    }>
+    const navigate = (pathname: string) => {
+      globalThis.__TEST_ROUTER__ = { pathname }
+      rerender(<MyApp Component={Page} pageProps={{}} router={{} as never} />)
+    }
+
+    navigate('/[course_name]/dashboard')
+    expect(appRoot(container).style.getPropertyValue('--navbar-height')).toBe(
+      '80px',
+    )
+    expect(
+      appRoot(container).style.getPropertyValue('--page-viewport-height'),
+    ).toBe('calc(var(--viewport-height) - var(--navbar-height))')
+
+    navigate('/')
+    expect(appRoot(container).style.getPropertyValue('--navbar-height')).toBe(
+      '72px',
+    )
+  })
+
   it('keeps the banner-adjusted viewport on a route without a navbar', async () => {
     const { container } = await renderApp({
       pathname: '/terms',

@@ -5,6 +5,13 @@ import {
   type AnnouncementBanner as AnnouncementBannerValue,
 } from '~/utils/platformSettings.schema'
 
+/**
+ * Height of the empty splash strip, measured on chat.illinois.edu and the
+ * pre-stack main at 390px and 1440px. The splash header is this strip plus the
+ * 72px splash navbar: 41 + 72 = 113px.
+ */
+export const EMPTY_SPLASH_STRIP_HEIGHT = '41px'
+
 interface AnnouncementBannerProps {
   /**
    * The stored banner, or `null` when Redis holds no usable configuration.
@@ -114,10 +121,18 @@ export function AnnouncementBanner({
   }
 
   if (!content) {
-    // Empty decorative strip: same orange and padding, no text line, hidden
-    // from assistive tech. Nothing is announced, so there is no landmark.
+    // Empty decorative strip, hidden from assistive tech. Nothing is announced,
+    // so there is no landmark. It is fixed at the splash page's measured height,
+    // so the header keeps its 113px total (strip + navbar). Active messages
+    // below are not constrained and grow with their text.
     if (!preserveEmptySpace) return null
-    return <div aria-hidden="true" className={className} style={style} />
+    return (
+      <div
+        aria-hidden="true"
+        className={className}
+        style={{ ...style, height: EMPTY_SPLASH_STRIP_HEIGHT }}
+      />
+    )
   }
 
   const inner = (

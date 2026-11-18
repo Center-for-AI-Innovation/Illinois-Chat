@@ -177,9 +177,9 @@ button:disabled {
      instead of 100vh so the bar doesn't make them scroll. */
   --viewport-height: calc(100vh - var(--announcement-banner-height));
 
-  /* Height of the site navbar row, inside the sticky site header. The page
-     below the header gets --page-viewport-height, which _app sets per route
-     (it subtracts the navbar only on routes that render one). */
+  /* Fallback height of the site navbar row. _app overrides it per route on its
+     wrapper: 72px on the splash page, 80px elsewhere. The page below the header
+     gets --page-viewport-height, which _app also sets per route. */
   --navbar-height: 80px;
 
   /* Primary Colors */

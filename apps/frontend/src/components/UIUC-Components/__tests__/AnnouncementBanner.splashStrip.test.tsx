@@ -5,7 +5,10 @@
 
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AnnouncementBanner } from '~/components/UIUC-Components/AnnouncementBanner'
+import {
+  AnnouncementBanner,
+  EMPTY_SPLASH_STRIP_HEIGHT,
+} from '~/components/UIUC-Components/AnnouncementBanner'
 import type { AnnouncementBanner as AnnouncementBannerValue } from '~/utils/platformSettings.schema'
 
 const ENV_KEYS = [
@@ -51,10 +54,21 @@ describe('AnnouncementBanner with preserveEmptySpace (splash)', () => {
 
     const strip = container.firstElementChild as HTMLElement
     expect(strip).toHaveAttribute('aria-hidden', 'true')
-    // Same padding as the active bar. jsdom drops `var(...)` colours, so the
-    // orange itself is only checked in the browser.
-    expect(strip).toHaveClass('py-2')
     expect(strip).toBeEmptyDOMElement()
+    // Matches the splash page's measured strip (41px), not just its padding.
+    // jsdom drops `var(...)` colours, so the orange is only checked in a browser.
+    expect(strip.style.height).toBe(EMPTY_SPLASH_STRIP_HEIGHT)
+    expect(EMPTY_SPLASH_STRIP_HEIGHT).toBe('41px')
+  })
+
+  it('does not constrain the height of an active message, so wrapped text grows', () => {
+    const { container } = render(
+      <AnnouncementBanner banner={ENABLED} preserveEmptySpace />,
+    )
+
+    expect(
+      (container.firstElementChild as HTMLElement).style.height,
+    ).toBe('')
   })
 
   it('never shows text from a disabled banner, even in the strip', () => {

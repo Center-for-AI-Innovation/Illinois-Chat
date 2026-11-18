@@ -5,6 +5,7 @@
 
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EMPTY_SPLASH_STRIP_HEIGHT } from '~/components/UIUC-Components/AnnouncementBanner'
 import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
 
@@ -132,8 +133,8 @@ describe('splash page (/)', () => {
     query.data = DISABLED
     renderAt('/')
 
-    resizeTo(16)
-    expect(publishedHeight()).toBe('16px')
+    resizeTo(41)
+    expect(publishedHeight()).toBe(EMPTY_SPLASH_STRIP_HEIGHT)
   })
 })
 
@@ -192,8 +193,8 @@ describe('client navigation and live updates', () => {
   it('drops the strip and its space when navigating from the splash to an application page', () => {
     query.data = DISABLED
     const { container, rerender } = renderAt('/')
-    resizeTo(16)
-    expect(publishedHeight()).toBe('16px')
+    resizeTo(41)
+    expect(publishedHeight()).toBe(EMPTY_SPLASH_STRIP_HEIGHT)
 
     globalThis.__TEST_ROUTER__ = { pathname: '/chatbots' }
     rerender(<SiteAnnouncementBanner />)
@@ -211,10 +212,10 @@ describe('client navigation and live updates', () => {
 
     globalThis.__TEST_ROUTER__ = { pathname: '/' }
     rerender(<SiteAnnouncementBanner />)
-    resizeTo(16)
+    resizeTo(41)
 
     expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
-    expect(publishedHeight()).toBe('16px')
+    expect(publishedHeight()).toBe(EMPTY_SPLASH_STRIP_HEIGHT)
   })
 
   it('reflows the published height when an active message wraps to two lines', () => {
@@ -249,9 +250,9 @@ describe('client navigation and live updates', () => {
 
     query.data = DISABLED
     rerender(<SiteAnnouncementBanner />)
-    resizeTo(16)
+    resizeTo(41)
 
     expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
-    expect(publishedHeight()).toBe('16px')
+    expect(publishedHeight()).toBe(EMPTY_SPLASH_STRIP_HEIGHT)
   })
 })

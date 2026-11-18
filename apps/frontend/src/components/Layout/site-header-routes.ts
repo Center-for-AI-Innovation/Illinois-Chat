@@ -71,3 +71,17 @@ export function getSiteNavbarOptions(
 export function routeHasSiteNavbar(pathname: string): boolean {
   return getSiteNavbarOptions(pathname) !== null
 }
+
+/** The splash navbar row. Measured with the 41px strip; no divider. */
+export const SPLASH_NAVBAR_HEIGHT = '72px'
+/** The application navbar row, with its divider. */
+export const APP_NAVBAR_HEIGHT = '80px'
+
+/**
+ * The navbar row height for a route, provided to the whole app by `_app` so the
+ * header and page offsets read the same value from their first render. Only the
+ * splash page is 72px.
+ */
+export function getSiteNavbarHeight(pathname: string): string {
+  return pathname === '/' ? SPLASH_NAVBAR_HEIGHT : APP_NAVBAR_HEIGHT
+}

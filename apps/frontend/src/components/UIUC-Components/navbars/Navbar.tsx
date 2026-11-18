@@ -35,9 +35,9 @@ export type NavbarContentWidth = 'workspace' | 'sidebar'
 
 interface NavbarProps {
   /**
-   * `splash` is the landing page header: no divider, and the page must set
-   * `--navbar-height` to its 72px row, since the header and content offset
-   * both read that token.
+   * `splash` is the landing page header: no divider. Its 72px row comes from
+   * `--navbar-height`, which `_app` sets for the `/` route, so the header and
+   * page offsets read the same value.
    */
   variant?: NavbarVariant
   /** Only applies to the `application` variant. */
