@@ -198,7 +198,7 @@ describe('Navbar', () => {
   describe.each([
     { name: 'application', props: {} },
     { name: 'splash', props: { variant: 'splash' as const } },
-    { name: 'admin page', props: { contentWidth: 'page' as const } },
+    { name: 'constrained application page', props: { contentWidth: 'page' as const } },
   ])('shared behavior in the $name layout', ({ props }) => {
     it('links the configured brand home', async () => {
       brandingResponds({
