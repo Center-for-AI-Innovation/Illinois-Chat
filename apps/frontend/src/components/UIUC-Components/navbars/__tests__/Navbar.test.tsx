@@ -61,7 +61,11 @@ describe('Navbar', () => {
   })
 
   it('uses the built-in logo when none is uploaded', async () => {
-    brandingResponds({ primaryWord: 'OSC', secondaryWord: 'Chat', logoUrl: null })
+    brandingResponds({
+      primaryWord: 'OSC',
+      secondaryWord: 'Chat',
+      logoUrl: null,
+    })
 
     const { container } = await renderNavbar()
 
@@ -171,26 +175,20 @@ describe('Navbar', () => {
     expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'splash')
   })
 
-  it.each([
-    { contentWidth: 'page', layout: 'page' },
-    { contentWidth: 'sidebar', layout: 'sidebar' },
-  ] as const)(
-    'aligns application pages to the $contentWidth content width',
-    async ({ contentWidth, layout }) => {
-      superAdminIs(false)
-      await renderNavbar({ contentWidth })
+  it('aligns application pages with the settings sidebar inset', async () => {
+    superAdminIs(false)
+    await renderNavbar({ contentWidth: 'sidebar' })
 
-      expect(screen.getByRole('banner')).toHaveAttribute(
-        'data-variant',
-        'application',
-      )
-      expect(screen.getByRole('banner')).toHaveAttribute('data-layout', layout)
-    },
-  )
+    expect(screen.getByRole('banner')).toHaveAttribute(
+      'data-variant',
+      'application',
+    )
+    expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'sidebar')
+  })
 
   it('ignores contentWidth for the splash variant', async () => {
     superAdminIs(false)
-    await renderNavbar({ variant: 'splash', contentWidth: 'page' })
+    await renderNavbar({ variant: 'splash', contentWidth: 'sidebar' })
 
     expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'splash')
   })
@@ -198,7 +196,7 @@ describe('Navbar', () => {
   describe.each([
     { name: 'application', props: {} },
     { name: 'splash', props: { variant: 'splash' as const } },
-    { name: 'constrained application page', props: { contentWidth: 'page' as const } },
+    { name: 'settings sidebar', props: { contentWidth: 'sidebar' as const } },
   ])('shared behavior in the $name layout', ({ props }) => {
     it('links the configured brand home', async () => {
       brandingResponds({

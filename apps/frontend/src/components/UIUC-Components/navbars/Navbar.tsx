@@ -29,10 +29,9 @@ export type NavbarVariant = 'application' | 'splash'
 
 /**
  * How an application navbar lines up with the page below it. `workspace` spans
- * the full width, `sidebar` matches the settings sidebar's inset, and `page`
- * matches a constrained content column.
+ * the full width, and `sidebar` matches the settings sidebar's inset.
  */
-export type NavbarContentWidth = 'workspace' | 'sidebar' | 'page'
+export type NavbarContentWidth = 'workspace' | 'sidebar'
 
 interface NavbarProps {
   /**
@@ -87,7 +86,6 @@ const navbarHeaderVariants = cva(
         splash: 'max-w-[1680px] px-4 sm:px-8',
         workspace: 'px-4 sm:px-8',
         sidebar: 'px-4',
-        page: 'max-w-6xl px-4 sm:px-6 lg:px-8',
       },
     },
   },
