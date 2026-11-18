@@ -49,7 +49,13 @@ app.use(express.json());
 app.post('/crawl', async (req: Request, res: Response) => {
     const rid: string = res.locals.rid;
     // Never log req.body: it can carry cookies. Log only the fields below.
-    const params = req.body?.params ?? {};
+    const params = req.body?.params;
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+        // No params object: the body is not JSON, or the caller left params out.
+        log.child({ prefix: `rid=${rid}` }).warning('request refused method=POST path=/crawl status=400: the body has no params object');
+        res.status(400).json({ error: 'Bad request', errorTitle: 'BadRequest', errorMessage: 'The request body must be JSON with a "params" object.' });
+        return;
+    }
     const prefix = params.courseName ? `rid=${rid} course=${oneLine(params.courseName)}` : `rid=${rid}`;
     const clog = log.child({ prefix });
     const started = Date.now();
@@ -98,14 +104,19 @@ app.use('/api', healthRoute); // GET /api/health
 // Without this, express prints the stack itself, with no timestamp and no request id.
 // It must be the last app.use, and express knows it as an error handler by its 4 arguments.
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
-    const status = Number(err?.status ?? err?.statusCode) || 500;
+    const given = Number(err?.status ?? err?.statusCode);
+    // Only a 4xx or 5xx status from the error is used; anything else is a 500.
+    const status = Number.isInteger(given) && given >= 400 && given <= 599 ? given : 500;
+    // The parse error of a JSON body quotes a piece of the body, which can be part of a
+    // cookie. Use a fixed text for it.
+    const reason = err?.type === 'entity.parse.failed' ? 'the body is not valid JSON' : String(err?.message ?? '');
     const elog = log.child({ prefix: `rid=${res.locals.rid}` });
     const what = `method=${req.method} path=${oneLine(req.path)} status=${status}`;
     if (status >= 500) {
         elog.exception(err, `request failed ${what}`);
     } else {
         // The caller sent a bad request: the message says what is wrong, a stack adds nothing.
-        elog.warning(`request refused ${what}: ${oneLine(err?.message)}`);
+        elog.warning(`request refused ${what}: ${oneLine(reason)}`);
     }
     if (res.headersSent) {
         // The reply has started, so its status cannot change. Close the connection.
@@ -115,7 +126,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     res.status(status).json({
         error: status >= 500 ? 'Internal server error' : 'Bad request',
         errorTitle: String(err?.name ?? 'Error'),
-        errorMessage: status >= 500 ? 'The crawler hit an unexpected error.' : String(err?.message ?? ''),
+        errorMessage: status >= 500 ? 'The crawler hit an unexpected error.' : reason,
     });
 });
 

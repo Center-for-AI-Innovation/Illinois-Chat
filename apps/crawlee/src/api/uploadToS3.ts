@@ -100,6 +100,12 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
     return null;
   } catch (headErr) {
     // NotFound → first crawl to see this PDF; fall through to upload + ingest.
+    // Anything else (no access, expired credentials, no network) is not expected: say so.
+    // The upload below is still tried, as before.
+    const name = headErr instanceof Error ? headErr.name : '';
+    if (name !== 'NotFound') {
+      clog.warning(`Could not check S3 for an earlier copy key=${s3Key}: ${oneLine(headErr)}`);
+    }
   }
 
   try {
