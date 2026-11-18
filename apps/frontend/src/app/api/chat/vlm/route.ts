@@ -17,7 +17,6 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
   try {
     const { conversation, stream } = await req.json()
 
-
     const openai = createOpenAI({
       baseURL: process.env.NCSA_HOSTED_VLM_BASE_URL,
       apiKey: 'non-empty',
@@ -33,6 +32,15 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
         model: openai(conversation.model.id) as any,
         temperature: conversation.temperature,
         messages,
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }) =>
+          log.error(
+            'LLM stream failed',
+            { model: conversation.model.id },
+            error,
+          ),
       })
       const response = result.toTextStreamResponse()
       return new NextResponse(response.body, {

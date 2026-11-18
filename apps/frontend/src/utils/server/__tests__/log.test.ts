@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLogger } from '../log'
+import { MAX_CACHED_MAP_BYTES, MAX_MAP_BYTES, getLogger } from '../log'
 import { runWithLogContext } from '../requestContext'
 
 const TS = '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z'
@@ -187,9 +187,58 @@ describe('getLogger', () => {
     getLogger('db').error('write failed', new Error('outer', { cause }))
     const line = c.error.mock.calls[0]![0] as string
     expect(line).toContain(
-      'Caused by: Error: Failed query: insert into "t" ("a") values ($1)\nparams: <omitted>',
+      'Caused by: Error: Failed query: insert into "t" ("a") values ($1)\\nparams: <omitted>',
     )
     expect(line).not.toContain('a@b.edu')
+  })
+
+  it('keeps the message of an error on one line, so it cannot start a fake line', () => {
+    const c = spies()
+    const err = new Error(
+      "Ollama model 'm'\n2026-11-18T00:00:00.000Z INFO    api.admin forged line' not found",
+      { cause: new Error('inner\r\nERROR fake\u0000\u2028x') },
+    )
+    getLogger('llm').error('chat request failed', err)
+    const lines = (c.error.mock.calls[0]![0] as string).split('\n')
+    expect(lines[1]).toBe(
+      "Error: Ollama model 'm'\\n2026-11-18T00:00:00.000Z INFO    api.admin forged line' not found",
+    )
+    // After the first line, a line is the error, a stack frame or a cause.
+    for (const line of lines.slice(1)) {
+      expect(line).toMatch(/^(\s+at |Caused by: |Error: )/)
+    }
+    expect(lines.at(-1)).toMatch(
+      /^(\s+at |Caused by: Error: inner\\r\\nERROR fake\\x00\\u2028x$)/,
+    )
+    expect(c.error.mock.calls[0]![0]).toContain(
+      'Caused by: Error: inner\\r\\nERROR fake\\x00\\u2028x',
+    )
+  })
+
+  it('escapes control characters in the message and the fields', () => {
+    const c = spies()
+    getLogger('s').info('a\u0000b\u001b[31mc', { v: 'x\ty\u0085z\u007f' })
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / a\\x00b\\x1b\[31mc v=x\\ty\\x85z\\x7f$/,
+    )
+  })
+
+  it('stops at 5 causes and survives a cause that points at itself', () => {
+    const c = spies()
+    const loop = new Error('loop')
+    loop.cause = loop
+    getLogger('s').error('cyclic', loop)
+    const text = c.error.mock.calls[0]![0] as string
+    expect(text.match(/Caused by: Error: loop/g)).toHaveLength(4)
+    expect(text).toMatch(/\nCaused by: \(more causes are left out\)$/)
+  })
+
+  it('cuts a thrown value that is not an Error', () => {
+    const c = spies()
+    getLogger('s').error('odd', undefined, { body: 'x'.repeat(2000) })
+    const text = (c.error.mock.calls[0]![0] as string).split('\n')[1]!
+    expect(text).toHaveLength(500 + '...[cut]'.length)
+    expect(text.endsWith('...[cut]')).toBe(true)
   })
 
   it('writes an Error inside a field value as name: message', () => {
@@ -241,6 +290,29 @@ describe('getLogger', () => {
     for (const secret of ['hunter2', 's3cret', 'guest:guest', 'pa55']) {
       expect(line).not.toContain(secret)
     }
+  })
+
+  it('hides a login with no user, a token as the user and a password with an @', () => {
+    const c = spies()
+    getLogger('s').info('urls', {
+      a: 'redis://:onlypass@host:6379/0',
+      b: 'https://token123@github.com/x',
+      c: 'postgres://user:p@ss@db/public',
+    })
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / a=redis:\/\/\*\*\*@host:6379\/0 b=https:\/\/\*\*\*@github\.com\/x c=postgres:\/\/\*\*\*@db\/public$/,
+    )
+  })
+
+  it('does not eat the text after a URL that has a port and no path', () => {
+    const c = spies()
+    getLogger('s').info('reply', {
+      body: { url: 'http://backend:8001', email: 'alice@illinois.edu' },
+      next: 'https://example.edu:8443?to=a@b',
+    })
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / body=\{"url":"http:\/\/backend:8001","email":"alice@illinois\.edu"\} next=https:\/\/example\.edu:8443\?to=a@b$/,
+    )
   })
 
   it('ends an ERROR line with the file and line that called log.error', () => {
@@ -295,6 +367,58 @@ describe('getLogger', () => {
           '    at async run (/app/node_modules/next/dist/server/next-server.js:700:9)',
           '    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)',
         ])
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it.skipIf(typeof process.getBuiltinModule !== 'function')(
+    'does not read a very large source map, and drops the map that was not used for the longest time',
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), 'log-test-'))
+      try {
+        // A map file of about `bytes`, with one mapping to line 11 of demo.ts.
+        const writeMap = (name: string, bytes: number) => {
+          const chunk = join(dir, `${name}.js`)
+          writeFileSync(
+            `${chunk}.map`,
+            JSON.stringify({
+              version: 3,
+              sources: [`webpack://app/./src/pages/api/${name}.ts`],
+              sourcesContent: ['x'.repeat(bytes)],
+              names: [],
+              mappings: 'AAUE',
+            }),
+          )
+          return chunk
+        }
+        const frameOf = (chunk: string) => {
+          const err = new Error('boom')
+          err.stack = `Error: boom\n    at m (${chunk}:1:5)`
+          const c = spies()
+          getLogger('api').error('failed', err)
+          const frame = (c.error.mock.calls.at(-1)![0] as string).split('\n')[2]
+          vi.restoreAllMocks()
+          return frame
+        }
+
+        const large = writeMap('large', MAX_MAP_BYTES + 1024)
+        expect(frameOf(large)).toBe(`    at m (${large}:1:5)`)
+
+        // Three maps that are together more than the cache holds.
+        const third = Math.ceil(MAX_CACHED_MAP_BYTES / 3) + 1024
+        const one = writeMap('one', third)
+        const two = writeMap('two', third)
+        const three = writeMap('three', third)
+        expect(frameOf(one)).toBe('    at src/pages/api/one.ts:11:3')
+        expect(frameOf(two)).toBe('    at src/pages/api/two.ts:11:3')
+        // 'one' is used again, so 'two' is now the oldest and is dropped.
+        expect(frameOf(one)).toBe('    at src/pages/api/one.ts:11:3')
+        expect(frameOf(three)).toBe('    at src/pages/api/three.ts:11:3')
+        // A dropped map is read again when a frame needs it.
+        expect(frameOf(two)).toBe('    at src/pages/api/two.ts:11:3')
+        expect(frameOf(one)).toBe('    at src/pages/api/one.ts:11:3')
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }

@@ -7,8 +7,9 @@
 // rid, path and course come from the request context (requestContext.ts) when
 // one is open. An error is appended as "Name: message" plus its stack frames on
 // the following lines. An ERROR line ends with at=<file>:<line>, the place in
-// the app that called log.error. A password in a URL (://user:secret@host) is
-// written as ://***@, also in an error message. Each event is exactly one
+// the app that called log.error. The login part of a URL (://user:secret@host)
+// is written as ://***@, also in an error message. A newline or another
+// control character in a value is escaped, so a value cannot start a line. Each event is exactly one
 // console call with one string.
 //
 // Server-only by convention; harmless in the browser, where there is no
@@ -56,13 +57,35 @@ function threshold(): number {
   return LEVEL_RANK.INFO!
 }
 
-// "://user:secret@host" in a URL. The password must not reach the log; the same
-// rule as _PASSWORD_IN_URL in the Python log_setup.py.
-const PASSWORD_IN_URL = /:\/\/[^/@\s]+:[^/@\s]+@/g
+// The login part of a URL: "://user:secret@host", "://:secret@host" and
+// "://token@host". It must not reach the log. The match stops at the
+// characters that end the host part of a URL or a JSON value, so
+// "http://a.edu:80","mail":"b@c.edu" is left as it is, and it runs to the last
+// @ before them, so a password with an @ in it is hidden as a whole. A login
+// without "://" in front ("user:secret@host") is not found.
+const LOGIN_IN_URL = /:\/\/[^/\s"'<>,?#]*@/g
+
+// Characters that can break or forge a log line: the C0 control characters
+// (newline, NUL, ESC and the others), DEL and the Unicode line separators.
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f\u0085\u2028\u2029]/g
+
+const SHORT_ESCAPES: Record<string, string> = {
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+}
 
 // A value must not be able to start a new log line.
 function escapeNewlines(text: string): string {
-  return text.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+  return text.replace(CONTROL_CHARACTERS, (found) => {
+    const code = found.charCodeAt(0)
+    return (
+      SHORT_ESCAPES[found] ??
+      (code < 0x100
+        ? `\\x${code.toString(16).padStart(2, '0')}`
+        : `\\u${code.toString(16).padStart(4, '0')}`)
+    )
+  })
 }
 
 // JSON.stringify turns an Error into {}, so an Error anywhere in a field value
@@ -98,14 +121,36 @@ function errorMessage(err: Error): string {
   return err.message.replace(/\nparams: [\s\S]*$/, '\nparams: <omitted>')
 }
 
-function formatError(err: unknown): string {
-  if (!(err instanceof Error)) return stringify(err)
+// A thrown value that is not an Error is cut at this length: it can be a whole
+// response object.
+const MAX_THROWN_VALUE_LENGTH = 500
+// A chain of causes is followed this far. It also ends a chain that loops.
+const MAX_CAUSES = 5
+
+// "Name: message" on one line, then the stack frames, then the causes. Only
+// the frames and "Caused by:" start a new line, so the text of an error
+// message cannot start a fake log line.
+function formatError(err: unknown, depth = 0): string {
+  if (!(err instanceof Error)) {
+    const text = escapeNewlines(stringify(err))
+    return text.length > MAX_THROWN_VALUE_LENGTH
+      ? `${text.slice(0, MAX_THROWN_VALUE_LENGTH)}...[cut]`
+      : text
+  }
   const frames = (err.stack ?? '')
     .split('\n')
     .filter((line) => /^\s+at /.test(line))
     .map(formatFrame)
-  let text = [`${err.name}: ${errorMessage(err)}`, ...frames].join('\n')
-  if (err.cause !== undefined) text += `\nCaused by: ${formatError(err.cause)}`
+  let text = [
+    `${escapeNewlines(err.name)}: ${escapeNewlines(errorMessage(err))}`,
+    ...frames,
+  ].join('\n')
+  if (err.cause !== undefined) {
+    text +=
+      depth + 1 >= MAX_CAUSES
+        ? '\nCaused by: (more causes are left out)'
+        : `\nCaused by: ${formatError(err.cause, depth + 1)}`
+  }
   return text
 }
 
@@ -127,25 +172,51 @@ function builtin<T>(name: string): T | undefined {
   }
 }
 
-const sourceMaps = new Map<string, { mtimeMs: number; map: SourceMapLike }>()
+// A parsed map takes about 10 times the size of its file in memory, and the
+// parse blocks the server (about 60 ms for a 12 MB file). So a map file larger
+// than MAX_MAP_BYTES is not read: its frames stay as positions in the chunk.
+// Those are the chunks of large packages; the chunks of the app code are small.
+// The parsed maps that are kept add up to MAX_CACHED_MAP_BYTES of files at
+// most; the map that was not used for the longest time goes first.
+export const MAX_MAP_BYTES = 4 * 1024 * 1024
+export const MAX_CACHED_MAP_BYTES = 8 * 1024 * 1024
+
+// In order of use: the first entry is the one that was not used for the
+// longest time.
+const sourceMaps = new Map<
+  string,
+  { mtimeMs: number; size: number; map: SourceMapLike }
+>()
 
 // The source map that the build wrote beside a server chunk (<chunk>.js.map,
 // from experimental.serverSourceMaps in next.config.mjs). Next.js leaves
 // err.stack unmapped, so the logger reads the map itself. A parsed map is kept
-// until its file changes.
+// until its file changes or the kept maps become too large.
 function sourceMapFor(file: string): SourceMapLike | undefined {
   const fs = builtin<typeof import('node:fs')>('node:fs')
   const mod = builtin<typeof import('node:module')>('node:module')
   if (!fs || !mod?.SourceMap) return undefined
   try {
     const mapFile = `${file}.map`
-    const { mtimeMs } = fs.statSync(mapFile)
+    const { mtimeMs, size } = fs.statSync(mapFile)
     const cached = sourceMaps.get(file)
-    if (cached?.mtimeMs === mtimeMs) return cached.map
+    sourceMaps.delete(file)
+    if (cached?.mtimeMs === mtimeMs) {
+      sourceMaps.set(file, cached)
+      return cached.map
+    }
+    if (size > MAX_MAP_BYTES) return undefined
     const map: SourceMapLike = new mod.SourceMap(
       JSON.parse(fs.readFileSync(mapFile, 'utf8')),
     )
-    sourceMaps.set(file, { mtimeMs, map })
+    sourceMaps.set(file, { mtimeMs, size, map })
+    let total = 0
+    for (const entry of sourceMaps.values()) total += entry.size
+    for (const [key, entry] of sourceMaps) {
+      if (total <= MAX_CACHED_MAP_BYTES) break
+      sourceMaps.delete(key)
+      total -= entry.size
+    }
     return map
   } catch {
     return undefined
@@ -239,7 +310,7 @@ export function formatLine(
   }
   let line = parts.join(' ')
   if (err !== undefined) line += `\n${formatError(err)}`
-  return line.replace(PASSWORD_IN_URL, '://***@')
+  return line.replace(LOGIN_IN_URL, '://***@')
 }
 
 const WRITERS: Record<Level, (line: string) => void> = {
