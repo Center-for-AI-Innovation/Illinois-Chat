@@ -285,6 +285,8 @@ function createReasoningFetchMiddleware(
             }
           }
         } catch (error) {
+          // The reply has started, so no caller can catch this any more.
+          log.error('LLM stream failed', undefined, error)
           if (isThinkingOpen) controller.enqueue(encoder.encode('</think>\n'))
           controller.error(error)
         }
@@ -447,7 +449,11 @@ async function handleStreamingResponse(commonParams: any): Promise<Response> {
       for await (const part of { [Symbol.asyncIterator]: () => iterator }) {
         if (part.type === 'error') {
           // The reply has started, so the caller cannot catch this any more.
-          log.error('LLM stream failed', undefined, part.error)
+          log.error(
+            'LLM stream failed',
+            { model: commonParams.model?.modelId },
+            part.error,
+          )
           throw part.error
         }
         if (part.type === 'text-delta')

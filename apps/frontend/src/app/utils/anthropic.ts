@@ -98,7 +98,12 @@ async function handleStreamingResponse(
     // streamText does not throw when the provider fails: the error comes as a
     // part of the stream, and the reply is an empty 200. onError is the one
     // place that sees it.
-    onError: ({ error }) => log.error('LLM stream failed', undefined, error),
+    onError: ({ error }) =>
+      log.error(
+        'LLM stream failed',
+        { model: commonParams.model?.modelId },
+        error,
+      ),
   })
 
   if (!isThinkingEnabled) {

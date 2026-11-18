@@ -73,10 +73,7 @@ async function executeToolFromApi(
  * @param {NextApiResponse} res - The Next.js API response object.
  * @returns {Promise<void>} A promise that resolves when the response is sent.
  */
-async function chat(
-  req: NextApiRequest,
-  res: NextApiResponse,
-): Promise<void> {
+async function chat(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   // Validate the HTTP method
   if (req.method !== 'POST') {
     log.warn('invalid request method', { method: req.method })
@@ -174,6 +171,10 @@ async function chat(
     selectedModel = activeModel
     llmProviders = modelsWithProviders
   } catch (error) {
+    // The message goes to the caller as a 400. Most of the time it says that
+    // the model is not available for the project, but a failure while the
+    // providers load ends here too, so keep the reason in the log.
+    log.warn('could not select the model for the request', undefined, error)
     res.status(400).json({ error: (error as Error).message })
     return
   }
