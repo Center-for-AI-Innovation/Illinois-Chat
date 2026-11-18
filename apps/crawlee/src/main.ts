@@ -1,13 +1,15 @@
 // uploadToS3.ts
 // logSetup must stay the first import: it configures the logger before other modules log.
-import { oneLine } from './logSetup.js';
+import { installProcessHandlers, oneLine } from './logSetup.js';
 import { randomBytes } from 'crypto';
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import { log } from 'crawlee';
 import { crawl } from './api/crawlee.js';
 import healthRoute from './api/health.js'; // Import your health route
 
 import cors from 'cors';
+
+installProcessHandlers();
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -29,16 +31,23 @@ app.use((req, res, next) => {
     }
 });
 // app.use(cors(corsOptions)); // only certain routes
-app.use(express.json());
 
 // Request ids come from the caller (X-Request-ID) or are minted here. Anything that does not
 // match this pattern is replaced, so a header value cannot break the log line.
+// This runs before the body is parsed, so a request with a bad body has an id too.
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-
-app.post('/crawl', async (req: Request, res: Response) => {
+app.use((req, res, next) => {
     const incomingId = req.get('x-request-id');
     const rid = incomingId && REQUEST_ID_PATTERN.test(incomingId) ? incomingId : randomBytes(6).toString('hex');
+    res.locals.rid = rid;
     res.set('X-Request-ID', rid);
+    next();
+});
+
+app.use(express.json());
+
+app.post('/crawl', async (req: Request, res: Response) => {
+    const rid: string = res.locals.rid;
     // Never log req.body: it can carry cookies. Log only the fields below.
     const params = req.body?.params ?? {};
     const prefix = params.courseName ? `rid=${rid} course=${oneLine(params.courseName)}` : `rid=${rid}`;
@@ -84,6 +93,31 @@ app.post('/crawl', async (req: Request, res: Response) => {
 
 // add a health check route
 app.use('/api', healthRoute); // GET /api/health
+
+// Errors from outside the /crawl handler, for example a body that is not valid JSON.
+// Without this, express prints the stack itself, with no timestamp and no request id.
+// It must be the last app.use, and express knows it as an error handler by its 4 arguments.
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+    const status = Number(err?.status ?? err?.statusCode) || 500;
+    const elog = log.child({ prefix: `rid=${res.locals.rid}` });
+    const what = `method=${req.method} path=${oneLine(req.path)} status=${status}`;
+    if (status >= 500) {
+        elog.exception(err, `request failed ${what}`);
+    } else {
+        // The caller sent a bad request: the message says what is wrong, a stack adds nothing.
+        elog.warning(`request refused ${what}: ${oneLine(err?.message)}`);
+    }
+    if (res.headersSent) {
+        // The reply has started, so its status cannot change. Close the connection.
+        req.socket?.destroy();
+        return;
+    }
+    res.status(status).json({
+        error: status >= 500 ? 'Internal server error' : 'Bad request',
+        errorTitle: String(err?.name ?? 'Error'),
+        errorMessage: status >= 500 ? 'The crawler hit an unexpected error.' : String(err?.message ?? ''),
+    });
+});
 
 
 const PORT = process.env.PORT || 3000;
