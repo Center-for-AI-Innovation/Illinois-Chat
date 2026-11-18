@@ -8,7 +8,6 @@ import { createProject } from '~/utils/apiUtils'
 
 import GlobalFooter from '~/components/UIUC-Components/GlobalFooter'
 import ProjectTable from '~/components/UIUC-Components/ProjectTable'
-import Navbar from './navbars/Navbar'
 
 const Dashboard = ({
   project_name,
@@ -95,7 +94,6 @@ const Dashboard = ({
 
   return (
     <>
-      <Navbar isPlain={false} />
       <Head>
         <title>{project_name || 'My Chatbots'} — Illinois Chat</title>
         <meta name="description" content="My projects on UIUC.chat." />
@@ -106,7 +104,7 @@ const Dashboard = ({
         tabIndex={-1}
         className="course-page-main"
         style={{
-          minHeight: 'var(--viewport-height)',
+          minHeight: 'var(--page-viewport-height)',
           padding: '1rem',
         }}
       >

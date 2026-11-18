@@ -62,7 +62,7 @@ afterEach(() => {
 })
 
 describe('Dashboard – rendering', () => {
-  it('renders the page with title, description, Navbar, ProjectTable, and GlobalFooter', async () => {
+  it('renders the page with title, description, ProjectTable, and GlobalFooter, without its own navbar', async () => {
     router.asPath = '/new'
 
     server.use(
@@ -79,7 +79,8 @@ describe('Dashboard – rendering', () => {
       />,
     )
 
-    expect(screen.getByTestId('navbar')).toBeInTheDocument()
+    // The shared site header owns the navbar; mounting one here would stack two.
+    expect(screen.queryByTestId('navbar')).not.toBeInTheDocument()
     expect(screen.getByTestId('footer')).toBeInTheDocument()
     expect(screen.getByTestId('project-table')).toBeInTheDocument()
     expect(
@@ -122,7 +123,7 @@ describe('Dashboard – rendering', () => {
     ).toBeInTheDocument()
   })
 
-  it('passes isPlain=false to Navbar', async () => {
+  it('does not mount a navbar of its own, even for a non-plain page', async () => {
     router.asPath = '/dashboard'
 
     const Dashboard = (await import('../Dashboard')).default
@@ -130,7 +131,10 @@ describe('Dashboard – rendering', () => {
       <Dashboard project_name="Test" current_user_email="user@example.com" />,
     )
 
-    expect(screen.getByTestId('navbar')).toHaveAttribute('data-plain', 'false')
+    expect(screen.queryByTestId('navbar')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /My Chatbots/i }),
+    ).toBeInTheDocument()
   })
 })
 

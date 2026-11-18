@@ -3,7 +3,6 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import React from 'react'
 import { useRouter } from 'next/router'
 import GlobalFooter from './GlobalFooter'
-import Navbar from './navbars/Navbar'
 import { montserrat_heading } from 'fonts'
 
 export const GetCurrentPageName = () => {
@@ -34,7 +33,6 @@ export const CanViewOnlyCourse = ({
 
   return (
     <>
-      <Navbar />
       <main
         id="main-content"
         tabIndex={-1}
