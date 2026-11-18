@@ -1,7 +1,7 @@
 // Rendered by MaintenanceGate in _app.tsx in place of every page except the
-// maintenance bypass routes (/admin and /silent-renew).
-// noindex for this state lives in _document.tsx so search results are not
-// replaced by the maintenance notice.
+// maintenance bypass routes (/admin and /silent-renew). It is client-side only:
+// the server HTML is the normal page, and this component adds no robots
+// directive.
 
 import { RefreshCw, Wrench } from 'lucide-react'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
