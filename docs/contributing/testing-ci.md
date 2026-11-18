@@ -28,7 +28,7 @@ Backend tests live in `apps/backend/tests` but are not wired into CI yet.
 
 ## Deploy (`illinois-chat-dev.yml`)
 
-Runs on pushes to `main` that touch `apps/**`, `infra/**` or `.github/workflows/**`: Trunk on the pushed commits, then builds and pushes the backend, worker, frontend and Crawlee images to ECR and forces a new deployment of the four ECS services. Details and required secrets are on [Cloud deployment](../self-hosting/cloud-deployment.md). A fourth workflow, `release-images.yml`, builds the same images when a GitHub release is published.
+Runs on pushes to `main` that touch `apps/**`, `infra/**` or `.github/workflows/**`: Trunk on the pushed commits, then builds and pushes the backend, worker, frontend and Crawlee images to ECR and forces a new deployment of the four ECS services. Details and the required secrets and variables are on [Cloud deployment](../self-hosting/cloud-deployment.md). A fourth workflow, `release-images.yml`, builds the same images when a GitHub release is published.
 
 ## Docs (`docs.yml`)
 

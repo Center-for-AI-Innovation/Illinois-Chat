@@ -36,7 +36,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -82,14 +82,14 @@ jobs:
           ECR_REPOSITORY: uiuc-chat-frontend
           IMAGE_TAG: ${{ github.event.release.tag_name }}
           POSTHOG_API_KEY: ${{ secrets.PROD_POSTHOG_API_KEY }}
-          NEXT_PUBLIC_KEYCLOAK_URL: ${{ secrets.PROD_NEXT_PUBLIC_KEYCLOAK_URL }}
-          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_REALM }}
-          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
+          NEXT_PUBLIC_KEYCLOAK_URL: ${{ vars.PROD_NEXT_PUBLIC_KEYCLOAK_URL }}
+          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ vars.NEXT_PUBLIC_KEYCLOAK_REALM }}
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.PROD_POSTHOG_API_KEY }}
-          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.PROD_NEXT_PUBLIC_POSTHOG_HOST }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.PROD_NEXT_PUBLIC_POSTHOG_HOST }}
           NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: ${{ vars.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG || 'True' }}
           NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ${{ vars.NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT }}
-          NEXT_PUBLIC_SUPER_ADMIN_EMAILS: ${{ vars.NEXT_PUBLIC_SUPER_ADMIN_EMAILS }}
+          NEXT_PUBLIC_SUPER_ADMIN_EMAILS: ${{ secrets.NEXT_PUBLIC_SUPER_ADMIN_EMAILS }}
         run: |
           cd apps/frontend
 
@@ -111,6 +111,14 @@ jobs:
               exit 1
               ;;
           esac
+          # The rest are repository variables; a deleted or renamed one would bake in empty.
+          # An empty PostHog host would also fall back to the dev PostHog instance in _app.tsx.
+          for name in NEXT_PUBLIC_KEYCLOAK_REALM NEXT_PUBLIC_KEYCLOAK_CLIENT_ID NEXT_PUBLIC_POSTHOG_HOST; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is empty; set the repository variable (PROD_ variant where one exists) before building."
+              exit 1
+            fi
+          done
 
           docker build \
             --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \

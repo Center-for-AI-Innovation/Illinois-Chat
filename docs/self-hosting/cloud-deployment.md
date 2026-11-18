@@ -30,16 +30,23 @@ The frontend build fails on purpose when `NEXT_PUBLIC_KEYCLOAK_URL` is empty or 
 
 ### Secrets and variables
 
-Set these under **Settings → Secrets and variables → Actions** in the repository:
+Set these under **Settings → Secrets and variables → Actions** in the repository.
+
+The rule: credentials and tokens are **secrets**; everything else is a **variable**. Anything named `NEXT_PUBLIC_*` is inlined into the client bundle and ships to every browser, so storing it as a secret protects nothing and only hides it from maintainers (and masks it as `***` in build logs).
 
 | Secret | Used by |
 | --- | --- |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | both image workflows |
-| `ECS_CLUSTER_NAME`, `ECS_FRONTEND_SERVICE_NAME`, `ECS_BACKEND_SERVICE_NAME`, `ECS_WORKER_SERVICE_NAME`, `ECS_CRAWLEE_SERVICE_NAME` | `illinois-chat-dev.yml` |
-| `NEXT_PUBLIC_KEYCLOAK_URL`, `NEXT_PUBLIC_KEYCLOAK_REALM`, `NEXT_PUBLIC_KEYCLOAK_CLIENT_ID` | frontend image (`PROD_NEXT_PUBLIC_KEYCLOAK_URL` for releases) |
-| `POSTHOG_API_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | frontend image (`PROD_*` variants for releases) |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | both image workflows |
+| `POSTHOG_API_KEY` (`PROD_POSTHOG_API_KEY` for releases) | frontend image |
+| `NEXT_PUBLIC_SUPER_ADMIN_EMAILS` | frontend image |
 
-Repository variables (not secrets): `NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG` (default `True`) and `NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT`.
+| Variable | Used by |
+| --- | --- |
+| `AWS_REGION` | both image workflows |
+| `ECS_CLUSTER_NAME`, `ECS_FRONTEND_SERVICE_NAME`, `ECS_BACKEND_SERVICE_NAME`, `ECS_WORKER_SERVICE_NAME`, `ECS_CRAWLEE_SERVICE_NAME` | `illinois-chat-dev.yml` |
+| `NEXT_PUBLIC_KEYCLOAK_URL` (`PROD_NEXT_PUBLIC_KEYCLOAK_URL` for releases), `NEXT_PUBLIC_KEYCLOAK_REALM`, `NEXT_PUBLIC_KEYCLOAK_CLIENT_ID` | frontend image |
+| `NEXT_PUBLIC_POSTHOG_HOST` (`PROD_NEXT_PUBLIC_POSTHOG_HOST` for releases) | frontend image |
+| `NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG` (default `True`), `NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT` | frontend image |
 
 ### IAM permissions
 
@@ -139,7 +146,7 @@ aws ecs update-service --cluster <cluster> --service <service> --force-new-deplo
 
 ## Troubleshooting
 
-- **Workflow fails at "Login to Amazon ECR"** — check the AWS secrets and the ECR permissions above.
+- **Workflow fails at "Login to Amazon ECR"** — check the AWS secrets, the `AWS_REGION` variable and the ECR permissions above.
 - **Service won't start** — check CloudWatch logs, verify the task definition, confirm the image tag exists in ECR.
 - **New tasks fail health checks** — check CloudWatch logs; confirm the health check targets `/health` on port 8001 for the backend.
 - **Image pull errors** — verify the task execution role can pull from ECR and that the image was pushed.
