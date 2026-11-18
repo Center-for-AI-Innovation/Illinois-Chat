@@ -4,6 +4,7 @@ import axios, { type AxiosResponse } from 'axios'
 import { type ContextWithMetadata } from '~/types/chat'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { requestIdHeaders } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.getContextsMQR')
 
@@ -37,6 +38,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const response: AxiosResponse<ContextWithMetadata[]> = await axios.get(
       `${mqrUrl}/getTopContextsWithMQR`,
       {
+        headers: requestIdHeaders(),
         params: {
           course_name: course_name,
           search_query: search_query,

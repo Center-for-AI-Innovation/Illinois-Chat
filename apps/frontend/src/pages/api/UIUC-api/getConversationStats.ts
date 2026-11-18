@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.getConversationStats')
 
@@ -22,7 +23,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (from_date) url.searchParams.append('from_date', from_date)
     if (to_date) url.searchParams.append('to_date', to_date)
 
-    const response = await fetch(url.toString())
+    const response = await backendFetch(url.toString())
 
     if (!response.ok) {
       throw new Error(`Failed to fetch data: ${response.statusText}`)

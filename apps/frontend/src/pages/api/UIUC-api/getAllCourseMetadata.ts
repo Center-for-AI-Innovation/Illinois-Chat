@@ -209,6 +209,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(200).json(all_course_metadata)
   } catch (error) {
     log.error('error fetching course metadata', undefined, error)
-    return res.status(500).json({ success: false, error: error })
+    return res
+      .status(500)
+      .json({ success: false, error: 'Internal server error' })
   }
 }

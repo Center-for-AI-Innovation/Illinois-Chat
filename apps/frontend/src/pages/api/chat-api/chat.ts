@@ -9,7 +9,7 @@ import {
   type ToolOutput,
   type UIUCTool,
 } from '~/types/chat'
-import fetchCourseMetadataServer from '~/pages/api/chat-api/util/fetchCourseMetadataServer'
+import { readCourseMetadata } from '~/pages/api/UIUC-api/getCourseMetadata'
 import { determineAndValidateModelServer } from '~/server/determineAndValidateModelServer'
 import { validateApiKeyAndRetrieveData } from './keys/validate'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
@@ -147,7 +147,7 @@ async function chat(req: NextApiRequest, res: NextApiResponse): Promise<void> {
 
   // Retrieve course metadata
   const courseMetadata: CourseMetadata | null =
-    await fetchCourseMetadataServer(course_name)
+    await readCourseMetadata(course_name)
   if (!courseMetadata || null === courseMetadata) {
     res.status(404).json({ error: 'Course metadata not found' })
     return

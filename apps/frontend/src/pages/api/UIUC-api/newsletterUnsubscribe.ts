@@ -27,7 +27,9 @@ const newsletterUnsubscribe = async (
       })
   } catch (error: any) {
     log.error('failed to save the newsletter unsubscribe', undefined, error)
-    return res.status(500).json({ success: false, error: error })
+    return res
+      .status(500)
+      .json({ success: false, error: 'Internal server error' })
   }
   return res.status(200).json({ success: true })
 }

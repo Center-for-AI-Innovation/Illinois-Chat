@@ -20,6 +20,7 @@ import {
 } from '~/types/chat'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { getBaseUrl } from '~/utils/apiUtils'
+import { getLogger } from '~/utils/server/log'
 import { createLogConversationPayload } from '@/hooks/__internal__/conversation'
 import {
   type AllLLMProviders,
@@ -47,6 +48,8 @@ import { SambaNovaModelID } from './modelProviders/types/SambaNova'
 import { webLLMModels } from './modelProviders/WebLLM'
 import { REDACTED_SECRET } from './modelProviders/providerSecrets'
 import { OpenAIError } from './server'
+
+const log = getLogger('streamProcessing')
 
 /**
  * Enum representing the possible states of the state machine used in processing text chunks.
@@ -669,7 +672,7 @@ export async function updateConversationInDatabase(
     const latestMessage =
       conversation.messages?.[conversation.messages.length - 1] ?? null
     if (latestMessage) {
-      await fetch(`${baseUrl}/api/UIUC-api/logConversation`, {
+      const saved = await fetch(`${baseUrl}/api/UIUC-api/logConversation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -682,14 +685,22 @@ export async function updateConversationInDatabase(
           ),
         ),
       })
+      if (!saved.ok) {
+        // fetch() does not throw on an error status. Without this line a
+        // conversation that was not saved leaves no trace.
+        log.error('could not save the conversation of an API chat', {
+          course: course_name,
+          conversation: conversation.id,
+          status: saved.status,
+        })
+      }
     }
   } catch (error) {
-    console.error(
-      'Error logging the conversation for project',
-      course_name,
+    log.error(
+      'could not save the conversation of an API chat',
+      { course: course_name, conversation: conversation.id },
       error,
     )
-    // return false
   }
 
   posthog.capture('stream_api_conversation_updated', {

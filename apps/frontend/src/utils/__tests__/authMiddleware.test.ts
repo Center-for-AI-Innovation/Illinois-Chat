@@ -134,7 +134,43 @@ describe('authMiddleware', () => {
     expect(res.body).toMatchObject({ error: 'Invalid token' })
   })
 
-  it('withAuth returns 401 authentication failed for unexpected errors', async () => {
+  it.each([
+    ['the JWKS endpoint is down', 'connect ECONNREFUSED 10.0.0.1:8080', 503],
+    [
+      'the key id is unknown',
+      "Unable to find a signing key that matches 'k1'",
+      401,
+    ],
+    ['the token has no key id', 'Missing kid in JWT header', 401],
+  ])('withAuth: when %s the status is right', async (_name, reason, status) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const jwt = (await import('jsonwebtoken')).default
+    const verifyTokenAsync = vi
+      .fn()
+      .mockRejectedValue(
+        new jwt.JsonWebTokenError(
+          `error in secret or public key callback: ${reason}`,
+        ),
+      )
+    vi.doMock('../keycloakClient', () => ({ verifyTokenAsync }))
+    vi.doMock('~/utils/authHelpers', () => ({
+      getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
+      getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+    }))
+
+    vi.resetModules()
+    const { withAuth } = await import('../authMiddleware')
+
+    const wrapped = withAuth((() => {}) as any)
+    const req: any = { cookies: { access_token: 't' }, headers: {} }
+    const res = makeRes()
+
+    await wrapped(req, res)
+    expect(res.statusCode).toBe(status)
+  })
+
+  it('withAuth returns 503 for unexpected errors, so the browser does not sign the user out', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const verifyTokenAsync = vi.fn().mockRejectedValue(new Error('boom'))
     vi.doMock('../keycloakClient', () => ({ verifyTokenAsync }))
@@ -151,8 +187,10 @@ describe('authMiddleware', () => {
     const res = makeRes()
 
     await wrapped(req, res)
-    expect(res.statusCode).toBe(401)
-    expect(res.body).toMatchObject({ error: 'Authentication failed' })
+    expect(res.statusCode).toBe(503)
+    expect(res.body).toMatchObject({
+      error: 'Authentication service unavailable',
+    })
   })
 
   it('hasRole/hasAnyRole check roles', async () => {

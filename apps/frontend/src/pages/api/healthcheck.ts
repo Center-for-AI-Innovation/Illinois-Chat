@@ -44,7 +44,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       checks.redis = { status: 'ok' }
       await redis.disconnect()
     } catch (err: any) {
-      checks.redis = { status: 'error', error: serializeError(err) }
+      // No detail in this public reply: the error of a bad REDIS_URL holds the URL with its password.
+      checks.redis = { status: 'error', error: err?.name ?? 'Error' }
       log.error('health check failed', { check: 'redis' }, err)
     }
   } else {

@@ -48,8 +48,8 @@ vi.mock('~/utils/superAdmins.server', () => ({
   isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
-vi.mock('~/pages/api/chat-api/util/fetchCourseMetadataServer', () => ({
-  default: hoisted.fetchCourseMetadataServer,
+vi.mock('~/pages/api/UIUC-api/getCourseMetadata', () => ({
+  readCourseMetadata: hoisted.fetchCourseMetadataServer,
 }))
 vi.mock('~/server/determineAndValidateModelServer', () => ({
   determineAndValidateModelServer: hoisted.determineAndValidateModelServer,

@@ -1,6 +1,9 @@
 import KcAdminClient from '@keycloak/keycloak-admin-client'
 import jwksClient from 'jwks-rsa'
 import jwt from 'jsonwebtoken'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('keycloakClient')
 
 // Keycloak configuration
 const KEYCLOAK_REALM =
@@ -22,20 +25,35 @@ export async function initializeKeycloakAdmin(
     return kcAdminClient
   }
 
-  kcAdminClient = new KcAdminClient({
+  const client = new KcAdminClient({
     baseUrl: keycloakBaseUrl,
     realmName: KEYCLOAK_REALM,
   })
 
   // Authenticate with client credentials
   if (KEYCLOAK_ADMIN_CLIENT_SECRET) {
-    await kcAdminClient.auth({
-      grantType: 'client_credentials',
-      clientId: KEYCLOAK_ADMIN_CLIENT_ID,
-      clientSecret: KEYCLOAK_ADMIN_CLIENT_SECRET,
-    })
+    try {
+      await client.auth({
+        grantType: 'client_credentials',
+        clientId: KEYCLOAK_ADMIN_CLIENT_ID,
+        clientSecret: KEYCLOAK_ADMIN_CLIENT_SECRET,
+      })
+    } catch (error) {
+      // Never the client secret or a token. The client is not kept, so the next call tries again.
+      log.error(
+        'Keycloak admin login failed',
+        { realm: KEYCLOAK_REALM, client_id: KEYCLOAK_ADMIN_CLIENT_ID },
+        error,
+      )
+      throw error
+    }
+  } else {
+    log.warn(
+      'KEYCLOAK_ADMIN_CLIENT_SECRET is not set: the Keycloak admin client is not logged in',
+    )
   }
 
+  kcAdminClient = client
   return kcAdminClient
 }
 
@@ -91,7 +109,7 @@ export async function fetchRealmPublicKey(
 
     return null
   } catch (error) {
-    console.error('Error fetching realm public key:', error)
+    log.error('Keycloak: could not fetch the realm public key', error as Error)
     return null
   }
 }
@@ -118,7 +136,10 @@ export async function getOpenIdConfig(keycloakBaseUrl: string): Promise<any> {
 
     return await response.json()
   } catch (error) {
-    console.error('Error fetching OpenID configuration:', error)
+    log.error(
+      'Keycloak: could not fetch the OpenID configuration',
+      error as Error,
+    )
     throw error
   }
 }
@@ -180,7 +201,7 @@ export async function getUserInfo(
     const user = await adminClient.users.findOne({ id: userId })
     return user
   } catch (error) {
-    console.error('Error fetching user info:', error)
+    log.error('Keycloak: could not fetch the user info', error as Error)
     throw error
   }
 }
@@ -197,7 +218,7 @@ export async function getUserRoles(
     const roles = await adminClient.users.listRoleMappings({ id: userId })
     return roles
   } catch (error) {
-    console.error('Error fetching user roles:', error)
+    log.error('Keycloak: could not fetch the user roles', error as Error)
     throw error
   }
 }
@@ -214,7 +235,10 @@ export async function userHasRole(
     const roles = await getUserRoles(keycloakBaseUrl, userId)
     return roles.some((role: any) => role.name === roleName)
   } catch (error) {
-    console.error('Error checking user role:', error)
+    log.error(
+      'Keycloak: could not check the user role; treated as no role',
+      error as Error,
+    )
     return false
   }
 }
@@ -228,7 +252,7 @@ export async function getRealmInfo(keycloakBaseUrl: string): Promise<any> {
     const realm = await adminClient.realms.findOne({ realm: KEYCLOAK_REALM })
     return realm
   } catch (error) {
-    console.error('Error fetching realm info:', error)
+    log.error('Keycloak: could not fetch the realm info', error as Error)
     throw error
   }
 }

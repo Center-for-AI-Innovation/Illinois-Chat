@@ -1,9 +1,12 @@
+import { getLogger } from '~/utils/server/log'
 import {
   ProviderNames,
   type NCSAHostedProvider,
 } from '~/utils/modelProviders/LLMProvider'
 import { OllamaModelIDs, OllamaModels, type OllamaModel } from './ollama'
 import { isCountryOfConcern } from './countriesOfConcern'
+
+const log = getLogger('modelProviders.NCSAHosted')
 
 export const getNCSAHostedModels = async (
   ncsaHostedProvider: NCSAHostedProvider,
@@ -43,6 +46,10 @@ export const getNCSAHostedModels = async (
     })
 
     if (!response.ok) {
+      log.warn('model list request failed', {
+        status: response.status,
+        reason: response.statusText,
+      })
       ncsaHostedProvider.error = `HTTP error ${response.status} ${response.statusText}.`
       ncsaHostedProvider.models = [] // clear any previous models.
       return ncsaHostedProvider as NCSAHostedProvider
@@ -80,7 +87,7 @@ export const getNCSAHostedModels = async (
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     ncsaHostedProvider.error = message
-    console.warn('ERROR in getNCSAHostedModels', error)
+    log.warn('could not fetch the model list', undefined, error)
     ncsaHostedProvider.models = [] // clear any previous models.
     return ncsaHostedProvider as NCSAHostedProvider
   }

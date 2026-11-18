@@ -1,4 +1,7 @@
 import { S3Client } from '@aws-sdk/client-s3'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('s3Client')
 
 const region = process.env.AWS_REGION
 
@@ -32,6 +35,10 @@ if (region && process.env.AWS_KEY && process.env.AWS_SECRET) {
   s3Client = new S3Client(baseConfig)
 } else if (region) {
   s3Client = new S3Client({ region })
+} else {
+  log.warn(
+    'AWS_REGION is not set: there is no default S3 client, only per-project storage works',
+  )
 }
 
 // MinIO Client configuration

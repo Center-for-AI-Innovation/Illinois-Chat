@@ -3,6 +3,7 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.downloadMITCourse')
 
@@ -31,7 +32,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const response = await fetch(
+    const response = await backendFetch(
       `${getBackendUrl()}/mit-download?url=${encodeURIComponent(urlParam)}&course_name=${encodeURIComponent(courseName)}&local_dir=${encodeURIComponent(localDir)}`,
     )
 

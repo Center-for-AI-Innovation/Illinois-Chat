@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.getProjectStats')
 
@@ -17,7 +18,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const response = await fetch(
+    const response = await backendFetch(
       `${getBackendUrl()}/getProjectStats?project_name=${project_name}`,
     )
 

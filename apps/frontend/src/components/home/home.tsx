@@ -192,8 +192,7 @@ const Home = ({
         dispatch({ field: 'apiKey', value: local_api_key })
       } else {
         console.error(
-          "you have entered an API key that does not start with 'sk-', which indicates it's invalid. Please enter just the key from OpenAI starting with 'sk-'. You entered",
-          apiKey,
+          "you have entered an API key that does not start with 'sk-', which indicates it's invalid. Please enter just the key from OpenAI starting with 'sk-'.",
         )
       }
     }

@@ -4,6 +4,7 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { requestIdHeaders } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.exportAllDocuments')
 
@@ -27,6 +28,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const response = await axios.get(`${getBackendUrl()}/exportDocuments`, {
       params: { course_name },
       responseType: 'arraybuffer',
+      headers: requestIdHeaders(),
     })
 
     // Check content type from response headers

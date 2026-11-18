@@ -1,5 +1,8 @@
+import { getLogger } from '~/utils/server/log'
 import { ChatBody } from '~/types/chat'
 import type { OllamaProvider } from '~/utils/modelProviders/LLMProvider'
+
+const log = getLogger('modelProviders.ollama')
 
 export interface OllamaModel {
   id: string
@@ -204,6 +207,10 @@ export const getOllamaModels = async (
     const response = await fetch(ollamaProvider.baseUrl + '/api/tags')
 
     if (!response.ok) {
+      log.warn('model list request failed', {
+        status: response.status,
+        reason: response.statusText,
+      })
       ollamaProvider.error = `HTTP error ${response.status} ${response.statusText}.`
       ollamaProvider.models = [] // clear any previous models.
       return ollamaProvider as OllamaProvider
@@ -221,7 +228,7 @@ export const getOllamaModels = async (
     return ollamaProvider as OllamaProvider
   } catch (error: any) {
     ollamaProvider.error = error.message
-    console.warn('ERROR in getOllamaModels', error)
+    log.warn('could not fetch the model list', undefined, error)
     ollamaProvider.models = [] // clear any previous models.
     return ollamaProvider as OllamaProvider
   }

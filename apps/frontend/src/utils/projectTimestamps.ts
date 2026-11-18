@@ -1,5 +1,8 @@
 import { db, projects, documents } from '~/db/dbClient'
 import { eq, max, inArray } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('projectTimestamps')
 
 export interface ProjectTimestamps {
   created_at: string | null
@@ -40,7 +43,7 @@ export async function getProjectTimestamps(
       last_updated_at: lastDocUpdate ?? createdAt,
     }
   } catch (error) {
-    console.error(`Error fetching timestamps for project ${courseName}:`, error)
+    log.warn('could not read project timestamps', { course: courseName }, error)
     return { created_at: null, last_updated_at: null }
   }
 }
@@ -98,7 +101,7 @@ export async function getBatchProjectTimestamps(
       })
     }
   } catch (error) {
-    console.error('Error fetching batch project timestamps:', error)
+    log.warn('could not read project timestamps for a batch', error as Error)
   }
 
   return result
