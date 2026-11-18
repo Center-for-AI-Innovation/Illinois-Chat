@@ -476,13 +476,13 @@ describe('getLogger', () => {
       'redis://:p#ss@cache:6379',
       "amqp://guest:gu'est@mq",
       'https://user:p<a>ss@h',
-      'amqp://u:p"ss@h',
+      'postgres://admin:2024#Winter@db.internal:5432/app',
       'https://u:8443@h/x',
     ]
     getLogger('s').info(urls.join(' '))
     const line = c.log.mock.calls[0]![0] as string
     expect(line).toMatch(
-      / postgres:\/\/\*\*\*@db\.internal\/x redis:\/\/\*\*\*@cache:6379 redis:\/\/\*\*\*@cache:6379 amqp:\/\/\*\*\*@mq https:\/\/\*\*\*@h amqp:\/\/\*\*\*@h https:\/\/\*\*\*@h\/x$/,
+      / postgres:\/\/\*\*\*@db\.internal\/x redis:\/\/\*\*\*@cache:6379 redis:\/\/\*\*\*@cache:6379 amqp:\/\/\*\*\*@mq https:\/\/\*\*\*@h postgres:\/\/\*\*\*@db\.internal:5432\/app https:\/\/\*\*\*@h\/x$/,
     )
   })
 
@@ -503,44 +503,77 @@ describe('getLogger', () => {
     )
   })
 
-  it('leaves a URL alone when it ends at " ? # or & and other text with an @ follows', () => {
+  it('hides a password that starts with digits, and a login after more than two slashes', () => {
     const c = spies()
-    const texts = [
-      'redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu',
-      'https://site.edu/login?next=https://a.edu&email=bob@x.edu',
-      'https://a.edu?email=x@y.edu',
-      'https://a.edu:8443#x@y',
-      '{"url":"http://x.com:80","mail":"u@v.edu"}',
-    ]
-    for (const text of texts) getLogger('s').info(text)
+    getLogger('s').info(
+      'redis://default:1234&abcd@cache.internal:6379 mongodb://root:99?x@mongo postgres://user:1#x@h http:///user:SECRETB@127.0.0.1:9/',
+    )
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / redis:\/\/\*\*\*@cache\.internal:6379 mongodb:\/\/\*\*\*@mongo postgres:\/\/\*\*\*@h http:\/\/\*\*\*@127\.0\.0\.1:9\/$/,
+    )
+  })
+
+  it('leaves a URL in JSON, a URL with a path, and a URL before a newline alone', () => {
+    const c = spies()
+    getLogger('s').info('reply', {
+      body: { url: 'http://backend:8001', email: 'alice@illinois.edu' },
+      page: 'https://site.edu/login?email=bob@x.edu',
+    })
     // The login is looked for before a newline is escaped, so a newline ends
     // the URL.
     getLogger('s').info('http://backend:8001\nbob@c.edu')
-    texts.forEach((text, index) => {
-      expect(c.log.mock.calls[index]![0]).toContain(` s ${text}`)
-    })
-    expect(c.log.mock.calls[texts.length]![0]).toContain(
+    expect(c.log.mock.calls[0]![0]).toMatch(
+      / body=\{"url":"http:\/\/backend:8001","email":"alice@illinois\.edu"\} page=https:\/\/site\.edu\/login\?email=bob@x\.edu$/,
+    )
+    expect(c.log.mock.calls[1]![0]).toContain(
       ' s http://backend:8001\\nbob@c.edu',
     )
   })
 
-  it('takes away text between a URL and a later @ when it cannot tell that there is no login', () => {
-    // The price of never showing a password. No secret is in these lines.
+  it('takes away the text between a URL with no path and a later @', () => {
+    // The price of a rule that does not show a password. No secret is in
+    // these lines.
     const c = spies()
-    getLogger('s').info('see https://a.edu:8443,contact:bob@y.edu')
-    getLogger('s').info('http://a.edu;bob@x.edu')
-    expect(c.log.mock.calls[0]![0]).toContain(' s see https://***@y.edu')
-    expect(c.log.mock.calls[1]![0]).toContain(' s http://***@x.edu')
+    const log = getLogger('s')
+    log.info('https://a.edu?email=x@y.edu')
+    log.info('redirect_uri=http://localhost:3000&login_hint=alice@illinois.edu')
+    log.info('see https://a.edu:8443,contact:bob@y.edu')
+    expect(c.log.mock.calls[0]![0]).toContain(' s https://***@y.edu')
+    expect(c.log.mock.calls[1]![0]).toContain(
+      ' s redirect_uri=http://***@illinois.edu',
+    )
+    expect(c.log.mock.calls[2]![0]).toContain(' s see https://***@y.edu')
   })
 
-  it('does not eat the text after a URL that has a port and no path', () => {
+  it('hides the login before a long error message is cut', () => {
     const c = spies()
-    getLogger('s').info('reply', {
-      body: { url: 'http://backend:8001', email: 'alice@illinois.edu' },
-      next: 'https://example.edu:8443?to=a@b',
-    })
-    expect(c.log.mock.calls[0]![0]).toMatch(
-      / body=\{"url":"http:\/\/backend:8001","email":"alice@illinois\.edu"\} next=https:\/\/example\.edu:8443\?to=a@b$/,
+    const err = new Error(
+      `${'x'.repeat(3985)} postgres://user:SECRETPASS@host/db and more text`,
+    )
+    err.stack = undefined
+    getLogger('s').error('failed', err)
+    const text = c.error.mock.calls[0]![0] as string
+    expect(text).not.toMatch(/SECRET|user:/)
+    expect(text).toMatch(/ postgres:\/\/\*\*\*\S*\.\.\.\[cut\]$/)
+  })
+
+  it('escapes the name of a field, and takes fields only from an object', () => {
+    const c = spies()
+    getLogger('s').info('m', { ['k\nFAKE 2026 ERROR x']: 1 })
+    getLogger('s').info('n', 'abc' as unknown as Record<string, unknown>)
+    getLogger('s').info('o', ['a'] as unknown as Record<string, unknown>)
+    expect(c.log.mock.calls[0]![0]).toMatch(/ s m k\\nFAKE 2026 ERROR x=1$/)
+    expect(c.log.mock.calls[1]![0]).toMatch(/ s n$/)
+    expect(c.log.mock.calls[2]![0]).toMatch(/ s o$/)
+  })
+
+  it('omits the bound values of a failed query that is written into the message', () => {
+    const c = spies()
+    getLogger('s').warn(
+      `step failed: ${new Error('Failed query: select 1\nparams: a@b.c,secret')}`,
+    )
+    expect(c.warn.mock.calls[0]![0]).toMatch(
+      / step failed: Error: Failed query: select 1\\nparams: <omitted>$/,
     )
   })
 

@@ -64,6 +64,8 @@ function normalizeVLLMStreamResponse(response: Response): Response {
     async start(controller) {
       let isThinkingOpen = false
       let hasStartedContent = false
+      // Set when [DONE] has closed the reply.
+      let isClosed = false
 
       const emit = (text: string) => {
         if (text.length > 0) {
@@ -83,6 +85,7 @@ function normalizeVLLMStreamResponse(response: Response): Response {
             isThinkingOpen = false
           }
           controller.close()
+          isClosed = true
           return
         }
 
@@ -139,6 +142,8 @@ function normalizeVLLMStreamResponse(response: Response): Response {
           const { done, value } = await reader.read()
 
           if (done) {
+            // [DONE] has closed the reply already; a second close would throw.
+            if (isClosed) return
             if (isThinkingOpen) {
               emit('</think>\n\n')
             }

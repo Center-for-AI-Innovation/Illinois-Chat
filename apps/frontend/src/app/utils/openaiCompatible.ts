@@ -8,6 +8,7 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { getLogger } from '~/utils/server/log'
+import { isClosedStreamError } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.openaiCompatible')
 export const dynamic = 'force-dynamic'
@@ -285,8 +286,10 @@ function createReasoningFetchMiddleware(
             }
           }
         } catch (error) {
-          // No log line here: the AI SDK passes this error on as a part of
-          // its stream, and handleStreamingResponse or the caller logs it.
+          // No log line here: the error goes on to the reader of this body,
+          // the AI SDK, and comes out of its stream in
+          // handleStreamingResponse (or in the caller, when it is the first
+          // part). That place writes the ERROR line.
           if (isThinkingOpen) controller.enqueue(encoder.encode('</think>\n'))
           controller.error(error)
         }
@@ -446,20 +449,27 @@ async function handleStreamingResponse(commonParams: any): Promise<Response> {
       if (!first.done && first.value.type === 'text-delta') {
         controller.enqueue(encoder.encode(first.value.textDelta))
       }
-      for await (const part of { [Symbol.asyncIterator]: () => iterator }) {
-        if (part.type === 'error') {
-          // The reply has started, so the caller cannot catch this any more.
+      // The reply has started, so the caller cannot catch a failure any more.
+      // It comes in one of two ways: the provider sends an error part, or the
+      // connection breaks and the read of the stream throws. Both end in the
+      // catch, which writes the one ERROR line.
+      try {
+        for await (const part of { [Symbol.asyncIterator]: () => iterator }) {
+          if (part.type === 'error') throw part.error
+          if (part.type === 'text-delta')
+            controller.enqueue(encoder.encode(part.textDelta))
+        }
+        controller.close()
+      } catch (error) {
+        if (!isClosedStreamError(error)) {
           log.error(
             'LLM stream failed',
             { model: commonParams.model?.modelId },
-            part.error,
+            error,
           )
-          throw part.error
         }
-        if (part.type === 'text-delta')
-          controller.enqueue(encoder.encode(part.textDelta))
+        controller.error(error)
       }
-      controller.close()
     },
   })
 

@@ -5,6 +5,7 @@ import { decrypt } from '~/utils/crypto'
 import { SambaNovaModels } from '~/utils/modelProviders/types/SambaNova'
 import { type CoreMessage, generateText, streamText } from 'ai'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.sambanova')
 
@@ -85,7 +86,9 @@ export async function runSambaNovaChat(
               error,
             ),
         })
-        return result.toTextStreamResponse()
+        return logStreamFailure(result.toTextStreamResponse(), log, {
+          model: conversation.model.id,
+        })
       } catch (error) {
         // Logged once by the outer catch.
         throw error

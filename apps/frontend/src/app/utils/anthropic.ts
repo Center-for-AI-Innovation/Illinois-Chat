@@ -8,6 +8,7 @@ import {
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { type AnthropicModel } from '~/utils/modelProviders/types/anthropic'
 import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.anthropic')
 export const dynamic = 'force-dynamic'
@@ -107,7 +108,9 @@ async function handleStreamingResponse(
   })
 
   if (!isThinkingEnabled) {
-    return result.toTextStreamResponse()
+    return logStreamFailure(result.toTextStreamResponse(), log, {
+      model: commonParams.model?.modelId,
+    })
   }
 
   // Get the original stream response
