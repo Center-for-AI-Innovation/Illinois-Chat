@@ -236,6 +236,26 @@ export async function readMaintenanceSettings(): Promise<
   }
 }
 
+/**
+ * The maintenance flag alone, for the public status endpoint. Reads one key
+ * instead of the notice copy too, since the copy is not part of that response.
+ * Never throws, like the other reads here.
+ */
+export async function readMaintenanceMode(): Promise<AvailabilityRead<boolean>> {
+  try {
+    const redis = await ensureRedisConnected()
+    const mode = await redis.get(MAINTENANCE_MODE_KEY)
+    return { state: 'configured', value: mode === 'true' }
+  } catch (error) {
+    const reason = describeError(error)
+    console.error(
+      '[platformSettings] Redis unavailable reading maintenance mode:',
+      reason,
+    )
+    return { state: 'unavailable', reason }
+  }
+}
+
 export interface PlatformSettingsSnapshot {
   settings: PlatformSettings
   version: string

@@ -2,13 +2,6 @@ import { useRouter } from 'next/router'
 import { getSiteNavbarOptions } from '~/components/Layout/site-header-routes'
 import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import Navbar from '~/components/UIUC-Components/navbars/Navbar'
-import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
-
-interface SiteHeaderProps {
-  /** Forwarded to SiteAnnouncementBanner; see that component for details. */
-  initialBanner?: AnnouncementBanner | null
-  initialBannerReadAt?: number
-}
 
 /**
  * The one sticky header for the site: the announcement bar, then the navbar
@@ -18,20 +11,17 @@ interface SiteHeaderProps {
  * directly under the bar from the first paint, including the server-rendered
  * splash page, and cannot overlap it. No measured height is needed to place the
  * navbar. Mounted once by `_app`, so there is one banner fetch and one navbar.
+ *
+ * The banner's first paint comes from the shared site-status cache, which
+ * `_app` seeds from the page props; this component takes no seed props.
  */
-export function SiteHeader({
-  initialBanner,
-  initialBannerReadAt,
-}: SiteHeaderProps) {
+export function SiteHeader() {
   const router = useRouter()
   const navbar = getSiteNavbarOptions(router.pathname)
 
   return (
     <div className="sticky top-0 z-50">
-      <SiteAnnouncementBanner
-        initialBanner={initialBanner}
-        initialBannerReadAt={initialBannerReadAt}
-      />
+      <SiteAnnouncementBanner />
       {navbar && <Navbar {...navbar} />}
     </div>
   )

@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { PlatformSettingsUpdate } from '~/utils/platformSettings.schema'
-import { ANNOUNCEMENT_BANNER_QUERY_KEY } from './useFetchAnnouncementBanner'
 import { NAVBAR_BRANDING_QUERY_KEY } from './useFetchNavbarBranding'
 import {
   PLATFORM_SETTINGS_QUERY_KEY,
   type PlatformSettingsResponse,
 } from './useFetchPlatformSettings'
+import { SITE_STATUS_QUERY_KEY } from './useFetchSiteStatus'
 import { toRequestError } from './requestError'
 
 export interface UpdatePlatformSettingsResponse {
@@ -62,17 +62,14 @@ export function useUpdatePlatformSettings() {
   return useMutation({
     mutationFn: updatePlatformSettings,
     onSuccess: () => {
-      // Maintenance lives behind its own two endpoints that the app-wide gate
-      // reads, so those caches have to be dropped too or the operator who just
-      // enabled maintenance keeps browsing as if it were off.
+      // The app-wide maintenance gate and the banner both read the shared site
+      // status, so it has to be dropped or the operator who just enabled
+      // maintenance keeps browsing as if it were off.
       void queryClient.invalidateQueries({
         queryKey: PLATFORM_SETTINGS_QUERY_KEY,
       })
-      void queryClient.invalidateQueries({ queryKey: ['maintenanceMode'] })
+      void queryClient.invalidateQueries({ queryKey: SITE_STATUS_QUERY_KEY })
       void queryClient.invalidateQueries({ queryKey: ['maintenanceDetails'] })
-      void queryClient.invalidateQueries({
-        queryKey: ANNOUNCEMENT_BANNER_QUERY_KEY,
-      })
       void queryClient.invalidateQueries({
         queryKey: NAVBAR_BRANDING_QUERY_KEY,
       })

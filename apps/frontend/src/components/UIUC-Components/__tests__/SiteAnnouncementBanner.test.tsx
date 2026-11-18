@@ -4,16 +4,27 @@ import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnounc
 import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
 
 const query = vi.hoisted(() => ({
-  data: undefined as AnnouncementBanner | null | undefined,
+  banner: undefined as AnnouncementBanner | null | undefined,
   options: undefined as { enabled?: boolean } | undefined,
 }))
 
-vi.mock('~/hooks/queries/useFetchAnnouncementBanner', () => ({
-  useFetchAnnouncementBanner: (options: { enabled?: boolean }) => {
-    query.options = options
-    return { data: query.data }
-  },
-}))
+vi.mock('~/hooks/queries/useFetchSiteStatus', async () => {
+  const actual = await vi.importActual<{
+    isSiteStatusExempt: (pathname: string) => boolean
+  }>('~/hooks/queries/useFetchSiteStatus')
+  return {
+    isSiteStatusExempt: actual.isSiteStatusExempt,
+    useFetchSiteStatus: (options: { enabled?: boolean }) => {
+      query.options = options
+      return {
+        data:
+          query.banner === undefined
+            ? undefined
+            : { announcementBanner: query.banner },
+      }
+    },
+  }
+})
 
 const ENABLED: AnnouncementBanner = {
   enabled: true,
@@ -37,7 +48,7 @@ function bannerHeightVariable() {
 }
 
 beforeEach(() => {
-  query.data = undefined
+  query.banner = undefined
   query.options = undefined
   // Without Illinois Chat config the legacy chain renders the rebrand notice,
   // which makes "did the fallback fire" observable.
@@ -57,14 +68,14 @@ afterEach(() => {
 
 describe('SiteAnnouncementBanner', () => {
   it('shows the configured banner on any page', () => {
-    query.data = ENABLED
+    query.banner = ENABLED
     renderAt('/[course_name]/chat')
 
     expect(screen.getByText('Downtime Saturday 8pm.')).toBeInTheDocument()
   })
 
   it('shows the saved announcement on /admin, so operators see what visitors see', () => {
-    query.data = ENABLED
+    query.banner = ENABLED
     renderAt('/admin')
 
     expect(
@@ -73,7 +84,7 @@ describe('SiteAnnouncementBanner', () => {
   })
 
   it('skips the silent-renew iframe', () => {
-    query.data = ENABLED
+    query.banner = ENABLED
     renderAt('/silent-renew')
 
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
@@ -99,7 +110,7 @@ describe('SiteAnnouncementBanner', () => {
   })
 
   it('keeps the legacy fallback on the home page only', () => {
-    query.data = null
+    query.banner = null
     const { unmount } = renderAt('/')
     expect(screen.getByText(/rebranded to Illinois Chat/)).toBeInTheDocument()
     unmount()
@@ -117,7 +128,7 @@ describe('SiteAnnouncementBanner', () => {
   })
 
   it('resets the height variable when it unmounts', () => {
-    query.data = ENABLED
+    query.banner = ENABLED
     const { unmount } = renderAt('/chatbots')
     document.documentElement.style.setProperty(
       '--announcement-banner-height',

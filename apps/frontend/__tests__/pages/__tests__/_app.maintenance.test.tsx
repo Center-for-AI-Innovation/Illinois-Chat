@@ -98,12 +98,23 @@ const maintenanceQuery = vi.hoisted(() => ({
   enabledCalls: [] as (boolean | undefined)[],
 }))
 
-vi.mock('~/hooks/queries/useFetchMaintenanceMode', () => ({
-  useFetchMaintenanceMode: ({ enabled }: { enabled?: boolean } = {}) => {
-    maintenanceQuery.enabledCalls.push(enabled)
-    return { data: enabled === false ? undefined : maintenanceQuery.value }
-  },
-}))
+vi.mock('~/hooks/queries/useFetchSiteStatus', async () => {
+  const actual = await vi.importActual<{
+    isSiteStatusExempt: (pathname: string) => boolean
+  }>('~/hooks/queries/useFetchSiteStatus')
+  return {
+    isSiteStatusExempt: actual.isSiteStatusExempt,
+    useFetchSiteStatus: ({ enabled }: { enabled?: boolean } = {}) => {
+      maintenanceQuery.enabledCalls.push(enabled)
+      return {
+        data:
+          enabled === false || maintenanceQuery.value === undefined
+            ? undefined
+            : { announcementBanner: null, isMaintenanceMode: maintenanceQuery.value },
+      }
+    },
+  }
+})
 
 function Page() {
   return <div>Home page content</div>

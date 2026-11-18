@@ -27,7 +27,12 @@ import {
 import { Analytics } from '@vercel/analytics/next'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
-import { useFetchMaintenanceMode } from '~/hooks/queries/useFetchMaintenanceMode'
+import {
+  isSiteStatusExempt,
+  SITE_STATUS_QUERY_KEY,
+  useFetchSiteStatus,
+  type SiteStatus,
+} from '~/hooks/queries/useFetchSiteStatus'
 import { NAVBAR_BRANDING_QUERY_KEY } from '~/hooks/queries/useFetchNavbarBranding'
 import type {
   AnnouncementBanner,
@@ -35,15 +40,6 @@ import type {
 } from '~/utils/platformSettings.schema'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
 import { Toaster } from '@/components/shadcn/ui/sonner'
-
-// Routes that must stay reachable while maintenance mode is on.
-//
-// `/silent-renew` is the OIDC silent-renewal target and `/admin` is where an
-// operator turns maintenance back off — gating either one makes maintenance
-// unrecoverable. Note this list is only half the story: the gate itself now
-// lives *below* KeycloakProvider so the sign-in callback (which Keycloak
-// returns to `/`, not to an exempt path) is still processed. See MaintenanceGate.
-const MAINTENANCE_EXEMPT_PREFIXES = ['/admin', '/silent-renew']
 
 /**
  * Swaps page content for the maintenance notice, leaving the surrounding
@@ -55,19 +51,19 @@ const MAINTENANCE_EXEMPT_PREFIXES = ['/admin', '/silent-renew']
  * the code on the floor and locks everyone out, including whoever needs to
  * disable maintenance.
  *
+ * Routes that must stay reachable while maintenance is on — `/admin` (where an
+ * operator turns it back off) and `/silent-renew` (the OIDC renewal target) —
+ * are exempt via `isSiteStatusExempt`, which the banner shares.
+ *
  * Fails open: while the check is in flight or errored, content renders. That
  * matches the previous `useState(false)` default.
  */
 function MaintenanceGate({ children }: { children: ReactNode }) {
   const router = useRouter()
-  const isExempt = MAINTENANCE_EXEMPT_PREFIXES.some((prefix) =>
-    router.pathname.startsWith(prefix),
-  )
-  const { data: isMaintenanceMode } = useFetchMaintenanceMode({
-    enabled: !isExempt,
-  })
+  const isExempt = isSiteStatusExempt(router.pathname)
+  const { data: status } = useFetchSiteStatus({ enabled: !isExempt })
 
-  if (!isExempt && isMaintenanceMode === true) {
+  if (!isExempt && status?.isMaintenanceMode === true) {
     return <Maintenance />
   }
   return <>{children}</>
@@ -120,11 +116,24 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
   // cache and refetch on each render.
   const [queryClient] = useState(() => {
     const client = new QueryClient()
-    // Seeded once so a statically generated page paints its navbar brand
-    // without waiting on a fetch; later navigations reuse the cache. Stamped
-    // with the read time so an old ISR page is refetched, not trusted.
-    const { navbarBranding, navbarBrandingReadAt } =
-      pageProps as SiteBannerPageProps
+    // Seeded once so a statically generated page paints its banner and navbar
+    // brand without waiting on a fetch; later navigations reuse the cache.
+    // Stamped with the read time so an old ISR page is refetched, not trusted.
+    // The seeded status carries no maintenance state, so the status query
+    // refetches it on mount regardless of age (see useFetchSiteStatus).
+    const {
+      announcementBanner,
+      announcementBannerReadAt,
+      navbarBranding,
+      navbarBrandingReadAt,
+    } = pageProps as SiteBannerPageProps
+    if (announcementBanner !== undefined) {
+      client.setQueryData<SiteStatus>(
+        SITE_STATUS_QUERY_KEY,
+        { announcementBanner },
+        { updatedAt: announcementBannerReadAt ?? 0 },
+      )
+    }
     if (navbarBranding) {
       client.setQueryData(NAVBAR_BRANDING_QUERY_KEY, navbarBranding, {
         updatedAt: navbarBrandingReadAt ?? 0,
@@ -204,14 +213,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               <ThemeProvider>
               <Toaster position="bottom-center" />
               <MaintenanceGate>
-                <SiteHeader
-                  initialBanner={
-                    (pageProps as SiteBannerPageProps).announcementBanner
-                  }
-                  initialBannerReadAt={
-                    (pageProps as SiteBannerPageProps).announcementBannerReadAt
-                  }
-                />
+                <SiteHeader />
                 <Component {...pageProps} />
               </MaintenanceGate>
             </ThemeProvider>

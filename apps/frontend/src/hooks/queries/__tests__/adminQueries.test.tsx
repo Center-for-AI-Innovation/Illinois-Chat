@@ -290,7 +290,7 @@ describe('platform settings queries', () => {
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: PLATFORM_SETTINGS_QUERY_KEY,
     })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['maintenanceMode'] })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['siteStatus'] })
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: ['maintenanceDetails'],
     })
