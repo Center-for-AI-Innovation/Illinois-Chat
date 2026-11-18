@@ -445,7 +445,11 @@ async function handleStreamingResponse(commonParams: any): Promise<Response> {
         controller.enqueue(encoder.encode(first.value.textDelta))
       }
       for await (const part of { [Symbol.asyncIterator]: () => iterator }) {
-        if (part.type === 'error') throw part.error
+        if (part.type === 'error') {
+          // The reply has started, so the caller cannot catch this any more.
+          log.error('LLM stream failed', undefined, part.error)
+          throw part.error
+        }
         if (part.type === 'text-delta')
           controller.enqueue(encoder.encode(part.textDelta))
       }

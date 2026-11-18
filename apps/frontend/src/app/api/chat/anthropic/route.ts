@@ -87,6 +87,11 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
           experimental_transform: experimentalTransform,
         }),
         ...(providerOptions && { providerOptions }),
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }) =>
+          log.error('LLM stream failed', { model: modelId }, error),
       })
 
       if (isThinking) {
@@ -146,7 +151,11 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
         },
       )
     } else {
-      log.error('Anthropic chat request failed', { provider: 'Anthropic' }, error)
+      log.error(
+        'Anthropic chat request failed',
+        { provider: 'Anthropic' },
+        error,
+      )
       return NextResponse.json(
         {
           error: 'An error occurred while processing the chat request',

@@ -603,7 +603,8 @@ function _buildQueryTopContext({
 
     return contextText
   } catch (e) {
-    log.error('could not build the stuffed prompt', undefined, e)
+    // The route logs the ERROR with the stack; this line names the step.
+    log.warn('could not build the stuffed prompt')
     throw e
   }
 }

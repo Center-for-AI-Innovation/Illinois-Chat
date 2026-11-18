@@ -89,6 +89,21 @@ describe('chat-api/keys/validate', () => {
     const r1 = await handler(req1 as any)
     expect(r1.status).toBe(403)
 
+    // A body with no api_key, or one that is not JSON, is a caller mistake:
+    // 400 and no ERROR line.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const body of ['{}', 'not json', '{"api_key":7}', 'null']) {
+      const bad = await handler(
+        new Request('http://localhost', { method: 'POST', body }) as any,
+      )
+      expect(bad.status).toBe(400)
+      await expect(bad.json()).resolves.toEqual({
+        error: 'api_key is required',
+      })
+    }
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+
     hoisted.selectWhere.mockResolvedValueOnce([{ email: 'a@b.com' }])
     hoisted.client.mockResolvedValueOnce([{ id: '123', email: 'a@b.com' }])
     hoisted.updateWhere.mockResolvedValueOnce(undefined)

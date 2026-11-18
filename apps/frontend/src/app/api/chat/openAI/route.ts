@@ -98,7 +98,14 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     }
 
     if (stream) {
-      const result = await streamText(commonParams as any)
+      const result = await streamText({
+        ...(commonParams as any),
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }: { error: unknown }) =>
+          log.error('LLM stream failed', { model }, error),
+      })
       const response = result.toTextStreamResponse()
       return new NextResponse(response.body, {
         status: response.status,

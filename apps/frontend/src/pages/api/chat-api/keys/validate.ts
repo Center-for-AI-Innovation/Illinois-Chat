@@ -106,12 +106,8 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
 
     return { isValidApiKey, authContext }
   } catch (userError) {
-    // Log the error if there's an issue retrieving the user object.
-    log.error(
-      'could not load the user for a valid API key',
-      undefined,
-      userError,
-    )
+    // The caller logs the ERROR with the stack; this line names the step.
+    log.warn('could not load the user for a valid API key')
     posthog.capture('api_key_validation_failed', {
       error: (userError as Error).message,
     })
@@ -127,9 +123,16 @@ export async function validateApiKeyAndRetrieveData(apiKey: string) {
 export async function handler(req: NextRequest) {
   try {
     // Extract the API key and course name from the request body.
-    const { api_key, course_name } = (await req.json()) as {
-      api_key: string
-      course_name: string
+    const body = (await req.json().catch(() => null)) as {
+      api_key?: unknown
+    } | null
+    const api_key = body && typeof body === 'object' ? body.api_key : undefined
+    if (typeof api_key !== 'string' || !api_key) {
+      // A caller mistake, not a server error: no ERROR line for it.
+      return NextResponse.json(
+        { error: 'api_key is required' },
+        { status: 400 },
+      )
     }
 
     const { isValidApiKey, authContext } =

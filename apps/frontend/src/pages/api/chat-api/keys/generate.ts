@@ -55,7 +55,8 @@ async function handler(
       .where(eq(apiKeys.email, email))
 
     if (!keys) {
-      log.error('could not read API keys from the database', { user: userId })
+      // The catch below logs the ERROR; this line names the step.
+      log.warn('could not read API keys from the database', { user: userId })
       throw new Error('Failed to fetch API keys')
     }
 
