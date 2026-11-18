@@ -7,9 +7,8 @@
 // rid, path and course come from the request context (requestContext.ts) when
 // one is open. An error is appended as "Name: message" plus its stack frames on
 // the following lines. An ERROR line ends with at=<file>:<line>, the place in
-// the app that called log.error. The login part of a URL (://user:secret@host)
-// is written as ://***@, also in an error message. A newline or another
-// control character in a value is escaped, so a value cannot start a line. Each event is exactly one
+// the app that called log.error. A newline or another control character in a
+// value is escaped, so a value cannot start a line. Each event is exactly one
 // console call with one string.
 //
 // Server-only by convention; harmless in the browser, where there is no
@@ -57,34 +56,6 @@ function threshold(): number {
   return LEVEL_RANK.INFO!
 }
 
-// The login part of a URL: "://user:secret@host", "://:secret@host",
-// "://token@host" and "://user@realm:secret@host". It must not reach the log.
-// One rule, with no exceptions, so that a password is not shown: the login is
-// everything from ":" and two or more slashes or backslashes (a browser reads
-// "http:///user:pw@host" and "http:\\user:pw@host" as a URL with a login) to
-// the last @ before the next /, space or double quote. A user name or a password can hold any other
-// character. The double quote ends it because a URL in JSON ends there:
-// {"url":"http://backend:8001","email":"a@b.edu"} is left as it is.
-// The cost: text that is not a login can be lost. "https://a.edu?email=a@b.edu"
-// is written as "https://***@b.edu". A URL with a path is not touched.
-// Not found: a login without "://" in front ("user:secret@host"), and a
-// password that has a /, a space or a double quote in it.
-const LOGIN_IN_URL = /:[/\\]{2,}[^/\s"]*@/g
-// A login that a cut ended before its @: "://user:secr...[cut]".
-const LOGIN_BEFORE_CUT = /:[/\\]{2,}[^/\s"]*?(?=\.\.\.\[cut\])/g
-
-// Text of another service for a log field: the login of a URL is hidden first,
-// because a cut inside a login would take its @ away, and then the text is cut.
-export function cutForLog(text: string, length = 500): string {
-  return hideLogins(text).slice(0, length)
-}
-
-export function hideLogins(text: string): string {
-  return text
-    .replace(LOGIN_IN_URL, '://***@')
-    .replace(LOGIN_BEFORE_CUT, '://***')
-}
-
 // Characters that can break or forge a log line: the C0 and C1 control
 // characters (newline, NUL, ESC and the others), DEL, the Unicode line
 // separators, and the characters that change the direction of the text.
@@ -97,22 +68,18 @@ const SHORT_ESCAPES: Record<string, string> = {
   '\t': '\\t',
 }
 
-// Every value goes through here before it is written: a login in a URL is
-// hidden, and a value must not be able to start a new log line. The login is
-// looked for first, while a newline is still a character that ends a URL.
+// Every value goes through here before it is written, so that a value cannot
+// start a new log line.
 function escapeNewlines(text: string): string {
-  return hideLogins(withoutQueryParams(text)).replace(
-    CONTROL_CHARACTERS,
-    (found) => {
-      const code = found.charCodeAt(0)
-      return (
-        SHORT_ESCAPES[found] ??
-        (code < 0x100
-          ? `\\x${code.toString(16).padStart(2, '0')}`
-          : `\\u${code.toString(16).padStart(4, '0')}`)
-      )
-    },
-  )
+  return withoutQueryParams(text).replace(CONTROL_CHARACTERS, (found) => {
+    const code = found.charCodeAt(0)
+    return (
+      SHORT_ESCAPES[found] ??
+      (code < 0x100
+        ? `\\x${code.toString(16).padStart(2, '0')}`
+        : `\\u${code.toString(16).padStart(4, '0')}`)
+    )
+  })
 }
 
 // JSON.stringify turns an Error into {}, so an Error anywhere in a field value
@@ -153,10 +120,8 @@ function withoutQueryParams(text: string): string {
   )
 }
 
-// The login is hidden before the cut: a cut inside a login would take its @
-// away, and then the login could not be found.
 function errorMessage(err: Error): string {
-  const message = hideLogins(withoutQueryParams(String(err.message)))
+  const message = withoutQueryParams(String(err.message))
   return message.length > MAX_ERROR_MESSAGE_LENGTH
     ? `${message.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...[cut]`
     : message
