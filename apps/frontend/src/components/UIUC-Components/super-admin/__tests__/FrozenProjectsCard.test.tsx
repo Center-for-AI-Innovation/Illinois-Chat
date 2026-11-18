@@ -130,6 +130,77 @@ describe('FrozenProjectsCard', () => {
     expect(posted).toEqual([{ course_name: 'Alpha' }])
   })
 
+  it('shows an unfrozen project with an unfinished audit as a warning, and drops it from the list', async () => {
+    let frozen = [...PROJECTS]
+    server.use(
+      http.get('*/api/admin/frozenProjects', () =>
+        HttpResponse.json({ projects: frozen }),
+      ),
+      http.post('*/api/admin/frozenProjects', () => {
+        // The unfreeze landed, so the next list no longer includes Alpha.
+        frozen = frozen.filter((project) => project.course_name !== 'Alpha')
+        return HttpResponse.json(
+          {
+            recovered: true,
+            error:
+              'The project was unfrozen, but its audit entry could not be finalized. Check the audit log before retrying.',
+          },
+          { status: 500 },
+        )
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FrozenProjectsCard />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Recover Alpha' }),
+    )
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Recover project' }),
+    )
+
+    expect(
+      await screen.findByText('Project recovered; audit needs attention'),
+    ).toBeTruthy()
+    expect(
+      screen.getByText(/The project was unfrozen, but its audit entry/),
+    ).toBeTruthy()
+    expect(screen.queryByText('Could not recover the project')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('Alpha')).toBeNull())
+    expect(screen.getByText('Beta')).toBeTruthy()
+  })
+
+  it('keeps an ordinary 500 red and leaves the project listed', async () => {
+    server.use(
+      http.get('*/api/admin/frozenProjects', () =>
+        HttpResponse.json({ projects: PROJECTS }),
+      ),
+      http.post('*/api/admin/frozenProjects', () =>
+        HttpResponse.json({ error: 'Internal server error' }, { status: 500 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<FrozenProjectsCard />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Recover Alpha' }),
+    )
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Recover project' }),
+    )
+
+    expect(
+      await screen.findByText('Could not recover the project'),
+    ).toBeTruthy()
+    expect(screen.getByText('Internal server error')).toBeTruthy()
+    expect(
+      screen.queryByText('Project recovered; audit needs attention'),
+    ).toBeNull()
+    expect(screen.getByText('Alpha')).toBeTruthy()
+  })
+
   it('surfaces the server refusal and keeps the list usable', async () => {
     server.use(
       http.get('*/api/admin/frozenProjects', () =>

@@ -18,6 +18,18 @@ export interface RecoverFrozenProjectResult {
   course_name: string
 }
 
+/**
+ * The project was unfrozen, but its audit entry could not be finalized. This is
+ * a success with a bookkeeping problem, not a failed recovery, so the UI shows
+ * it differently from an ordinary error.
+ */
+export class FrozenProjectRecoveryPartialError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'FrozenProjectRecoveryPartialError'
+  }
+}
+
 export async function recoverFrozenProject(
   courseName: string,
 ): Promise<RecoverFrozenProjectResult> {
@@ -29,10 +41,15 @@ export async function recoverFrozenProject(
 
   const body = await response.json().catch(() => null)
   if (!response.ok) {
+    // Only the server's explicit flag counts as recovered. Any other 500 is
+    // treated as a failure, because nothing in it says the unfreeze landed.
+    const message =
+      body?.error ?? `Failed to recover project (${response.status})`
+    if (response.status === 500 && body?.recovered === true) {
+      throw new FrozenProjectRecoveryPartialError(message)
+    }
     // The server's message says whether anything changed, so pass it through.
-    throw new Error(
-      body?.error ?? `Failed to recover project (${response.status})`,
-    )
+    throw new Error(message)
   }
 
   return body as RecoverFrozenProjectResult

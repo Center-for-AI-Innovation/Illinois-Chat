@@ -35,10 +35,14 @@ import {
   useFetchFrozenProjects,
   type FrozenProjectSummary,
 } from '~/hooks/queries/useFetchFrozenProjects'
-import { useRecoverFrozenProject } from '~/hooks/queries/useRecoverFrozenProject'
+import {
+  FrozenProjectRecoveryPartialError,
+  useRecoverFrozenProject,
+} from '~/hooks/queries/useRecoverFrozenProject'
 import {
   AdminCard,
   AdminInlineError,
+  AdminInlineWarning,
   adminMutedTextClass,
   adminSubtleTextClass,
 } from './AdminCard'
@@ -49,16 +53,24 @@ export function FrozenProjectsCard() {
   const recover = useRecoverFrozenProject()
   const [candidate, setCandidate] = useState<FrozenProjectSummary | null>(null)
   const [recoverError, setRecoverError] = useState<string | null>(null)
+  const [recoverWarning, setRecoverWarning] = useState<string | null>(null)
   const [recoveredName, setRecoveredName] = useState<string | null>(null)
 
   async function confirmRecovery(project: FrozenProjectSummary) {
     setRecoverError(null)
+    setRecoverWarning(null)
     setRecoveredName(null)
     try {
       await recover.mutateAsync(project.course_name)
       setRecoveredName(project.course_name)
     } catch (err) {
-      setRecoverError(err instanceof Error ? err.message : 'Unknown error')
+      if (err instanceof FrozenProjectRecoveryPartialError) {
+        // Unfrozen, so the list refreshes without it. Only the audit row is
+        // unresolved, and that needs attention rather than a failure message.
+        setRecoverWarning(err.message)
+      } else {
+        setRecoverError(err instanceof Error ? err.message : 'Unknown error')
+      }
     }
   }
 
@@ -74,6 +86,12 @@ export function FrozenProjectsCard() {
             <AdminInlineError
               title="Could not recover the project"
               message={recoverError}
+            />
+          )}
+          {recoverWarning && (
+            <AdminInlineWarning
+              title="Project recovered; audit needs attention"
+              message={recoverWarning}
             />
           )}
           {recoveredName && (
