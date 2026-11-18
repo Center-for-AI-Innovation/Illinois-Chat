@@ -71,7 +71,7 @@ describe('upsertChatbotTags', () => {
   it('swallows db errors so a registry failure never blocks a save', async () => {
     hoisted.onConflictDoUpdate.mockRejectedValueOnce(new Error('boom'))
     const consoleError = vi
-      .spyOn(console, 'error')
+      .spyOn(console, 'warn')
       .mockImplementation(() => undefined)
 
     await expect(

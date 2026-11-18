@@ -759,7 +759,10 @@ export const ChatInput = ({
           // For image files, generate a presigned URL for display
           if (s3Key) {
             const presignedUrl = await fetchPresignedUrl(s3Key, courseName)
-            console.log('Generated presigned URL for image:', presignedUrl)
+            console.log(
+              'Generated presigned URL for image:',
+              Boolean(presignedUrl),
+            )
             if (presignedUrl) {
               setFileUploads((prev) =>
                 prev.map((f) =>

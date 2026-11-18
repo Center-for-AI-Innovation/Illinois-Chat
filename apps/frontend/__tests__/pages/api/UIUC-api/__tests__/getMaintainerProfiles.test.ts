@@ -13,7 +13,7 @@ vi.mock('~/server/authorization', () => ({
 }))
 
 vi.mock('~/pages/api/UIUC-api/getCourseMetadata', () => ({
-  getCourseMetadata: hoisted.getCourseMetadata,
+  readCourseMetadata: hoisted.getCourseMetadata,
 }))
 
 vi.mock('~/utils/authHelpers', () => ({

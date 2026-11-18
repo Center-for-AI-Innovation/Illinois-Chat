@@ -17,6 +17,19 @@ function getTokenFromCookies(req: NextApiRequest): string | null {
   return raw
 }
 
+// jsonwebtoken reports a failed key lookup as a JsonWebTokenError with this
+// prefix, so a Keycloak outage looks like a bad token unless it is told apart.
+const KEY_LOOKUP_FAILED = 'error in secret or public key callback: '
+// Key lookups that fail because of the token itself, not because of Keycloak.
+const KEY_LOOKUP_TOKEN_FAULT = /Missing kid|Unable to find a signing key/
+
+/** True when the token is at fault (expired, malformed, unknown key id). */
+function isTokenProblem(error: unknown): error is jwt.JsonWebTokenError {
+  if (!(error instanceof jwt.JsonWebTokenError)) return false
+  if (!error.message.startsWith(KEY_LOOKUP_FAILED)) return true
+  return KEY_LOOKUP_TOKEN_FAULT.test(error.message)
+}
+
 export interface AuthenticatedRequest extends NextApiRequest {
   user?: AuthenticatedUser
   courseName?: string
@@ -56,12 +69,19 @@ export function withAuth(
           issuerUrl,
         )) as AuthenticatedUser
       } catch (error) {
-        if (error instanceof jwt.JsonWebTokenError) {
-          // Expired or malformed token: the client's problem, no stack needed.
-          log.warn(`access token rejected: ${error.name}: ${error.message}`)
-        } else {
+        // Keycloak did not give the signing key, or the check failed for a
+        // reason that is not the token. A 401 here signs the user out in the
+        // browser for an outage on our side, so answer 503.
+        if (!isTokenProblem(error)) {
           log.error('could not verify the access token', undefined, error)
+          return res.status(503).json({
+            error: 'Authentication service unavailable',
+            message: 'Your identity could not be verified. Try again shortly.',
+          })
         }
+
+        // Expired or malformed token: the client's problem, no stack needed.
+        log.warn(`access token rejected: ${error.name}: ${error.message}`)
 
         if (error instanceof jwt.TokenExpiredError) {
           return res.status(401).json({
@@ -70,16 +90,9 @@ export function withAuth(
           })
         }
 
-        if (error instanceof jwt.JsonWebTokenError) {
-          return res.status(401).json({
-            error: 'Invalid token',
-            message: 'The provided token is invalid',
-          })
-        }
-
         return res.status(401).json({
-          error: 'Authentication failed',
-          message: 'Unable to verify your identity',
+          error: 'Invalid token',
+          message: 'The provided token is invalid',
         })
       }
 

@@ -3,6 +3,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.downloadConvoHistoryUser')
 
@@ -54,7 +55,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const backendUrl = getBackendUrl()
     const url = `${backendUrl}/export-convo-history-user?user_email=${encodeURIComponent(userEmail)}&project_name=${encodeURIComponent(projectName)}`
 
-    const response = await fetch(url, {
+    const response = await backendFetch(url, {
       method: 'GET',
       headers: {
         Accept: 'application/zip, application/json, */*',

@@ -2,6 +2,7 @@ import { withAuth } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.getWeeklyTrends')
 
@@ -15,7 +16,7 @@ async function handler(req: any, res: any) {
   }
 
   try {
-    const response = await fetch(
+    const response = await backendFetch(
       `${getBackendUrl()}/getWeeklyTrends?project_name=${project_name}`,
     )
 

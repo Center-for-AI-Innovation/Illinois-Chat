@@ -7,6 +7,7 @@ import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import type { CourseMetadata } from '~/types/courseMetadata'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.createProject')
 
@@ -79,7 +80,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const response = await fetch(`${getBackendUrl()}/createProject`, {
+    const response = await backendFetch(`${getBackendUrl()}/createProject`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

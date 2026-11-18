@@ -80,6 +80,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     res.status(200).json({ success: true, documentSummary })
   } catch (error) {
     log.error('error fetching document summary', undefined, error)
-    res.status(500).json({ success: false, error: error })
+    res.status(500).json({ success: false, error: 'Internal server error' })
   }
 }

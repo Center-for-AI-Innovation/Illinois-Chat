@@ -21,6 +21,15 @@ function withRequestId(
   return { ...headers, 'X-Request-ID': rid }
 }
 
+/**
+ * The X-Request-ID header for a backend call that does not go through
+ * backendFetch (axios). Empty outside a request.
+ */
+export function requestIdHeaders(): Record<string, string> {
+  const rid = getLogContext()?.rid
+  return rid ? { 'X-Request-ID': rid } : {}
+}
+
 // Path only: query strings can carry keys and user input.
 function pathOf(url: string): string {
   try {

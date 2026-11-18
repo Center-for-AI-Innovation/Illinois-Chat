@@ -60,9 +60,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
       { file: req.body?.uniqueFileName, upload_type: req.body?.uploadType },
       error,
     )
-    res
-      .status(500)
-      .json({ message: 'Error generating presigned URL', error: error })
+    res.status(500).json({ message: 'Error generating presigned URL' })
   }
 }
 

@@ -16,6 +16,7 @@ import { withCourseAccessFromRequest } from '~/server/authorization'
 import { AllSupportedModels } from '~/utils/modelProviders/LLMProvider'
 import { eq } from 'drizzle-orm'
 import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.logConversation')
 
@@ -225,19 +226,22 @@ const logConversation = async (
 
   // Send to our custom monitor
   try {
-    const response = await fetch(getBackendUrl() + '/llm-monitor-message', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await backendFetch(
+      getBackendUrl() + '/llm-monitor-message',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // messages: sanitizedConversation.messages, // we get these from database on the backend.
+          course_name: course_name,
+          conversation_id: conversationId,
+          model_name: sanitizedConversation.model?.name,
+          user_email: sanitizedConversation.userEmail,
+        }),
       },
-      body: JSON.stringify({
-        // messages: sanitizedConversation.messages, // we get these from database on the backend.
-        course_name: course_name,
-        conversation_id: conversationId,
-        model_name: sanitizedConversation.model?.name,
-        user_email: sanitizedConversation.userEmail,
-      }),
-    })
+    )
 
     if (!response.ok) {
       failedStep = failedStep ?? 'llm-monitor'
