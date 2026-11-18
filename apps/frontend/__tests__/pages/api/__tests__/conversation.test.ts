@@ -186,6 +186,70 @@ describe('conversation API', () => {
     expect(out.contexts?.[1]?.text).toBe('')
   })
 
+  it('convertChatToDBMessage does not split an emoji at the truncation boundary (#414)', () => {
+    const boundary = convertChatToDBMessage(
+      {
+        id: uuidv4(),
+        role: 'user',
+        content: 'hi',
+        contexts: [
+          {
+            readable_filename: 'f',
+            pagenumber: '1',
+            s3_path: 's3://x',
+            text: 'a'.repeat(99) + '🤖 AI and LLMs',
+          },
+        ],
+      } as any,
+      'conv-1',
+    )
+    const boundaryText = (boundary.contexts as any[])[0].text as string
+    expect(boundaryText).toBe('a'.repeat(99) + '🤖...')
+    expect(boundaryText.isWellFormed()).toBe(true)
+    expect(JSON.stringify(boundary.contexts)).not.toMatch(/\\ud83e"/)
+  })
+
+  it('convertChatToDBMessage sanitizes lone surrogates and null bytes in tool outputs (#414)', () => {
+    const out = convertChatToDBMessage(
+      {
+        id: uuidv4(),
+        role: 'assistant',
+        content: 'hi',
+        tools: [
+          {
+            id: 'retrieval',
+            output: {
+              text: 'ok',
+              data: {
+                contexts: [
+                  { text: 'a'.repeat(5) + '\ud83e...', filename: 'f' },
+                ],
+                extra: 'x\u0000y',
+                count: 1,
+              },
+            },
+          },
+        ],
+      } as any,
+      'conv-1',
+    )
+
+    expect(out.tools).toEqual([
+      {
+        id: 'retrieval',
+        output: {
+          text: 'ok',
+          data: {
+            contexts: [{ text: 'aaaaa\uFFFD...', filename: 'f' }],
+            extra: 'xy',
+            count: 1,
+          },
+        },
+      },
+    ])
+    expect(JSON.stringify(out.tools)).not.toMatch(/\\ud83e/)
+  })
+
   it('convertDBToChatConversation sorts messages and preserves feedback and contexts', () => {
     const conv = convertDBToChatConversation(
       {
