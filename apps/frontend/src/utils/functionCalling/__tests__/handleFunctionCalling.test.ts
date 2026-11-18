@@ -1124,3 +1124,62 @@ describe('handleFunctionCalling Sim edge cases', () => {
     expect(conversation.messages[0].tools[0].error).toMatch(/Bad Gateway/)
   })
 })
+
+describe('handleToolCall NLIP tools', () => {
+  const nlipTool = (): any => ({
+    id: 'nlip:b_bot',
+    invocationId: 'inv1',
+    name: 'ask_nlip_b_bot',
+    readableName: 'Ask B (NLIP)',
+    description: 'd',
+    aiGeneratedArgumentValues: { question: 'What is NLIP?' },
+  })
+  const conversationWith = (tool: any): any => ({
+    id: 'c1',
+    messages: [{ id: 'm1', role: 'user', content: 'hi', tools: [tool] }],
+  })
+
+  it('posts the question to the NLIP tools route instead of Sim', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, output: { text: 'answer' } }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+    const tool = nlipTool()
+    const conversation = conversationWith(tool)
+
+    await handleToolCall([tool], conversation, 'proj')
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/UIUC-api/tools/nlipTools?course_name=proj',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ id: 'b_bot', question: 'What is NLIP?' }),
+      }),
+    )
+    expect(conversation.messages[0].tools[0].output).toEqual({
+      text: 'answer',
+    })
+  })
+
+  it('surfaces the route error when the NLIP request fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'NLIP agent request failed' }), {
+        status: 502,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    const tool = nlipTool()
+    const conversation = conversationWith(tool)
+
+    await handleToolCall([tool], conversation, 'proj')
+
+    expect(conversation.messages[0].tools[0].error).toMatch(
+      /NLIP agent request failed/,
+    )
+  })
+})

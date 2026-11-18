@@ -37,6 +37,11 @@ import {
   sanitizeSimWorkflowInput,
 } from '~/utils/simDiscovery'
 import { type SimExecutionResult } from '~/types/sim'
+import {
+  executeNlipTool,
+  fetchNlipTools,
+  NLIP_TOOL_PREFIX,
+} from '~/server/nlip/client'
 
 /**
  * Convert conversation to OpenAI message format for agent mode.
@@ -221,6 +226,8 @@ export async function executeToolServer(
   params: ExecuteToolServerParams,
 ): Promise<UIUCTool> {
   const { tool, projectName, signal } = params
+  if (tool.id.startsWith(NLIP_TOOL_PREFIX))
+    return executeNlipTool(tool, projectName, signal)
   const toolCopy = { ...tool }
 
   const resolved = await resolveSimCredentials(projectName)
@@ -456,7 +463,7 @@ export async function fetchContextsServer(
  * Fetch available Sim AI tools for a project (server-side).
  * Hits the Sim API directly instead of going through the Next.js API route.
  */
-export async function fetchToolsServer(
+async function fetchSimToolsServer(
   courseName: string,
   signal?: AbortSignal,
 ): Promise<UIUCTool[]> {
@@ -495,6 +502,23 @@ export async function fetchToolsServer(
   }
 
   return getUIUCToolFromSim(result.workflows)
+}
+
+/** Sim workflows and registered NLIP agents share the existing tool pipeline. */
+export async function fetchToolsServer(
+  courseName: string,
+  signal?: AbortSignal,
+): Promise<UIUCTool[]> {
+  const [sim, nlip] = await Promise.allSettled([
+    fetchSimToolsServer(courseName, signal),
+    fetchNlipTools(courseName),
+  ])
+  if (nlip.status === 'rejected')
+    console.error('[Agent] NLIP tool discovery unavailable')
+  return [
+    ...(sim.status === 'fulfilled' ? sim.value : []),
+    ...(nlip.status === 'fulfilled' ? nlip.value : []),
+  ]
 }
 
 /**
