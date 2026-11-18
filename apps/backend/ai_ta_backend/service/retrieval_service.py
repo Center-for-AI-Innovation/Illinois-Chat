@@ -1204,6 +1204,7 @@ class RetrievalService:
             elif file_extension == ".py":
                 return self._extract_python_content(file_path)
             else:
+                logger.warning("chat file has an unsupported type ext=%s", file_extension)
                 return f"Unsupported file type: {file_extension}"
 
         except Exception as e:
@@ -1321,6 +1322,8 @@ class RetrievalService:
                     return "No content found in DOCX file"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "DOCX processing libraries")
                 return "DOCX processing libraries not available"
             except Exception as e:
                 logger.exception("DOCX processing error for %s", os.path.basename(file_path))
@@ -1508,6 +1511,8 @@ class RetrievalService:
                     return "No content found in Excel file"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "Excel processing libraries")
                 return "Excel processing libraries not available"
             except Exception as e:
                 logger.exception("Excel processing error for %s", os.path.basename(file_path))
@@ -1656,6 +1661,8 @@ class RetrievalService:
                     return "No content found in PowerPoint file"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "PowerPoint processing libraries")
                 return "PowerPoint processing libraries not available"
             except Exception as e:
                 logger.exception("PowerPoint processing error for %s", os.path.basename(file_path))
@@ -1797,6 +1804,8 @@ class RetrievalService:
                     return "No text found in image"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "Image OCR libraries")
                 return "Image OCR libraries not available (pytesseract, PIL)"
             except Exception as e:
                 logger.exception("Image OCR error for %s", os.path.basename(file_path))
@@ -1897,6 +1906,8 @@ class RetrievalService:
                 return "No text found via OCR"
 
         except ImportError:
+            # The caller stores this text as the file content, so this line is the only sign of the failure.
+            logger.error("chat file extraction unavailable: a Python library is missing (%s)", "OCR libraries")
             return "OCR libraries not available: No module named 'pdfplumber'"
         except Exception as e:
             logger.exception("OCR processing error for %s", os.path.basename(file_path))
