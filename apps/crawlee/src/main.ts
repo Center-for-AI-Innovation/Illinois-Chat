@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import express, { NextFunction, Request, Response } from 'express';
 import { log } from 'crawlee';
 import { crawl } from './api/crawlee.js';
+import { crawlOutcome, summaryFields } from './crawlOutcome.js';
 import healthRoute from './api/health.js'; // Import your health route
 
 import cors from 'cors';
@@ -96,9 +97,28 @@ app.post('/crawl', async (req: Request, res: Response) => {
         // };
 
         // Inside the context, the lines of crawlee loggers that are not clog get the prefix too.
-        const results = await crawlContext.run(prefix, () => crawl(req.body.params, clog, rid));
-        clog.info(`crawl done pages=${results} ms=${Date.now() - started}`);
-        res.status(200).json(`Crawl completed successfully. Number of results: ${results}`);
+        const summary = await crawlContext.run(prefix, () => crawl(req.body.params, clog, rid));
+        // A crawl that did not throw is not a success yet: it is one only when the backend
+        // accepted a document. crawlOutcome() has the rules.
+        const outcome = crawlOutcome(summary);
+        const line = `crawl done result=${outcome.result} status=${outcome.status} ${summaryFields(summary)} ms=${Date.now() - started}`;
+        if (outcome.level === 'error') {
+            clog.error(`${line}: ${oneLine(outcome.message)}`);
+        } else if (outcome.level === 'warning') {
+            clog.warning(`${line}: ${oneLine(outcome.message)}`);
+        } else {
+            clog.info(line);
+        }
+        if (outcome.status === 200) {
+            res.status(200).json({ message: outcome.message, ...summary });
+        } else {
+            res.status(outcome.status).json({
+                error: 'The crawl gave no documents',
+                errorTitle: outcome.result,
+                errorMessage: outcome.message,
+                ...summary,
+            });
+        }
     } catch (error) {
         const e = error as Error;
         if (e?.name === 'ZodError') {

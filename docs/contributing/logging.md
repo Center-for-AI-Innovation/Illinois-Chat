@@ -160,7 +160,23 @@ It differs from the other services:
 - The level names are short (`DEBUG`, `INFO`, `WARN`, `ERROR`) and padded to 5 characters.
 - There is no logger name. Each crawl gets a child logger whose prefix is `rid=<id> course=<name>`; the prefix ends with `:`.
 
-`POST /crawl` takes the `X-Request-ID` header under the same rule as the other services, or makes a 12-character id, and sends the id back in the `X-Request-ID` response header. It writes one `INFO` line when a crawl starts (`crawl started`) and one when it ends (`crawl done pages=<n> ms=<n>`). A failed crawl gives one `ERROR` line `crawl failed ms=<n>` with the stack (for invalid parameters, only the message), and a 500 reply with `error`, `errorTitle` and `errorMessage`; `scrapeWeb.ts` shows `errorMessage` to the user. A page that still fails after its retries gives a `WARN` line (`Page failed after all retries`). Before it, crawlee itself writes a `WARN` line `Reclaiming failed request back to the list or queue.` for each retry and one `ERROR` line `Request failed and reached maximum retries.`, with a stack, for the page; crawlee always writes these. A page the backend's `/ingest` refuses gives an `ERROR` with the URL, the status and the first 500 characters of the reply. Lines for each page are `DEBUG`. Values from requests and web pages are kept on one line (`oneLine()` in `logSetup.ts`).
+`POST /crawl` takes the `X-Request-ID` header under the same rule as the other services, or makes a 12-character id, and sends the id back in the `X-Request-ID` response header. It writes one `INFO` line when a crawl starts (`crawl started`) and one line when it ends (`crawl done result=<name> status=<n> pages_loaded=<n> ... ms=<n>`). The table below gives the level and the status of that line. A crawl that throws gives one `ERROR` line `crawl failed ms=<n>` with the stack (for invalid parameters, only the message), and a 500 reply with `error`, `errorTitle` and `errorMessage`; `scrapeWeb.ts` shows `errorMessage` to the user. A page that still fails after its retries gives a `WARN` line (`Page failed after all retries`). Before it, crawlee itself writes a `WARN` line `Reclaiming failed request back to the list or queue.` for each retry and one `ERROR` line `Request failed and reached maximum retries.`, with a stack, for the page; crawlee always writes these. A page the backend's `/ingest` refuses gives an `ERROR` with the URL, the status and the first 500 characters of the reply. Lines for each page are `DEBUG`. Values from requests and web pages are kept on one line (`oneLine()` in `logSetup.ts`).
+
+**What `/crawl` answers.** A crawl is a success only when the backend's `/ingest` accepted at least one document. Before, `/crawl` answered 200 whenever the crawler did not throw, also when every page failed. The rules are in `apps/crawlee/src/crawlOutcome.ts`:
+
+| What the crawl did | `result=` | Status | Level |
+|---|---|---|---|
+| At least one page or PDF was accepted, nothing failed | `ok` | 200 | `INFO` |
+| At least one was accepted, and some pages or PDFs failed | `partial` | 200 | `WARN` |
+| No page could be loaded (no connection, timeout, bad host) | `NoPageLoaded` | 502 | `ERROR` |
+| Pages were read, but `/ingest` refused each one, or each PDF failed | `IngestRefused` | 502 | `ERROR` |
+| Each page was empty or an error page, or there was no page (an empty sitemap) | `NothingToIngest` | 422 | `WARN` |
+| `NO_CRAWL=true` | `CrawlDisabled` | 503 | `WARN` |
+| `INGEST_URL` is not set, invalid parameters, or the crawler throws | (line `crawl failed`) | 500 | `ERROR` |
+
+The `crawl done` line has the same fields in each case: `pages_loaded`, `pages_failed`, `pages_skipped`, `pages_ingested`, `pages_refused`, `pdfs_found`, `pdfs_ingested`, `pdfs_skipped`, `pdfs_failed`. To find the crawls that gave no documents, search for `crawl done` with a `result=` that is not `ok` or `partial`. A reply that is not 200 has `error`, `errorTitle` (the `result` name) and `errorMessage`, with the first error of the crawl, and the counts. A 200 reply is an object with `message` and the counts; before, it was a string.
+
+`/crawl` answers after each ingest request and each PDF of the crawl has an answer, so the counts are final and no line of a crawl comes after its `crawl done` line. An ingest request that gets no answer in 60 seconds counts as refused. A page counts as loaded when its handler ends, so a page that is tried again is counted once. A PDF that many pages link to is handled once for each crawl.
 
 `logSetup.ts` turns crawlee's text logger into a `CrawlerLogger`, a small subclass. It changes the root logger object in place, because crawlee makes some loggers when it is imported (`BrowserPool`, `Request`, the Playwright utilities), and each of them keeps a reference to that object. So the changes apply to every line, also the lines that crawlee and Playwright write themselves:
 

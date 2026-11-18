@@ -156,16 +156,19 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   return s3Key;
 }
 
-export async function ingestPdf(s3Key: string, courseName: string, base_url: string, url: string, documentGroups: string[], clog: Log = rootLog, requestId?: string) {
+// Returns true when the backend accepted the PDF. Never throws: each failure is one ERROR line.
+export async function ingestPdf(s3Key: string, courseName: string, base_url: string, url: string, documentGroups: string[], clog: Log = rootLog, requestId?: string): Promise<boolean> {
   const ingestUrl = process.env.INGEST_URL;
   if (!ingestUrl) {
     clog.error('INGEST_URL is not set, so the PDF cannot be sent to ingest.');
-    return;
+    return false;
   }
 
   try {
-    fetch(ingestUrl, {
+    const response = await fetch(ingestUrl, {
       "method": "POST",
+      // No answer in 60 seconds counts as a failure, so a request that hangs cannot keep the crawl open.
+      "signal": AbortSignal.timeout(60_000),
       "headers": {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate",
@@ -180,16 +183,16 @@ export async function ingestPdf(s3Key: string, courseName: string, base_url: str
         course_name: courseName,
         groups: documentGroups,
       })
-    })
-      .then(async response => {
-        const text = await response.text();
-        if (!response.ok) {
-          clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)} status=${response.status} body=${oneLine(text.slice(0, 500))}`);
-        }
-      })
-      .catch(err => clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(err)}` + (err?.cause ? ` (cause: ${oneLine(err.cause)})` : '')));
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)} status=${response.status} body=${oneLine(text.slice(0, 500))}`);
+      return false;
+    }
+    return true;
   } catch (error) {
-    // Only reached if fetch() throws before sending (for example an invalid INGEST_URL).
-    clog.error(`Could not send PDF ingest request url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(error)}`);
+    const cause = (error as { cause?: unknown })?.cause;
+    clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(error)}` + (cause ? ` (cause: ${oneLine(cause)})` : ''));
+    return false;
   }
 }
