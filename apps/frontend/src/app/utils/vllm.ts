@@ -6,6 +6,7 @@ import {
 import { type CoreMessage } from 'ai'
 import { type Conversation } from '~/types/chat'
 import { getLogger } from '~/utils/server/log'
+import { isClosedStreamError } from '~/utils/server/streamErrors'
 
 const log = getLogger('llm.vllm')
 
@@ -121,8 +122,12 @@ function normalizeVLLMStreamResponse(response: Response): Response {
 
           emit(output)
         } catch (error) {
-          // The reply has started, so no caller can catch this any more.
-          log.error('LLM stream failed', undefined, error)
+          // The reply has started, so no caller can catch this any more. A
+          // reader that went away is not a failure, and it would be one line
+          // for every token that is left.
+          if (!isClosedStreamError(error)) {
+            log.error('LLM stream failed', undefined, error)
+          }
           controller.error(error)
         }
       }
@@ -145,7 +150,9 @@ function normalizeVLLMStreamResponse(response: Response): Response {
           parser.feed(decodedChunk)
         }
       } catch (error) {
-        log.error('LLM stream failed', undefined, error)
+        if (!isClosedStreamError(error)) {
+          log.error('LLM stream failed', undefined, error)
+        }
         controller.error(error)
       }
     },

@@ -171,10 +171,13 @@ async function chat(req: NextApiRequest, res: NextApiResponse): Promise<void> {
     selectedModel = activeModel
     llmProviders = modelsWithProviders
   } catch (error) {
-    // The message goes to the caller as a 400. Most of the time it says that
-    // the model is not available for the project, but a failure while the
-    // providers load ends here too, so keep the reason in the log.
-    log.warn('could not select the model for the request', undefined, error)
+    // The message goes to the caller as a 400. A model that is not enabled
+    // already has its WARNING line from determineAndValidateModelServer. A
+    // failure while the providers load ends here too, and has no line yet.
+    const reason = (error as Error)?.message ?? ''
+    if (!reason.startsWith('The requested model')) {
+      log.warn('could not select the model for the request', undefined, error)
+    }
     res.status(400).json({ error: (error as Error).message })
     return
   }
