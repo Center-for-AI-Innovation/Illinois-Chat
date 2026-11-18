@@ -352,6 +352,71 @@ is reported separately from the write, because it only regenerates the replica
 that served the request and can fail on its own without the save being any less
 durable.
 
+### Local fixtures for frozen-project recovery
+
+`scripts/seedFrozenRecovery.ts` creates four projects for testing recovery by
+hand. Run it from `apps/frontend`:
+
+```bash
+# Dry run (the default). Reads both stores and writes nothing.
+npx tsx scripts/seedFrozenRecovery.ts --email you@example.edu
+
+# Create the fixtures that are missing.
+npx tsx scripts/seedFrozenRecovery.ts --email you@example.edu --apply
+
+# Also re-freeze marked fixtures that differ from their declared state.
+npx tsx scripts/seedFrozenRecovery.ts --email you@example.edu --apply --reset
+```
+
+The script loads `apps/frontend/.env` with dotenv, the same way
+`seedChatbots.ts` does. Variables already set in the shell take precedence over
+the file. It needs these values, and it does not fall back to the `dbClient`
+defaults:
+`REDIS_URL`, `POSTGRES_ENDPOINT`, `POSTGRES_PORT`, `POSTGRES_DATABASE`,
+`POSTGRES_USERNAME`, and `POSTGRES_PASSWORD`. Both endpoints must be loopback
+(`localhost`, `127.0.0.1`, or `::1`). Otherwise the script exits before
+importing a store module or opening a connection. Only hostnames are printed.
+
+Fixtures, all prefixed `seed-frozen-recovery-`:
+
+| Name | Owner | State |
+| --- | --- | --- |
+| `owned` | the `--email` address | frozen, private, logged-in users not allowed |
+| `public` | `frozen-seed-owner@example.test` | frozen, public |
+| `private` | `frozen-seed-owner@example.test` | frozen, private |
+| `active-control` | `frozen-seed-owner@example.test` | not frozen, public. Recovery must not touch it. |
+
+Each record carries a `seed_fixture` marker with a nested value. Recovery
+should leave it unchanged, which shows that metadata is preserved.
+
+Behavior:
+
+- A fixture counts as ours only if both Redis and Postgres carry its marker.
+  A record present in only one store, or missing the marker in either store,
+  is a collision. Every fixture is checked before any write. If any collision
+  exists, the script writes nothing, even with `--apply`.
+- Without `--reset`, an existing fixture is left alone on every run. A
+  recovery you made by hand is kept.
+- With `--reset`, a fixture whose `is_frozen` differs from its declared value
+  gets only `is_frozen` changed on its current record. Its other fields, owner
+  edits, and marker are kept. The write is conditional on the Redis value that
+  was read, so a concurrent edit makes it fail rather than get overwritten.
+
+Manual checks:
+
+1. Sign in as a super admin who is not an owner of the fixtures. Open
+   `/admin`, then the Frozen projects tab. The three frozen fixtures appear,
+   and `active-control` does not.
+2. While `public` is frozen, opening its project page as a signed-in non-member
+   shows the frozen notice in the browser. The page shell may still load with
+   HTTP 200. The project's API routes return 403 with the frozen message.
+3. Recover `public` from the tab. It leaves the frozen list, reappears in
+   project listings, and the `seed_fixture` marker is still in its stored
+   record.
+4. Re-run `--apply`. The recovered project is skipped and stays unfrozen.
+5. Run `--apply --reset`. The three frozen fixtures are frozen again, and
+   `active-control` stays unfrozen.
+
 ### Known limitations
 
 All of these are pre-existing. The super-admin bypass deliberately does not
