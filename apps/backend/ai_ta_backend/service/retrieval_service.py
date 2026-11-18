@@ -526,8 +526,9 @@ class RetrievalService:
             logger.debug("vector store delete course=%s engine=%s response=%s", course_name, engine_kind, response)
         except Exception as e:
             if "timed out" in str(e):
-                # Timed out is fine. Still deletes.
-                pass
+                # The store usually still deletes after a timeout, but nothing confirms it.
+                logger.warning("vector store delete timed out course=%s %s=%s; not confirmed", course_name,
+                               identifier_key, identifier_value)
             else:
                 logger.exception("deleting file from vector store failed course=%s %s=%s", course_name, identifier_key,
                                  identifier_value)
@@ -1362,6 +1363,7 @@ class RetrievalService:
             vectors: List[List[float]] = []
             payloads: List[dict] = []
 
+            first_chunk_error = None
             for i, chunk in enumerate(chunks):
                 try:
                     import uuid
@@ -1384,11 +1386,19 @@ class RetrievalService:
 
                 except Exception as e:
                     logger.debug("embedding chunk %d failed for %s: %s", i, readable_filename, e)
+                    if first_chunk_error is None:
+                        first_chunk_error = e
                     continue
 
             if len(ids) < len(chunks):
-                logger.warning("embedded %d of %d chunks course=%s conversation_id=%s file=%s", len(ids), len(chunks),
-                               course_name, conversation_id, readable_filename)
+                # The first cause, so the line says why and not only how many. Type and a cut
+                # first line: the chunk text and the provider's key are not in it.
+                cause = ("%s: %s" % (type(first_chunk_error).__name__,
+                                     (str(first_chunk_error).splitlines() or [''])[0][:300])
+                         if first_chunk_error is not None else "no embedding returned")
+                logger.log(logging.WARNING if ids else logging.ERROR,
+                           "embedded %d of %d chunks course=%s conversation_id=%s file=%s first_error=%s", len(ids),
+                           len(chunks), course_name, conversation_id, readable_filename, cause)
 
             if ids:
                 # Engine-aware ingest. ``upsert_main_collection`` routes to

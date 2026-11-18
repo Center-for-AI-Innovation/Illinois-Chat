@@ -54,7 +54,8 @@ def decrypt(encrypted_text: str, key: str) -> str:
     decrypted = decryptor.update(ciphertext) + decryptor.finalize()
     return decrypted.decode('utf-8')
   except Exception as error:
-    raise ValueError('Failed to decrypt data: ' + str(error))
+    # The type says what failed (InvalidTag = wrong key). Never the data or the key.
+    raise ValueError('Failed to decrypt data: ' + type(error).__name__) from error
 
 
 def is_encrypted(s: str) -> bool:

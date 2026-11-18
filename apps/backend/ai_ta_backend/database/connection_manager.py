@@ -125,7 +125,7 @@ class ConnectionManager:
         pooler), and this matches the host engines in `database/sql.py`.
         """
         logger.debug("Creating external DB engine course=%s", project_name)
-        return create_engine(db_config["connection_uri"], poolclass=NullPool)
+        return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
 
     # ── Vector Engine Resolution ──
     #

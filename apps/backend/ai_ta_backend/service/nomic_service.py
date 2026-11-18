@@ -34,7 +34,7 @@ class NomicService():
       nomic.cli.login(os.environ['NOMIC_API_KEY'])
     except Exception as e:
       if log_now and not isinstance(e, KeyError):
-        logger.error("Nomic login failed: %s", e)
+        logger.error("Nomic login failed (%s)", type(e).__name__)  # the text can repeat the API key
         _init_error_logged = True
       raise
     self.ollama_client = Client(host=os.environ['OLLAMA_SERVER_URL'])

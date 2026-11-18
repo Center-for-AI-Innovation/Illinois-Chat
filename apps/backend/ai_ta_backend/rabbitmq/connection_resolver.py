@@ -95,7 +95,8 @@ def _decrypt_config(stored: dict) -> Optional[dict]:
         return None
     key = os.environ.get('ENCRYPTION_MASTER_KEY', '')
     if not key:
-        logger.warning("ENCRYPTION_MASTER_KEY not set; cannot decrypt external config")
+        # ERROR: the job then runs on the host defaults, not on the project's own connection.
+        logger.error("ENCRYPTION_MASTER_KEY is not set: cannot decrypt the project's external connection")
         return None
     plaintext = _decrypt(encrypted_str, key)
     return json.loads(plaintext)
@@ -170,7 +171,9 @@ class WorkerConnectionResolver:
         try:
             return _decrypt_config(encrypted_blob)
         except Exception as e:
-            logger.error("Failed to decrypt %s for project %s: %s", field, project_name, e)
+            # Only the type: the text of a decrypt or JSON error can hold the decrypted config.
+            logger.error("cannot decrypt %s course=%s (%s); using the host default for it", field, project_name,
+                         type(e).__name__)
             return None
 
     # ── Public API ──
@@ -286,7 +289,7 @@ class WorkerConnectionResolver:
         pooler), and this matches the worker's host engine in rmsql.py.
         """
         logger.debug("Creating external SQL engine for project: %s", project_name)
-        return create_engine(db_config["connection_uri"], poolclass=NullPool)
+        return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
 
     # ── S3 ──
 

@@ -77,7 +77,7 @@ def _process_conversation(s3, convo, course_name, file_paths, worksheet, row_num
     # print(f"Appended to JSONL for conversation ID: {convo_id}")
     logger.debug("processed conversation convo_id=%s messages=%d", convo_id, len(messages))
   except Exception as e:
-    logger.warning("processing conversation failed convo_id=%s: %s", convo.get('convo_id'), e)
+    logger.warning("processing conversation failed convo_id=%s: %s: %s", convo.get('convo_id'), type(e).__name__, e, exc_info=True)
     error_log.append(f"Error processing conversation ID {convo['convo_id']}: {str(e)}")
 
 
@@ -120,7 +120,7 @@ def _create_markdown(s3, convo_id, messages, markdown_dir, media_dir, user_email
         md_file.write("---\n\n")  # Separator for each message for better readability
 
   except Exception as e:
-    logger.warning("creating markdown failed convo_id=%s: %s", convo_id, e)
+    logger.warning("creating markdown failed convo_id=%s: %s: %s", convo_id, type(e).__name__, e, exc_info=True)
     error_log.append(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
 
 
@@ -155,7 +155,7 @@ def _create_markdown_for_user_convo_export(s3, convo_id, messages, markdown_dir,
 
     logger.debug("created markdown convo_id=%s", convo_id)
   except Exception as e:
-    logger.warning("creating markdown failed convo_id=%s: %s", convo_id, e)
+    logger.warning("creating markdown failed convo_id=%s: %s: %s", convo_id, type(e).__name__, e, exc_info=True)
     error_log.append(f"Error creating markdown for conversation ID {convo_id}: {str(e)}")
 
 
@@ -180,7 +180,7 @@ def _process_message_content(s3, content, convo_id, media_dir, error_log, bucket
     else:
       return content
   except Exception as e:
-    logger.warning("processing message content failed convo_id=%s: %s", convo_id, e)
+    logger.warning("processing message content failed convo_id=%s: %s: %s", convo_id, type(e).__name__, e, exc_info=True)
     error_log.append(f"Error processing message content for conversation ID {convo_id}: {str(e)}")
     return content
 
@@ -199,7 +199,7 @@ def _process_message_content_for_user_convo_export(s3, content_text: str, conten
       content += f"\n![Image]({relative_image_path})"
     return content
   except Exception as e:
-    logger.warning("processing message content failed convo_id=%s: %s", convo_id, e)
+    logger.warning("processing message content failed convo_id=%s: %s: %s", convo_id, type(e).__name__, e, exc_info=True)
     error_log.append(f"Error processing message content for conversation ID {convo_id}: {str(e)}")
     return content_text
 
@@ -244,7 +244,7 @@ def _write_to_excel(convo_id, course_name, messages, worksheet, row_num, user_em
       worksheet.merge_range(start_row, 0, row_num - 1, 0, convo_id, wrap_format)
 
   except Exception as e:
-    logger.warning("writing to Excel failed convo_id=%s: %s", convo_id, e)
+    logger.warning("writing to Excel failed convo_id=%s: %s: %s", convo_id, type(e).__name__, e, exc_info=True)
     error_log.append(f"Error writing to Excel for conversation ID {convo_id}: {str(e)}")
 
 
@@ -253,7 +253,7 @@ def _append_to_jsonl(convo_data, jsonl_file_path, error_log):
     with open(jsonl_file_path, 'a') as jsonl_file:
       jsonl_file.write(json.dumps(convo_data) + '\n')
   except Exception as e:
-    logger.warning("appending to JSONL failed convo_id=%s: %s", convo_data.get('convo_id'), e)
+    logger.warning("appending to JSONL failed convo_id=%s: %s: %s", convo_data.get('convo_id'), type(e).__name__, e, exc_info=True)
     error_log.append(f"Error appending to JSONL for conversation ID {convo_data['convo_id']}: {str(e)}")
 
 

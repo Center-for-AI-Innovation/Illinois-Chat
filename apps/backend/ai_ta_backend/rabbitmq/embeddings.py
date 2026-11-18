@@ -364,6 +364,10 @@ class APIRequest:
         if isinstance(error, Exception):
           logger.error("embedding request %s failed after all attempts endpoint=%s: %s: %s", self.task_id,
                        urlparse(request_url).path, type(error).__name__, error)
+        elif status in (401, 403):
+          # No body: a server that refuses a key can repeat the key in its reply.
+          logger.error("embedding request %s refused status=%s host=%s endpoint=%s: check the embedding API key",
+                       self.task_id, status, urlparse(request_url).hostname, urlparse(request_url).path)
         else:
           logger.error("embedding request %s failed after all attempts status=%s endpoint=%s body=%s",
                        self.task_id, status, urlparse(request_url).path, text[:500])

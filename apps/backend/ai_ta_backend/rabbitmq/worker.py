@@ -323,7 +323,10 @@ class Worker:
                 logger.exception("job failed before ingest (DB or connection resolve), discarded after %d attempts",
                                  attempt)
                 self._record_discarded_job(status_db or self.sql_session, job_id, inputs,
-                                           "%s: %s" % (type(e).__name__, e), attempt)
+                                           # The admin sees this text. Type and a cut first line: driver
+                                           # text can name the project's database host and user.
+                                           "%s: %s" % (type(e).__name__, (str(e).splitlines() or [''])[0][:300]),
+                                           attempt)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:
             clear()

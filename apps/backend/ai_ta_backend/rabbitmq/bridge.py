@@ -55,6 +55,9 @@ def ingest():
     course_name, readable_filename, s3_paths | content | url, base_url, groups, ...
     """
     if INGEST_API_KEY and request.headers.get("Authorization", "") != f"Bearer {INGEST_API_KEY}":
+        # Says which case it is. Never the header or the key.
+        logger.warning("ingest refused: %s bearer token",
+                       "wrong" if request.headers.get("Authorization") else "missing")
         return jsonify({"error": "unauthorized"}), 401
 
     data = request.get_json(force=True, silent=True)
@@ -72,7 +75,8 @@ def ingest():
         return jsonify({"outcome": "Queued Ingest task", "task_id": task_id}), 200
     except Exception as exc:  # noqa: BLE001 - surface any failure to the caller
         logger.exception("Failed to queue ingest job")
-        return jsonify({"error": str(exc)}), 500
+        # The log has the detail. Driver text can name a project's database host, so the body has the type only.
+        return jsonify({"error": "Failed to queue ingest job: %s" % type(exc).__name__}), 500
 
 
 if __name__ == '__main__':

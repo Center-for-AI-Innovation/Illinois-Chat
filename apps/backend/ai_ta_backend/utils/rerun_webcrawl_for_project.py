@@ -14,7 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 def send_request(webcrawl_url, payload):
-  response = requests.post(webcrawl_url, json=payload)
+  response = requests.post(webcrawl_url, json=payload, timeout=600)
+  if not response.ok:
+    # The request already answered 200 to its caller, so this line is the only sign of the failure.
+    logger.warning("crawl request failed status=%s base_url=%s body=%s", response.status_code,
+                   (payload.get('params') or {}).get('url') if isinstance(payload, dict) else None,
+                   response.text[:500])
+    return {}
   return response.json()
 
 

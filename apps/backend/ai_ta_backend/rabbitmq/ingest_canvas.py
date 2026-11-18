@@ -496,6 +496,10 @@ class IngestCanvas:
                             with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
                                 html_file.write(response.text)
                             downloaded += 1
+                        else:
+                            skipped += 1
+                            logger.debug("external link skipped status=%s host=%s", response.status_code,
+                                         urlsplit(external_url).hostname)
 
                     elif item['type'] == 'Discussion':
                         try:
@@ -668,23 +672,32 @@ class IngestCanvas:
         url = None
         try:
             count = 0
+            saved = 0
+            first_skip = None
             for url in urls:
                 count += 1
                 with requests.get(url, stream=True, timeout=30) as r:
                     content_disposition = r.headers.get('Content-Disposition')
-                    if content_disposition is None:
+                    if r.status_code >= 400 or content_disposition is None or 'filename=' not in content_disposition:
+                        # Path only: the query string of a Canvas file link holds the verifier.
+                        if first_skip is None:
+                            first_skip = "status=%s path=%s" % (r.status_code, urlsplit(url).path)
+                        logger.debug("linked file skipped status=%s path=%s", r.status_code, urlsplit(url).path)
                         continue
-
-                    if 'filename=' in content_disposition:
-                        filename = content_disposition.split('filename=')[1].strip('"')
-                    else:
-                        continue
+                    saved += 1
+                    filename = content_disposition.split('filename=')[1].strip('"')
 
                     file_path = _safe_join(dir_path, filename)
                     with open(file_path, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
                     logger.debug("downloaded linked file %s", filename)
+            if count and not saved:
+                logger.warning("no linked Canvas file was downloaded canvas_course_id=%s links=%d first: %s", course_id,
+                               count, first_skip)
+            else:
+                logger.info("linked Canvas files downloaded=%d skipped=%d canvas_course_id=%s", saved, count - saved,
+                            course_id)
             return "Success"
         except requests.RequestException as e:
             logger.error("downloading linked Canvas files failed canvas_course_id=%s url=%s: %s", course_id,

@@ -342,7 +342,7 @@ class GraphDatabase:
       Always explain the alternative approaches being tried.
       """
     if current_app and current_app.debug:
-        logger.debug("KG system prompt: %s", system_prompt)
+        logger.debug("KG system prompt chars=%d", len(system_prompt))
     return self._create_chain(schema_info, system_prompt, self.clinical_kg_graph)
 
   def _create_prime_kg_chain(self):
@@ -483,7 +483,7 @@ class GraphDatabase:
     If no results, try alternative terms related to the query and explain your reasoning.
     """
     if current_app and current_app.debug:
-        logger.debug("KG system prompt: %s", system_prompt)
+        logger.debug("KG system prompt chars=%d", len(system_prompt))
     return self._create_chain(schema_info, system_prompt, self.prime_kg_graph, return_direct=True, return_intermediate_steps=True, verbose=True)
 
   def create_chain_with_custom_prompt(self, additional_instructions=""):
@@ -526,7 +526,7 @@ class GraphDatabase:
         {additional_instructions}
         """
     if current_app and current_app.debug:
-        logger.debug("KG system prompt: %s", system_prompt)
+        logger.debug("KG system prompt chars=%d", len(system_prompt))
     return self._create_chain(self.ckg_schema_info, system_prompt, self.clinical_kg_graph, verbose=False)
 
   def _extract_kg_result(self, response):
@@ -557,11 +557,12 @@ class GraphDatabase:
     def query_node(state: KGQueryState):
         cypher_query_prompt = cypher_generator(state["user_query"], state["attempt"])
         if current_app and current_app.debug:
-            logger.debug("KG attempt %s, generated Cypher query prompt: %s", state['attempt'], cypher_query_prompt)
+            logger.debug("KG attempt %s, generated Cypher query prompt chars=%d", state['attempt'],
+                         len(str(cypher_query_prompt)))
         try:
             result = chain.invoke({"query": cypher_query_prompt})
             if current_app and current_app.debug:
-                logger.debug("KG chain result (type: %s): %s", type(result), result)
+                logger.debug("KG chain result type=%s chars=%d", type(result).__name__, len(str(result)))
             cypher_query_actual = cypher_query_prompt  # fallback
             if isinstance(result, dict):
                 steps = result.get("intermediate_steps")
@@ -587,7 +588,7 @@ class GraphDatabase:
     def should_retry(state: KGQueryState):
         results = state["results"]
         if current_app and current_app.debug:
-            logger.debug("KG should_retry called. attempt=%s results=%s", state['attempt'], results)
+            logger.debug("KG should_retry called. attempt=%s results_chars=%d", state['attempt'], len(str(results)))
         # Only return success if the 'result' field in the results dict is non-empty
         if isinstance(results, dict) and results.get("result"):
             if current_app and current_app.debug:

@@ -150,6 +150,7 @@ def _pgvector_rows_to_scored_points(rows: list[dict]) -> list[_PgvectorScoredPoi
                 parsed = json.loads(doc_groups)
                 doc_groups = parsed if isinstance(parsed, list) else []
             except Exception:
+                logger.debug("doc_groups is not valid JSON, treated as no groups")
                 doc_groups = []
         payload = {
             "page_content": row.get("page_content") or "",

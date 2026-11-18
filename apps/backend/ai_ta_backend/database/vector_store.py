@@ -87,7 +87,7 @@ class PgVectorStore:
         if connection_uri:
             from sqlalchemy import create_engine
 
-            self._engine = create_engine(connection_uri, pool_pre_ping=True)
+            self._engine = create_engine(connection_uri, pool_pre_ping=True, hide_parameters=True)
         elif engine is not None:
             self._engine = engine
         else:

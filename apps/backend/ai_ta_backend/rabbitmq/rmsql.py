@@ -98,7 +98,7 @@ class SQLAlchemyIngestDB:
             db_uri = f"postgresql://{os.getenv('POSTGRES_USERNAME')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_ENDPOINT')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DATABASE')}"
 
         # Create engine and session. The engine is lazy: nothing connects yet.
-        self.engine = create_engine(db_uri, poolclass=NullPool)
+        self.engine = create_engine(db_uri, poolclass=NullPool, hide_parameters=True)
         self.Session = sessionmaker(bind=self.engine)
         url = self.engine.url
         logger.debug("engine configured for %s:%s/%s", url.host, url.port, url.database)

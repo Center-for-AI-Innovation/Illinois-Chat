@@ -142,7 +142,7 @@ class SQLDatabase:
         else:
             db_uri = f"postgresql://{os.getenv('POSTGRES_USERNAME')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_ENDPOINT')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DATABASE')}"
 
-        self.engine = create_engine(db_uri, poolclass=NullPool)
+        self.engine = create_engine(db_uri, poolclass=NullPool, hide_parameters=True)
         self.Session = sessionmaker(bind=self.engine)
         # create_engine does not connect; the first query does.
         logger.debug("SQL engine created for %s (connects on first query)", db_type)

@@ -574,12 +574,19 @@ class Ingest:
                     logging_level=logging.INFO,
                     model=self.embedding_model)
                 asyncio.run(oai.process_api_requests_from_file())
+                # A request that failed every attempt has a list of errors where the reply would be.
+                failed_requests = [item for item in oai.results if not isinstance(item[1], dict)]
+                if failed_requests:
+                    # embeddings.py already logged each cause. No chunk text in this error.
+                    raise RuntimeError("embeddings failed for %d of %d chunks; see the 'embedding request' lines" %
+                                       (len(failed_requests), len(oai.results)))
                 embeddings_dict: dict[str, List[float]] = {
                     item[0]['input']: item[1]['data'][0]['embedding'] for item in oai.results
                 }
             logger.debug("embeddings done chunks=%d ms=%d", len(input_texts),
                          int((time.monotonic() - embeddings_start_time) * 1000))
 
+            upsert_failures = 0
             if self.qdrant_client is not None:
                 # Batched upload to Qdrant. The temporary indexing_threshold toggles are
                 # intentionally disabled because multiple ingest workers can trigger
@@ -615,8 +622,10 @@ class Ingest:
                             )
                         except Exception as e:
                             # Timeouts can be acceptable while server processes the request in background
-                            logger.warning("Qdrant batch upsert failed for %s, continuing with the next batch: %s",
-                                           metadatas[0].get('s3_path') or metadatas[0].get('url'), e)
+                            logger.error("Qdrant batch upsert failed for %s; these chunks can be missing from search: %s: %s",
+                                         metadatas[0].get('s3_path') or metadatas[0].get('url'), type(e).__name__,
+                                         (str(e).splitlines() or [''])[0][:300])
+                            upsert_failures += 1
                         finally:
                             batch = []
 
@@ -629,8 +638,10 @@ class Ingest:
                             wait=False,
                         )
                     except Exception as e:
-                        logger.warning("Qdrant final batch upsert failed for %s, continuing: %s",
-                                       metadatas[0].get('s3_path') or metadatas[0].get('url'), e)
+                        logger.error("Qdrant final batch upsert failed for %s; these chunks can be missing from search: %s: %s",
+                                     metadatas[0].get('s3_path') or metadatas[0].get('url'), type(e).__name__,
+                                     (str(e).splitlines() or [''])[0][:300])
+                        upsert_failures += 1
 
             else:
                 # Batched upload to pgvector
@@ -647,8 +658,10 @@ class Ingest:
                                 ids=ids_batch, vectors=vectors_batch, payloads=payloads_batch, wait=False
                             )
                         except Exception as e:
-                            logger.warning("pgvector batch upsert failed for %s, continuing with the next batch: %s",
-                                           metadatas[0].get('s3_path') or metadatas[0].get('url'), e)
+                            logger.error("pgvector batch upsert failed for %s; these chunks can be missing from search: %s: %s",
+                                         metadatas[0].get('s3_path') or metadatas[0].get('url'), type(e).__name__,
+                                         (str(e).splitlines() or [''])[0][:300])
+                            upsert_failures += 1
                         ids_batch, vectors_batch, payloads_batch = [], [], []
                 if ids_batch:
                     try:
@@ -656,8 +669,16 @@ class Ingest:
                             ids=ids_batch, vectors=vectors_batch, payloads=payloads_batch, wait=True
                         )
                     except Exception as e:
-                        logger.warning("pgvector final batch upsert failed for %s, continuing: %s",
-                                       metadatas[0].get('s3_path') or metadatas[0].get('url'), e)
+                        logger.error("pgvector final batch upsert failed for %s; these chunks can be missing from search: %s: %s",
+                                     metadatas[0].get('s3_path') or metadatas[0].get('url'), type(e).__name__,
+                                     (str(e).splitlines() or [''])[0][:300])
+                        upsert_failures += 1
+
+            if upsert_failures:
+                # The file still gets its documents row: a timed-out upsert often lands anyway.
+                # This line is the one place that says the vectors may be incomplete.
+                logger.error("vector upload incomplete for %s: %d batch(es) failed of %d chunks",
+                             metadatas[0].get('s3_path') or metadatas[0].get('url'), upsert_failures, len(contexts))
 
             # Supabase SQL insertion
             # contexts_for_supa = [{
@@ -1034,7 +1055,7 @@ class Ingest:
             return err
 
     def _ingest_html(self, s3_path: str, course_name: str, force_embeddings: bool, **kwargs) -> str:
-        logger.debug("html ingest s3_path=%s kwargs=%s", s3_path, kwargs)
+        logger.debug("html ingest s3_path=%s fields=%s", s3_path, sorted(kwargs))
         try:
             response = self.s3_client.get_object(Bucket=self.s3_bucket_name, Key=s3_path)
             raw_html = response['Body'].read().decode('utf-8', errors='ignore')
@@ -1354,7 +1375,7 @@ class Ingest:
         LangChain `Documents` have .metadata and .page_content attributes.
         Be sure to use TemporaryFile() to avoid memory leaks!
         """
-        logger.debug("pdf ingest s3_path=%s kwargs=%s", s3_path, kwargs)
+        logger.debug("pdf ingest s3_path=%s fields=%s", s3_path, sorted(kwargs))
 
         try:
             with NamedTemporaryFile() as pdf_tmpfile:
@@ -1488,7 +1509,7 @@ class Ingest:
         Returns:
             str: "Success" or an error message
         """
-        logger.debug("text ingest s3_path=%s kwargs=%s", s3_path, kwargs)
+        logger.debug("text ingest s3_path=%s fields=%s", s3_path, sorted(kwargs))
         try:
             # NOTE: slightly different method for .txt files, no need for download. It's part of the 'body'
             response = self.s3_client.get_object(Bucket=self.s3_bucket_name, Key=s3_path)
