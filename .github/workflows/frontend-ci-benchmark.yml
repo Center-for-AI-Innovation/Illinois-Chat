@@ -1,0 +1,673 @@
+# EXPERIMENT ONLY (branch bench/frontend-ci). Not a PR check, no deploy, no secrets,
+# no network credentials, no PR comments. Every job is guarded to this exact ref.
+# Design and interpretation: scripts/ci-benchmark/README.md
+name: Frontend CI benchmark (experiment)
+
+on:
+  push:
+    branches:
+      - bench/frontend-ci
+  workflow_dispatch:
+    inputs:
+      affected_base:
+        description: >-
+          Base ref for the affected-tests trial. Blank uses origin/main, which normally
+          yields NO_SAMPLE. A historical commit gives a sample; the source under test stays HEAD.
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: frontend-ci-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Resolves ONE timings cache key before the shards start. Shards restore that exact
+  # key, so a baseline that saves a newer snapshot mid-run cannot change their partition.
+  resolve-timings:
+    name: Resolve timing snapshot
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      timingsKey: ${{ steps.lookup.outputs.cache-matched-key }}
+    steps:
+      # Same path as the baseline save and the shard restores: the cache version is
+      # derived from the path, so a different path would never match.
+      # lookup-only downloads nothing; it only reports cache-matched-key.
+      - name: Lookup newest timings snapshot
+        id: lookup
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/bench/timings.json
+          key: frontend-ci-bench-timings-lookup-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            frontend-ci-bench-timings-
+          lookup-only: true
+      - name: Record resolved key
+        env:
+          KEY: ${{ steps.lookup.outputs.cache-matched-key }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          printf '{"timingsKey":"%s"}\n' "$KEY" > "$RUNNER_TEMP/bench/resolve.json"
+          echo "resolved timings key: ${KEY:-<none, cold start>}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-resolve
+          path: ${{ runner.temp }}/bench/resolve.json
+
+  # Variant A: baseline. Same steps as PR Checks (typecheck, then tests with coverage and
+  # the coverage gate), minus Trunk. It also saves per-file timings and its LCOV.
+  baseline:
+    name: A baseline (sequential)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - name: Record versions
+        working-directory: apps/frontend
+        run: |
+          {
+            echo "node $(node -v)"
+            npm ls vitest typescript next @vitest/coverage-v8 --depth=0 || true
+          } | tee "$BENCH_OUT/versions.txt"
+      - name: npm run typecheck
+        working-directory: apps/frontend
+        run: bash ../../scripts/ci-benchmark/timed.sh "npm run typecheck" npm run typecheck
+      # Equivalent to `npm run test:coverage:check`, split so the JSON reporter can write per-file timings.
+      - name: vitest run --coverage (baseline)
+        working-directory: apps/frontend
+        run: |
+          bash ../../scripts/ci-benchmark/timed.sh "vitest run --coverage (baseline)" \
+            npm run test:coverage -- --reporter=default --reporter=json \
+            --outputFile.json="$BENCH_OUT/baseline-report.json"
+      - name: check-coverage.mjs (unchanged)
+        working-directory: apps/frontend
+        run: bash ../../scripts/ci-benchmark/timed.sh "check-coverage.mjs" node scripts/check-coverage.mjs
+      - name: Stage baseline LCOV
+        if: always()
+        working-directory: apps/frontend
+        run: |
+          if [ -f coverage/lcov.info ]; then cp coverage/lcov.info "$BENCH_OUT/lcov.info"; fi
+      - name: Build per-file timings snapshot
+        id: timings
+        if: always()
+        run: node scripts/ci-benchmark/build-timings.mjs "$BENCH_OUT/baseline-report.json" "$BENCH_OUT/timings.json"
+      - name: Save timings snapshot for later runs
+        if: always() && steps.timings.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/bench/timings.json
+          key: frontend-ci-bench-timings-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Step summary
+        if: always()
+        run: |
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "A baseline: test and check steps"
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_SETUP_FILE" "A baseline: setup"
+      - name: Upload baseline artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Variant B: canonical typecheck, independent of the test shards.
+  typecheck:
+    name: B typecheck (tsc, canonical)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - name: npm run typecheck
+        working-directory: apps/frontend
+        run: bash ../../scripts/ci-benchmark/timed.sh "npm run typecheck" npm run typecheck
+      - name: Step summary
+        if: always()
+        run: node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "B typecheck (tsc)"
+      - name: Upload typecheck artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-typecheck
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Production build trial. NOT in the baseline and NOT in any speedup comparison: the
+  # main PR Checks do not build. Same Node 20 runner and npm ci. No secrets and no
+  # dummy env: a missing config is a real failure and is reported as one.
+  build:
+    name: H build trial (build:self-hosted, not in baseline)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - name: npm run build:self-hosted
+        working-directory: apps/frontend
+        run: bash ../../scripts/ci-benchmark/timed.sh "npm run build:self-hosted" npm run build:self-hosted
+      - name: Step summary
+        if: always()
+        run: node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "H build trial (not in baseline)"
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-build
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Variant C: experimental `bun check` on a benchmark-only tsconfig. Bun 1.4.4 pinned.
+  bun-check:
+    name: C bun check (experimental, Bun 1.4.4)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: bun check (benchmark tsconfig)
+        working-directory: apps/frontend
+        run: |
+          bun --version > "$BENCH_OUT/bun-version.txt"
+          bash ../../scripts/ci-benchmark/timed.sh "bun check" \
+            bun check -p scripts/ci-benchmark/tsconfig.bun-check.json --pretty false \
+            > "$BENCH_OUT/bun-check.txt" 2>&1
+      - name: Step summary
+        if: always()
+        run: |
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "C bun check (experimental)"
+          { echo '```'; tail -n 15 "$BENCH_OUT/bun-check.txt" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload bun artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-bun-check
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Variant D: standalone oxlint, pinned, installed outside the lockfile. Read-only.
+  oxlint:
+    name: D oxlint (experimental, 1.94.0)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          echo "BENCH_OUT=$RUNNER_TEMP/bench" >> "$GITHUB_ENV"
+          echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install oxlint 1.94.0 (outside the frontend lockfile)
+        run: npm install --prefix "$RUNNER_TEMP/oxlint" --no-audit --no-fund oxlint@1.94.0
+      - name: oxlint (benchmark config, read-only)
+        working-directory: apps/frontend
+        run: |
+          "$RUNNER_TEMP/oxlint/node_modules/.bin/oxlint" --version > "$BENCH_OUT/oxlint-version.txt"
+          bash ../../scripts/ci-benchmark/timed.sh "oxlint" \
+            "$RUNNER_TEMP/oxlint/node_modules/.bin/oxlint" \
+            -c scripts/ci-benchmark/oxlint.benchmark.json --format=json src __tests__ \
+            > "$BENCH_OUT/oxlint.json"
+      - name: Step summary
+        if: always()
+        working-directory: apps/frontend
+        run: |
+          node ../../scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "D oxlint (experimental)"
+          # shellcheck disable=SC2016 # single-quoted JS below is intentional
+          if [ -f "$BENCH_OUT/oxlint.json" ]; then node -e '
+            const j = require(process.argv[1]); const by = {};
+            for (const x of j.diagnostics ?? []) { const k = x.severity + " " + x.code; by[k] = (by[k] ?? 0) + 1; }
+            const rows = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 25)
+              .map(([k, v]) => `| ${k} | ${v} |`);
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              ["", `Diagnostics: ${(j.diagnostics ?? []).length}`, "", "| Rule | Count |", "| --- | ---: |", ...rows].join("\n") + "\n");
+          ' "$BENCH_OUT/oxlint.json"
+          fi
+      - name: Upload oxlint artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-oxlint
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Variant E: the existing `npm run lint`, for comparison with D. Not autofixed.
+  eslint:
+    name: E npm run lint (ESLint, existing script)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - name: npm run lint
+        working-directory: apps/frontend
+        run: bash ../../scripts/ci-benchmark/timed.sh "npm run lint" npm run lint > "$BENCH_OUT/eslint.log" 2>&1
+      - name: Step summary
+        if: always()
+        run: |
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "E npm run lint (ESLint)"
+          grep -Eo '[0-9]+ problems?.*' "$BENCH_OUT/eslint.log" | tail -n 1 >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload eslint artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-eslint
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Variant F: four parallel shards. All four restore the SAME pinned snapshot key
+  # resolved by resolve-timings. Without a snapshot they use Vitest's native --shard.
+  shards:
+    name: F shard ${{ matrix.shard }}/4 (blob)
+    needs: [resolve-timings]
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SHARD_COUNT: 4
+      SNAPSHOT_KEY: ${{ needs.resolve-timings.outputs.timingsKey }}
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench/shard-${{ matrix.shard }}"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/shard-${{ matrix.shard }}/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/shard-${{ matrix.shard }}/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      # Exact-key restore: the key was resolved once, so every shard gets identical bytes.
+      - name: Restore pinned timings snapshot
+        if: env.SNAPSHOT_KEY != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/bench/timings.json
+          key: ${{ needs.resolve-timings.outputs.timingsKey }}
+      - name: Select partition mode
+        run: |
+          if [ -n "$SNAPSHOT_KEY" ]; then
+            test -f "$RUNNER_TEMP/bench/timings.json" || { echo "pinned snapshot $SNAPSHOT_KEY did not restore" >&2; exit 1; }
+            echo "BENCH_TIMINGS_FILE=$RUNNER_TEMP/bench/timings.json" >> "$GITHUB_ENV"
+            echo "partition: timed-lpt from pinned snapshot $SNAPSHOT_KEY" | tee -a "$BENCH_STEPS_FILE.note"
+          else
+            echo "partition: native-hash, no snapshot (cold start, not time-balanced)" | tee -a "$BENCH_STEPS_FILE.note"
+          fi
+      # Blob reporter with coverage; the merge job merges coverage once.
+      - name: vitest shard ${{ matrix.shard }}/4
+        working-directory: apps/frontend
+        env:
+          BENCH_PLAN_FILE: ${{ runner.temp }}/bench/shard-${{ matrix.shard }}/plan/shard-${{ matrix.shard }}-of-4.json
+        run: |
+          bash ../../scripts/ci-benchmark/timed.sh "vitest shard ${{ matrix.shard }}/4" \
+            npx vitest run --config scripts/ci-benchmark/vitest.shard.config.mts \
+            --shard="${{ matrix.shard }}/${SHARD_COUNT}" \
+            --coverage --coverage.reportsDirectory="$RUNNER_TEMP/bench/shard-${{ matrix.shard }}/coverage" \
+            --reporter=blob \
+            --outputFile.blob="$RUNNER_TEMP/bench/shard-${{ matrix.shard }}/blob/blob-${{ matrix.shard }}-of-4.json"
+      - name: Step summary
+        if: always()
+        run: |
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "F shard ${{ matrix.shard }}/4" \
+            --note "$(cat "$BENCH_STEPS_FILE.note" 2>/dev/null)"
+      - name: Upload shard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/bench/shard-${{ matrix.shard }}
+          retention-days: 7
+          if-no-files-found: error
+
+  # Merge: all four blobs must be present, file set verified, merged once, then the
+  # unchanged coverage checker runs on the merged lcov.info.
+  merge:
+    name: G merge shards + coverage check
+    needs: [shards]
+    if: always() && github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-shard-*
+          path: ${{ runner.temp }}/collected
+      - name: Collect blobs and plans (fail unless all four shards produced both)
+        run: |
+          mkdir -p "$BENCH_OUT/merge-blobs" "$BENCH_OUT/merge-plans"
+          shopt -s nullglob
+          blobs=("$RUNNER_TEMP"/collected/benchmark-shard-*/blob/*.json)
+          plans=("$RUNNER_TEMP"/collected/benchmark-shard-*/plan/*.json)
+          echo "blobs: ${#blobs[@]}, plans: ${#plans[@]}"
+          if [ "${#blobs[@]}" -ne 4 ] || [ "${#plans[@]}" -ne 4 ]; then
+            echo "MISSING SHARD OUTPUT" >&2
+            exit 1
+          fi
+          cp "${blobs[@]}" "$BENCH_OUT/merge-blobs/"
+          cp "${plans[@]}" "$BENCH_OUT/merge-plans/"
+      - name: vitest list (expected file set, full suite)
+        working-directory: apps/frontend
+        run: |
+          bash ../../scripts/ci-benchmark/timed.sh "vitest list (expected files)" \
+            npx vitest list --config scripts/ci-benchmark/vitest.shard.config.mts \
+            --filesOnly --json="$BENCH_OUT/expected.json"
+      - name: vitest merge blobs + coverage
+        working-directory: apps/frontend
+        run: |
+          bash ../../scripts/ci-benchmark/timed.sh "vitest merge blobs + coverage" \
+            npx vitest run --config scripts/ci-benchmark/vitest.shard.config.mts \
+            --mergeReports="$BENCH_OUT/merge-blobs" --coverage \
+            --reporter=default --reporter=json \
+            --outputFile.json="$BENCH_OUT/merged-report.json"
+      - name: verify shard file set
+        run: |
+          rc=0
+          bash scripts/ci-benchmark/timed.sh "verify shard file set" \
+            node scripts/ci-benchmark/verify-shards.mjs \
+            --expected "$BENCH_OUT/expected.json" --plans "$BENCH_OUT/merge-plans" --count 4 \
+            --merged "$BENCH_OUT/merged-report.json" > "$BENCH_OUT/verify-shards.txt" 2>&1 || rc=$?
+          cat "$BENCH_OUT/verify-shards.txt"
+          exit "$rc"
+      - name: check-coverage.mjs on merged lcov (unchanged)
+        working-directory: apps/frontend
+        run: bash ../../scripts/ci-benchmark/timed.sh "check-coverage.mjs (merged)" node scripts/check-coverage.mjs
+      - name: Stage merged LCOV
+        if: always()
+        working-directory: apps/frontend
+        run: |
+          if [ -f coverage/lcov.info ]; then cp coverage/lcov.info "$BENCH_OUT/lcov.info"; fi
+      - name: Step summary
+        if: always()
+        run: |
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "G merge and coverage check"
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_SETUP_FILE" "G merge: setup"
+      - name: Upload merge artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-merge
+          path: |
+            ${{ runner.temp }}/bench/steps.jsonl
+            ${{ runner.temp }}/bench/setup.jsonl
+            ${{ runner.temp }}/bench/expected.json
+            ${{ runner.temp }}/bench/merged-report.json
+            ${{ runner.temp }}/bench/verify-shards.txt
+            ${{ runner.temp }}/bench/lcov.info
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Variant I: affected-tests trial. `vitest related` over the static graph of changed
+  # modules; changed test files run directly. Anything broader forces FULL. No coverage,
+  # and the global thresholds are never applied to an affected run.
+  affected:
+    name: I affected tests (trial)
+    if: github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare output directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench/affected"
+          {
+            echo "BENCH_OUT=$RUNNER_TEMP/bench"
+            echo "BENCH_STEPS_FILE=$RUNNER_TEMP/bench/steps.jsonl"
+            echo "BENCH_SETUP_FILE=$RUNNER_TEMP/bench/setup.jsonl"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        id: node
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - name: npm ci (setup, separate file)
+        working-directory: apps/frontend
+        run: |
+          BENCH_STEPS_FILE="$BENCH_SETUP_FILE" bash ../../scripts/ci-benchmark/timed.sh \
+            "npm ci (npm-cache-hit=${{ steps.node.outputs.cache-hit }})" npm ci
+      - name: Select affected tests
+        env:
+          AFFECTED_BASE: ${{ inputs.affected_base || 'origin/main' }}
+        run: |
+          echo "base ref: $AFFECTED_BASE"
+          node scripts/ci-benchmark/select-affected.mjs --base "$AFFECTED_BASE" --head HEAD \
+            --out "$BENCH_OUT/affected/selection.json"
+      - name: Run affected selection
+        working-directory: apps/frontend
+        run: |
+          sel="$BENCH_OUT/affected/selection.json"
+          mode=$(jq -r .mode "$sel")
+          echo "mode=$mode" | tee "$BENCH_OUT/affected/status.txt"
+          case "$mode" in
+            NO_SAMPLE)
+              echo "not measured: no frontend change" | tee -a "$BENCH_OUT/affected/status.txt"
+              ;;
+            FULL)
+              bash ../../scripts/ci-benchmark/timed.sh "vitest full (affected FULL, no coverage)" \
+                npx vitest run --reporter=default --reporter=json \
+                --outputFile.json="$BENCH_OUT/affected/report.json"
+              ;;
+            AFFECTED)
+              mapfile -t files < <(jq -r '.directTests[], .relatedSources[]' "$sel")
+              bash ../../scripts/ci-benchmark/timed.sh "vitest related (affected, no coverage)" \
+                npx vitest related --run --passWithNoTests "${files[@]}" \
+                --reporter=default --reporter=json \
+                --outputFile.json="$BENCH_OUT/affected/report.json"
+              ;;
+            *)
+              echo "unknown mode: $mode" >&2
+              exit 1
+              ;;
+          esac
+      - name: Step summary
+        if: always()
+        run: |
+          node scripts/ci-benchmark/summarize.mjs "$BENCH_STEPS_FILE" "I affected tests (trial)" \
+            --note "$(cat "$BENCH_OUT/affected/status.txt" 2>/dev/null)"
+          jq -r '"reason: \(.reason)\nbase \(.base), merge-base \(.mergeBase)\ndirect tests \(.directTests|length), related modules \(.relatedSources|length)"' \
+            "$BENCH_OUT/affected/selection.json" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload affected artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-affected
+          path: ${{ runner.temp }}/bench
+          retention-days: 7
+          if-no-files-found: warn
+
+  # Aggregate timings, then VERIFY baseline vs merged shards. Any missing input or any
+  # difference in executed test files, statuses, per-file LCOV totals, or bucket totals fails this job.
+  report:
+    name: Benchmark report and verification
+    needs:
+      [
+        resolve-timings,
+        baseline,
+        typecheck,
+        build,
+        bun-check,
+        oxlint,
+        eslint,
+        shards,
+        merge,
+        affected,
+      ]
+    if: always() && github.ref == 'refs/heads/bench/frontend-ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-*
+          path: ${{ runner.temp }}/all
+      - name: Job results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          {
+            echo "### Job results"
+            echo "| Job | Result |"
+            echo "| --- | --- |"
+            # shellcheck disable=SC2016 # single-quoted JS below is intentional
+            echo "$NEEDS_JSON" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{for(const [k,v] of Object.entries(JSON.parse(s))) console.log(`| ${k} | ${v.result} |`)})'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Timing report
+        run: node scripts/ci-benchmark/report.mjs "$RUNNER_TEMP/all" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify baseline vs merged shards (fails on any mismatch or missing input)
+        run: |
+          node scripts/ci-benchmark/compare-results.mjs \
+            --baseline-report "$RUNNER_TEMP/all/benchmark-baseline/baseline-report.json" \
+            --merged-report "$RUNNER_TEMP/all/benchmark-merge/merged-report.json" \
+            --baseline-lcov "$RUNNER_TEMP/all/benchmark-baseline/lcov.info" \
+            --merged-lcov "$RUNNER_TEMP/all/benchmark-merge/lcov.info" >> "$GITHUB_STEP_SUMMARY"
