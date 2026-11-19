@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { type AuthenticatedUser } from '~/proxy'
+import { type CourseMetadata } from '~/types/courseMetadata'
 import { type NextRequest, NextResponse } from 'next/server'
 import {
   getKeycloakBaseFromHost,
@@ -31,6 +32,8 @@ export interface AuthenticatedRequest extends NextRequest {
   // The single project name the access check resolved and authorized. Handlers
   // must use this, never their own copy from the query or body (#312).
   courseName?: string
+  // Stored metadata the access check loaded; never the request body's copy.
+  courseMetadata?: CourseMetadata
 }
 
 export function getUserIdentifier(req: AuthenticatedRequest): string | null {
