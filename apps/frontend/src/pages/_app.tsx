@@ -1,6 +1,7 @@
 import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
-import { type AppType } from 'next/app'
+import { type AppProps } from 'next/app'
+import { type NextPage } from 'next'
 
 import Maintenance from '~/components/UIUC-Components/Maintenance'
 import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
@@ -12,7 +13,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useRouter } from 'next/router'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
 
 // import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
@@ -104,7 +105,19 @@ interface SiteBannerPageProps {
   navbarBrandingReadAt?: number
 }
 
-const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
+export type NextPageWithLayout = NextPage & {
+  getLayout?: (page: ReactElement) => ReactNode
+}
+
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout
+}
+
+const MyApp = ({
+  Component,
+  pageProps: { ...pageProps },
+}: AppPropsWithLayout) => {
+  const getLayout = Component.getLayout ?? ((page) => page)
   const router = useRouter()
   // Held in state so the cache survives re-renders. The maintenance gate reads
   // through React Query now, and a client rebuilt every render would drop that
@@ -177,7 +190,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               position="left"
               buttonPosition="bottom-right"
             />
-              <ThemeProvider>
+            <ThemeProvider>
               <Toaster position="bottom-center" />
               <MaintenanceGate>
                 <SiteAnnouncementBanner
@@ -188,7 +201,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
                     (pageProps as SiteBannerPageProps).announcementBannerReadAt
                   }
                 />
-                <Component {...pageProps} />
+                {getLayout(<Component {...pageProps} />)}
               </MaintenanceGate>
             </ThemeProvider>
           </PostHogProvider>

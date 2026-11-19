@@ -45,11 +45,9 @@ export async function getModels(
 
   const resolved = await resolveModels(projectName)
 
-  await redisClient.set(
-    modelsCacheKey(projectName),
-    JSON.stringify(resolved),
-    { EX: MODELS_CACHE_TTL_SECONDS },
-  )
+  await redisClient.set(modelsCacheKey(projectName), JSON.stringify(resolved), {
+    EX: MODELS_CACHE_TTL_SECONDS,
+  })
   return resolved
 }
 

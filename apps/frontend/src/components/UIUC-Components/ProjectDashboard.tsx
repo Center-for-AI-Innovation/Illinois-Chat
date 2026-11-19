@@ -1,5 +1,4 @@
 import Head from 'next/head'
-import { useRouter } from 'next/router'
 import { useState } from 'react'
 
 import SettingsLayout, {
@@ -8,37 +7,22 @@ import SettingsLayout, {
 import GlobalFooter from './GlobalFooter'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { CannotEditCourse } from './CannotEditCourse'
 import DocumentGroupsCard from './DocumentGroupsCard'
 import DocumentsCard from './DocumentsCard'
 import { UploadCard } from './UploadCard'
 
-const MakeOldCoursePage = ({
+const ProjectDashboard = ({
   course_name,
   metadata,
   current_email,
-  isSuperAdmin = false,
 }: {
   course_name: string
   metadata: CourseMetadata
   current_email: string
-  isSuperAdmin?: boolean
 }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState,
   )
-  const router = useRouter()
-
-  if (
-    metadata &&
-    !isSuperAdmin &&
-    current_email !== (metadata.course_owner as string) &&
-    metadata.course_admins.indexOf(current_email) === -1
-  ) {
-    router.replace(`/${course_name}/not_authorized`)
-
-    return <CannotEditCourse course_name={course_name as string} />
-  }
 
   return (
     <SettingsLayout
@@ -93,4 +77,4 @@ const MakeOldCoursePage = ({
   )
 }
 
-export default MakeOldCoursePage
+export default ProjectDashboard
