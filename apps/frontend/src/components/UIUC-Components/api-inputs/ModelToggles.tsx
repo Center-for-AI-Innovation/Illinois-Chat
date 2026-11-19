@@ -22,9 +22,14 @@ export function ModelToggles({
   form: any
   provider: LLMProvider
 }) {
-  const providerModels = provider?.provider
-    ? form.state.values.providers[provider.provider]?.models || {}
-    : {}
+  // Subscribe to the form store so the list re-renders when the form is
+  // reset with refetched providers (e.g. after saving a key for the first time).
+  const providerModels =
+    form.useStore((state: any) =>
+      provider?.provider
+        ? state.values.providers?.[provider.provider]?.models
+        : undefined,
+    ) || {}
   const chatbotId = GetCurrentPageName()
 
   const [pendingModel, setPendingModel] = useState<PendingFlaggedModel | null>(
