@@ -1,0 +1,33 @@
+{
+  // Benchmark-only oxlint trial config (oxlint 1.94.0, pinned in the workflow).
+  // Not used by `npm run lint`, and not a replacement for the ESLint setup.
+  // Enables the correctness and suspicious categories and the plugins that
+  // apply to this codebase. Style and pedantic categories are left off on
+  // purpose: they conflict with the existing Prettier formatting and would
+  // measure style preferences, not CI cost or correctness.
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "react",
+    "jsx-a11y",
+    "import",
+    "promise",
+    "nextjs",
+    "vitest"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    // The project uses the automatic JSX runtime (tsconfig "jsx": "react-jsx"),
+    // so React does not need to be in scope. Enabling this flags every JSX file.
+    "react/react-in-jsx-scope": "off",
+    // Mock type-parameter style, not a correctness issue; ~2000 hits in tests.
+    "vitest/require-mock-type-parameters": "off",
+    // Style-leaning rules that duplicate the team's existing conventions.
+    "unicorn/consistent-function-scoping": "off",
+    "eslint/no-underscore-dangle": "off",
+    "eslint/no-shadow": "off"
+  }
+}
