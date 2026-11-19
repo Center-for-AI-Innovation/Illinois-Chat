@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 import { CannotEditCourse } from '~/components/UIUC-Components/CannotEditCourse'
@@ -32,6 +32,21 @@ export default function CourseAdminLayout({
     courseName,
     enabled: router.isReady && auth.isAuthenticated && !noContext,
   })
+
+  // A 401 can mean the cookie expired before silent renew; re-check once a new token arrives
+  const token = auth.user?.access_token
+  const roleRef = useRef(role)
+  roleRef.current = role
+  const prevToken = useRef(token)
+  useEffect(() => {
+    if (token === prevToken.current) return
+    prevToken.current = token
+    const current = roleRef.current
+    if (!current.isLoadingError || current.error.status !== 401) return
+    // AuthCookie, a parent, writes the new cookie in an effect that runs after this one
+    const id = setTimeout(() => void current.refetch(), 0)
+    return () => clearTimeout(id)
+  }, [token])
 
   if (!router.isReady || auth.isLoading || courseName === '') {
     return <LoadingPlaceholderForAdminPages />

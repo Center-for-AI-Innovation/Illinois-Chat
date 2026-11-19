@@ -1,6 +1,6 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 
 const hoisted = vi.hoisted(() => ({
   router: { isReady: true, query: { course_name: 'my-bot' } as any },
@@ -151,6 +151,61 @@ describe('CourseAdminLayout', () => {
       error: { status: 500 },
     }
     renderLayout()
+    expect(screen.getByText('page-content')).toBeTruthy()
+  })
+
+  it('re-checks the role when a renewed token arrives after a 401', async () => {
+    const refetch = vi.fn()
+    hoisted.auth = {
+      isLoading: false,
+      isAuthenticated: true,
+      user: { access_token: 'expired' },
+    }
+    hoisted.role = {
+      isPending: false,
+      isError: true,
+      isLoadingError: true,
+      data: undefined,
+      error: { status: 401 },
+      refetch,
+    }
+    const view = renderLayout()
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(refetch).not.toHaveBeenCalled()
+
+    hoisted.auth = { ...hoisted.auth, user: { access_token: 'renewed' } }
+    view.rerender(
+      <CourseAdminLayout>
+        <Child />
+      </CourseAdminLayout>,
+    )
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not refetch on token renewal once the role is confirmed', async () => {
+    const refetch = vi.fn()
+    hoisted.auth = {
+      isLoading: false,
+      isAuthenticated: true,
+      user: { access_token: 'first' },
+    }
+    hoisted.role = { ...hoisted.role, refetch }
+    const view = renderLayout()
+    hoisted.auth = { ...hoisted.auth, user: { access_token: 'second' } }
+    view.rerender(
+      <CourseAdminLayout>
+        <Child />
+      </CourseAdminLayout>,
+    )
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(refetch).not.toHaveBeenCalled()
     expect(screen.getByText('page-content')).toBeTruthy()
   })
 

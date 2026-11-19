@@ -56,13 +56,33 @@ describe('useFetchCourseRole retries', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('does not retry a 4xx', async () => {
+  it('retries a 401 once and then returns the role', async () => {
     const { result, fetchMock } = renderRoleHook([
       res(401),
       res(200, { role: 'owner' }),
     ])
-    await waitFor(() => expect(result.current.isError).toBe(true))
+    await waitFor(() => expect(result.current.data).toBe('owner'), {
+      timeout: 3000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up after a second 401', async () => {
+    const { result, fetchMock } = renderRoleHook([res(401), res(401)])
+    await waitFor(() => expect(result.current.isError).toBe(true), {
+      timeout: 3000,
+    })
     expect(result.current.error?.status).toBe(401)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry other 4xx', async () => {
+    const { result, fetchMock } = renderRoleHook([
+      res(403),
+      res(200, { role: 'owner' }),
+    ])
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error?.status).toBe(403)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
