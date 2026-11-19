@@ -1,10 +1,9 @@
 import Head from 'next/head'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import SettingsLayout, {
   getInitialCollapsedState,
 } from '~/components/Layout/SettingsLayout'
-import { fetchPresignedUrl } from '~/utils/apiUtils'
 import GlobalFooter from './GlobalFooter'
 
 import { type CourseMetadata } from '~/types/courseMetadata'
@@ -21,44 +20,13 @@ const ProjectDashboard = ({
   metadata: CourseMetadata
   current_email: string
 }) => {
-  const [bannerUrl, setBannerUrl] = useState<string>('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     getInitialCollapsedState,
   )
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (metadata == null) {
-          console.error('No metadata found for course')
-          return
-        }
-        // fetch banner image url
-        if (metadata?.banner_image_s3 && metadata.banner_image_s3 !== '') {
-          console.log('Getting banner image: ', metadata.banner_image_s3)
-          try {
-            const url = await fetchPresignedUrl(
-              metadata.banner_image_s3,
-              course_name,
-            )
-            setBannerUrl(url as string)
-            console.log('Got banner image: ', url)
-          } catch (error) {
-            console.error('Error fetching banner image: ', error)
-          }
-        }
-      } catch (error) {
-        console.error(error)
-        // alert('An error occurred while fetching course metadata. Please try again later.')
-      }
-    }
-
-    fetchData()
-  }, [metadata])
 
   return (
     <SettingsLayout
       course_name={course_name}
-      bannerUrl={bannerUrl}
       sidebarCollapsed={sidebarCollapsed}
       setSidebarCollapsed={setSidebarCollapsed}
     >
@@ -73,7 +41,7 @@ const ProjectDashboard = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main flex min-h-screen w-full flex-col items-center"
+        className="course-page-main flex min-h-(--viewport-height) w-full flex-col items-center"
       >
         <h1 className="sr-only">{course_name} Dashboard</h1>
         <div className="items-left flex w-full flex-col justify-center py-0">

@@ -1,6 +1,7 @@
 import { type NextApiResponse } from 'next'
 import { getCourseMetadata, getCourseRole } from '~/server/authorization'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
+import { isSuperAdminAsync } from '~/utils/superAdmins.server'
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!req.user) {
@@ -23,7 +24,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .json({ error: 'Project is temporarily frozen by the administrator' })
   }
 
-  return res.status(200).json({ role: getCourseRole(req.user, metadata) })
+  const role = getCourseRole(req.user, metadata)
+  // Super admins can manage any project, matching withCourseOwnerOrAdminAccess
+  if (
+    role !== 'owner' &&
+    role !== 'admin' &&
+    (await isSuperAdminAsync(req.user.email))
+  ) {
+    return res.status(200).json({ role: 'super_admin' })
+  }
+  return res.status(200).json({ role })
 }
 
 export default withAuth(handler)

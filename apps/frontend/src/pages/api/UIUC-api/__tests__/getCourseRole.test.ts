@@ -2,10 +2,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NextApiResponse } from 'next'
 
-const hoisted = vi.hoisted(() => ({ hGet: vi.fn() }))
+const hoisted = vi.hoisted(() => ({
+  hGet: vi.fn(),
+  isSuperAdmin: vi.fn(async () => false),
+}))
 
 vi.mock('~/utils/redisClient', () => ({
   ensureRedisConnected: vi.fn(async () => ({ hGet: hoisted.hGet })),
+}))
+vi.mock('~/utils/superAdmins.server', () => ({
+  isSuperAdminAsync: hoisted.isSuperAdmin,
 }))
 vi.mock('~/utils/authMiddleware', () => ({
   withAuth: (fn: unknown) => fn,
@@ -44,13 +50,39 @@ const stored = (over: Record<string, unknown> = {}) =>
   })
 
 describe('GET /api/UIUC-api/getCourseRole', () => {
-  beforeEach(() => hoisted.hGet.mockReset())
+  beforeEach(() => {
+    hoisted.hGet.mockReset()
+    hoisted.isSuperAdmin.mockReset()
+    hoisted.isSuperAdmin.mockResolvedValue(false)
+  })
 
   it('returns the role for a signed-in user', async () => {
     hoisted.hGet.mockResolvedValue(stored())
     const res = await run({ course_name: 'c' }, 'admin@illinois.edu')
     expect(res.statusCode).toBe(200)
     expect(res.body).toEqual({ role: 'admin' })
+  })
+
+  it('returns super_admin for a platform super admin with no project role', async () => {
+    hoisted.hGet.mockResolvedValue(stored())
+    hoisted.isSuperAdmin.mockResolvedValue(true)
+    const res = await run({ course_name: 'c' }, 'root@illinois.edu')
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toEqual({ role: 'super_admin' })
+  })
+
+  it('keeps the project role for a super admin who owns the project', async () => {
+    hoisted.hGet.mockResolvedValue(stored())
+    hoisted.isSuperAdmin.mockResolvedValue(true)
+    const res = await run({ course_name: 'c' }, 'owner@illinois.edu')
+    expect(res.body).toEqual({ role: 'owner' })
+  })
+
+  it('returns 403 to a super admin when the project is frozen', async () => {
+    hoisted.hGet.mockResolvedValue(stored({ is_frozen: true }))
+    hoisted.isSuperAdmin.mockResolvedValue(true)
+    const res = await run({ course_name: 'c' }, 'root@illinois.edu')
+    expect(res.statusCode).toBe(403)
   })
 
   it('returns 401 when signed out', async () => {

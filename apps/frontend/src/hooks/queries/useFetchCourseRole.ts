@@ -4,6 +4,9 @@ import { getBaseUrl } from '~/utils/apiUtils'
 
 export type { CourseRole }
 
+// The endpoint reports 'super_admin' when a platform super admin holds no project role
+export type CourseAccessRole = CourseRole | 'super_admin'
+
 export class CourseRoleError extends Error {
   status: number
 
@@ -14,7 +17,9 @@ export class CourseRoleError extends Error {
   }
 }
 
-export async function fetchCourseRole(courseName: string): Promise<CourseRole> {
+export async function fetchCourseRole(
+  courseName: string,
+): Promise<CourseAccessRole> {
   const response = await fetch(
     `${getBaseUrl()}/api/UIUC-api/getCourseRole?course_name=${encodeURIComponent(courseName)}`,
   )
@@ -24,7 +29,7 @@ export async function fetchCourseRole(courseName: string): Promise<CourseRole> {
       `Error fetching course role: ${response.statusText || response.status}`,
     )
   }
-  const data = (await response.json()) as { role: CourseRole }
+  const data = (await response.json()) as { role: CourseAccessRole }
   return data.role
 }
 
@@ -35,7 +40,7 @@ export function useFetchCourseRole({
   courseName: string
   enabled?: boolean
 }) {
-  return useQuery<CourseRole, CourseRoleError>({
+  return useQuery<CourseAccessRole, CourseRoleError>({
     queryKey: ['courseRole', courseName],
     queryFn: () => fetchCourseRole(courseName),
     // Retry network errors and 5xx; retry a 401 once in case the token is mid-renewal

@@ -73,6 +73,12 @@ describe('CourseAdminLayout', () => {
     expect(screen.getByText('page-content')).toBeTruthy()
   })
 
+  it('renders the page for a platform super admin', () => {
+    hoisted.role.data = 'super_admin'
+    renderLayout()
+    expect(screen.getByText('page-content')).toBeTruthy()
+  })
+
   it('shows CannotEditCourse for a member without mounting the page', () => {
     hoisted.role.data = 'member'
     renderLayout()

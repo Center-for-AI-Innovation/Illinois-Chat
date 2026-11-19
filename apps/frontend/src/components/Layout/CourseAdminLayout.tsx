@@ -11,7 +11,8 @@ import { useFetchCourseRole } from '~/hooks/queries/useFetchCourseRole'
 import { isNoContextProject } from '~/utils/projectName'
 
 /**
- * Guards a project settings page so only the owner and admins can open it.
+ * Guards a project settings page so only the owner, admins and platform
+ * super admins can open it.
  * Applied through `Page.getLayout` in `_app`, so the page's own components
  * (which fetch data on mount) only mount once the role is confirmed.
  */
@@ -85,7 +86,11 @@ export default function CourseAdminLayout({
     )
   }
 
-  if (role.data !== 'owner' && role.data !== 'admin') {
+  if (
+    role.data !== 'owner' &&
+    role.data !== 'admin' &&
+    role.data !== 'super_admin'
+  ) {
     return <CannotEditCourse course_name={courseName} />
   }
 
