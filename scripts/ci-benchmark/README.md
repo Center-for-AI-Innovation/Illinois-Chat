@@ -8,6 +8,7 @@ deploys nothing, uses no secrets or network credentials, and posts nothing.
   `refs/heads/bench/frontend-ci`, so a dispatch from another ref does nothing.
 - Runs on push to `bench/frontend-ci` and on manual dispatch. No PR is needed.
 - Canonical PR Checks and all other workflows are unchanged.
+- Observed results from the three runs on one commit: [RESULTS.md](RESULTS.md).
 
 ## Files
 
