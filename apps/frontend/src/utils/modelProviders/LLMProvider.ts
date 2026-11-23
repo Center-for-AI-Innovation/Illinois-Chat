@@ -200,6 +200,14 @@ export const VisionCapableModels: Set<
   SambaNovaModelID.Llama_3_2_90B_Vision_Instruct,
 
   // OpenAI-compatible vision-capable models
+  OpenAICompatibleModelID.Qwen3_6_35B_A3B,
+  OpenAICompatibleModelID.Qwen3_8_27B,
+  OpenAICompatibleModelID.Qwen3_8_Flash,
+  OpenAICompatibleModelID.Gemma_4_31B,
+  OpenAICompatibleModelID.Muse_Glimmer_30B,
+  OpenAICompatibleModelID.DeepSeek_V4_1_Flash,
+  OpenAICompatibleModelID.DeepSeek,
+  OpenAICompatibleModelID.DeepSeek_V4_1,
   OpenAICompatibleModelID.Claude_Haiku_4_5,
   OpenAICompatibleModelID.Claude_Opus_4_1,
   OpenAICompatibleModelID.Claude_Opus_4_5,
@@ -272,6 +280,11 @@ export const ReasoningCapableModels: Set<
   OpenAIModelID.GPT_5_2_codex,
   OllamaModelIDs.DEEPSEEK_R1_14b_qwen_fp16,
   // OpenAI-compatible reasoning models
+  OpenAICompatibleModelID.Nemotron_3_Super_120B_A12B,
+  OpenAICompatibleModelID.Gemma_4_31B,
+  OpenAICompatibleModelID.Ornith_1_0_35B,
+  OpenAICompatibleModelID.Muse_Glimmer_30B,
+  OpenAICompatibleModelID.Beam_1_0,
   // GPT-5 family (all have reasoning capabilities)
   OpenAICompatibleModelID.GPT_5,
   OpenAICompatibleModelID.GPT_5_5,
@@ -293,15 +306,24 @@ export const ReasoningCapableModels: Set<
   OpenAICompatibleModelID.Claude_Opus_4_1,
   OpenAICompatibleModelID.Claude_Opus_4_5,
   // DeepSeek reasoning models
+  OpenAICompatibleModelID.DeepSeek_V4_Flash,
+  OpenAICompatibleModelID.DeepSeek_V4_1_Flash,
+  OpenAICompatibleModelID.DeepSeek,
+  OpenAICompatibleModelID.DeepSeek_V4_1,
   OpenAICompatibleModelID.DeepSeek_R1_Zero,
   OpenAICompatibleModelID.DeepSeek_R1_0528_Qwen3_8B,
   OpenAICompatibleModelID.DeepSeek_V3_2,
   OpenAICompatibleModelID.DeepSeek_V3_2_Speciale,
   // Qwen reasoning models
+  OpenAICompatibleModelID.Qwen3_8_Flash,
+  OpenAICompatibleModelID.Qwen3_6_35B_A3B,
+  OpenAICompatibleModelID.Qwen3_8_27B,
   OpenAICompatibleModelID.Qwen3_32B,
   OpenAICompatibleModelID.Qwen3_235B_A22B,
   OpenAICompatibleModelID.Qwen3_VL_235B_A22B_Thinking,
   // GLM reasoning models
+  OpenAICompatibleModelID.GLM_5_3,
+  OpenAICompatibleModelID.GLM,
   OpenAICompatibleModelID.GLM_4_5,
   OpenAICompatibleModelID.GLM_4_1V_9B_Thinking,
   // OLMO reasoning models

@@ -129,3 +129,33 @@ describe('ChatbotDetailDialog admin settings', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+describe('ChatbotDetailDialog role badge', () => {
+  it('shows no role badge on a public bot the user has no role on', () => {
+    renderDialog({
+      card: { ...adminCard(undefined), accessLevel: 'public', isPrivate: false },
+    })
+    for (const label of ['Owner', 'Admin', 'Member']) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+
+  it('shows the Admin badge for a non-owner admin', () => {
+    renderDialog({ card: adminCard('admin') })
+    expect(screen.getByText('Admin')).toBeInTheDocument()
+    expect(screen.queryByText('Owner')).not.toBeInTheDocument()
+  })
+
+  it('infers the Admin badge from course_admins when no role is passed', () => {
+    renderDialog({
+      card: {
+        ...adminCard(undefined),
+        metadata: {
+          course_owner: 'owner@example.com',
+          course_admins: ['me@example.com'],
+        } as ChatbotCardData['metadata'],
+      },
+    })
+    expect(screen.getByText('Admin')).toBeInTheDocument()
+  })
+})
