@@ -60,13 +60,19 @@ const handler = async (
     })
 
     if (!response.ok) {
+      // A 401 or 403 from the backend is about the key between our two
+      // services, not about the user. The browser would read it as "you are
+      // not signed in", so it gets 502. Other statuses pass through.
+      const refused = response.status === 401 || response.status === 403
       // backendFetch already logged one ERROR with the status and body.
       log.warn('ingest not queued', {
-        status: response.status,
+        upstream_status: response.status,
         file: s3_filepath,
       })
-      return res.status(response.status).json({
-        error: `Ingest backend answered with status ${response.status}`,
+      return res.status(refused ? 502 : response.status).json({
+        error: refused
+          ? `Ingest backend refused the request (status ${response.status})`
+          : `Ingest backend answered with status ${response.status}`,
       })
     }
 

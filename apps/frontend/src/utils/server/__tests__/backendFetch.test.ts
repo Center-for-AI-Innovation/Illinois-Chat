@@ -47,6 +47,25 @@ describe('backendFetch', () => {
     )
   })
 
+  it('logs a 422 as one WARNING line, not an ERROR', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const body = '{"error":"Canvas import found no documents"}'
+    fetchMock.mockResolvedValue(new Response(body, { status: 422 }))
+
+    const res = await backendFetch('http://backend:8001/canvas_ingest', {
+      method: 'POST',
+    })
+
+    expect(res.status).toBe(422)
+    await expect(res.text()).resolves.toBe(body)
+    expect(error).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0] as string).toMatch(
+      / WARNING backendFetch backend 422 POST \/canvas_ingest ms=\d+ body=/,
+    )
+  })
+
   it('logs status, method, path, ms and the first 500 body characters on !ok', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     const longBody = 'x'.repeat(600)

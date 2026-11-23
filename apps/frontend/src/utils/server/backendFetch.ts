@@ -1,7 +1,10 @@
 // fetch() for calls from Next API routes to the Python backend (or the ingest
 // bridge). Forwards the request id so one grep follows a request across
 // services, and logs one ERROR line when the backend answers with an error
-// status. Returns the response unchanged; callers still decide what to do.
+// status (one WARNING line for a 422: the backend understood the request and
+// found nothing it could do with it, for example a Canvas course with no
+// document to import). Returns the response unchanged; callers still decide
+// what to do.
 // No timeout on purpose: scrape and Canvas calls run for minutes.
 // Server-only by convention.
 import { getLogger } from './log'
@@ -65,6 +68,7 @@ export async function backendFetch(
   } catch (err) {
     body = `<unreadable: ${err instanceof Error ? err.message : String(err)}>`
   }
-  log.error(what, { ms, body })
+  if (response.status === 422) log.warn(what, { ms, body })
+  else log.error(what, { ms, body })
   return response
 }
