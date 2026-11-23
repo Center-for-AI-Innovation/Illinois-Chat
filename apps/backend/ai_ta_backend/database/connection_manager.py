@@ -30,6 +30,7 @@ from botocore.config import Config
 from injector import inject
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.pool import NullPool
 
 
@@ -125,7 +126,12 @@ class ConnectionManager:
         pooler), and this matches the host engines in `database/sql.py`.
         """
         logger.debug("Creating external DB engine course=%s", project_name)
-        return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
+        try:
+            return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
+        except ArgumentError:
+            # SQLAlchemy writes the whole string into this error, and the string holds the
+            # password. `from None` keeps that text out of the traceback too.
+            raise ValueError("the connection_uri of project %s is not a valid database URL" % project_name) from None
 
     # ── Vector Engine Resolution ──
     #

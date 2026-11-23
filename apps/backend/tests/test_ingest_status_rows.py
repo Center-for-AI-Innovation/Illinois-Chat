@@ -39,6 +39,10 @@ def run(monkeypatch):
     return _run
 
 
+def errors(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+
+
 def test_ingested_file_is_not_marked_failed_when_the_cleanup_raises(run, caplog):
     caplog.set_level(logging.INFO)
     sql = MagicMock()
@@ -49,11 +53,11 @@ def test_ingested_file_is_not_marked_failed_when_the_cleanup_raises(run, caplog)
     sql.insert_failed_document.assert_not_called()
     # The delete is tried one more time, so the file does not stay "ingesting".
     assert sql.delete_document_in_progress.call_count == 2
-    assert [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR] == [
-        "ingest finished, but its status rows could not be updated"]
+    assert errors(caplog) == ["could not delete the documents_in_progress row"]
 
 
-def test_recorded_failure_gets_no_second_row_when_the_cleanup_raises(run):
+def test_recorded_failure_gets_no_second_row_when_the_cleanup_raises(run, caplog):
+    caplog.set_level(logging.INFO)
     sql = MagicMock()
     sql.delete_document_in_progress.side_effect = [RuntimeError("connection reset"), True]
 
@@ -62,29 +66,66 @@ def test_recorded_failure_gets_no_second_row_when_the_cleanup_raises(run):
     assert sql.insert_failed_document.call_count == 1
     assert sql.insert_failed_document.call_args.args[0]["error"] == "No text detected in image"
     assert sql.delete_document_in_progress.call_count == 2
+    assert "recorded failure for file=courses/proj/a.pdf" in caplog.text
 
 
-def test_failure_whose_row_raised_is_written_on_the_second_try(run):
+@pytest.mark.parametrize("first_answer", [RuntimeError("connection reset"), False])
+def test_failure_row_that_was_not_written_is_tried_again(run, caplog, first_answer):
+    """The database helper raises, or answers False for a SQL error that it logged itself."""
+    caplog.set_level(logging.INFO)
     sql = MagicMock()
-    sql.insert_failed_document.side_effect = [RuntimeError("connection reset"), True]
+    sql.insert_failed_document.side_effect = [first_answer, True]
 
     assert run(sql, FAILURE) == FAILURE
 
     assert sql.insert_failed_document.call_count == 2
+    # The delete worked on the first try and is not done a second time.
     sql.delete_document_in_progress.assert_called_once_with("job-1")
+    assert "recorded failure for file=courses/proj/a.pdf" in caplog.text
 
 
-def test_second_failure_of_the_status_rows_is_logged_and_keeps_the_result(run, caplog):
+def test_delete_that_answers_false_is_tried_again(run):
+    sql = MagicMock()
+    sql.delete_document_in_progress.side_effect = [False, True]
+
+    assert run(sql, SUCCESS) == SUCCESS
+
+    assert sql.delete_document_in_progress.call_count == 2
+    sql.insert_failed_document.assert_not_called()
+
+
+def test_rows_that_fail_two_times_are_logged_and_the_result_is_kept(run, caplog):
     caplog.set_level(logging.INFO)
     sql = MagicMock()
+    sql.insert_failed_document.return_value = False
     sql.delete_document_in_progress.side_effect = RuntimeError("connection reset")
+
+    assert run(sql, FAILURE) == FAILURE
+
+    assert sql.insert_failed_document.call_count == 2 and sql.delete_document_in_progress.call_count == 2
+    assert errors(caplog) == [
+        "could not delete the documents_in_progress row",
+        "could not delete the documents_in_progress row",
+        "status rows not updated after 2 tries (failed_row_written=False in_progress_row_deleted=False); "
+        "the dashboard can show a wrong status for the file"]
+    # The line that says the failure is recorded would be false here.
+    assert "recorded failure for file=" not in caplog.text
+
+
+def test_error_after_the_status_rows_writes_no_failed_row(run, monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    sql = MagicMock()
+
+    def flush(timeout=None):
+        raise RuntimeError("sentry transport closed")
+
+    monkeypatch.setattr(ingest_module.sentry_sdk, "flush", flush)
 
     assert run(sql, SUCCESS) == SUCCESS
 
     sql.insert_failed_document.assert_not_called()
-    assert [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR] == [
-        "ingest finished, but its status rows could not be updated",
-        "status rows not updated on the second try; the file can show as ingesting"]
+    sql.delete_document_in_progress.assert_called_once_with("job-1")
+    assert errors(caplog) == ["ingest finished, but the end of the job failed"]
 
 
 def test_error_before_the_ingest_has_a_result_is_still_recorded_as_failed(run, monkeypatch):

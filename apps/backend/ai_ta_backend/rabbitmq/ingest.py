@@ -252,10 +252,9 @@ class Ingest:
         _resolved_connections: optional ResolvedConnections from WorkerConnectionResolver.
         """
         success_fail_dict = None
-        # True when run_ingest and its retries gave a result. After that, an error can only
-        # come from the status rows, and the result of the ingest stays what it is.
+        # True when run_ingest and its retries gave a result. From then on the result of the
+        # ingest stays what it is: an error after it must not write a documents_failed row.
         ingest_ran = False
-        failure_recorded = False
         try:
             rc = _resolved_connections
             self.initialize_resources(
@@ -316,15 +315,7 @@ class Ingest:
                     break
             failure = success_fail_dict['failure_ingest']
             ingest_ran = True
-            if failure:
-                # insert_failed_document answers False when the database refused the row.
-                failure_recorded = self.sql_session.insert_failed_document(
-                    self._failed_document_payload(inputs, self._failure_text(failure))) is not False
-                logger.info("recorded failure for file=%s",
-                            (s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths) or url)
-
-            # Remove from documents in progress
-            self.sql_session.delete_document_in_progress(job_id)
+            self._update_status_rows(job_id, inputs, failure)
 
             sentry_sdk.flush(timeout=20)
             return json.dumps(success_fail_dict)
@@ -339,12 +330,11 @@ class Ingest:
 
         except Exception as e:
             if ingest_ran:
-                # The ingest has its result; the write of its status rows failed. A failed row
-                # written here would mark an ingested file as failed, or give a failed file
-                # a second row. Try the missing rows one more time and keep the result.
-                logger.exception("ingest finished, but its status rows could not be updated")
+                # The ingest has its result, and _update_status_rows did its work. A failed
+                # row written here would mark an ingested file as failed, or give a failed
+                # file a second row. Keep the result.
+                logger.exception("ingest finished, but the end of the job failed")
                 sentry_sdk.capture_exception(e)
-                self._finish_status_rows(job_id, inputs, success_fail_dict, failure_recorded)
                 return json.dumps(success_fail_dict, default=str)
             logger.exception("main_ingest failed")
             sentry_sdk.capture_exception(e)
@@ -366,21 +356,41 @@ class Ingest:
         """The error text of a `failure_ingest` value."""
         return failure.get('error', str(failure)) if isinstance(failure, dict) else str(failure)
 
-    def _finish_status_rows(self, job_id: str, inputs: dict, result: dict, failure_recorded: bool) -> None:
-        """Second and last try to write the status rows of a job whose ingest has a result:
-        the documents_failed row when the result is a failure that has no row yet, then the
-        delete of the documents_in_progress row. Without it the file shows as ingesting."""
-        if self.sql_session is None:
-            logger.error("status rows not updated: no database session; the file can show as ingesting")
+    def _update_status_rows(self, job_id: str, inputs: dict, failure) -> None:
+        """Writes the status rows of a job whose ingest has a result: the documents_failed
+        row when the result is a failure, then the delete of the documents_in_progress row.
+
+        A write that is not done is tried one more time. It does not raise: an error here
+        must not change the result of the ingest."""
+        recorded, deleted = self._try_status_rows(job_id, inputs, failure, not failure, False)
+        if not (recorded and deleted):
+            recorded, deleted = self._try_status_rows(job_id, inputs, failure, recorded, deleted)
+        if recorded and deleted:
+            if failure:
+                s3_paths = inputs.get('s3_paths', '')
+                logger.info("recorded failure for file=%s",
+                            (s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths) or inputs.get('url'))
             return
-        try:
-            failure = result.get('failure_ingest')
-            if failure and not failure_recorded:
-                self.sql_session.insert_failed_document(
-                    self._failed_document_payload(inputs, self._failure_text(failure)))
-            self.sql_session.delete_document_in_progress(job_id)
-        except Exception:
-            logger.exception("status rows not updated on the second try; the file can show as ingesting")
+        logger.error("status rows not updated after 2 tries (failed_row_written=%s in_progress_row_deleted=%s); "
+                     "the dashboard can show a wrong status for the file", recorded, deleted)
+
+    def _try_status_rows(self, job_id: str, inputs: dict, failure, recorded: bool, deleted: bool):
+        """One try at the writes that are not done. Returns (recorded, deleted).
+
+        The database helpers answer False for a SQL error, which they log, and raise for
+        other errors. The two cases mean "not done"."""
+        if not recorded:
+            try:
+                recorded = self.sql_session.insert_failed_document(
+                    self._failed_document_payload(inputs, self._failure_text(failure))) is not False
+            except Exception:  # pylint: disable=broad-except
+                logger.exception("could not write the documents_failed row")
+        if not deleted:
+            try:
+                deleted = self.sql_session.delete_document_in_progress(job_id) is not False
+            except Exception:  # pylint: disable=broad-except
+                logger.exception("could not delete the documents_in_progress row")
+        return recorded, deleted
 
     @staticmethod
     def _failed_document_payload(inputs: dict, error: str) -> dict:

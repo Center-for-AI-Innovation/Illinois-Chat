@@ -51,9 +51,25 @@ def _section_error(e: "CanvasError") -> str:
     does not let our account read that part (a tab that is hidden from students, for
     example). That is "No access!", so the route can tell it from a section that broke.
     """
-    if e.upstream_status in (401, 403):
+    # Canvas also answers 403 when it throttles the token ("403 Forbidden (Rate Limit
+    # Exceeded)"). That is a failure of the call, not a part the account cannot read.
+    throttled = 'rate limit' in str(e.upstream_message or '').lower()
+    if e.upstream_status in (401, 403) and not throttled:
         return "No access! " + e.describe()
     return "Failed! " + e.describe()
+
+
+def _write_html(path: str, text) -> bool:
+    """Writes the HTML of one Canvas item to `path`.
+
+    Canvas sends null or an empty string for an item with no content. Then no file is
+    made, because each file in the folder is queued for ingest, and the answer is False.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return False
+    with open(path, 'w') as html_file:
+        html_file.write(text)
+    return True
 
 
 def _safe_join(dir_path: str, name: str) -> str:
@@ -448,10 +464,9 @@ class IngestCanvas:
                         logger.debug("item skipped: %s", e.describe())
                         skipped += 1
                         continue
-                    page_body = page_content_request.json()['body']
-                    with open(f"{dest_folder}/{page['url']}.html", 'w') as html_file:
-                        html_file.write(page_body)
-                    downloaded += 1
+                    page_body = page_content_request.json().get('body')
+                    if _write_html(f"{dest_folder}/{page['url']}.html", page_body):
+                        downloaded += 1
             logger.info("section=pages downloaded=%d skipped=%d", downloaded, skipped)
             return "Success"
         except CanvasError as e:
@@ -544,9 +559,7 @@ class IngestCanvas:
                 return 'skipped'
             title_fmt = item['title'].replace(' ', '_')
             html_file_name = f"Module_{module_number}_external_link_{title_fmt}.html"
-            with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
-                html_file.write(response.text)
-            return 'downloaded'
+            return 'downloaded' if _write_html(f"{dest_folder}/{html_file_name}", response.text) else None
 
         if item['type'] == 'Discussion':
             try:
@@ -557,9 +570,8 @@ class IngestCanvas:
             discussion_data = discussion_req.json()
             title_fmt = discussion_data['title'].replace(" ", "_")
             discussion_filename = f"Module_{module_number}_Discussion_{title_fmt}.html"
-            with open(f"{dest_folder}/{discussion_filename}", 'w') as html_file:
-                html_file.write(discussion_data['message'])
-            return 'downloaded'
+            written = _write_html(f"{dest_folder}/{discussion_filename}", discussion_data.get('message'))
+            return 'downloaded' if written else None
 
         # Assignments are handled separately. Quizzes are not handled yet.
         if item['type'] in ['Assignment', 'Quiz']:
@@ -577,12 +589,8 @@ class IngestCanvas:
         if 'published' in item_data and not item_data['published']:
             logger.debug("item not published: %s", item_data['url'])
             return None
-        if 'body' not in item_data:
-            return None
         html_file_name = f"Module_{module_number}_{item['type']}_{item_data['url']}.html"
-        with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
-            html_file.write(item_data['body'])
-        return 'downloaded'
+        return 'downloaded' if _write_html(f"{dest_folder}/{html_file_name}", item_data.get('body')) else None
 
     def download_assignments(self, dest_folder: str, api_path: str) -> str:
         """
@@ -597,10 +605,7 @@ class IngestCanvas:
                     logger.debug("assignment not published: %s", assignment['name'])
                     continue
 
-                if assignment['description'] is not None and assignment['description'] != "":
-                    assignment_name = f"assignment_{assignment['id']}.html"
-                    with open(f"{dest_folder}/{assignment_name}", 'w') as html_file:
-                        html_file.write(assignment['description'])
+                if _write_html(f"{dest_folder}/assignment_{assignment['id']}.html", assignment.get('description')):
                     downloaded += 1
             logger.info("section=assignments downloaded=%d", downloaded)
             return "Success"
@@ -625,9 +630,8 @@ class IngestCanvas:
                     logger.debug("discussion not published: %s", discussion['title'])
                     continue
 
-                with open(f"{dest_folder}/{discussion['title']}.html", 'w') as html_file:
-                    html_file.write(discussion['message'])
-                downloaded += 1
+                if _write_html(f"{dest_folder}/{discussion['title']}.html", discussion.get('message')):
+                    downloaded += 1
             logger.info("section=discussions downloaded=%d", downloaded)
             return "Success"
         except CanvasError as e:

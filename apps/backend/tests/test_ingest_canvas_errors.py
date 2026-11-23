@@ -13,9 +13,11 @@ Coverage:
     on stderr: yt-dlp's own messages go to DEBUG through ``_YtDlpLogger``.
   - A section that Canvas answers 401 or 403 for is "No access! ...", not
     "Failed! ..."; a course with no syllabus is "none found".
-  - One bad item of a module (a dead external link, a field Canvas left empty)
-    is skipped with one WARNING; the section is "Success" and keeps the items
-    that are good.
+  - One bad item of a module (a dead external link) is skipped with one
+    WARNING; the section is "Success" and keeps the items that are good.
+  - An item that Canvas sends with no content (null or empty) makes no file,
+    because each file in the folder is queued for ingest.
+  - A 403 that is Canvas throttling ("Rate Limit Exceeded") is "Failed! ...".
   - A page yt-dlp does not support (``UnsupportedError``) gives one ERROR line
     with no traceback and no verifier: yt-dlp's text repeats the full URL.
 """
@@ -163,13 +165,18 @@ def test_one_bad_module_item_does_not_fail_the_section(monkeypatch, tmp_path):
     monkeypatch.setattr(ingest_canvas.sentry_sdk, "capture_exception", captured.append)
     modules = [{"position": 1, "name": "m", "items": [
         {"type": "ExternalUrl", "title": "dead link", "external_url": UNREACHABLE},
-        # Canvas left the message of this discussion empty.
+        # Canvas left the message of this discussion and the body of this page empty.
         {"type": "Discussion", "url": API + "/discussion_topics/5"},
+        {"type": "Page", "url": API + "/pages/empty"},
+        # The reply for this page has no "url" field, so the handler of the item raises.
+        {"type": "Page", "url": API + "/pages/broken"},
         {"type": "Page", "url": API + "/pages/intro"},
     ]}]
     replies = {
         API + "/modules?include=items&per_page=50": modules,
         API + "/discussion_topics/5": {"title": "week 1", "message": None},
+        API + "/pages/empty": {"url": "empty", "body": None},
+        API + "/pages/broken": {"body": "<p>x</p>"},
         API + "/pages/intro": {"url": "intro", "body": "<p>hello</p>"},
     }
     canvas = IngestCanvas()
@@ -178,12 +185,15 @@ def test_one_bad_module_item_does_not_fail_the_section(monkeypatch, tmp_path):
     result, lines, records = _collect(lambda: canvas.download_modules(str(tmp_path), API))
 
     assert result == "Success"
+    # Only the good item made a file: an empty file would be queued for ingest.
+    assert [f.name for f in tmp_path.iterdir()] == ["Module_1_Page_intro.html"]
     assert (tmp_path / "Module_1_Page_intro.html").read_text() == "<p>hello</p>"
     warnings = [r.getMessage() for r in records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert warnings[0].startswith(
         "section=modules: 2 item(s) failed and were skipped, first: type=ExternalUrl ConnectionError: ")
     assert [r for r in records if r.levelno >= logging.ERROR] == []
+    # The two items with no content are not counted: Canvas refused nothing.
     assert "section=modules downloaded=1 skipped=2" in "\n".join(lines)
     # A skipped item is not an event for Sentry, and the link's query string stays out of the log.
     assert captured == []
@@ -216,7 +226,8 @@ def test_section_result_tells_no_access_from_a_failure(download, status, expecte
     canvas = IngestCanvas()
 
     def refuse(method, url):
-        raise CanvasError("Canvas request failed", status, "reply", "/api/v1/courses/1/x")
+        raise CanvasError("Canvas request failed", status, '{"errors":[{"message":"user not authorized"}]}',
+                          "/api/v1/courses/1/x")
 
     canvas._canvas_request = refuse
 
@@ -226,6 +237,34 @@ def test_section_result_tells_no_access_from_a_failure(download, status, expecte
     # One WARNING for the section, and no traceback: Canvas answered, nothing of ours broke.
     assert [r.levelno for r in records if r.levelno >= logging.WARNING] == [logging.WARNING]
     assert "Traceback" not in "\n".join(lines)
+
+
+def test_canvas_throttling_is_a_failure_not_no_access(tmp_path):
+    canvas = IngestCanvas()
+
+    def throttle(method, url):
+        raise CanvasError("Canvas request failed", 403, "403 Forbidden (Rate Limit Exceeded)", "/api/v1/courses/1/files")
+
+    canvas._canvas_request = throttle
+    assert canvas.download_files(str(tmp_path), API) == "Failed! Canvas 403 for /api/v1/courses/1/files"
+
+
+@pytest.mark.parametrize("download, listing", [
+    ("download_pages", [{"title": "p", "html_url": "u", "page_id": 7, "url": "p"}]),
+    ("download_discussions", [{"title": "d", "message": None}, {"title": "e", "message": ""}]),
+    ("download_assignments", [{"id": 1, "name": "a", "description": None}, {"id": 2, "name": "b", "description": " "}]),
+])
+def test_item_with_no_content_makes_no_file_and_does_not_fail_the_section(download, listing, tmp_path):
+    canvas = IngestCanvas()
+    # The list call gives the items; the call for one page gives a null body.
+    canvas._canvas_request = lambda method, url: SimpleNamespace(
+        json=lambda: {"body": None} if url.endswith("/pages/7") else listing)
+
+    result, lines, records = _collect(lambda: getattr(canvas, download)(str(tmp_path), API))
+
+    assert result == "Success"
+    assert list(tmp_path.iterdir()) == []
+    assert [r for r in records if r.levelno >= logging.WARNING] == []
 
 
 class _FakeResponse:

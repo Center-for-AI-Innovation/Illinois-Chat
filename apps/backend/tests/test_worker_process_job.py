@@ -118,8 +118,9 @@ def test_discarded_job_is_recorded_in_the_host_database(worker):
     assert worker.sql_session.deleted == ["job-1"]
     [failed] = worker.sql_session.failed
     assert failed["course_name"] == "ece120"
-    assert failed["error"] == ("Job discarded after %d attempts: RuntimeError: database unreachable" %
-                               (worker_module.MAX_JOB_RETRIES + 1))
+    # The row names the error type only: the text of a driver error names the host and the user.
+    assert failed["error"] == ("Job discarded after %d attempts: the database or the connections of the project "
+                               "could not be reached (RuntimeError)" % (worker_module.MAX_JOB_RETRIES + 1))
 
 
 def test_discarded_job_is_recorded_in_the_project_documents_database(worker, monkeypatch):

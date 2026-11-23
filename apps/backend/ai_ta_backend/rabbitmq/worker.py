@@ -324,9 +324,11 @@ class Worker:
                 if status_db is None:
                     status_db = self._status_db_after_failed_resolve(inputs.get('course_name', ''))
                 self._record_discarded_job(status_db, job_id, inputs,
-                                           # The admin sees this text. Type and a cut first line: driver
-                                           # text can name the project's database host and user.
-                                           "%s: %s" % (type(e).__name__, (str(e).splitlines() or [''])[0][:300]),
+                                           # The admin sees this text. The error type only: the text of
+                                           # a driver error names the database host and user. The worker
+                                           # log has the full error.
+                                           "the database or the connections of the project could not be "
+                                           "reached (%s)" % type(e).__name__,
                                            attempt)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:

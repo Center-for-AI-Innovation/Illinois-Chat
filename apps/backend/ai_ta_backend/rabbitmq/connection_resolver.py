@@ -27,6 +27,7 @@ from botocore.config import Config
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine as SAEngine
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.pool import NullPool
 
 try:
@@ -301,7 +302,12 @@ class WorkerConnectionResolver:
         pooler), and this matches the worker's host engine in rmsql.py.
         """
         logger.debug("Creating external SQL engine for project: %s", project_name)
-        return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
+        try:
+            return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
+        except ArgumentError:
+            # SQLAlchemy writes the whole string into this error, and the string holds the
+            # password. `from None` keeps that text out of the traceback too.
+            raise ValueError("the connection_uri of project %s is not a valid database URL" % project_name) from None
 
     # ── S3 ──
 
