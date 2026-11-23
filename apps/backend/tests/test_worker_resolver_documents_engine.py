@@ -19,8 +19,14 @@ from ai_ta_backend.rabbitmq import connection_resolver as cr
 
 PROJECT = "demo"
 SECRET = "p4ssw0rd-in-the-uri"
-# No "://", so SQLAlchemy cannot parse it and the log mask for "://user:password@" does not match.
-BAD_URI = "postgresql+psycopg2 user:" + SECRET + "@db.example.edu/docs"
+BAD_URIS = [
+    # No "://", so SQLAlchemy cannot parse it and the log mask for "://user:password@" does not match.
+    "postgresql+psycopg2 user:" + SECRET + "@db.example.edu/docs",
+    # A password with "@" and ":" that is not encoded. SQLAlchemy reads the end of it as the
+    # port and raises a plain ValueError that quotes it.
+    "postgresql://user:p@ss:" + SECRET + "@db.example.edu:5432/docs",
+    "postgresql://user:" + SECRET,
+]
 
 
 class _SqlStub:
@@ -59,12 +65,26 @@ def test_no_project_name_gets_none():
     assert resolver({}).resolve_documents_engine("") is None
 
 
-@pytest.mark.parametrize("build", [cr.WorkerConnectionResolver._create_engine,
-                                   connection_manager.ConnectionManager._create_engine])
-def test_invalid_connection_uri_is_not_in_the_error(build, caplog):
+BUILDERS = [cr.WorkerConnectionResolver._create_engine, connection_manager.ConnectionManager._create_engine]
+
+
+@pytest.mark.parametrize("build", BUILDERS)
+def test_scheme_that_cannot_be_used_is_named(build, caplog):
+    """postgres:// passes the check in the app, and SQLAlchemy 2 does not take it."""
     caplog.set_level(logging.DEBUG)
     with pytest.raises(ValueError) as raised:
-        build(PROJECT, {"connection_uri": BAD_URI})
+        build(PROJECT, {"connection_uri": "postgres://user:" + SECRET + "@db.example.edu:5432/docs"})
+    assert str(raised.value) == ("the connection_uri of project demo has the scheme postgres://, which the backend "
+                                 "cannot use; use postgresql://")
+    assert raised.value.__cause__ is None and raised.value.__suppress_context__
+
+
+@pytest.mark.parametrize("build", BUILDERS)
+@pytest.mark.parametrize("bad_uri", BAD_URIS)
+def test_invalid_connection_uri_is_not_in_the_error(build, bad_uri, caplog):
+    caplog.set_level(logging.DEBUG)
+    with pytest.raises(ValueError) as raised:
+        build(PROJECT, {"connection_uri": bad_uri})
     assert str(raised.value) == "the connection_uri of project demo is not a valid database URL"
     # SQLAlchemy's own error quotes the whole string. It must not come back as the cause or the context.
     assert raised.value.__cause__ is None and raised.value.__suppress_context__

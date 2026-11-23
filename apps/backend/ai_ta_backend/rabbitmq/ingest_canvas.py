@@ -51,12 +51,16 @@ def _section_error(e: "CanvasError") -> str:
     does not let our account read that part (a tab that is hidden from students, for
     example). That is "No access!", so the route can tell it from a section that broke.
     """
-    # Canvas also answers 403 when it throttles the token ("403 Forbidden (Rate Limit
-    # Exceeded)"). That is a failure of the call, not a part the account cannot read.
-    throttled = 'rate limit' in str(e.upstream_message or '').lower()
-    if e.upstream_status in (401, 403) and not throttled:
+    if e.upstream_status in (401, 403) and not _throttled(e):
         return "No access! " + e.describe()
     return "Failed! " + e.describe()
+
+
+def _throttled(e: "CanvasError") -> bool:
+    """True when Canvas refused the call because it throttles the token. Canvas answers
+    "403 Forbidden (Rate Limit Exceeded)" for that. It is a failure of the call: the token
+    is good, and the account can read the part."""
+    return 'rate limit' in str(e.upstream_message or '').lower()
 
 
 def _write_html(path: str, text) -> bool:
@@ -66,6 +70,7 @@ def _write_html(path: str, text) -> bool:
     made, because each file in the folder is queued for ingest, and the answer is False.
     """
     if not isinstance(text, str) or not text.strip():
+        logger.debug("item has no content, no file made: %s", os.path.basename(path))
         return False
     with open(path, 'w') as html_file:
         html_file.write(text)
@@ -245,7 +250,7 @@ class IngestCanvas:
                               accept_response.status_code, accept_response.text[:500], urlsplit(accept_url).path)
 
         except CanvasError as e:
-            if e.path and e.path.endswith('/users/self') and e.upstream_status in (401, 403):
+            if e.path and e.path.endswith('/users/self') and e.upstream_status in (401, 403) and not _throttled(e):
                 error = CanvasError("Canvas rejected the configured access token", e.upstream_status,
                                     e.upstream_message, e.path)
             else:

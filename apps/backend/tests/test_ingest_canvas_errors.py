@@ -92,6 +92,18 @@ def test_401_on_users_self_means_rejected_token(monkeypatch, caplog):
     assert [r.getMessage() for r in errors] == ['Canvas 401 for /api/v1/users/self: {"errors":"invalid"}']
 
 
+def test_throttling_on_users_self_is_not_a_rejected_token(monkeypatch):
+    url = "https://canvas.illinois.edu/api/v1/users/self"
+    monkeypatch.setattr(requests, "request",
+                        lambda *a, **k: http_response(403, "403 Forbidden (Rate Limit Exceeded)", url))
+    with pytest.raises(CanvasError) as info:
+        IngestCanvas().auto_accept_enrollments("12345")
+    # The token is good. The reply must not tell the admin to make a new one.
+    assert info.value.message != "Canvas rejected the configured access token"
+    assert info.value.upstream_status == 403
+    assert info.value.upstream_message == "403 Forbidden (Rate Limit Exceeded)"
+
+
 class LineCollector(logging.Handler):
 
     def __init__(self):
@@ -265,6 +277,25 @@ def test_item_with_no_content_makes_no_file_and_does_not_fail_the_section(downlo
     assert result == "Success"
     assert list(tmp_path.iterdir()) == []
     assert [r for r in records if r.levelno >= logging.WARNING] == []
+    # An item with no content is not a downloaded item, and each one has a DEBUG line.
+    output = "\n".join(lines)
+    assert "section=%s downloaded=0" % download[len("download_"):] in output
+    assert output.count("item has no content, no file made: ") == len(listing)
+
+
+def test_external_link_with_an_empty_page_makes_no_file(monkeypatch, tmp_path):
+    modules = [{"position": 1, "name": "m", "items": [
+        {"type": "ExternalUrl", "title": "blank", "external_url": "https://example.edu/blank"}]}]
+    canvas = IngestCanvas()
+    canvas._canvas_request = lambda method, url: SimpleNamespace(json=lambda: modules)
+    monkeypatch.setattr(ingest_canvas.requests, "get",
+                        lambda url, timeout=None: SimpleNamespace(status_code=200, text="  \n"))
+
+    result, lines, records = _collect(lambda: canvas.download_modules(str(tmp_path), API))
+
+    assert result == "Success"
+    assert list(tmp_path.iterdir()) == []
+    assert "section=modules downloaded=0 skipped=0" in "\n".join(lines)
 
 
 class _FakeResponse:

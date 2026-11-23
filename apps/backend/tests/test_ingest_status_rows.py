@@ -106,10 +106,52 @@ def test_rows_that_fail_two_times_are_logged_and_the_result_is_kept(run, caplog)
     assert errors(caplog) == [
         "could not delete the documents_in_progress row",
         "could not delete the documents_in_progress row",
-        "status rows not updated after 2 tries (failed_row_written=False in_progress_row_deleted=False); "
-        "the dashboard can show a wrong status for the file"]
+        "status rows not updated after 2 tries (documents_failed row: not written, documents_in_progress row: "
+        "not deleted); the dashboard can show a wrong status for the file"]
     # The line that says the failure is recorded would be false here.
     assert "recorded failure for file=" not in caplog.text
+
+
+def test_failed_row_that_is_never_written_is_not_called_recorded(run, caplog):
+    caplog.set_level(logging.INFO)
+    sql = MagicMock()
+    sql.insert_failed_document.return_value = False
+
+    assert run(sql, FAILURE) == FAILURE
+
+    # The delete worked. The file is then in no table, and the log must say so.
+    sql.delete_document_in_progress.assert_called_once_with("job-1")
+    assert errors(caplog) == [
+        "status rows not updated after 2 tries (documents_failed row: not written, documents_in_progress row: "
+        "deleted); the dashboard can show a wrong status for the file"]
+    assert "recorded failure for file=" not in caplog.text
+
+
+def test_failed_row_is_not_called_recorded_while_the_file_still_shows_as_ingesting(run, caplog):
+    caplog.set_level(logging.INFO)
+    sql = MagicMock()
+    sql.delete_document_in_progress.return_value = False
+
+    assert run(sql, FAILURE) == FAILURE
+
+    assert sql.insert_failed_document.call_count == 1
+    assert errors(caplog) == [
+        "status rows not updated after 2 tries (documents_failed row: written, documents_in_progress row: "
+        "not deleted); the dashboard can show a wrong status for the file"]
+    assert "recorded failure for file=" not in caplog.text
+
+
+def test_ingested_file_whose_row_cannot_be_deleted_is_not_said_to_have_a_failed_row(run, caplog):
+    caplog.set_level(logging.INFO)
+    sql = MagicMock()
+    sql.delete_document_in_progress.return_value = False
+
+    assert run(sql, SUCCESS) == SUCCESS
+
+    sql.insert_failed_document.assert_not_called()
+    assert errors(caplog) == [
+        "status rows not updated after 2 tries (documents_failed row: not needed, documents_in_progress row: "
+        "not deleted); the dashboard can show a wrong status for the file"]
 
 
 def test_error_after_the_status_rows_writes_no_failed_row(run, monkeypatch, caplog):

@@ -19,6 +19,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -27,7 +28,7 @@ from botocore.config import Config
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine as SAEngine
-from sqlalchemy.exc import ArgumentError
+from sqlalchemy.exc import ArgumentError, NoSuchModuleError
 from sqlalchemy.pool import NullPool
 
 try:
@@ -302,11 +303,22 @@ class WorkerConnectionResolver:
         pooler), and this matches the worker's host engine in rmsql.py.
         """
         logger.debug("Creating external SQL engine for project: %s", project_name)
+        uri = db_config["connection_uri"]
         try:
-            return create_engine(db_config["connection_uri"], poolclass=NullPool, hide_parameters=True)
-        except ArgumentError:
-            # SQLAlchemy writes the whole string into this error, and the string holds the
-            # password. `from None` keeps that text out of the traceback too.
+            return create_engine(uri, poolclass=NullPool, hide_parameters=True)
+        except NoSuchModuleError:
+            # The scheme names a driver that SQLAlchemy cannot load, for example postgres://.
+            # The scheme holds no secret, so the message names it. `from None` for the same
+            # reason as below.
+            scheme = uri.split("://", 1)[0] if isinstance(uri, str) and "://" in uri else ""
+            if not re.fullmatch(r"[A-Za-z0-9+.\-]{1,40}", scheme):
+                scheme = "?"
+            raise ValueError("the connection_uri of project %s has the scheme %s://, which the backend cannot "
+                             "use; use postgresql://" % (project_name, scheme)) from None
+        except (ArgumentError, ValueError):
+            # SQLAlchemy writes the string, or the part of it after the user name, into these
+            # errors, and that text holds the password. `from None` keeps it out of the
+            # traceback too.
             raise ValueError("the connection_uri of project %s is not a valid database URL" % project_name) from None
 
     # ── S3 ──

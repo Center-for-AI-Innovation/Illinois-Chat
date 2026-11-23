@@ -371,8 +371,10 @@ class Ingest:
                 logger.info("recorded failure for file=%s",
                             (s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths) or inputs.get('url'))
             return
-        logger.error("status rows not updated after 2 tries (failed_row_written=%s in_progress_row_deleted=%s); "
-                     "the dashboard can show a wrong status for the file", recorded, deleted)
+        failed_row = "not needed" if not failure else "written" if recorded else "not written"
+        logger.error("status rows not updated after 2 tries (documents_failed row: %s, documents_in_progress row: %s); "
+                     "the dashboard can show a wrong status for the file", failed_row,
+                     "deleted" if deleted else "not deleted")
 
     def _try_status_rows(self, job_id: str, inputs: dict, failure, recorded: bool, deleted: bool):
         """One try at the writes that are not done. Returns (recorded, deleted).
