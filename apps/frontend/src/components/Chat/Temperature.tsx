@@ -79,7 +79,7 @@ export const TemperatureSlider: FC<Props> = ({
       )}
       <div className="mx-6 my-4 flex flex-col">
         <div className={`mt-2 mb-1 text-center`}>
-          <div className="${isSmallScreen ? 'text-xs' : ''} inline-block rounded-lg bg-(--primary) p-2 text-2xl font-bold text-white">
+          <div className="${isSmallScreen ? 'text-xs' : ''} inline-block rounded-lg bg-(--illinois-orange) p-2 text-2xl font-bold text-white">
             {temperature.toFixed(1)}
           </div>
         </div>
