@@ -2,7 +2,7 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
-import { backendFetch } from '~/utils/server/backendFetch'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
 import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.deleteDocument')
@@ -58,7 +58,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         s3_path: s3Path,
         url: urlParam,
       })
-      return res.status(response.status).json({
+      return res.status(statusForBrowser(response.status)).json({
         error: `Failed to delete document. Status: ${response.status}`,
       })
     }

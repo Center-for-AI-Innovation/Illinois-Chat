@@ -676,6 +676,31 @@ describe('getLogger', () => {
         })
       })
 
+      it('looks again after a read that failed for a reason that can pass', () => {
+        const chunk = join(dir, 'busy.js')
+        writeChunkMap(chunk, 'busy')
+        // No file handle is left for one moment. The map file is good.
+        vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
+          throw Object.assign(new Error('EMFILE: too many open files'), {
+            code: 'EMFILE',
+          })
+        })
+        const c = spies()
+        const err = new Error('boom')
+        err.stack = `Error: boom\n    at m (${chunk}:1:5)`
+        getLogger('api').error('failed', err)
+        expect((c.error.mock.calls.at(-1)![0] as string).split('\n')[2]).toBe(
+          `    at m (${chunk}:1:5)`,
+        )
+        vi.restoreAllMocks()
+        // The chunk is not remembered as one without a map.
+        expect(lookUp(chunk)).toEqual({
+          frame: '    at src/pages/api/busy.ts:11:3',
+          stats: 1,
+          reads: 1,
+        })
+      })
+
       it('forgets the oldest chunk without a map when too many are kept', () => {
         const first = join(dir, 'first.js')
         expect(lookUp(first).stats).toBe(1)

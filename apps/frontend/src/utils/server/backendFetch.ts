@@ -33,6 +33,16 @@ export function requestIdHeaders(): Record<string, string> {
   return rid ? { 'X-Request-ID': rid } : {}
 }
 
+/**
+ * The status that a route sends to the browser for a status of the backend.
+ * A 401 or 403 from the backend is about the key or the network between our
+ * two services, not about the user, and the browser reads a 401 as "not signed
+ * in". So these two become 502. Every other status stays as it is.
+ */
+export function statusForBrowser(backendStatus: number): number {
+  return backendStatus === 401 || backendStatus === 403 ? 502 : backendStatus
+}
+
 // Path only: query strings can carry keys and user input.
 function pathOf(url: string): string {
   try {

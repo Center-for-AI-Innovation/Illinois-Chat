@@ -3,7 +3,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
-import { backendFetch } from '~/utils/server/backendFetch'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.downloadConvoHistoryUser')
 
@@ -68,7 +68,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       log.error('backend conversation history export failed', {
         status: response.status,
       })
-      return res.status(response.status).json({
+      return res.status(statusForBrowser(response.status)).json({
         error: `Backend error: ${response.status} ${response.statusText}`,
       })
     }

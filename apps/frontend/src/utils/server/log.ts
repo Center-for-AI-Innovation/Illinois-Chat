@@ -249,8 +249,8 @@ const sourceMaps = new Map<
 type NodeFs = typeof import('node:fs')
 type NodeModule = typeof import('node:module')
 
-// Production only: the chunks that gave no map (no map file, a map that is too
-// large or cannot be read). At most MAX_CHUNKS_WITHOUT_MAP are kept, because a
+// Production only: the chunks that gave no map for a reason that cannot change
+// (no map file, a map that is too large or is not a source map). At most MAX_CHUNKS_WITHOUT_MAP are kept, because a
 // stack can name any file; the oldest goes first.
 export const MAX_CHUNKS_WITHOUT_MAP = 1000
 const chunksWithoutMap = new Set<string>()
@@ -280,7 +280,7 @@ function sourceMapFor(file: string): SourceMapLike | undefined {
     if (chunksWithoutMap.has(file)) return undefined
   }
   const map = readSourceMap(fs, mod.SourceMap, file)
-  if (!map && production) {
+  if (map === null && production) {
     if (chunksWithoutMap.size >= MAX_CHUNKS_WITHOUT_MAP) {
       for (const oldest of chunksWithoutMap) {
         chunksWithoutMap.delete(oldest)
@@ -289,16 +289,19 @@ function sourceMapFor(file: string): SourceMapLike | undefined {
     }
     chunksWithoutMap.add(file)
   }
-  return map
+  return map ?? undefined
 }
 
 // The parsed map of a chunk, from the kept maps when its file did not change,
-// else from the file. Undefined when there is no map that can be used.
+// else from the file. When there is no map that can be used: null if the
+// answer cannot change while the file stays as it is (no map file, a map that
+// is too large or is not a source map), undefined if the read failed for a
+// reason that can pass (no file handle left, for example).
 function readSourceMap(
   fs: NodeFs,
   SourceMap: NodeModule['SourceMap'],
   file: string,
-): SourceMapLike | undefined {
+): SourceMapLike | null | undefined {
   try {
     const mapFile = `${file}.map`
     const cached = sourceMaps.get(file)
@@ -310,10 +313,14 @@ function readSourceMap(
       sourceMaps.set(file, cached)
       return cached.map
     }
-    if (size > MAX_MAP_BYTES) return undefined
-    const map: SourceMapLike = new SourceMap(
-      JSON.parse(fs.readFileSync(mapFile, 'utf8')),
-    )
+    if (size > MAX_MAP_BYTES) return null
+    const text = fs.readFileSync(mapFile, 'utf8')
+    let map: SourceMapLike
+    try {
+      map = new SourceMap(JSON.parse(text))
+    } catch {
+      return null
+    }
     sourceMaps.set(file, { mtimeMs, size, map })
     let total = 0
     for (const entry of sourceMaps.values()) total += entry.size
@@ -323,8 +330,9 @@ function readSourceMap(
       total -= entry.size
     }
     return map
-  } catch {
-    return undefined
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code
+    return code === 'ENOENT' ? null : undefined
   }
 }
 

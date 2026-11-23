@@ -2,7 +2,7 @@ import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
-import { backendFetch } from '~/utils/server/backendFetch'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
 import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.ingestCanvas')
@@ -103,7 +103,7 @@ Please review and approve at https://canvas.illinois.edu/ using account uiuc.cha
         status: response.status,
       })
     }
-    return res.status(response.status).json(responseBody)
+    return res.status(statusForBrowser(response.status)).json(responseBody)
   } catch (error) {
     log.error(
       'Canvas ingest submission failed',

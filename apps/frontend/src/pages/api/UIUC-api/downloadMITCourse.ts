@@ -3,7 +3,7 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { getLogger } from '~/utils/server/log'
-import { backendFetch } from '~/utils/server/backendFetch'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.downloadMITCourse')
 
@@ -41,7 +41,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         status: response.status,
         url: urlParam,
       })
-      return res.status(response.status).json({
+      return res.status(statusForBrowser(response.status)).json({
         error: `Failed to download MIT course. Status: ${response.status}`,
       })
     }
