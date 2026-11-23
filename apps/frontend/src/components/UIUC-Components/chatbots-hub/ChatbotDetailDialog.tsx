@@ -107,7 +107,7 @@ export function ChatbotDetailDialog({
         ? 'admin'
         : owner === 'You'
           ? 'owner'
-          : 'member')
+          : undefined)
   const showAdminSettings =
     resolvedUserRole === 'owner' || resolvedUserRole === 'admin'
 
