@@ -19,6 +19,14 @@ describe('SwitchField', () => {
     )
   })
 
+  it('keeps the field data-slot on its root', () => {
+    const { container } = render(
+      <SwitchField label="Guided Learning" checked={false} />,
+    )
+
+    expect(container.querySelector('[data-slot="field"]')).not.toBeNull()
+  })
+
   it('toggles exactly once when the label is clicked', async () => {
     const onCheckedChange = vi.fn()
     const user = userEvent.setup()
