@@ -326,7 +326,11 @@ export async function crawl(
           }),
         );
 
-        const isUrlASitemap = /sitemap.*\.xml$/.test(config.url);
+        // The same answer as /sitemap.*\.xml$/, with no regular expression: on a URL from
+        // the request, that pattern can take a very long time ("sitemapsitemap...").
+        const isUrlASitemap =
+          config.url.endsWith(".xml") &&
+          config.url.slice(0, -".xml".length).includes("sitemap");
         if (isUrlASitemap) {
           const listOfUrls = await downloadListOfUrls({ url: config.url });
 
