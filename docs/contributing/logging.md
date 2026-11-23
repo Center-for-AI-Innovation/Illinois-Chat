@@ -182,7 +182,9 @@ It differs from the other services:
 
 The `crawl done` line has the same fields in each case: `pages_loaded`, `pages_failed`, `pages_skipped`, `pages_ingested`, `pages_refused`, `pdfs_found`, `pdfs_ingested`, `pdfs_skipped`, `pdfs_failed`. To find the crawls that gave no documents, search for `crawl done` with a `result=` that is not `ok` or `partial`. A reply that is not 200 has `error`, `errorTitle` (the `result` name) and `errorMessage`, with the first error of the crawl, and the counts. A 200 reply is an object with `message` and the counts; before, it was a string.
 
-`/crawl` answers after each ingest request and each PDF of the crawl has an answer, so the counts are final and no line of a crawl comes after its `crawl done` line. An ingest request that gets no answer in 60 seconds counts as refused. A page counts as loaded when its handler ends, so a page that is tried again is counted once. A PDF that many pages link to is handled once for each crawl.
+`/crawl` answers after each ingest request and each PDF of the crawl has an answer, so the counts are final and no line of a crawl comes after its `crawl done` line. An ingest request that gets no answer in 60 seconds counts as refused. A page counts as loaded when its handler ends, so a page that is tried again is counted once. Such a page is also sent to ingest one time: the try that comes after only reads its links, and writes one `DEBUG` line. A PDF that many pages link to is handled once for each crawl.
+
+The download of a PDF has a limit of 120 seconds for the whole download and a limit of 100 MB (`apps/crawlee/src/pdfDownload.ts`). A PDF that hits a limit fails, with one `ERROR` line that names the limit: `PDF download failed url=<url>: hit the time limit of 120 s`, or `hit the size limit of 100 MB`. A call to S3 fails when it gets no connection in 10 seconds, or when no data moves for 60 seconds. Without these limits, one server that never ends its reply kept `/crawl` open with no end.
 
 `logSetup.ts` turns crawlee's text logger into a `CrawlerLogger`, a small subclass. It changes the root logger object in place, because crawlee makes some loggers when it is imported (`BrowserPool`, `Request`, the Playwright utilities), and each of them keeps a reference to that object. So the changes apply to every line, also the lines that crawlee and Playwright write themselves:
 
@@ -204,7 +206,7 @@ Every request gets a request id, not only `POST /crawl`: the id is made first, b
 
 Some lines still have no timestamp, because they are written before the logger exists or by other programs: the lines of `npm` and of `start_xvfb_and_run_cmd.sh` when the container starts, and a notice that a dependency prints while it loads (`[baseline-browser-mapping] ...`).
 
-The tests for the logger are in `apps/crawlee/src/logSetup.test.ts`. Run them with `npm test` in `apps/crawlee`. They are not part of the CI checks.
+The tests for the logger are in `apps/crawlee/src/logSetup.test.ts`. Run them with `npm test` in `apps/crawlee`. The `crawlee-tests` job of `.github/workflows/pr-checks.yml` runs the type check (`npm run build`) and all the crawler tests on each pull request.
 
 `logSetup.ts` maps `LOG_LEVEL` to crawlee's own level setting (`APIFY_LOG_LEVEL`). An unknown value falls back to `INFO` with one warning line. In Compose the crawler gets `LOG_LEVEL` from `.env` through `env_file`, not from its `environment:` list like the other services. On the dev stack, put it in `apps/crawlee/.env`. The Docker image sets `FORCE_COLOR=0`, so the container output has no colour codes.
 

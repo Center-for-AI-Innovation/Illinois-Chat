@@ -4,13 +4,15 @@ Three GitHub Actions workflows live in `.github/workflows`. Pull requests run ch
 
 ## Pull request checks (`pr-checks.yml`)
 
-Runs on pull requests into `main` (and the legacy `monorepo` / `illinois-chat` branches), as one job:
+Runs on pull requests into `main` (and the legacy `monorepo` / `illinois-chat` branches), as two jobs. The first one, `trunk-and-tests`:
 
 1. **Trunk** lints only the files the PR changed (`check-mode: pull_request`). Everything outside `apps/frontend` is ignored in `.trunk/trunk.yaml`, so only frontend issues surface.
 2. **Backend tests**: a placeholder step for now; no backend tests run in CI yet.
 3. **Node 20** is set up and `npm ci` runs in `apps/frontend`.
 4. `npm run typecheck` type-checks shipped source against `tsconfig.build.json` (test files are excluded; `npm run typecheck:all` covers them locally).
 5. `npm run test:coverage:check` runs Vitest with coverage and then `scripts/check-coverage.mjs`, which fails if a watched folder drops below its line-coverage floor (for example `src/utils` 100 %, `src/pages/api` 90 %).
+
+The second job, `crawlee-tests`, is for the web crawler in `apps/crawlee`. It installs with `npm ci --ignore-scripts`, which skips the download of the Playwright browsers, then runs `npm run build` (the `tsc` type check) and `npm test` (the unit tests, which start no browser).
 
 ### Local equivalents
 
