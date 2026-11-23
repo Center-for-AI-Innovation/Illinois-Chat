@@ -63,17 +63,21 @@ def _throttled(e: "CanvasError") -> bool:
     return 'rate limit' in str(e.upstream_message or '').lower()
 
 
-def _write_html(path: str, text) -> bool:
-    """Writes the HTML of one Canvas item to `path`.
+def _write_html(dest_folder: str, name: str, text) -> bool:
+    """Writes the HTML of one Canvas item to the file `name` in `dest_folder`.
 
     Canvas sends null or an empty string for an item with no content. Then no file is
     made, because each file in the folder is queued for ingest, and the answer is False.
+
+    The name comes from a title or a part of a link. A "/" in it is written as "_": it
+    would point at a folder that is not there, and the section would fail.
     """
     if not isinstance(text, str) or not text.strip():
-        # A name can come from a title or a link, and a Canvas link can hold `verifier=`.
-        logger.debug("item has no content, no file made: %s", _strip_query(os.path.basename(path)))
+        # No name here: a name can be a link, and a link can hold a token.
+        logger.debug("item has no content, no file made")
         return False
-    with open(path, 'w') as html_file:
+    safe_name = name.replace('/', '_').replace(os.sep, '_').replace('\x00', '_')
+    with open(os.path.join(dest_folder, safe_name), 'w') as html_file:
         html_file.write(text)
     return True
 
@@ -471,7 +475,7 @@ class IngestCanvas:
                         skipped += 1
                         continue
                     page_body = page_content_request.json().get('body')
-                    if _write_html(f"{dest_folder}/{page['url']}.html", page_body):
+                    if _write_html(dest_folder, f"{page['url']}.html", page_body):
                         downloaded += 1
             logger.info("section=pages downloaded=%d skipped=%d", downloaded, skipped)
             return "Success"
@@ -565,7 +569,7 @@ class IngestCanvas:
                 return 'skipped'
             title_fmt = item['title'].replace(' ', '_')
             html_file_name = f"Module_{module_number}_external_link_{title_fmt}.html"
-            return 'downloaded' if _write_html(f"{dest_folder}/{html_file_name}", response.text) else None
+            return 'downloaded' if _write_html(dest_folder, html_file_name, response.text) else None
 
         if item['type'] == 'Discussion':
             try:
@@ -576,7 +580,7 @@ class IngestCanvas:
             discussion_data = discussion_req.json()
             title_fmt = discussion_data['title'].replace(" ", "_")
             discussion_filename = f"Module_{module_number}_Discussion_{title_fmt}.html"
-            written = _write_html(f"{dest_folder}/{discussion_filename}", discussion_data.get('message'))
+            written = _write_html(dest_folder, discussion_filename, discussion_data.get('message'))
             return 'downloaded' if written else None
 
         # Assignments are handled separately. Quizzes are not handled yet.
@@ -601,7 +605,7 @@ class IngestCanvas:
             logger.debug("module item has no body, no file made type=%s", item.get('type'))
             return None
         html_file_name = f"Module_{module_number}_{item['type']}_{item_data['url']}.html"
-        return 'downloaded' if _write_html(f"{dest_folder}/{html_file_name}", item_data['body']) else None
+        return 'downloaded' if _write_html(dest_folder, html_file_name, item_data['body']) else None
 
     def download_assignments(self, dest_folder: str, api_path: str) -> str:
         """
@@ -616,7 +620,7 @@ class IngestCanvas:
                     logger.debug("assignment not published: %s", assignment['name'])
                     continue
 
-                if _write_html(f"{dest_folder}/assignment_{assignment['id']}.html", assignment.get('description')):
+                if _write_html(dest_folder, f"assignment_{assignment['id']}.html", assignment.get('description')):
                     downloaded += 1
             logger.info("section=assignments downloaded=%d", downloaded)
             return "Success"
@@ -641,7 +645,7 @@ class IngestCanvas:
                     logger.debug("discussion not published: %s", discussion['title'])
                     continue
 
-                if _write_html(f"{dest_folder}/{discussion['title']}.html", discussion.get('message')):
+                if _write_html(dest_folder, f"{discussion['title']}.html", discussion.get('message')):
                     downloaded += 1
             logger.info("section=discussions downloaded=%d", downloaded)
             return "Success"

@@ -280,7 +280,7 @@ def test_item_with_no_content_makes_no_file_and_does_not_fail_the_section(downlo
     # An item with no content is not a downloaded item, and each one has a DEBUG line.
     output = "\n".join(lines)
     assert "section=%s downloaded=0" % download[len("download_"):] in output
-    assert output.count("item has no content, no file made: ") == len(listing)
+    assert output.count("item has no content, no file made") == len(listing)
 
 
 def test_file_item_of_a_module_does_not_log_its_download_link(tmp_path):
@@ -288,7 +288,7 @@ def test_file_item_of_a_module_does_not_log_its_download_link(tmp_path):
     link = "https://canvas.illinois.edu/files/77/download?download_frd=1&verifier=" + MARKER
     modules = [{"position": 1, "name": "m", "items": [
         {"type": "File", "url": API + "/files/77"},
-        # A title that is a link with a token in it, on an external page that is empty.
+        # A page whose `url` field has a token in it and whose body is only spaces.
         {"type": "Page", "url": API + "/pages/linked"},
     ]}]
     replies = {
@@ -308,13 +308,26 @@ def test_file_item_of_a_module_does_not_log_its_download_link(tmp_path):
     assert "module item has no body, no file made type=File" in output
 
 
-def test_no_content_line_hides_the_query_of_a_name(tmp_path):
-    assert ingest_canvas._write_html(str(tmp_path / ("doc?token=" + MARKER + ".html")), None) is False
-    result, lines, records = _collect(
-        lambda: ingest_canvas._write_html(str(tmp_path / ("doc?token=" + MARKER + ".html")), ""))
+def test_no_content_line_does_not_print_the_name(tmp_path):
+    """A name can be a link with a token, also with "/" or a space in its query."""
+    name = "p?next=/a/b&token=" + MARKER + " more=" + MARKER + ".html"
+    result, lines, records = _collect(lambda: ingest_canvas._write_html(str(tmp_path), name, ""))
     assert result is False
-    assert MARKER not in "\n".join(lines)
-    assert "item has no content, no file made: doc?***" in "\n".join(lines)
+    assert list(tmp_path.iterdir()) == []
+    assert lines and MARKER not in "\n".join(lines)
+
+
+def test_title_with_a_slash_does_not_fail_the_section(tmp_path):
+    canvas = IngestCanvas()
+    discussions = [{"title": "HW 1/2", "message": "<p>due Friday</p>"}, {"title": "Week 2", "message": "<p>x</p>"}]
+    canvas._canvas_request = lambda method, url: SimpleNamespace(json=lambda: discussions)
+
+    result, lines, records = _collect(lambda: canvas.download_discussions(str(tmp_path), API))
+
+    assert result == "Success"
+    assert sorted(f.name for f in tmp_path.iterdir()) == ["HW 1_2.html", "Week 2.html"]
+    assert (tmp_path / "HW 1_2.html").read_text() == "<p>due Friday</p>"
+    assert "section=discussions downloaded=2" in "\n".join(lines)
 
 
 def test_external_link_with_an_empty_page_makes_no_file(monkeypatch, tmp_path):
