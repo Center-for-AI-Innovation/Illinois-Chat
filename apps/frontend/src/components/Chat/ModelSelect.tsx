@@ -565,7 +565,7 @@ const ModelDropdown: React.FC<
             await onChange(selected.value)
           }}
         >
-          <ComboboxInputGroup className="w-full cursor-pointer border-none bg-(--modal-button) text-(--modal-button-text) hover:bg-(--modal-button-hover) hover:text-(--modal-button-text-hover)">
+          <ComboboxInputGroup className="text-foreground w-full cursor-pointer">
             {selectedModel && (
               <Image
                 // @ts-ignore -- this being missing is fine
@@ -588,7 +588,7 @@ const ModelDropdown: React.FC<
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <CountryOfConcernIcon modelId={value} />
-              <ComboboxTrigger className="text-(--modal-button-text)">
+              <ComboboxTrigger>
                 <IconChevronDown size="1rem" aria-hidden="true" />
               </ComboboxTrigger>
             </div>

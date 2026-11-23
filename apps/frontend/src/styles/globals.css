@@ -356,9 +356,6 @@ button:disabled {
   --modal-button: var(--foreground-light);
   --modal-button-text: var(--background);
   --modal-button-text-hover: white;
-  --modal-button-hover: var(
-    --primary
-  ); /* color-mix(in srgb, var(--modal-button), black 15%); */
 
   --navbar-foreground: var(--foreground);
   --navbar-background: var(--background);
