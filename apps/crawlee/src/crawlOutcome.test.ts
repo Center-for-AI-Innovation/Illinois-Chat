@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { crawlOutcome, emptySummary, firstTime, summaryFields } from './crawlOutcome.js';
+import { crawlOutcome, emptySummary, PageDecisions, summaryFields } from './crawlOutcome.js';
 
 const summary = (changes: Partial<ReturnType<typeof emptySummary>>) => ({ ...emptySummary(), ...changes });
 
@@ -73,14 +73,38 @@ test('the summary line has every count under a fixed name', () => {
     );
 });
 
-test('firstTime is true one time for each key, so a page that is tried again is not sent or counted again', () => {
-    const decided = new Set<string>();
-    assert.equal(firstTime(decided, 'https://a/page'), true);
+test('a page that was sent is not sent or counted again when its handler runs again', () => {
+    const pages = new PageDecisions();
+    const counts = emptySummary();
+    assert.equal(pages.decide('https://a/page', false, counts), 'send');
     // The handler of the same request runs again after it threw.
-    assert.equal(firstTime(decided, 'https://a/page'), false);
-    assert.equal(firstTime(decided, 'https://a/page'), false);
-    // Another page of the same crawl still has its first time.
-    assert.equal(firstTime(decided, 'https://a/other'), true);
-    // Another crawl has its own set.
-    assert.equal(firstTime(new Set<string>(), 'https://a/page'), true);
+    assert.equal(pages.decide('https://a/page', false, counts), 'sent-before');
+    // Also when the later try would skip the page: the first content is in ingest.
+    assert.equal(pages.decide('https://a/page', true, counts), 'sent-before');
+    assert.equal(counts.pagesSkipped, 0);
+    // Another page of the same crawl is sent.
+    assert.equal(pages.decide('https://a/other', false, counts), 'send');
+    // Another crawl has its own pages.
+    assert.equal(new PageDecisions().decide('https://a/page', false, emptySummary()), 'send');
+});
+
+test('a skipped page is counted one time', () => {
+    const pages = new PageDecisions();
+    const counts = emptySummary();
+    assert.equal(pages.decide('https://a/empty', true, counts), 'skip');
+    assert.equal(pages.decide('https://a/empty', true, counts), 'skip-again');
+    assert.equal(pages.decide('https://a/empty', true, counts), 'skip-again');
+    assert.equal(counts.pagesSkipped, 1);
+});
+
+test('a page that the first try skipped is sent when a later try has content, and is then not a skipped page', () => {
+    const pages = new PageDecisions();
+    const counts = emptySummary();
+    // The first try read a page that was not ready, and then the handler threw.
+    assert.equal(pages.decide('https://a/slow', true, counts), 'skip');
+    assert.equal(counts.pagesSkipped, 1);
+    assert.equal(pages.decide('https://a/slow', false, counts), 'send');
+    assert.equal(counts.pagesSkipped, 0);
+    assert.equal(pages.decide('https://a/slow', false, counts), 'sent-before');
+    assert.equal(counts.pagesSkipped, 0);
 });

@@ -8,7 +8,7 @@ import {
 } from "crawlee";
 import { Page } from "playwright";
 
-import { CrawlSummary, emptySummary, firstTime } from "../crawlOutcome.js";
+import { CrawlSummary, emptySummary, PageDecisions } from "../crawlOutcome.js";
 import { oneLine } from "../logSetup.js";
 import { PdfDownloadError } from "../pdfDownload.js";
 import { Config, configSchema } from "./configValidation.js";
@@ -34,9 +34,9 @@ export async function crawl(
   // The work that goes on after a page handler returns: ingest requests and PDFs.
   const pending: Promise<void>[] = [];
   const seenPdfs = new Set<string>();
-  // The pages (by request.uniqueKey) that were sent to ingest or skipped. Crawlee runs the
-  // handler of a page again when it throws, and a page must be sent and counted one time.
-  const decidedPages = new Set<string>();
+  // Crawlee runs the handler of a page again when it throws. This keeps a page from a
+  // second send to ingest and from a second count.
+  const pageDecisions = new PageDecisions();
   const noteError = (text: string) => {
     summary.firstError ??= text.slice(0, 300);
   };
@@ -136,14 +136,22 @@ export async function crawl(
                 // the corpus. The ingest POST is fire-and-forget, so we log every skip with a
                 // greppable SKIP-INGEST prefix to keep the pipeline monitorable from the logs.
                 const skipReason = shouldSkipIngest(title, html, response?.status());
-                if (!firstTime(decidedPages, request.uniqueKey)) {
-                  // An earlier try of this handler threw after this point. The links
+                const decision = pageDecisions.decide(
+                  request.uniqueKey,
+                  Boolean(skipReason),
+                  summary,
+                );
+                if (decision === "sent-before") {
+                  // An earlier try of this handler threw after the send. The links
                   // of the page are still read below.
                   log.debug(
-                    `Page was sent to ingest or skipped on an earlier try, not sent or counted again url=${oneLine(request.loadedUrl)}`,
+                    `Page was sent to ingest on an earlier try, not sent again url=${oneLine(request.loadedUrl)}`,
                   );
-                } else if (skipReason) {
-                  summary.pagesSkipped++;
+                } else if (decision === "skip-again") {
+                  log.debug(
+                    `SKIP-INGEST again on a later try (${skipReason}): url=${oneLine(request.loadedUrl)}`,
+                  );
+                } else if (decision === "skip") {
                   log.warning(
                     `SKIP-INGEST (${skipReason}): status=${response?.status() ?? "n/a"} ` +
                       `base_url=${oneLine(config.url)} url=${oneLine(request.loadedUrl)} title=${JSON.stringify(title)}`,

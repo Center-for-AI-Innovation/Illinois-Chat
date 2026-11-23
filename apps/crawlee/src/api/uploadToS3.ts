@@ -10,6 +10,10 @@ import { S3Client, PutObjectCommand, HeadObjectCommand, HeadBucketCommand, Creat
 // for 60 seconds. A large upload that still makes progress is not cut off.
 const S3_CONNECT_TIMEOUT_MS = 10_000;
 const S3_IDLE_TIMEOUT_MS = 60_000;
+// The client makes 3 tries, and its idle limit does not count a reply that starts and then
+// stops. So each call also has one hard limit for all its tries together.
+const S3_CALL_TIMEOUT_MS = 5 * 60_000;
+const s3CallLimit = () => ({ abortSignal: AbortSignal.timeout(S3_CALL_TIMEOUT_MS) });
 
 function createS3Client(): S3Client {
   const region = process.env.AWS_REGION
@@ -72,14 +76,14 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
 
   // Check if the bucket exists, and create it if it does not
   try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: s3BucketName }));
+    await s3Client.send(new HeadBucketCommand({ Bucket: s3BucketName }), s3CallLimit());
     clog.debug(`Bucket ${s3BucketName} already exists.`);
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'NotFound') {
         clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
         try {
-          await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }));
+          await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), s3CallLimit());
           clog.debug(`Bucket ${s3BucketName} created.`);
         } catch (createError) {
           if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
@@ -107,7 +111,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // the PDF fails. If the object already exists, an earlier crawl already uploaded + ingested
   // it, so skip ingest (return null) instead of enqueuing a duplicate job.
   try {
-    await s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }));
+    await s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }), s3CallLimit());
     clog.debug(`SKIP-PDF (dup, already in S3): key=${key}, url=${oneLine(url)}`);
     return null;
   } catch (headErr) {
@@ -129,20 +133,20 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
       Bucket: s3BucketName,
       Key: s3Key,
       Body: pdfBuffer,
-    }));
+    }), s3CallLimit());
     clog.debug(`PDF uploaded to S3 at key: ${key}`);
   } catch (error) {
     if (error instanceof Error && error.name === 'NoSuchBucket') {
       clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
       try {
-        await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }));
+        await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), s3CallLimit());
         clog.debug(`Bucket ${s3BucketName} created.`);
         // Retry the upload after creating the bucket
         await s3Client.send(new PutObjectCommand({
           Bucket: s3BucketName,
           Key: s3Key,
           Body: pdfBuffer,
-        }));
+        }), s3CallLimit());
         clog.debug(`PDF uploaded to S3 at key: ${key}`);
       } catch (createError) {
         if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
@@ -152,7 +156,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
             Bucket: s3BucketName,
             Key: s3Key,
             Body: pdfBuffer,
-          }));
+          }), s3CallLimit());
           clog.debug(`PDF uploaded to S3 at key: ${key}`);
         } else {
           throw createError;

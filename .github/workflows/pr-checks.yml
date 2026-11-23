@@ -84,10 +84,11 @@ jobs:
       - name: Checkout monorepo
         uses: actions/checkout@v4
 
+      # Node 22, the version of the crawler image (apps/crawlee/Dockerfile).
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/crawlee/package-lock.json
 

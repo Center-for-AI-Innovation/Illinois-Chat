@@ -69,6 +69,10 @@ export async function downloadPdf(
         if (axios.isAxiosError(error) && message.startsWith('maxContentLength size of')) {
             throw new PdfDownloadError(`hit the size limit of ${sizeText(limits.maxBytes)}`, 'size', error);
         }
-        throw new PdfDownloadError(String(error), undefined, error);
+        // A connect failure to a host with more than one address is an AggregateError with
+        // an empty message. Its code (ECONNREFUSED, ETIMEDOUT) is then the only reason.
+        const code = (error as { code?: unknown } | null)?.code;
+        const reason = typeof code === 'string' && !String(error).includes(code) ? `${error} (${code})` : String(error);
+        throw new PdfDownloadError(reason, undefined, error);
     }
 }

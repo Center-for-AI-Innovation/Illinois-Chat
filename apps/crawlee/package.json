@@ -27,7 +27,7 @@
         "start:prod": "node --enable-source-maps --expose-gc dist/main.js",
         "start:dev": "tsx src/main.ts",
         "build": "tsc",
-        "test": "tsx --test src/*.test.ts",
+        "test": "tsx --test --test-timeout=60000 src/*.test.ts",
         "postinstall": "npx crawlee install-playwright-browsers"
     },
     "author": "Kastan Day",

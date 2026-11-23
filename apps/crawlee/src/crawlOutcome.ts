@@ -44,15 +44,38 @@ export function emptySummary(): CrawlSummary {
     };
 }
 
+/** What the crawl does with a page on one run of its handler. */
+export type PageDecision = 'send' | 'skip' | 'skip-again' | 'sent-before';
+
 /**
- * True the first time it is called with this key, false every time after. Crawlee runs the
- * handler of a page again when it throws, so the crawl asks this before it sends or skips a
- * page: each page then has its ingest decision, and its place in the counts, one time.
+ * Decides what one crawl does with a page each time the handler of the page runs. Crawlee
+ * runs the handler again when it throws, so one page can come here more than one time.
+ *
+ * - A page that was sent to ingest is not sent again: 'sent-before'.
+ * - A skip is not final. The first try can read a page that is not ready (an empty page or
+ *   an error page), and a later try can read the real content. So a skipped page is counted
+ *   one time ('skip', then 'skip-again'), and when a later try sends it, the skip comes out
+ *   of the count.
+ *
+ * The key is request.uniqueKey. Each crawl has its own object.
  */
-export function firstTime(seen: Set<string>, key: string): boolean {
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+export class PageDecisions {
+    private readonly sent = new Set<string>();
+    private readonly skipped = new Set<string>();
+
+    /** `skip` is true when this try found nothing to ingest. Keeps summary.pagesSkipped correct. */
+    decide(key: string, skip: boolean, summary: CrawlSummary): PageDecision {
+        if (this.sent.has(key)) return 'sent-before';
+        if (skip) {
+            if (this.skipped.has(key)) return 'skip-again';
+            this.skipped.add(key);
+            summary.pagesSkipped++;
+            return 'skip';
+        }
+        this.sent.add(key);
+        if (this.skipped.delete(key)) summary.pagesSkipped--;
+        return 'send';
+    }
 }
 
 export interface CrawlOutcome {

@@ -12,7 +12,7 @@ Runs on pull requests into `main` (and the legacy `monorepo` / `illinois-chat` b
 4. `npm run typecheck` type-checks shipped source against `tsconfig.build.json` (test files are excluded; `npm run typecheck:all` covers them locally).
 5. `npm run test:coverage:check` runs Vitest with coverage and then `scripts/check-coverage.mjs`, which fails if a watched folder drops below its line-coverage floor (for example `src/utils` 100 %, `src/pages/api` 90 %).
 
-The second job, `crawlee-tests`, is for the web crawler in `apps/crawlee`. It installs with `npm ci --ignore-scripts`, which skips the download of the Playwright browsers, then runs `npm run build` (the `tsc` type check) and `npm test` (the unit tests, which start no browser).
+The second job, `crawlee-tests`, is for the web crawler in `apps/crawlee`. It uses Node 22, the version of the crawler image, and installs with `npm ci --ignore-scripts`, which skips the download of the Playwright browsers, then runs `npm run build` (the `tsc` type check) and `npm test` (the unit tests, which start no browser).
 
 ### Local equivalents
 

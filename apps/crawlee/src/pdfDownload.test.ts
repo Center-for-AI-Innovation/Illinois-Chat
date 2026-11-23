@@ -125,3 +125,16 @@ describe('downloadPdf', () => {
         assert.equal((error.cause as { response?: { status?: number } }).response?.status, 404);
     });
 });
+
+it('a refused connection names its code, also when the message of the error is empty', async () => {
+    // Port 1 on localhost refuses at once. With two addresses for localhost, the error is
+    // an AggregateError whose message is empty, and only its code says what failed.
+    await assert.rejects(downloadPdf('http://localhost:1/file.pdf'), (error: unknown) => {
+        assert.ok(error instanceof PdfDownloadError);
+        assert.equal(error.limit, undefined);
+        assert.match(error.message, /ECONNREFUSED/);
+        // The code is in the text one time.
+        assert.equal(error.message.split('ECONNREFUSED').length, 2);
+        return true;
+    });
+});
