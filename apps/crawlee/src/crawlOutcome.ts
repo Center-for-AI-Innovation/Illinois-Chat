@@ -44,6 +44,17 @@ export function emptySummary(): CrawlSummary {
     };
 }
 
+/**
+ * True the first time it is called with this key, false every time after. Crawlee runs the
+ * handler of a page again when it throws, so the crawl asks this before it sends or skips a
+ * page: each page then has its ingest decision, and its place in the counts, one time.
+ */
+export function firstTime(seen: Set<string>, key: string): boolean {
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+}
+
 export interface CrawlOutcome {
     status: number;
     /** Level of the one line that ends the crawl. */

@@ -1,9 +1,15 @@
 // upload.ts
 import * as path from 'path';
-import axios from 'axios';
 import { Log, log as rootLog } from 'crawlee';
 import { oneLine } from '../logSetup.js';
+import { downloadPdf } from '../pdfDownload.js';
 import { S3Client, PutObjectCommand, HeadObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
+
+// The S3 client has no time limit of its own, and crawl() waits for every PDF. So each try
+// of a call fails when it gets no connection in 10 seconds, or when no data goes in or out
+// for 60 seconds. A large upload that still makes progress is not cut off.
+const S3_CONNECT_TIMEOUT_MS = 10_000;
+const S3_IDLE_TIMEOUT_MS = 60_000;
 
 function createS3Client(): S3Client {
   const region = process.env.AWS_REGION
@@ -13,6 +19,11 @@ function createS3Client(): S3Client {
   const baseConfig: any = region
     ? { region }
     : {}
+
+  baseConfig.requestHandler = {
+    connectionTimeout: S3_CONNECT_TIMEOUT_MS,
+    socketTimeout: S3_IDLE_TIMEOUT_MS,
+  }
 
   if (accessKeyId && secretAccessKey) {
     baseConfig.credentials = { accessKeyId, secretAccessKey }
@@ -49,10 +60,9 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // redirect and returns HTML, which we'd otherwise upload as a broken "PDF" that the
   // worker can't open ("cannot open broken document"), burning ~40s/each on retries.
   clog.debug(`Fetching candidate PDF. Filename: ${filename}, Url: ${url}`);
-  const response = await axios.get(url, { responseType: 'arraybuffer' });
-  const pdfBuffer = response.data;
-  const contentType = String(response.headers['content-type'] || '').toLowerCase();
-  const head = Buffer.from(pdfBuffer).subarray(0, 5).toString('latin1');
+  // downloadPdf has a time limit and a size limit, and throws a PdfDownloadError.
+  const { data: pdfBuffer, contentType } = await downloadPdf(url);
+  const head = pdfBuffer.subarray(0, 5).toString('latin1');
   if (!contentType.includes('application/pdf') && head !== '%PDF-') {
     clog.warning(`SKIP-PDF (not-a-pdf, content-type=${contentType || 'n/a'}): url=${url}`);
     return null;

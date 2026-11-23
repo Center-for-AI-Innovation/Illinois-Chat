@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { crawlOutcome, emptySummary, summaryFields } from './crawlOutcome.js';
+import { crawlOutcome, emptySummary, firstTime, summaryFields } from './crawlOutcome.js';
 
 const summary = (changes: Partial<ReturnType<typeof emptySummary>>) => ({ ...emptySummary(), ...changes });
 
@@ -71,4 +71,16 @@ test('the summary line has every count under a fixed name', () => {
         summaryFields(summary({ pagesLoaded: 1, pagesFailed: 2, pagesSkipped: 3, pagesIngested: 4, pagesRefused: 5, pdfsFound: 6, pdfsIngested: 7, pdfsSkipped: 8, pdfsFailed: 9 })),
         'pages_loaded=1 pages_failed=2 pages_skipped=3 pages_ingested=4 pages_refused=5 pdfs_found=6 pdfs_ingested=7 pdfs_skipped=8 pdfs_failed=9',
     );
+});
+
+test('firstTime is true one time for each key, so a page that is tried again is not sent or counted again', () => {
+    const decided = new Set<string>();
+    assert.equal(firstTime(decided, 'https://a/page'), true);
+    // The handler of the same request runs again after it threw.
+    assert.equal(firstTime(decided, 'https://a/page'), false);
+    assert.equal(firstTime(decided, 'https://a/page'), false);
+    // Another page of the same crawl still has its first time.
+    assert.equal(firstTime(decided, 'https://a/other'), true);
+    // Another crawl has its own set.
+    assert.equal(firstTime(new Set<string>(), 'https://a/page'), true);
 });
