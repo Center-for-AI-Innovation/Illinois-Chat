@@ -219,9 +219,17 @@ Contributors: the convention for adding to that directory — and the rule that
 - `401` from the CLI: the `ACCESS_TOKEN` cookie value expired — grab a fresh
   one from the browser.
 - `403`: the account is not in the super-admin allowlist.
-- Decryption warnings in backend/worker logs mean `ENCRYPTION_MASTER_KEY`
-  differs between services; per-project overrides silently fall back to the
-  shared defaults until the keys match.
+- A project whose stored connection cannot be decrypted, or from which a
+  connection cannot be built, does not run on the shared defaults instead.
+  Its uploads fail with a 500. A job already queued for it gets one attempt:
+  it ends with a failed row, or, when the documents database is the part
+  that cannot be used, the file stays in progress. The backend or the worker
+  logs one ERROR that names the project and the field (`database_config`,
+  `qdrant_config`, `s3_config` or `embedding_config`), never the value. The
+  usual cause is an `ENCRYPTION_MASTER_KEY` that is unset or different in
+  one service: give the frontend, the backend and the worker the same key.
+  Then upload the failed files again; a file left in progress also needs
+  the connection fixed and the file uploaded again.
 - Ingest writes fail against an external Postgres if it was not provisioned —
   the worker expects the RPCs and tables from
   `provision_external_pgvector_store.sql` to exist.
@@ -231,6 +239,6 @@ Contributors: the convention for adding to that directory — and the rule that
   them repairs the drift as well as preventing it.
 - A config that appears not to take effect is **not** a caching problem:
   nothing is cached, so the next request already reads the new row. Check
-  `is_active`, then the `ENCRYPTION_MASTER_KEY` match above.
+  `is_active`: a deactivated row reads as no config at all.
 - Every write is recorded in `project_connection_audit_log` (actor, action,
   changed field names — never values) on the host database.

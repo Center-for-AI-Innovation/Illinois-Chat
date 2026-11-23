@@ -63,7 +63,7 @@ EOF
 
 # ENCRYPTION_MASTER_KEY encrypts/decrypts project_external_connections configs.
 # The backend, worker, and frontend must all share the SAME value — a mismatch
-# makes decryption fail and per-project overrides silently fall back to defaults.
+# makes decryption fail, and uploads and jobs of projects with an external connection fail.
 # Generate once into the root .env, then sync into the app-local .env files.
 ensure_encryption_master_key() {
 	if [ -n "${ENCRYPTION_MASTER_KEY-}" ]; then

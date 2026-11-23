@@ -8,8 +8,10 @@ assert ``resolve()`` populates only the embedding fields when only an
 ``embedding_config`` is present.
 
 Mirrors the routing-table rule that ingest embeds with the project's configured
-model (provider gated by ALLOWED_EMBEDDING_PROVIDERS), falling back to env
-defaults when no/invalid config is present.
+model (provider gated by ALLOWED_EMBEDDING_PROVIDERS). With no embedding config,
+a provider that is not allowed, or ollama with no server URL, ingest uses the
+environment's embedding settings. A config that cannot be decrypted or is not a
+JSON object raises instead (test_worker_connection_resolver_config_errors.py).
 """
 
 from __future__ import annotations
