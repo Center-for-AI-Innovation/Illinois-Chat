@@ -3,18 +3,14 @@ import * as path from 'path';
 import { Log, log as rootLog } from 'crawlee';
 import { oneLine } from '../logSetup.js';
 import { downloadPdf } from '../pdfDownload.js';
+import { withS3CallLimit } from '../s3CallLimit.js';
 import { S3Client, PutObjectCommand, HeadObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
 
 // The S3 client has no time limit of its own, and crawl() waits for every PDF. So each try
 // of a call fails when it gets no connection in 10 seconds, or when no data goes in or out
-// for 60 seconds. A large upload that still makes progress is not cut off.
+// for 60 seconds. That idle limit does not cut off a large upload that still makes progress.
 const S3_CONNECT_TIMEOUT_MS = 10_000;
 const S3_IDLE_TIMEOUT_MS = 60_000;
-// The client makes 3 tries, and its idle limit does not count a reply that starts and then
-// stops. So each call also has one hard limit for all its tries together.
-const S3_CALL_TIMEOUT_MS = 5 * 60_000;
-const s3CallLimit = () => ({ abortSignal: AbortSignal.timeout(S3_CALL_TIMEOUT_MS) });
-
 function createS3Client(): S3Client {
   const region = process.env.AWS_REGION
   const accessKeyId = process.env.AWS_KEY
@@ -76,14 +72,14 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
 
   // Check if the bucket exists, and create it if it does not
   try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: s3BucketName }), s3CallLimit());
+    await withS3CallLimit((limit) => s3Client.send(new HeadBucketCommand({ Bucket: s3BucketName }), limit));
     clog.debug(`Bucket ${s3BucketName} already exists.`);
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'NotFound') {
         clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
         try {
-          await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), s3CallLimit());
+          await withS3CallLimit((limit) => s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), limit));
           clog.debug(`Bucket ${s3BucketName} created.`);
         } catch (createError) {
           if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
@@ -111,7 +107,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // the PDF fails. If the object already exists, an earlier crawl already uploaded + ingested
   // it, so skip ingest (return null) instead of enqueuing a duplicate job.
   try {
-    await s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }), s3CallLimit());
+    await withS3CallLimit((limit) => s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }), limit));
     clog.debug(`SKIP-PDF (dup, already in S3): key=${key}, url=${oneLine(url)}`);
     return null;
   } catch (headErr) {
@@ -129,34 +125,34 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   }
 
   try {
-    await s3Client.send(new PutObjectCommand({
+    await withS3CallLimit((limit) => s3Client.send(new PutObjectCommand({
       Bucket: s3BucketName,
       Key: s3Key,
       Body: pdfBuffer,
-    }), s3CallLimit());
+    }), limit));
     clog.debug(`PDF uploaded to S3 at key: ${key}`);
   } catch (error) {
     if (error instanceof Error && error.name === 'NoSuchBucket') {
       clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
       try {
-        await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), s3CallLimit());
+        await withS3CallLimit((limit) => s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), limit));
         clog.debug(`Bucket ${s3BucketName} created.`);
         // Retry the upload after creating the bucket
-        await s3Client.send(new PutObjectCommand({
+        await withS3CallLimit((limit) => s3Client.send(new PutObjectCommand({
           Bucket: s3BucketName,
           Key: s3Key,
           Body: pdfBuffer,
-        }), s3CallLimit());
+        }), limit));
         clog.debug(`PDF uploaded to S3 at key: ${key}`);
       } catch (createError) {
         if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
           clog.debug(`Bucket ${s3BucketName} already owned by you.`);
           // Retry the upload after confirming the bucket is owned by you
-          await s3Client.send(new PutObjectCommand({
+          await withS3CallLimit((limit) => s3Client.send(new PutObjectCommand({
             Bucket: s3BucketName,
             Key: s3Key,
             Body: pdfBuffer,
-          }), s3CallLimit());
+          }), limit));
           clog.debug(`PDF uploaded to S3 at key: ${key}`);
         } else {
           throw createError;

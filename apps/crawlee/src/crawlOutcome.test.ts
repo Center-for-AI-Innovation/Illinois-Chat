@@ -103,7 +103,7 @@ test('a page that the first try skipped is sent when a later try has content, an
     // The first try read a page that was not ready, and then the handler threw.
     assert.equal(pages.decide('https://a/slow', true, counts), 'skip');
     assert.equal(counts.pagesSkipped, 1);
-    assert.equal(pages.decide('https://a/slow', false, counts), 'send');
+    assert.equal(pages.decide('https://a/slow', false, counts), 'send-after-skip');
     assert.equal(counts.pagesSkipped, 0);
     assert.equal(pages.decide('https://a/slow', false, counts), 'sent-before');
     assert.equal(counts.pagesSkipped, 0);

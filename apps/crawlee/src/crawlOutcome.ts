@@ -45,7 +45,7 @@ export function emptySummary(): CrawlSummary {
 }
 
 /** What the crawl does with a page on one run of its handler. */
-export type PageDecision = 'send' | 'skip' | 'skip-again' | 'sent-before';
+export type PageDecision = 'send' | 'send-after-skip' | 'skip' | 'skip-again' | 'sent-before';
 
 /**
  * Decides what one crawl does with a page each time the handler of the page runs. Crawlee
@@ -55,7 +55,7 @@ export type PageDecision = 'send' | 'skip' | 'skip-again' | 'sent-before';
  * - A skip is not final. The first try can read a page that is not ready (an empty page or
  *   an error page), and a later try can read the real content. So a skipped page is counted
  *   one time ('skip', then 'skip-again'), and when a later try sends it, the skip comes out
- *   of the count.
+ *   of the count ('send-after-skip', so the caller can say that the skip no longer holds).
  *
  * The key is request.uniqueKey. Each crawl has its own object.
  */
@@ -73,8 +73,9 @@ export class PageDecisions {
             return 'skip';
         }
         this.sent.add(key);
-        if (this.skipped.delete(key)) summary.pagesSkipped--;
-        return 'send';
+        if (!this.skipped.delete(key)) return 'send';
+        summary.pagesSkipped--;
+        return 'send-after-skip';
     }
 }
 

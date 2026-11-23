@@ -157,6 +157,12 @@ export async function crawl(
                       `base_url=${oneLine(config.url)} url=${oneLine(request.loadedUrl)} title=${JSON.stringify(title)}`,
                   );
                 } else {
+                  if (decision === "send-after-skip") {
+                    // The SKIP-INGEST line of the earlier try no longer holds.
+                    log.info(
+                      `Page that an earlier try skipped has content now and is sent to ingest url=${oneLine(request.loadedUrl)}`,
+                    );
+                  }
                   const pageUrl = request.loadedUrl;
                   // Not awaited here, so the crawler goes on to the next page. crawl()
                   // waits for it before it returns.
