@@ -15,7 +15,7 @@ import {
   Share2,
 } from 'lucide-react'
 import NextLink from 'next/link'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from 'react-oidc-context'
 import {
   Avatar,
