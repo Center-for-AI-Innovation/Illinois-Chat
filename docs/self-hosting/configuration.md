@@ -133,6 +133,7 @@ The worker reads these from its process environment. None is in the root templat
 | `RABBITMQ_PREFETCH_COUNT` | full, dev | `1` | none |
 | `MAX_JOB_RETRIES` | full, dev | `10`; a failed job is re-queued immediately until this many attempts | none |
 | `INGEST_SUBPROCESS_TIMEOUT` | full, dev | `300` seconds | none |
+| `RABBITMQ_HEARTBEAT` | full, dev | `60` seconds. AMQP heartbeat timeout the worker asks for; pika lets the client override the broker, so this value is what gets used. Keep it under 350 so idle connections survive AWS NAT gateways and load balancers. `broker` accepts the broker's proposal; `0` is refused | none |
 | `QDRANT_UPSERT_BATCH_SIZE` | full, dev | `100` | none |
 | `EMBEDDING_MAX_ATTEMPTS` | full, dev | `10` | none |
 | `CANVAS_ACCESS_TOKEN` | full, dev | empty; required by `/canvas_ingest`, which returns 500 without it. Not passed by Compose | worker |

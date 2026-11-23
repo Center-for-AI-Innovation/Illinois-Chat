@@ -5,6 +5,7 @@ import {
   qdrantConfigSchema,
   embeddingConfigSchema,
   upsertBodySchema,
+  patchBodySchema,
   setActiveBodySchema,
   supabasePoolerWarning,
   testBodySchema,
@@ -339,6 +340,39 @@ describe('projectConnections/validation — ALLOWED_EMBEDDING_PROVIDERS env over
 })
 
 describe('projectConnections/validation — bodies', () => {
+  it('accepts partial embedding updates before validating the merged config', () => {
+    for (const config of [
+      { provider: 'ollama' },
+      { api_base: 'https://api.example.com/v1' },
+      { api_key: null },
+    ]) {
+      expect(
+        patchBodySchema.safeParse({
+          project_name: 'demo',
+          kind: 'embedding',
+          config,
+        }).success,
+      ).toBe(true)
+    }
+  })
+
+  it('rejects invalid fields in partial embedding updates', () => {
+    for (const config of [
+      { base_url: 'not a url' },
+      { api_key: '****' },
+      { model: null },
+      { unknown_field: 'value' },
+    ]) {
+      expect(
+        patchBodySchema.safeParse({
+          project_name: 'demo',
+          kind: 'embedding',
+          config,
+        }).success,
+      ).toBe(false)
+    }
+  })
+
   it('upsertBodySchema discriminates on kind', () => {
     expect(
       upsertBodySchema.safeParse({

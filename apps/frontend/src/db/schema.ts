@@ -235,26 +235,33 @@ export const messages = pgTable('messages', {
 })
 
 // Projects table
-export const projects = pgTable('projects', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  created_at: timestamp('created_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  course_name: varchar('course_name'),
-  doc_map_id: varchar('doc_map_id'),
-  convo_map_id: varchar('convo_map_id'),
-  last_uploaded_doc_id: bigint('last_uploaded_doc_id', { mode: 'number' }),
-  last_uploaded_convo_id: bigint('last_uploaded_convo_id', { mode: 'number' }),
-  subscribed: bigint('subscribed', { mode: 'number' }),
-  description: text('description'),
-  metadata_schema: jsonb('metadata_schema'),
-  conversation_map_index: text('conversation_map_index'),
-  document_map_index: text('document_map_index'),
-  // Encrypted envelope (see SimApiKeyField); never a plaintext key.
-  sim_api_key: jsonb('sim_api_key').$type<SimApiKeyField>(),
-  sim_base_url: text('sim_base_url'),
-  sim_workspace_id: text('sim_workspace_id'),
-})
+export const projects = pgTable(
+  'projects',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    course_name: varchar('course_name'),
+    doc_map_id: varchar('doc_map_id'),
+    convo_map_id: varchar('convo_map_id'),
+    last_uploaded_doc_id: bigint('last_uploaded_doc_id', { mode: 'number' }),
+    last_uploaded_convo_id: bigint('last_uploaded_convo_id', {
+      mode: 'number',
+    }),
+    subscribed: bigint('subscribed', { mode: 'number' }),
+    description: text('description'),
+    metadata_schema: jsonb('metadata_schema'),
+    conversation_map_index: text('conversation_map_index'),
+    document_map_index: text('document_map_index'),
+    // Encrypted envelope (see SimApiKeyField); never a plaintext key.
+    sim_api_key: jsonb('sim_api_key').$type<SimApiKeyField>(),
+    sim_base_url: text('sim_base_url'),
+    sim_workspace_id: text('sim_workspace_id'),
+  },
+  // Chatbots hub sorts by projects.created_at, looked up by course_name.
+  (table) => [index('projects_course_name_idx').on(table.course_name)],
+)
 
 // CourseNames table
 export const courseNames = pgTable('course_names', {

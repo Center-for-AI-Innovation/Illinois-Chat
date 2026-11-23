@@ -47,6 +47,24 @@
 }
 
 /*
+ * Composite inputs (shadcn InputGroup / Combobox input group): the text input
+ * is only part of the visible field, so the indicator moves to the wrapper and
+ * encloses the icons, chips, and buttons too. More specific than the rule
+ * above; the doc-group-multiselect override further down still wins.
+ */
+[data-slot='input-group'] [data-slot='input-group-control']:focus-visible,
+[data-slot='combobox-input-group'] [data-slot='combobox-input']:focus-visible {
+  outline: none !important;
+}
+[data-slot='input-group']:has([data-slot='input-group-control']:focus-visible),
+[data-slot='combobox-input-group']:has(
+    [data-slot='combobox-input']:focus-visible
+  ) {
+  outline: 2px solid var(--illinois-orange) !important;
+  outline-offset: 2px !important;
+}
+
+/*
  * Tailwind v4 preflight sets `cursor: default` on buttons. Mantine controls
  * used a pointer. Restore it for buttons and button-role controls.
  * Element-level specificity, so a utility (cursor-not-allowed, cursor-text)
@@ -148,6 +166,18 @@ button:disabled {
      theme rather than the OS, so native scrollbars, autofill and the file input
      follow the app theme. */
   color-scheme: light;
+
+  /* Height of the site-wide announcement bar, set at runtime by
+     SiteAnnouncementBanner. Fixed/sticky chrome offsets by it and full-viewport
+     layouts subtract it; 0px whenever no bar is showing. */
+  --announcement-banner-height: 0px;
+
+  /* The viewport below the announcement bar. Full-height layouts use this
+     instead of 100vh so the bar doesn't make them scroll. */
+  --viewport-height: calc(100vh - var(--announcement-banner-height));
+
+  /* Height of the fixed site navbar. Pages pad and sticky chrome offsets by it. */
+  --navbar-height: 80px;
 
   /* Primary Colors */
   --illinois-orange: #ff5f05; /* will override below to be accessible orange, left here for reference */
@@ -650,6 +680,15 @@ html {
   background: var(--illinois-white);
   /* Replaces DaisyUI's global mobile tap-highlight suppression. */
   -webkit-tap-highlight-color: transparent;
+}
+
+/* The banner is sticky and the navbar is fixed, so trackpad rubber-banding
+   moves them apart and opens a gap between them. Touch devices keep their
+   bounce and pull-to-refresh. */
+@media (hover: hover) and (pointer: fine) {
+  html {
+    overscroll-behavior-y: none;
+  }
 }
 
 html.dark {
