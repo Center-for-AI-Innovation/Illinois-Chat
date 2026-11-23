@@ -22,7 +22,6 @@ import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { LoadingSpinner } from './LoadingSpinner'
 import { showToast } from '~/utils/toastUtils'
 import { SUPPORT_EMAIL } from '~/utils/app/const'
-import { REQUEST_ID_HEADER, newRequestId } from '~/utils/requestId'
 
 interface WebScrapeProps {
   is_new_course: boolean
@@ -130,7 +129,6 @@ export const WebScrape = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            [REQUEST_ID_HEADER]: newRequestId(),
           },
           body: JSON.stringify({
             courseName: courseName,

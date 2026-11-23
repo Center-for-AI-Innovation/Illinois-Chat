@@ -1,7 +1,6 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
-import { REQUEST_ID_HEADER, requestIdFromHeaders } from '~/utils/requestId'
 
 type IngestResponse = {
   task_id?: string
@@ -12,9 +11,6 @@ const handler = async (
   req: AuthenticatedRequest,
   res: NextApiResponse<IngestResponse>,
 ) => {
-  // One id for the browser, this route, the backend and the worker.
-  const requestId = requestIdFromHeaders(req.headers)
-  res.setHeader(REQUEST_ID_HEADER, requestId)
   try {
     if (req.method !== 'POST') {
       console.error('Request method not allowed')
@@ -27,7 +23,7 @@ const handler = async (
       req.body
 
     console.log(
-      `👉 Submitting to ingest queue rid=${requestId}:`,
+      '👉 Submitting to ingest queue:',
       uniqueFileName,
       courseName,
       readableFilename,
@@ -48,7 +44,6 @@ const handler = async (
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        [REQUEST_ID_HEADER]: requestId,
       },
       body: JSON.stringify({
         course_name: courseName,
@@ -60,14 +55,13 @@ const handler = async (
 
     const responseBody = await response.json()
     console.log(
-      '📤 Submitted to ingest queue',
-      { rid: requestId, s3_filepath, status: response.status },
+      `📤 Submitted to ingest queue: ${s3_filepath}. Response status: ${response.status}`,
       responseBody,
     )
 
     return res.status(200).json(responseBody)
   } catch (error) {
-    const err = `❌❌ -- Bottom of /ingest rid=${requestId} -- Internal Server Error during ingest submission to Beam: ${error}`
+    const err = `❌❌ -- Bottom of /ingest -- Internal Server Error during ingest submission to Beam: ${error}`
     console.error(err)
     return res.status(500).json({ error: err })
   }

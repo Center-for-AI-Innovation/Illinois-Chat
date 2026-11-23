@@ -14,7 +14,6 @@ import {
   useGatedIngestPoller,
 } from '~/hooks/useGatedIngestPoller'
 import { v4 as uuidv4 } from 'uuid'
-import { REQUEST_ID_HEADER, newRequestId } from '~/utils/requestId'
 import { type FileUpload } from './UploadNotification'
 import { type AuthContextProps } from 'react-oidc-context'
 
@@ -223,9 +222,6 @@ export function LargeDropzone({
         const uniqueFileName = `${uuidv4()}-${nameWithoutExtension}${extension}`
         const uniqueReadableFileName = `${nameWithoutExtension}${extension}`
 
-        // One id per file, so `rid=<id>` finds this file in every log.
-        const requestId = newRequestId()
-
         try {
           await uploadToS3(file, uniqueFileName)
 
@@ -233,7 +229,6 @@ export function LargeDropzone({
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              [REQUEST_ID_HEADER]: requestId,
             },
             body: JSON.stringify({
               uniqueFileName: uniqueFileName,
@@ -242,12 +237,9 @@ export function LargeDropzone({
             }),
           })
           const res = await response.json()
-          console.debug(`Ingest submitted rid=${requestId}`, res)
+          console.debug('Ingest submitted...', res)
         } catch (error) {
-          console.error(
-            `Error during file upload or ingest rid=${requestId}:`,
-            error,
-          )
+          console.error('Error during file upload or ingest:', error)
           // Update file status to error so it doesn't block navigation
           setUploadFiles((prev) =>
             prev.map((f) =>
