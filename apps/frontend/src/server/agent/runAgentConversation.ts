@@ -24,6 +24,7 @@ import {
   generatePresignedUrlServer,
 } from './agentServerUtils'
 import { persistMessageServer } from '~/pages/api/conversation'
+import { truncateText } from '~/utils/sanitization'
 import { buildPrompt } from '~/app/utils/buildPromptUtils'
 import {
   routeModelRequest,
@@ -442,7 +443,7 @@ export async function runAgentConversation(
                 data: {
                   contextsRetrieved: contextsFound,
                   contexts: contexts.slice(0, 5).map((ctx) => ({
-                    text: ctx.text?.substring(0, 200) + '...',
+                    text: truncateText(ctx.text ?? '', 200),
                     filename: ctx.readable_filename,
                   })),
                 },
