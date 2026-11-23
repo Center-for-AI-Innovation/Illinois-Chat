@@ -1,8 +1,18 @@
 /* @vitest-environment node */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { backendFetch } from '../backendFetch'
+import { backendFetch, statusForBrowser } from '../backendFetch'
 import { runWithLogContext } from '../requestContext'
+
+describe('statusForBrowser', () => {
+  it('turns a 401 or 403 of the backend into 502 and keeps every other status', () => {
+    expect(statusForBrowser(401)).toBe(502)
+    expect(statusForBrowser(403)).toBe(502)
+    for (const status of [200, 400, 404, 422, 500, 502, 503]) {
+      expect(statusForBrowser(status)).toBe(status)
+    }
+  })
+})
 
 describe('backendFetch', () => {
   const fetchMock = vi.fn()

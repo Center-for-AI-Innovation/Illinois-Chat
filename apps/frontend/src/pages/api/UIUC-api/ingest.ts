@@ -1,7 +1,7 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
-import { backendFetch } from '~/utils/server/backendFetch'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
 import { getLogger } from '~/utils/server/log'
 
 const log = getLogger('api.ingest')
@@ -60,16 +60,16 @@ const handler = async (
     })
 
     if (!response.ok) {
-      // A 401 or 403 from the backend is about the key between our two
-      // services, not about the user. The browser would read it as "you are
-      // not signed in", so it gets 502. Other statuses pass through.
-      const refused = response.status === 401 || response.status === 403
+      // A 401 or 403 from the backend becomes 502 (see statusForBrowser).
+      // Other statuses pass through.
+      const status = statusForBrowser(response.status)
+      const refused = status !== response.status
       // backendFetch already logged one ERROR with the status and body.
       log.warn('ingest not queued', {
         upstream_status: response.status,
         file: s3_filepath,
       })
-      return res.status(refused ? 502 : response.status).json({
+      return res.status(status).json({
         error: refused
           ? `Ingest backend refused the request (status ${response.status})`
           : `Ingest backend answered with status ${response.status}`,

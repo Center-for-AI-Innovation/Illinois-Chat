@@ -7,7 +7,7 @@ import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import type { CourseMetadata } from '~/types/courseMetadata'
 import { getLogger } from '~/utils/server/log'
-import { backendFetch } from '~/utils/server/backendFetch'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
 
 const log = getLogger('api.createProject')
 
@@ -99,7 +99,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         error?: string
         message?: string
       } | null
-      return res.status(response.status).json({
+      return res.status(statusForBrowser(response.status)).json({
         error:
           backendBody?.error ??
           `Failed to create the project. Status: ${response.status}`,
