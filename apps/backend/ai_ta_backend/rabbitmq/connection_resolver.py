@@ -313,6 +313,11 @@ class WorkerConnectionResolver:
             scheme = uri.split("://", 1)[0] if isinstance(uri, str) and "://" in uri else ""
             if not re.fullmatch(r"[A-Za-z0-9+.\-]{1,40}", scheme):
                 scheme = "?"
+            if scheme in ("postgresql", "postgresql+psycopg2"):
+                # The scheme is good. What cannot be loaded is something else in the string,
+                # a `plugin=` in the query for example.
+                raise ValueError("the connection_uri of project %s is not a valid database URL" %
+                                 project_name) from None
             raise ValueError("the connection_uri of project %s has the scheme %s://, which the backend cannot "
                              "use; use postgresql://" % (project_name, scheme)) from None
         except (ArgumentError, ValueError):

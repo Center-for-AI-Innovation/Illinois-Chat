@@ -70,7 +70,8 @@ def _write_html(path: str, text) -> bool:
     made, because each file in the folder is queued for ingest, and the answer is False.
     """
     if not isinstance(text, str) or not text.strip():
-        logger.debug("item has no content, no file made: %s", os.path.basename(path))
+        # A name can come from a title or a link, and a Canvas link can hold `verifier=`.
+        logger.debug("item has no content, no file made: %s", _strip_query(os.path.basename(path)))
         return False
     with open(path, 'w') as html_file:
         html_file.write(text)
@@ -594,8 +595,13 @@ class IngestCanvas:
         if 'published' in item_data and not item_data['published']:
             logger.debug("item not published: %s", item_data['url'])
             return None
+        # Only an item with a body is a page. For a file, `url` is its download link with
+        # `verifier=`, which must not become a file name or a log line.
+        if not item_data.get('body'):
+            logger.debug("module item has no body, no file made type=%s", item.get('type'))
+            return None
         html_file_name = f"Module_{module_number}_{item['type']}_{item_data['url']}.html"
-        return 'downloaded' if _write_html(f"{dest_folder}/{html_file_name}", item_data.get('body')) else None
+        return 'downloaded' if _write_html(f"{dest_folder}/{html_file_name}", item_data['body']) else None
 
     def download_assignments(self, dest_folder: str, api_path: str) -> str:
         """

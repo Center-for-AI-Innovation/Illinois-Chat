@@ -80,6 +80,13 @@ def test_scheme_that_cannot_be_used_is_named(build, caplog):
 
 
 @pytest.mark.parametrize("build", BUILDERS)
+def test_good_scheme_with_a_plugin_that_cannot_be_loaded_is_not_blamed_on_the_scheme(build):
+    with pytest.raises(ValueError) as raised:
+        build(PROJECT, {"connection_uri": "postgresql://user:" + SECRET + "@db.example.edu/docs?plugin=nope"})
+    assert str(raised.value) == "the connection_uri of project demo is not a valid database URL"
+
+
+@pytest.mark.parametrize("build", BUILDERS)
 @pytest.mark.parametrize("bad_uri", BAD_URIS)
 def test_invalid_connection_uri_is_not_in_the_error(build, bad_uri, caplog):
     caplog.set_level(logging.DEBUG)

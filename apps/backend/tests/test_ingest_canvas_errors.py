@@ -283,6 +283,40 @@ def test_item_with_no_content_makes_no_file_and_does_not_fail_the_section(downlo
     assert output.count("item has no content, no file made: ") == len(listing)
 
 
+def test_file_item_of_a_module_does_not_log_its_download_link(tmp_path):
+    """A Canvas File object has no body, and its `url` is the download link with `verifier=`."""
+    link = "https://canvas.illinois.edu/files/77/download?download_frd=1&verifier=" + MARKER
+    modules = [{"position": 1, "name": "m", "items": [
+        {"type": "File", "url": API + "/files/77"},
+        # A title that is a link with a token in it, on an external page that is empty.
+        {"type": "Page", "url": API + "/pages/linked"},
+    ]}]
+    replies = {
+        API + "/modules?include=items&per_page=50": modules,
+        API + "/files/77": {"url": link, "display_name": "notes.pdf"},
+        API + "/pages/linked": {"url": "doc?token=" + MARKER, "body": "   "},
+    }
+    canvas = IngestCanvas()
+    canvas._canvas_request = lambda method, url: SimpleNamespace(json=lambda: replies[url])
+
+    result, lines, records = _collect(lambda: canvas.download_modules(str(tmp_path), API))
+
+    assert result == "Success"
+    assert list(tmp_path.iterdir()) == []
+    output = "\n".join(lines)
+    assert MARKER not in output
+    assert "module item has no body, no file made type=File" in output
+
+
+def test_no_content_line_hides_the_query_of_a_name(tmp_path):
+    assert ingest_canvas._write_html(str(tmp_path / ("doc?token=" + MARKER + ".html")), None) is False
+    result, lines, records = _collect(
+        lambda: ingest_canvas._write_html(str(tmp_path / ("doc?token=" + MARKER + ".html")), ""))
+    assert result is False
+    assert MARKER not in "\n".join(lines)
+    assert "item has no content, no file made: doc?***" in "\n".join(lines)
+
+
 def test_external_link_with_an_empty_page_makes_no_file(monkeypatch, tmp_path):
     modules = [{"position": 1, "name": "m", "items": [
         {"type": "ExternalUrl", "title": "blank", "external_url": "https://example.edu/blank"}]}]
