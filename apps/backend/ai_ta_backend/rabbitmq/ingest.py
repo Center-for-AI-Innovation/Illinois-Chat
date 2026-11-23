@@ -251,6 +251,11 @@ class Ingest:
         Main ingest function.
         _resolved_connections: optional ResolvedConnections from WorkerConnectionResolver.
         """
+        success_fail_dict = None
+        # True when run_ingest and its retries gave a result. After that, an error can only
+        # come from the status rows, and the result of the ingest stays what it is.
+        ingest_ran = False
+        failure_recorded = False
         try:
             rc = _resolved_connections
             self.initialize_resources(
@@ -309,14 +314,12 @@ class Ingest:
                                                         doc_groups, force_embeddings)
                 else:
                     break
-            if success_fail_dict['failure_ingest']:
-                failure = success_fail_dict['failure_ingest']
-                error_msg = (
-                    failure.get('error', str(failure))
-                    if isinstance(failure, dict)
-                    else str(failure)
-                )
-                self.sql_session.insert_failed_document(self._failed_document_payload(inputs, error_msg))
+            failure = success_fail_dict['failure_ingest']
+            ingest_ran = True
+            if failure:
+                # insert_failed_document answers False when the database refused the row.
+                failure_recorded = self.sql_session.insert_failed_document(
+                    self._failed_document_payload(inputs, self._failure_text(failure))) is not False
                 logger.info("recorded failure for file=%s",
                             (s3_paths[0] if isinstance(s3_paths, list) and s3_paths else s3_paths) or url)
 
@@ -335,6 +338,14 @@ class Ingest:
             return json.dumps({"failure_ingest": {'error': str(e)}})
 
         except Exception as e:
+            if ingest_ran:
+                # The ingest has its result; the write of its status rows failed. A failed row
+                # written here would mark an ingested file as failed, or give a failed file
+                # a second row. Try the missing rows one more time and keep the result.
+                logger.exception("ingest finished, but its status rows could not be updated")
+                sentry_sdk.capture_exception(e)
+                self._finish_status_rows(job_id, inputs, success_fail_dict, failure_recorded)
+                return json.dumps(success_fail_dict, default=str)
             logger.exception("main_ingest failed")
             sentry_sdk.capture_exception(e)
             error_msg = f"{type(e).__name__}: {e}"
@@ -349,6 +360,27 @@ class Ingest:
                 logger.error("could not record the main_ingest failure: no database session")
             success_fail_dict = {"failure_ingest": {'error': error_msg}}
             return json.dumps(success_fail_dict)
+
+    @staticmethod
+    def _failure_text(failure) -> str:
+        """The error text of a `failure_ingest` value."""
+        return failure.get('error', str(failure)) if isinstance(failure, dict) else str(failure)
+
+    def _finish_status_rows(self, job_id: str, inputs: dict, result: dict, failure_recorded: bool) -> None:
+        """Second and last try to write the status rows of a job whose ingest has a result:
+        the documents_failed row when the result is a failure that has no row yet, then the
+        delete of the documents_in_progress row. Without it the file shows as ingesting."""
+        if self.sql_session is None:
+            logger.error("status rows not updated: no database session; the file can show as ingesting")
+            return
+        try:
+            failure = result.get('failure_ingest')
+            if failure and not failure_recorded:
+                self.sql_session.insert_failed_document(
+                    self._failed_document_payload(inputs, self._failure_text(failure)))
+            self.sql_session.delete_document_in_progress(job_id)
+        except Exception:
+            logger.exception("status rows not updated on the second try; the file can show as ingesting")
 
     @staticmethod
     def _failed_document_payload(inputs: dict, error: str) -> dict:

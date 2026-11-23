@@ -8,7 +8,6 @@ import logging
 import json
 import sys
 import threading
-import time
 import multiprocessing as mp
 
 try:
@@ -322,7 +321,9 @@ class Worker:
             else:
                 logger.exception("job failed before ingest (DB or connection resolve), discarded after %d attempts",
                                  attempt)
-                self._record_discarded_job(status_db or self.sql_session, job_id, inputs,
+                if status_db is None:
+                    status_db = self._status_db_after_failed_resolve(inputs.get('course_name', ''))
+                self._record_discarded_job(status_db, job_id, inputs,
                                            # The admin sees this text. Type and a cut first line: driver
                                            # text can name the project's database host and user.
                                            "%s: %s" % (type(e).__name__, (str(e).splitlines() or [''])[0][:300]),
@@ -330,6 +331,24 @@ class Worker:
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:
             clear()
+
+    def _status_db_after_failed_resolve(self, course_name):
+        """The database with the status rows of a job whose resolve() failed every time.
+
+        resolve() builds all the connections of the project. Ask only for the documents
+        database: when a different part failed, the rows can still be updated. Returns None
+        when that fails too. No row is written then: a failed row in the host database is in
+        the wrong place for a project with its own documents database.
+        """
+        try:
+            engine = self.resolver.resolve_documents_engine(course_name)
+        except Exception as e:  # pylint: disable=broad-except
+            # Type only: the text of a driver error can name the project's database host and user.
+            logger.error("discarded job not recorded: the documents database of course=%s could not be resolved "
+                         "(%s); its documents_in_progress row stays, so the file shows as ingesting", course_name,
+                         type(e).__name__)
+            return None
+        return SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
 
     @staticmethod
     def _record_discarded_job(status_db, job_id, inputs, error, attempts):

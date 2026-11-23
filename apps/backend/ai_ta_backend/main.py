@@ -717,12 +717,22 @@ def ingest() -> Response:
   response.headers.add('Access-Control-Allow-Origin', '*')
   return response
 
-def _failed_canvas_sections(section_results) -> dict:
-  """The sections whose download failed: IngestCanvas reports them as "Failed! ..."."""
+def _canvas_sections_that(section_results, start: str) -> dict:
+  """The sections whose result string starts with `start`."""
   if not isinstance(section_results, dict):
     return {}
   return {section: result for section, result in section_results.items()
-          if isinstance(result, str) and result.startswith('Failed')}
+          if isinstance(result, str) and result.startswith(start)}
+
+
+def _failed_canvas_sections(section_results) -> dict:
+  """The sections whose download failed: IngestCanvas reports them as "Failed! ..."."""
+  return _canvas_sections_that(section_results, 'Failed')
+
+
+def _no_access_canvas_sections(section_results) -> dict:
+  """The sections Canvas did not let our account read: "No access! ..." (a 401 or 403)."""
+  return _canvas_sections_that(section_results, 'No access')
 
 
 @app.route('/canvas_ingest', methods=['POST'])
@@ -774,8 +784,11 @@ def canvas_ingest() -> Response:
                                                                 course_name=course_name,
                                                                 content_ingest_dict=options)
 
-      # Nothing queued is a Canvas failure only when a section failed to download.
-      # A course with no content in the selected sections is simply empty.
+      # Nothing queued has three causes, and the caller must be able to tell them apart:
+      #   502  a section failed to download (Canvas or the network broke)
+      #   422  Canvas gave our account no access to a section (a 401 or 403 for it)
+      #   422  the selected sections have no content
+      # A 200 here would show "complete" in the app for an import that added nothing.
       failed_sections = _failed_canvas_sections(section_results)
       if not job_ids and failed_sections:
         logger.error("canvas ingest queued no documents course=%s canvas_course_id=%s failed=%s", course_name,
@@ -785,8 +798,18 @@ def canvas_ingest() -> Response:
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
       if not job_ids:
-        logger.warning("canvas ingest found no documents course=%s canvas_course_id=%s", course_name,
-                       canvas_course_id)
+        no_access = _no_access_canvas_sections(section_results)
+        if no_access:
+          error = ("Canvas import found no documents. Canvas gives the Illinois Chat account no access to: "
+                   + ", ".join(sorted(no_access)) + ".")
+        else:
+          error = "Canvas import found no documents in the selected sections."
+        logger.warning("canvas ingest found no documents course=%s canvas_course_id=%s no_access=%s", course_name,
+                       canvas_course_id, sorted(no_access))
+        response = jsonify({"error": error, "section_results": section_results})
+        response.status_code = 422
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
       response = jsonify(
         {

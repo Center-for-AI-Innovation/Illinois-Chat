@@ -4,7 +4,7 @@ import uuid
 import shutil
 import logging
 import requests
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 from dotenv import load_dotenv
 
@@ -42,6 +42,18 @@ def _failed(e: Exception) -> str:
     the text can carry URLs, paths or server replies, and it reaches the API
     response through `section_results`. The log line has the details."""
     return "Failed! " + type(e).__name__
+
+
+def _section_error(e: "CanvasError") -> str:
+    """The result string of a section whose Canvas call failed.
+
+    A 401 or 403 for one section, after the token itself was accepted, means the course
+    does not let our account read that part (a tab that is hidden from students, for
+    example). That is "No access!", so the route can tell it from a section that broke.
+    """
+    if e.upstream_status in (401, 403):
+        return "No access! " + e.describe()
+    return "Failed! " + e.describe()
 
 
 def _safe_join(dir_path: str, name: str) -> str:
@@ -260,7 +272,8 @@ class IngestCanvas:
                                 content_ingest_dict: dict) -> Dict[str, str]:
         """Downloads all Canvas course materials through the course ID and stores in local directory.
 
-        Returns the result of each section: "Success", "Failed! ...", or "skipped"
+        Returns the result of each section: "Success", "none found", "No access! ..."
+        when Canvas answered 401 or 403 for it, "Failed! ..." when it broke, or "skipped"
         when the section was not selected.
         """
         self.initialize_resources()
@@ -405,7 +418,7 @@ class IngestCanvas:
             return "Success"
         except CanvasError as e:
             logger.warning("section=files skipped: %s", e.describe())
-            return "Failed! " + e.describe()
+            return _section_error(e)
         except Exception as e:
             logger.exception("section=files failed for %s", urlsplit(api_path).path)
             sentry_sdk.capture_exception(e)
@@ -443,7 +456,7 @@ class IngestCanvas:
             return "Success"
         except CanvasError as e:
             logger.warning("section=pages skipped: %s", e.describe())
-            return "Failed! " + e.describe()
+            return _section_error(e)
         except Exception as e:
             logger.exception("section=pages failed for %s", urlsplit(api_path).path)
             return _failed(e)
@@ -454,14 +467,18 @@ class IngestCanvas:
         """
         try:
             course_settings_request = self._canvas_request('GET', f"{api_path}?include=syllabus_body")
-            syllabus_body = course_settings_request.json()['syllabus_body']
+            # Canvas sends null for a course that has no syllabus.
+            syllabus_body = course_settings_request.json().get('syllabus_body')
+            if not syllabus_body:
+                logger.info("section=syllabus downloaded=0: the course has no syllabus")
+                return "none found"
             with open(f"{dest_folder}/syllabus.html", 'w') as html_file:
                 html_file.write(syllabus_body)
             logger.info("section=syllabus downloaded=1")
             return "Success"
         except CanvasError as e:
             logger.warning("section=syllabus skipped: %s", e.describe())
-            return "Failed! " + e.describe()
+            return _section_error(e)
         except Exception as e:
             logger.exception("section=syllabus failed for %s", urlsplit(api_path).path)
             sentry_sdk.capture_exception(e)
@@ -473,11 +490,11 @@ class IngestCanvas:
         Modules may contain: assignments, quizzes, files, pages, discussions, external tools and external urls.
         Rest of the things are covered in other functions.
         """
-        external_url = None
         try:
             module_request = self._canvas_request('GET', f"{api_path}/modules?include=items&per_page=50")
             modules = module_request.json()
-            downloaded = skipped = 0
+            downloaded = skipped = item_errors = 0
+            first_item_error = None
             for module in modules:
                 if 'published' in module and not module['published']:
                     logger.debug("module not published: %s", module['name'])
@@ -486,77 +503,86 @@ class IngestCanvas:
                 module_number = str(module['position'])
                 logger.debug("downloading module %s", module_number)
                 for item in module['items']:
-
-                    if item['type'] == 'ExternalUrl':
-                        external_url = item['external_url']
-                        response = requests.get(external_url, timeout=30)
-                        if response.status_code == 200:
-                            title_fmt = item['title'].replace(' ', '_')
-                            html_file_name = f"Module_{module_number}_external_link_{title_fmt}.html"
-                            with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
-                                html_file.write(response.text)
-                            downloaded += 1
-                        else:
-                            skipped += 1
-                            logger.debug("external link skipped status=%s host=%s", response.status_code,
-                                         urlsplit(external_url).hostname)
-
-                    elif item['type'] == 'Discussion':
-                        try:
-                            discussion_req = self._canvas_request('GET', item['url'])
-                        except CanvasError as e:
-                            logger.debug("item skipped: %s", e.describe())
-                            skipped += 1
-                            continue
-                        discussion_data = discussion_req.json()
-                        title_fmt = discussion_data['title'].replace(" ", "_")
-                        discussion_filename = f"Module_{module_number}_Discussion_{title_fmt}.html"
-                        with open(f"{dest_folder}/{discussion_filename}", 'w') as html_file:
-                            html_file.write(discussion_data['message'])
-                        downloaded += 1
-
-                    elif item['type'] in ['Assignment', 'Quiz']:
-                        # Assignments are handled separately
-                        # Quizzes are not handled yet
+                    try:
+                        outcome = self._download_module_item(item, module_number, dest_folder)
+                    except Exception as e:  # pylint: disable=broad-except
+                        # One bad item (a dead external link, a field that Canvas left empty)
+                        # must not fail the section and lose the items that are good.
+                        skipped += 1
+                        item_errors += 1
+                        reason = _request_error(e) if isinstance(e, requests.RequestException) else type(e).__name__
+                        if first_item_error is None:
+                            first_item_error = "type=%s %s" % (item.get('type'), reason)
+                        logger.debug("module item skipped type=%s: %s", item.get('type'), reason)
                         continue
-
-                    else:  # OTHER ITEMS - PAGES
-                        if 'url' not in item:
-                            continue
-
-                        item_url = item['url']
-                        try:
-                            item_request = self._canvas_request('GET', item_url)
-                        except CanvasError as e:
-                            logger.debug("item skipped: %s", e.describe())
-                            skipped += 1
-                            continue
-                        item_data = item_request.json()
-                        if 'published' in item_data and not item_data['published']:
-                            logger.debug("item not published: %s", item_data['url'])
-                            continue
-                        if 'body' not in item_data:
-                            continue
-
-                        item_body = item_data['body']
-                        html_file_name = f"Module_{module_number}_{item['type']}_{item_data['url']}.html"
-                        with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
-                            html_file.write(item_body)
+                    if outcome == 'downloaded':
                         downloaded += 1
+                    elif outcome == 'skipped':
+                        skipped += 1
+            if item_errors:
+                logger.warning("section=modules: %d item(s) failed and were skipped, first: %s", item_errors,
+                               first_item_error)
             logger.info("section=modules downloaded=%d skipped=%d", downloaded, skipped)
             return "Success"
         except CanvasError as e:
             logger.warning("section=modules skipped: %s", e.describe())
-            return "Failed! " + e.describe()
-        except requests.RequestException as e:
-            logger.error("section=modules failed for %s url=%s: %s", urlsplit(api_path).path,
-                         urlsplit(external_url).path if external_url else None, _request_error(e))
-            sentry_sdk.capture_exception(e)
-            return _failed(e)
+            return _section_error(e)
         except Exception as e:
             logger.exception("section=modules failed for %s", urlsplit(api_path).path)
             sentry_sdk.capture_exception(e)
             return _failed(e)
+
+    def _download_module_item(self, item: dict, module_number: str, dest_folder: str) -> Optional[str]:
+        """Downloads one module item. Returns 'downloaded', 'skipped' when Canvas or the
+        linked site refused it, or None for an item that has nothing to download here."""
+        if item['type'] == 'ExternalUrl':
+            external_url = item['external_url']
+            response = requests.get(external_url, timeout=30)
+            if response.status_code != 200:
+                logger.debug("external link skipped status=%s host=%s", response.status_code,
+                             urlsplit(external_url).hostname)
+                return 'skipped'
+            title_fmt = item['title'].replace(' ', '_')
+            html_file_name = f"Module_{module_number}_external_link_{title_fmt}.html"
+            with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
+                html_file.write(response.text)
+            return 'downloaded'
+
+        if item['type'] == 'Discussion':
+            try:
+                discussion_req = self._canvas_request('GET', item['url'])
+            except CanvasError as e:
+                logger.debug("item skipped: %s", e.describe())
+                return 'skipped'
+            discussion_data = discussion_req.json()
+            title_fmt = discussion_data['title'].replace(" ", "_")
+            discussion_filename = f"Module_{module_number}_Discussion_{title_fmt}.html"
+            with open(f"{dest_folder}/{discussion_filename}", 'w') as html_file:
+                html_file.write(discussion_data['message'])
+            return 'downloaded'
+
+        # Assignments are handled separately. Quizzes are not handled yet.
+        if item['type'] in ['Assignment', 'Quiz']:
+            return None
+
+        # OTHER ITEMS - PAGES
+        if 'url' not in item:
+            return None
+        try:
+            item_request = self._canvas_request('GET', item['url'])
+        except CanvasError as e:
+            logger.debug("item skipped: %s", e.describe())
+            return 'skipped'
+        item_data = item_request.json()
+        if 'published' in item_data and not item_data['published']:
+            logger.debug("item not published: %s", item_data['url'])
+            return None
+        if 'body' not in item_data:
+            return None
+        html_file_name = f"Module_{module_number}_{item['type']}_{item_data['url']}.html"
+        with open(f"{dest_folder}/{html_file_name}", 'w') as html_file:
+            html_file.write(item_data['body'])
+        return 'downloaded'
 
     def download_assignments(self, dest_folder: str, api_path: str) -> str:
         """
@@ -580,7 +606,7 @@ class IngestCanvas:
             return "Success"
         except CanvasError as e:
             logger.warning("section=assignments skipped: %s", e.describe())
-            return "Failed! " + e.describe()
+            return _section_error(e)
         except Exception as e:
             logger.exception("section=assignments failed for %s", urlsplit(api_path).path)
             sentry_sdk.capture_exception(e)
@@ -606,7 +632,7 @@ class IngestCanvas:
             return "Success"
         except CanvasError as e:
             logger.warning("section=discussions skipped: %s", e.describe())
-            return "Failed! " + e.describe()
+            return _section_error(e)
         except Exception as e:
             logger.exception("section=discussions failed for %s", urlsplit(api_path).path)
             sentry_sdk.capture_exception(e)

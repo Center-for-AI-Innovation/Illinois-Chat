@@ -229,6 +229,18 @@ class WorkerConnectionResolver:
 
         return result
 
+    def resolve_documents_engine(self, project_name: str) -> Optional[SAEngine]:
+        """Only the project's documents database, or None when it uses the host one.
+
+        For the worker's failure path. resolve() can fail on a part that is not the
+        documents database (Qdrant, S3, the embedding config), and the status rows of the
+        job must still be updated in the database where the producer wrote them.
+        """
+        if not project_name:
+            return None
+        db_config = self._decrypt_field(self._get_raw_config(project_name), project_name, "database_config")
+        return self._create_engine(project_name, db_config) if db_config else None
+
     # ── Embedding ──
 
     def _resolve_embedding(self, result: ResolvedConnections,

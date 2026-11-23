@@ -11,6 +11,11 @@ Coverage:
     marker to the log (the requests/urllib3 traceback repeats the full URL).
   - A video yt-dlp cannot fetch gives exactly one ERROR line (ours) and nothing
     on stderr: yt-dlp's own messages go to DEBUG through ``_YtDlpLogger``.
+  - A section that Canvas answers 401 or 403 for is "No access! ...", not
+    "Failed! ..."; a course with no syllabus is "none found".
+  - One bad item of a module (a dead external link, a field Canvas left empty)
+    is skipped with one WARNING; the section is "Success" and keeps the items
+    that are good.
   - A page yt-dlp does not support (``UnsupportedError``) gives one ERROR line
     with no traceback and no verifier: yt-dlp's text repeats the full URL.
 """
@@ -104,13 +109,7 @@ def _videos(canvas, tmp_path):
     return canvas.download_videos_from_urls([UNREACHABLE], 1, str(tmp_path))
 
 
-def _modules(canvas, tmp_path):
-    modules = [{"position": 1, "name": "m", "items": [{"type": "ExternalUrl", "title": "t", "external_url": UNREACHABLE}]}]
-    canvas._canvas_request = lambda method, url: SimpleNamespace(json=lambda: modules)
-    return canvas.download_modules(str(tmp_path), "https://canvas.illinois.edu/api/v1/courses/1")
-
-
-@pytest.mark.parametrize("download", [_files, _videos, _modules])
+@pytest.mark.parametrize("download", [_files, _videos])
 def test_failed_download_does_not_log_the_verifier(download, monkeypatch, tmp_path):
     captured = []
     monkeypatch.setattr(ingest_canvas.sentry_sdk, "capture_exception", captured.append)
@@ -134,6 +133,99 @@ def test_failed_download_does_not_log_the_verifier(download, monkeypatch, tmp_pa
     assert MARKER not in output
     assert "Traceback" not in output
     assert result == "Failed! ConnectionError"
+
+
+API = "https://canvas.illinois.edu/api/v1/courses/1"
+
+
+def _collect(run):
+    """Runs `run` and returns its result with the log lines and records it wrote."""
+    collector = LineCollector()
+    records = []
+    recorder = logging.Handler(level=logging.DEBUG)
+    recorder.emit = records.append
+    root = logging.getLogger()
+    old_level = root.level
+    root.addHandler(collector)
+    root.addHandler(recorder)
+    root.setLevel(logging.DEBUG)
+    try:
+        result = run()
+    finally:
+        root.removeHandler(collector)
+        root.removeHandler(recorder)
+        root.setLevel(old_level)
+    return result, collector.lines, records
+
+
+def test_one_bad_module_item_does_not_fail_the_section(monkeypatch, tmp_path):
+    captured = []
+    monkeypatch.setattr(ingest_canvas.sentry_sdk, "capture_exception", captured.append)
+    modules = [{"position": 1, "name": "m", "items": [
+        {"type": "ExternalUrl", "title": "dead link", "external_url": UNREACHABLE},
+        # Canvas left the message of this discussion empty.
+        {"type": "Discussion", "url": API + "/discussion_topics/5"},
+        {"type": "Page", "url": API + "/pages/intro"},
+    ]}]
+    replies = {
+        API + "/modules?include=items&per_page=50": modules,
+        API + "/discussion_topics/5": {"title": "week 1", "message": None},
+        API + "/pages/intro": {"url": "intro", "body": "<p>hello</p>"},
+    }
+    canvas = IngestCanvas()
+    canvas._canvas_request = lambda method, url: SimpleNamespace(json=lambda: replies[url])
+
+    result, lines, records = _collect(lambda: canvas.download_modules(str(tmp_path), API))
+
+    assert result == "Success"
+    assert (tmp_path / "Module_1_Page_intro.html").read_text() == "<p>hello</p>"
+    warnings = [r.getMessage() for r in records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert warnings[0].startswith(
+        "section=modules: 2 item(s) failed and were skipped, first: type=ExternalUrl ConnectionError: ")
+    assert [r for r in records if r.levelno >= logging.ERROR] == []
+    assert "section=modules downloaded=1 skipped=2" in "\n".join(lines)
+    # A skipped item is not an event for Sentry, and the link's query string stays out of the log.
+    assert captured == []
+    assert MARKER not in "\n".join(lines)
+    assert "Traceback" not in "\n".join(lines)
+
+
+@pytest.mark.parametrize("body", [{"syllabus_body": None}, {"syllabus_body": ""}, {}])
+def test_course_without_a_syllabus_is_none_found(body, tmp_path):
+    canvas = IngestCanvas()
+    canvas._canvas_request = lambda method, url: SimpleNamespace(json=lambda: body)
+
+    result, lines, records = _collect(lambda: canvas.download_syllabus(str(tmp_path), API))
+
+    assert result == "none found"
+    assert list(tmp_path.iterdir()) == []
+    assert [r for r in records if r.levelno >= logging.WARNING] == []
+    assert "section=syllabus downloaded=0: the course has no syllabus" in "\n".join(lines)
+
+
+@pytest.mark.parametrize("download", ["download_files", "download_pages", "download_syllabus", "download_modules",
+                                      "download_assignments", "download_discussions"])
+@pytest.mark.parametrize("status, expected", [
+    (401, "No access! Canvas 401 for /api/v1/courses/1/x"),
+    (403, "No access! Canvas 403 for /api/v1/courses/1/x"),
+    (500, "Failed! Canvas 500 for /api/v1/courses/1/x"),
+    (None, "Failed! Canvas unreachable for /api/v1/courses/1/x"),
+])
+def test_section_result_tells_no_access_from_a_failure(download, status, expected, tmp_path):
+    canvas = IngestCanvas()
+
+    def refuse(method, url):
+        raise CanvasError("Canvas request failed", status, "reply", "/api/v1/courses/1/x")
+
+    canvas._canvas_request = refuse
+
+    result, lines, records = _collect(lambda: getattr(canvas, download)(str(tmp_path), API))
+
+    assert result == expected
+    # One WARNING for the section, and no traceback: Canvas answered, nothing of ours broke.
+    assert [r.levelno for r in records if r.levelno >= logging.WARNING] == [logging.WARNING]
+    assert "Traceback" not in "\n".join(lines)
 
 
 class _FakeResponse:

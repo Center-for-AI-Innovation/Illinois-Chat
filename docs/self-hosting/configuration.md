@@ -192,7 +192,6 @@ Read by `docker-compose.sim.yaml`, which both start scripts load unless `--no-si
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | dev | empty; not passed by Compose | root |
 | `NOMIC_API_KEY` | dev | empty; not passed by Compose | root |
 | `SENTRY_DSN` | dev | empty; not passed by Compose | root |
-| `LOG_LEVEL` | full (backend, worker), dev | `INFO`; one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. An unknown value falls back to `INFO` with one warning line. `start-dev.sh` does not write it; add it to `apps/backend/.env` | root, worker |
 
 ## Vector database (Qdrant, optional)
 
