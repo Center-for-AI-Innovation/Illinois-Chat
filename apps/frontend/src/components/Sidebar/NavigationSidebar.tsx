@@ -10,6 +10,7 @@ import {
   IconMenu2,
   IconMessageCode,
   IconMoon,
+  IconNetwork,
   IconReportAnalytics,
   IconSun,
 } from '@tabler/icons-react'
@@ -190,6 +191,18 @@ export default function NavigationSidebar({
         />
       ),
       link: course_name ? `/${course_name}/tools` : '/tools',
+    },
+    {
+      name: <NavText>NLIP</NavText>,
+      icon: (
+        <IconNetwork
+          size={18}
+          strokeWidth={2}
+          style={{ marginRight: '3px', marginLeft: '3px' }}
+          aria-hidden="true"
+        />
+      ),
+      link: course_name ? `/${course_name}/nlip` : '/nlip',
     },
     {
       name: <NavText>API</NavText>,

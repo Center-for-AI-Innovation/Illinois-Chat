@@ -1,0 +1,120 @@
+import { type NextPage } from 'next'
+import React, { useEffect, useState } from 'react'
+import { Montserrat } from 'next/font/google'
+import { useRouter } from 'next/router'
+
+import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
+import {
+  LoadingPlaceholderForAdminPages,
+  MainPageBackground,
+} from '~/components/UIUC-Components/MainPageBackground'
+import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+
+import MakeNlipPage from '~/components/UIUC-Components/NlipPage'
+import { useAuth } from 'react-oidc-context'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '~/utils/app/const'
+
+const montserrat = Montserrat({
+  weight: '700',
+  subsets: ['latin'],
+})
+
+const NlipAgentsPage: NextPage = () => {
+  const router = useRouter()
+  const auth = useAuth()
+
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorType, setErrorType] = useState<401 | 403 | 404 | null>(null)
+
+  const getCurrentPageName = () => {
+    const raw = router.query.course_name
+    return typeof raw === 'string'
+      ? raw
+      : Array.isArray(raw)
+        ? raw[0]
+        : undefined
+  }
+  const courseName = getCurrentPageName() as string
+
+  useEffect(() => {
+    if (!router.isReady || auth.isLoading) return
+
+    const fetchCourseData = async () => {
+      setIsLoading(true)
+      try {
+        const existResponse = await fetch(
+          `/api/UIUC-api/getCourseExists?course_name=${courseName}`,
+        )
+        if (!existResponse.ok) {
+          const s = existResponse.status
+          if (s === 401 || s === 403 || s === 404)
+            setErrorType(s as 401 | 403 | 404)
+          return
+        }
+
+        const exists = await existResponse.json()
+        if (!exists) {
+          setErrorType(404)
+        }
+      } catch (error) {
+        console.error(error)
+
+        const errorWithStatus = error as Error & { status?: number }
+        const status = errorWithStatus.status
+        if (status === 401 || status === 403 || status === 404) {
+          setErrorType(status as 401 | 403 | 404)
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchCourseData()
+  }, [router.isReady, auth.isLoading, courseName])
+
+  if (auth.isLoading || isLoading || courseName === undefined) {
+    return <LoadingPlaceholderForAdminPages />
+  }
+
+  if (!auth.isAuthenticated) {
+    return <PermissionGate course_name={courseName as string} />
+  }
+
+  const user_emails = auth.user?.profile?.email ? [auth.user.profile.email] : []
+
+  if (
+    courseName &&
+    (courseName.toLowerCase() == 'gpt4' ||
+      courseName.toLowerCase() == 'global' ||
+      courseName.toLowerCase() == 'extreme')
+  ) {
+    return <CannotEditGPT4Page course_name={courseName as string} />
+  }
+
+  if (user_emails.length == 0) {
+    return (
+      <MainPageBackground>
+        <h3
+          className={`heading-h3 mt-16 bg-[linear-gradient(50deg,gold,white)] bg-clip-text p-8 text-transparent ${montserrat.className}`}
+        >
+          You&apos;ve encountered a software bug!<br></br>Your account has no
+          email address. Please send us an email so we can fix it for you:{' '}
+          <a className="goldUnderline" href={SUPPORT_MAILTO}>
+            {SUPPORT_EMAIL}
+          </a>
+        </h3>
+      </MainPageBackground>
+    )
+  }
+
+  if (errorType !== null) {
+    return (
+      <PermissionGate
+        course_name={courseName ? (courseName as string) : 'new'}
+        errorType={errorType}
+      />
+    )
+  }
+
+  return <MakeNlipPage course_name={courseName as string} />
+}
+export default NlipAgentsPage
