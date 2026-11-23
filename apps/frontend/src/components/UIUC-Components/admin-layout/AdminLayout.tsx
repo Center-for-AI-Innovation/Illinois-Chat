@@ -3,10 +3,10 @@ import { useAuth } from 'react-oidc-context'
 
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
 import { AdminSidebar } from './AdminSidebar'
 import { ADMIN_CONTENT_ID, followSectionUntilSettled } from './adminScroll'
-import { GlobalNav } from './GlobalNav'
 import { SubPageHeader } from './SubPageHeader'
 
 // Figma "Admin Sub-Pages": global nav over a bordered admin panel holding the
@@ -28,8 +28,8 @@ function AdminShell({
   }, [])
 
   return (
-    <div className="bg-background flex h-svh flex-col">
-      <GlobalNav />
+    <div className="bg-background flex h-(--viewport-height) flex-col pt-(--navbar-height)">
+      <Navbar />
       <div className="flex min-h-0 flex-1 p-4 md:p-8">
         <SidebarProvider className="bg-background border-border min-h-0 overflow-hidden rounded-xl border shadow-sm">
           <AdminSidebar courseName={courseName} />
