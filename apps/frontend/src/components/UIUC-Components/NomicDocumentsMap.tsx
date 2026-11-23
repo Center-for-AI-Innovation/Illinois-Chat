@@ -105,19 +105,19 @@ function NomicDocumentMap({ course_name }: { course_name: string }) {
                         </p>
                         <ul className="list-inside list-disc space-y-2 text-(--foreground)">
                           <li className="text-sm">
-                            <span className="font-bold text-(--accent)">
+                            <span className="font-bold text-(--illinois-industrial)">
                               Similar topics
                             </span>{' '}
                             cluster together
                           </li>
                           <li className="text-sm">
-                            <span className="font-bold text-(--accent)">
+                            <span className="font-bold text-(--illinois-industrial)">
                               Different topics
                             </span>{' '}
                             are positioned further apart
                           </li>
                           <li className="text-sm">
-                            <span className="font-bold text-(--accent)">
+                            <span className="font-bold text-(--illinois-industrial)">
                               Common themes
                             </span>{' '}
                             and knowledge gaps become visible

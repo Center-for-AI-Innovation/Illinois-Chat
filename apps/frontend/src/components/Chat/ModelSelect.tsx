@@ -288,7 +288,7 @@ export const ModelItem = forwardRef<
                     <LoadingSpinner size="xs" />
                     <span
                       style={{ marginLeft: '7px' }}
-                      className="text-xs text-(--accent)"
+                      className="text-xs text-(--illinois-industrial)"
                     >
                       loading
                     </span>

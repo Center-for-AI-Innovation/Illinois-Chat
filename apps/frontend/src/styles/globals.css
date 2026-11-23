@@ -58,8 +58,8 @@
 }
 [data-slot='input-group']:has([data-slot='input-group-control']:focus-visible),
 [data-slot='combobox-input-group']:has(
-    [data-slot='combobox-input']:focus-visible
-  ) {
+  [data-slot='combobox-input']:focus-visible
+) {
   outline: 2px solid var(--illinois-orange) !important;
   outline-offset: 2px !important;
 }
@@ -304,8 +304,8 @@ button:disabled {
   --badge: var(--illinois-orange);
   --badge-error: #f00;
 
-  --link: var(--primary);
-  --link-hover: color-mix(in srgb, var(--primary), white 20%);
+  --link: var(--illinois-orange);
+  --link-hover: color-mix(in srgb, var(--illinois-orange), white 20%);
 
   --button: color-mix(in srgb, var(--foreground), var(--background) 20%);
   --button-text-color: var(--background);
@@ -329,7 +329,7 @@ button:disabled {
   --chat-background-user: var(
     --chat-background
   ); /* color-mix(in srgb, var(--background), black 10%); */
-  --chat-user: var(--primary); /* var(--foreground); */
+  --chat-user: var(--illinois-orange); /* var(--foreground); */
 
   --citation-foreground: var(--link);
   --citation-background: color-mix(in srgb, var(--background), var(--link) 5%);
@@ -350,7 +350,7 @@ button:disabled {
 */
   --modal: var(--background);
   --modal-dark: color-mix(in srgb, var(--modal), black 15%);
-  --modal-active: var(--primary);
+  --modal-active: var(--illinois-orange);
   --modal-text: var(--foreground);
   --modal-border: var(--background-dark);
   --modal-button: var(--foreground-light);
@@ -375,7 +375,7 @@ button:disabled {
   --notification-title: white;
   --notification-message: white;
   --notification-border: rgba(255, 255, 255, 20%);
-  --notification-highlight: var(--primary);
+  --notification-highlight: var(--illinois-orange);
 
   --sources-foreground: var(--foreground);
   --sources-background: var(--background-dark);
@@ -390,9 +390,7 @@ button:disabled {
     var(--sources-background) 60%
   );
 
-  --dashboard-stat: var(
-    --accent
-  ); /* #3b75af; not offical uiuc colors, --accent is */
+  --dashboard-stat: var(--illinois-industrial);
   --dashboard-foreground: var(--foreground); /* var(--illinois-white); */
   --dashboard-foreground-faded: rgba(
     from var(--dashboard-foreground) r g b / 0.7
@@ -438,7 +436,7 @@ button:disabled {
   --pulsate: var(
     --foreground
   ); /* color-mix(in srgb, var(--foreground), var(--background) 75%); */
-  --pulsate-secondary: var(--primary);
+  --pulsate-secondary: var(--illinois-orange);
 
   /* sidebar is always the same color */
   /*
@@ -525,12 +523,7 @@ button:disabled {
   outline: none;
 }
 
-/*
- * shadcn primitives draw their own design-system focus ring (border-ring +
- * 3px ring-ring/50), so the global orange outline (`*:focus-visible` at the top
- * of this file) would double it up. Higher specificity, and !important to beat
- * that rule's !important.
- */
+/* shadcn primitives draw their own focus ring; beat the global !important outline. */
 [data-slot='button']:focus-visible,
 [data-slot='switch']:focus-visible,
 [data-slot='input']:focus-visible,
@@ -587,9 +580,7 @@ html[data-input-modality='keyboard']
   --foreground: #fafafa;
   --background: #081735;
 
-  /* Semantic tokens: Figma dark values where the design defines them, otherwise
-     derived from --foreground/--background. Every token :root pins to a hex
-     needs a value here, or the light value leaks into dark mode. */
+  /* Every token :root pins to a hex needs a dark value here, or light leaks in. */
   --foreground-subtle: color-mix(
     in srgb,
     var(--foreground),
@@ -1374,7 +1365,7 @@ button.css-s37qmw {
 }
 
 .think-tag-brain-icon {
-  @apply text-(--accent);
+  @apply text-(--illinois-industrial);
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
   transition: transform 0.2s ease;
 }
@@ -1510,7 +1501,7 @@ button.css-s37qmw {
 }
 
 .think-tag-content.expanded:focus {
-  @apply ring-2 ring-(--accent) outline-hidden;
+  @apply ring-2 ring-(--illinois-industrial) outline-hidden;
 }
 
 .think-tag-content.expanded > div {
@@ -1538,7 +1529,7 @@ button.css-s37qmw {
 
 .think-tag-header:focus-visible {
   @apply outline-hidden;
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: inset 0 0 0 2px var(--illinois-industrial);
 }
 
 .think-tag-icon {
@@ -1551,7 +1542,7 @@ button.css-s37qmw {
 
 .think-tag-icon.expanded {
   transform: rotate(180deg);
-  @apply text-(--accent);
+  @apply text-(--illinois-industrial);
 }
 
 /* Update the link styles to show proper cursor and interaction states */

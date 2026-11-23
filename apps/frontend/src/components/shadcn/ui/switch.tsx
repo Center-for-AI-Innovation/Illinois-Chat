@@ -84,12 +84,7 @@ interface SwitchProps
   onCheckedChange?: (checked: boolean) => void
 }
 
-// Base UI latches controlled-vs-uncontrolled on the first render: a `checked`
-// that starts out `undefined` (form data still loading, for example) leaves the
-// switch uncontrolled for its whole lifetime, so it ignores every later
-// `checked` value and its track stays stuck in the off position. Always hand
-// Base UI a
-// boolean so the switch is controlled from the very first render.
+// Base UI latches uncontrolled if `checked` starts undefined; always pass a boolean.
 const toChecked = (checked: boolean | undefined) => checked ?? false
 
 // Base UI renders a <span role="switch">, not a <button>.
