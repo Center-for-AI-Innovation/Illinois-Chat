@@ -78,7 +78,7 @@ export const UserSettings = () => {
     homeDispatch({ field: 'showModelSettings', value: false })
   }
 
-  const tabTriggerClass = `${isSmallScreen ? 'px-2 text-xs' : 'px-4 text-sm'} py-2.5 ${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-text) justify-start data-active:bg-(--modal-active) hover:bg-(--modal-active) hover:text-white data-active:text-white whitespace-normal`
+  const tabTriggerClass = `${isSmallScreen ? 'px-2 text-xs' : 'px-4 text-sm'} py-2.5 ${montserrat_paragraph.variable} font-montserratParagraph text-(--modal-text) justify-start data-active:bg-(--modal-active) hover:bg-(--modal-active) hover:text-(--accent-foreground) data-active:text-(--accent-foreground) whitespace-normal`
 
   return (
     <Dialog open={opened} onOpenChange={(next) => !next && handleClose()}>

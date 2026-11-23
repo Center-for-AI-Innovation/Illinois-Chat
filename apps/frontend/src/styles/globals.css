@@ -350,7 +350,7 @@ button:disabled {
 */
   --modal: var(--background);
   --modal-dark: color-mix(in srgb, var(--modal), black 15%);
-  --modal-active: var(--illinois-orange);
+  --modal-active: var(--accent);
   --modal-text: var(--foreground);
   --modal-border: var(--background-dark);
   --modal-button: var(--foreground-light);
