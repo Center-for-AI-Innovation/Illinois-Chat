@@ -246,14 +246,59 @@ const sourceMaps = new Map<
   { mtimeMs: number; size: number; map: SourceMapLike }
 >()
 
+type NodeFs = typeof import('node:fs')
+type NodeModule = typeof import('node:module')
+
+// Production only: the chunks that gave no map (no map file, a map that is too
+// large or cannot be read). At most MAX_CHUNKS_WITHOUT_MAP are kept, because a
+// stack can name any file; the oldest goes first.
+export const MAX_CHUNKS_WITHOUT_MAP = 1000
+const chunksWithoutMap = new Set<string>()
+
 // The source map that the build wrote beside a server chunk (<chunk>.js.map,
 // from experimental.serverSourceMaps in next.config.mjs). Next.js leaves
 // err.stack unmapped, so the logger reads the map itself. A parsed map is kept
-// until its file changes or the kept maps become too large.
+// until the kept maps become too large or, outside production, its file
+// changes.
 function sourceMapFor(file: string): SourceMapLike | undefined {
-  const fs = builtin<typeof import('node:fs')>('node:fs')
-  const mod = builtin<typeof import('node:module')>('node:module')
+  const fs = builtin<NodeFs>('node:fs')
+  const mod = builtin<NodeModule>('node:module')
   if (!fs || !mod?.SourceMap) return undefined
+  // The chunks of a production build never change, so there the first answer
+  // for a chunk is kept and the file system is not asked again for every
+  // frame of every error. Dev rebuilds its chunks, so there the map file is
+  // checked on every call.
+  const production = process.env.NODE_ENV === 'production'
+  if (production) {
+    const cached = sourceMaps.get(file)
+    if (cached) {
+      // Put back at the end: it is now the most recently used.
+      sourceMaps.delete(file)
+      sourceMaps.set(file, cached)
+      return cached.map
+    }
+    if (chunksWithoutMap.has(file)) return undefined
+  }
+  const map = readSourceMap(fs, mod.SourceMap, file)
+  if (!map && production) {
+    if (chunksWithoutMap.size >= MAX_CHUNKS_WITHOUT_MAP) {
+      for (const oldest of chunksWithoutMap) {
+        chunksWithoutMap.delete(oldest)
+        break
+      }
+    }
+    chunksWithoutMap.add(file)
+  }
+  return map
+}
+
+// The parsed map of a chunk, from the kept maps when its file did not change,
+// else from the file. Undefined when there is no map that can be used.
+function readSourceMap(
+  fs: NodeFs,
+  SourceMap: NodeModule['SourceMap'],
+  file: string,
+): SourceMapLike | undefined {
   try {
     const mapFile = `${file}.map`
     const cached = sourceMaps.get(file)
@@ -266,7 +311,7 @@ function sourceMapFor(file: string): SourceMapLike | undefined {
       return cached.map
     }
     if (size > MAX_MAP_BYTES) return undefined
-    const map: SourceMapLike = new mod.SourceMap(
+    const map: SourceMapLike = new SourceMap(
       JSON.parse(fs.readFileSync(mapFile, 'utf8')),
     )
     sourceMaps.set(file, { mtimeMs, size, map })

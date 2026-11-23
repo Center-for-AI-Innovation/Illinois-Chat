@@ -1,10 +1,15 @@
 /* @vitest-environment node */
 
-import fs, { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import fs, { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MAX_CACHED_MAP_BYTES, MAX_MAP_BYTES, getLogger } from '../log'
+import {
+  MAX_CACHED_MAP_BYTES,
+  MAX_CHUNKS_WITHOUT_MAP,
+  MAX_MAP_BYTES,
+  getLogger,
+} from '../log'
 import { runWithLogContext } from '../requestContext'
 
 const TS = '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z'
@@ -586,6 +591,186 @@ describe('getLogger', () => {
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }
+    },
+  )
+
+  // A map file with one mapping: line 1, column 1 of the chunk is `mappings`
+  // in <name>.ts ('AAUE' is line 11, column 3; 'AAWE' is line 12, column 3).
+  const writeChunkMap = (chunk: string, name: string, mappings = 'AAUE') =>
+    writeFileSync(
+      `${chunk}.map`,
+      JSON.stringify({
+        version: 3,
+        sources: [`webpack://app/./src/pages/api/${name}.ts`],
+        names: [],
+        mappings,
+      }),
+    )
+
+  // The frame as the logger writes it, and how often it asked the file system
+  // for the map file of the chunk.
+  const lookUp = (chunk: string) => {
+    const err = new Error('boom')
+    err.stack = `Error: boom\n    at m (${chunk}:1:5)`
+    const c = spies()
+    const stat = vi.spyOn(fs, 'statSync')
+    const read = vi.spyOn(fs, 'readFileSync')
+    getLogger('api').error('failed', err)
+    const frame = (c.error.mock.calls.at(-1)![0] as string).split('\n')[2]
+    const ofMap = (calls: unknown[][]) =>
+      calls.filter(([file]) => String(file) === `${chunk}.map`).length
+    const stats = ofMap(stat.mock.calls)
+    const reads = ofMap(read.mock.calls)
+    vi.restoreAllMocks()
+    return { frame, stats, reads }
+  }
+
+  describe.skipIf(typeof process.getBuiltinModule !== 'function')(
+    'source maps in production',
+    () => {
+      let dir: string
+      beforeEach(() => {
+        dir = mkdtempSync(join(tmpdir(), 'log-test-'))
+        vi.stubEnv('NODE_ENV', 'production')
+      })
+      afterEach(() => {
+        vi.unstubAllEnvs()
+        rmSync(dir, { recursive: true, force: true })
+      })
+
+      it('uses a kept map without asking the file system again', () => {
+        const chunk = join(dir, 'kept.js')
+        writeChunkMap(chunk, 'kept')
+        const mapped = '    at src/pages/api/kept.ts:11:3'
+        expect(lookUp(chunk)).toEqual({ frame: mapped, stats: 1, reads: 1 })
+        expect(lookUp(chunk)).toEqual({ frame: mapped, stats: 0, reads: 0 })
+        // The built chunks do not change, so a new map file is not seen.
+        writeChunkMap(chunk, 'kept', 'AAWE')
+        utimesSync(`${chunk}.map`, new Date(), new Date(Date.now() + 60_000))
+        expect(lookUp(chunk)).toEqual({ frame: mapped, stats: 0, reads: 0 })
+      })
+
+      it('looks only once for a map file that is not there', () => {
+        const chunk = join(dir, 'no-map.js')
+        const unmapped = `    at m (${chunk}:1:5)`
+        expect(lookUp(chunk)).toEqual({ frame: unmapped, stats: 1, reads: 0 })
+        expect(lookUp(chunk)).toEqual({ frame: unmapped, stats: 0, reads: 0 })
+        // Also not when the file appears later.
+        writeChunkMap(chunk, 'no-map')
+        expect(lookUp(chunk)).toEqual({ frame: unmapped, stats: 0, reads: 0 })
+      })
+
+      it('looks only once at a map that is too large or cannot be parsed', () => {
+        const large = join(dir, 'large.js')
+        writeFileSync(`${large}.map`, 'x'.repeat(MAX_MAP_BYTES + 1))
+        expect(lookUp(large)).toMatchObject({ stats: 1, reads: 0 })
+        expect(lookUp(large)).toMatchObject({ stats: 0, reads: 0 })
+
+        const broken = join(dir, 'broken.js')
+        writeFileSync(`${broken}.map`, 'not json')
+        expect(lookUp(broken)).toMatchObject({ stats: 1, reads: 1 })
+        expect(lookUp(broken)).toEqual({
+          frame: `    at m (${broken}:1:5)`,
+          stats: 0,
+          reads: 0,
+        })
+      })
+
+      it('forgets the oldest chunk without a map when too many are kept', () => {
+        const first = join(dir, 'first.js')
+        expect(lookUp(first).stats).toBe(1)
+        expect(lookUp(first).stats).toBe(0)
+        const log = getLogger('api')
+        spies()
+        for (let i = 0; i < MAX_CHUNKS_WITHOUT_MAP; i++) {
+          const err = new Error('boom')
+          err.stack = `Error: boom\n    at m (${join(dir, `other-${i}.js`)}:1:5)`
+          log.error('failed', err)
+        }
+        vi.restoreAllMocks()
+        // 'first' was dropped, the newest one is still kept.
+        expect(lookUp(first).stats).toBe(1)
+        const newest = join(dir, `other-${MAX_CHUNKS_WITHOUT_MAP - 1}.js`)
+        expect(lookUp(newest).stats).toBe(0)
+      })
+
+      it('still drops the map that was not used for the longest time', () => {
+        const third = Math.ceil(MAX_CACHED_MAP_BYTES / 3) + 1024
+        const writeMap = (name: string) => {
+          const chunk = join(dir, `${name}.js`)
+          writeFileSync(
+            `${chunk}.map`,
+            JSON.stringify({
+              version: 3,
+              sources: [`webpack://app/./src/pages/api/${name}.ts`],
+              sourcesContent: ['x'.repeat(third)],
+              names: [],
+              mappings: 'AAUE',
+            }),
+          )
+          return chunk
+        }
+        const one = writeMap('one')
+        const two = writeMap('two')
+        const three = writeMap('three')
+        expect(lookUp(one).reads).toBe(1)
+        expect(lookUp(two).reads).toBe(1)
+        // 'one' is used again from the kept maps, so 'two' is now the oldest.
+        expect(lookUp(one)).toMatchObject({ stats: 0, reads: 0 })
+        // 'three' does not fit beside both: 'two' is dropped, 'one' stays.
+        expect(lookUp(three).reads).toBe(1)
+        expect(lookUp(one)).toMatchObject({ stats: 0, reads: 0 })
+        // A dropped map is read again when a frame needs it.
+        expect(lookUp(two)).toEqual({
+          frame: '    at src/pages/api/two.ts:11:3',
+          stats: 1,
+          reads: 1,
+        })
+      })
+    },
+  )
+
+  describe.skipIf(typeof process.getBuiltinModule !== 'function')(
+    'source maps outside production',
+    () => {
+      let dir: string
+      beforeEach(() => {
+        dir = mkdtempSync(join(tmpdir(), 'log-test-'))
+        vi.stubEnv('NODE_ENV', 'development')
+      })
+      afterEach(() => {
+        vi.unstubAllEnvs()
+        rmSync(dir, { recursive: true, force: true })
+      })
+
+      it('checks the map file on every call and reads it again when it changed', () => {
+        const chunk = join(dir, 'rebuilt.js')
+        writeChunkMap(chunk, 'rebuilt')
+        const mapped = '    at src/pages/api/rebuilt.ts:11:3'
+        expect(lookUp(chunk)).toEqual({ frame: mapped, stats: 1, reads: 1 })
+        expect(lookUp(chunk)).toEqual({ frame: mapped, stats: 1, reads: 0 })
+        // Dev rebuilds the chunk: the new map is used.
+        writeChunkMap(chunk, 'rebuilt', 'AAWE')
+        utimesSync(`${chunk}.map`, new Date(), new Date(Date.now() + 60_000))
+        expect(lookUp(chunk)).toEqual({
+          frame: '    at src/pages/api/rebuilt.ts:12:3',
+          stats: 1,
+          reads: 1,
+        })
+      })
+
+      it('looks again for a map file that was not there', () => {
+        const chunk = join(dir, 'late.js')
+        const unmapped = `    at m (${chunk}:1:5)`
+        expect(lookUp(chunk)).toEqual({ frame: unmapped, stats: 1, reads: 0 })
+        expect(lookUp(chunk)).toEqual({ frame: unmapped, stats: 1, reads: 0 })
+        writeChunkMap(chunk, 'late')
+        expect(lookUp(chunk)).toEqual({
+          frame: '    at src/pages/api/late.ts:11:3',
+          stats: 1,
+          reads: 1,
+        })
+      })
     },
   )
 

@@ -35,6 +35,10 @@ The web crawler's lines look a little different. The time has a space instead of
 2026-11-03 00:16:29.261 INFO  rid=3c9e51b07a24 course=ece120: crawl started url=https://ece.illinois.edu/ strategy=same-hostname maxPages=50
 ```
 
+**What a healthy start looks like.** The backend writes `logging configured level=INFO` and `Sentry disabled: SENTRY_DSN unset` (or `Sentry configured (initialised on first request)`) once per gunicorn worker. The worker writes `Worker connected to RabbitMQ queue=uiuc-chat` and then `Waiting for messages`. Gunicorn's first line, `Starting gunicorn`, and Flask's two banner lines in the worker, ` * Serving Flask app 'worker'` and ` * Debug mode: off`, are the only lines without the time in front.
+
+**What one upload looks like.** The backend writes `ingest request`, `job enqueued job=<id>` and the `request method=POST route=/ingest status=200` line. The worker then writes `job received file=<name>`, `start handler=<handler>`, `done handler=<handler> ... result=Success` (or `result=failed err=<reason>` at `ERROR`) and `job done ms=<n>`. `job done` means the job ran to the end; whether the file made it is on the `done handler=` line.
+
 **Follow one request.** The backend sends the request id back in the `X-Request-ID` header of every reply. A caller may also send its own id in an `X-Request-ID` request header (letters, digits, `-` and `_`, up to 64 characters), and the backend then uses it. To see everything that happened for one id, in every container:
 
 ```bash

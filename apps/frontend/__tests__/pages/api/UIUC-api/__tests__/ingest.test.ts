@@ -87,8 +87,95 @@ describe('UIUC-api/ingest', () => {
     // The route adds the file it could not queue.
     expect(consoleWarn).toHaveBeenCalledWith(
       expect.stringMatching(
-        /WARNING api\.ingest .*ingest not queued status=502 file=courses\/CS101\/u\.pdf/,
+        /WARNING api\.ingest .*ingest not queued upstream_status=502 file=courses\/CS101\/u\.pdf/,
       ),
+    )
+    fetchSpy.mockRestore()
+    consoleError.mockRestore()
+    consoleWarn.mockRestore()
+  })
+
+  // A 401 or 403 from the backend is about the key between our services. The
+  // browser must not read it as "you are not signed in".
+  it.each([401, 403])(
+    'answers 502 when the backend refuses the request with %i',
+    async (upstream) => {
+      process.env.INGEST_URL = 'http://ingest/ingest'
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response('denied', { status: upstream }))
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {})
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const res = createMockRes()
+      await handler(
+        createMockReq({
+          method: 'POST',
+          body: {
+            uniqueFileName: 'u.pdf',
+            courseName: 'CS101',
+            readableFilename: 'r.pdf',
+          },
+        }) as any,
+        res as any,
+      )
+
+      expect(res.status).toHaveBeenCalledTimes(1)
+      expect(res.status).toHaveBeenCalledWith(502)
+      expect(res.json).toHaveBeenCalledWith({
+        error: `Ingest backend refused the request (status ${upstream})`,
+      })
+      // The log lines keep the status that the backend gave.
+      expect(consoleError).toHaveBeenCalledTimes(1)
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringMatching(
+          new RegExp(`ERROR .*backend ${upstream} POST /ingest `),
+        ),
+      )
+      expect(consoleWarn).toHaveBeenCalledTimes(1)
+      expect(consoleWarn).toHaveBeenCalledWith(
+        expect.stringMatching(
+          new RegExp(
+            `WARNING api\\.ingest .*ingest not queued upstream_status=${upstream} file=courses/CS101/u\\.pdf`,
+          ),
+        ),
+      )
+      fetchSpy.mockRestore()
+      consoleError.mockRestore()
+      consoleWarn.mockRestore()
+    },
+  )
+
+  it('passes a backend 500 through as 500', async () => {
+    process.env.INGEST_URL = 'http://ingest/ingest'
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('boom', { status: 500 }))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const res = createMockRes()
+    await handler(
+      createMockReq({
+        method: 'POST',
+        body: {
+          uniqueFileName: 'u.pdf',
+          courseName: 'CS101',
+          readableFilename: 'r.pdf',
+        },
+      }) as any,
+      res as any,
+    )
+
+    expect(res.status).toHaveBeenCalledTimes(1)
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Ingest backend answered with status 500',
+    })
+    expect(consoleWarn).toHaveBeenCalledWith(
+      expect.stringMatching(/ingest not queued upstream_status=500 /),
     )
     fetchSpy.mockRestore()
     consoleError.mockRestore()
