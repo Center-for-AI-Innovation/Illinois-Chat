@@ -22,7 +22,7 @@ configure_logging()
 logger = logging.getLogger('worker')
 
 from rmsql import SQLAlchemyIngestDB
-from connection_resolver import WorkerConnectionResolver
+from connection_resolver import ConnectionConfigError, WorkerConnectionResolver
 from flask import Flask, jsonify
 
 
@@ -297,8 +297,16 @@ class Worker:
             # republish: the broker redelivers the unacked message itself once it notices the
             # connection dropped, and listen_for_jobs reconnects.
             raise
+        except ConnectionConfigError as e:
+            # Only resolve() raises this: a stored connection of the project cannot be used.
+            # Trying again cannot fix it, so the first attempt is the last.
+            try:
+                self._fail_broken_connection(job_id, inputs, e, retry_count + 1)
+            finally:
+                channel.basic_ack(delivery_tag=method.delivery_tag)
         except Exception as e:  # pylint: disable=broad-except
-            # Only resolver and status-DB errors get here: run_ingest_isolated never raises.
+            # Transient resolver and status-DB errors get here (the host row read, a database
+            # that does not answer): run_ingest_isolated never raises.
             # One first try plus MAX_JOB_RETRIES retries.
             attempt, attempts = retry_count + 1, MAX_JOB_RETRIES + 1
             if retry_count < MAX_JOB_RETRIES:
@@ -323,24 +331,69 @@ class Worker:
                                  attempt)
                 if status_db is None:
                     status_db = self._status_db_after_failed_resolve(inputs.get('course_name', ''))
-                self._record_discarded_job(status_db, job_id, inputs,
-                                           # The admin sees this text. The error type only: the text of
-                                           # a driver error names the database host and user. The worker
-                                           # log has the full error.
-                                           "the database or the connections of the project could not be "
-                                           "reached (%s)" % type(e).__name__,
-                                           attempt)
+                if status_db is not None:
+                    # The admin sees this text. The error type only: the text of a driver error
+                    # names the database host and user. The worker log has the full error.
+                    outcome = self._record_discarded_job(
+                        status_db, job_id, inputs,
+                        "Job discarded after %d attempts: the database or the connections of the project "
+                        "could not be reached (%s)" % (attempt, type(e).__name__))
+                    if outcome:
+                        where = "the host" if status_db is self.sql_session else "the project's documents"
+                        logger.error("discarded job %s; course=%s, %s database", outcome,
+                                     inputs.get('course_name', ''), where)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:
             clear()
 
+    def _fail_broken_connection(self, job_id, inputs, error, attempt):
+        """End a job whose project has a stored connection that cannot be used.
+
+        Records the failure where the producer wrote the job's status rows, then logs one
+        ERROR with what happened to them. Never raises: the caller acks the delivery, and
+        the consumer must keep going.
+        """
+        try:
+            outcome = self._record_broken_connection(job_id, inputs, error)
+        except Exception as other:  # pylint: disable=broad-except
+            # The type only: the text of a driver error names the database host and user.
+            # The traceback goes to DEBUG.
+            logger.debug("recording the failed job raised", exc_info=True)
+            outcome = "not recorded: %s; its documents_in_progress row stays" % type(other).__name__
+        # The text, not the error: the record then keeps no traceback, and with it no frame.
+        logger.error("job failed attempt=%d: %s%s", attempt, str(error), "; " + outcome if outcome else "")
+
+    def _record_broken_connection(self, job_id, inputs, error):
+        """Move the job to documents_failed in the project's documents database (the host one
+        when the project has none). Returns what to add to the ERROR line, or None when the
+        job was recorded and its in-progress row removed.
+
+        Never the host database for a project with its own documents database: when that
+        database is the broken part, or cannot be resolved either, nothing is written. Any
+        other error is the caller's to fold into its ERROR line.
+        """
+        if error.field == "database_config":
+            return ("not recorded: the documents database of the project is the part that cannot be used; "
+                    "its documents_in_progress row stays")
+        try:
+            engine = self.resolver.resolve_documents_engine(inputs.get('course_name', ''))
+        except ConnectionConfigError as second:
+            return "not recorded: %s; its documents_in_progress row stays" % second
+        status_db = SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
+        # The admin sees this text in the project's failed documents.
+        return self._record_discarded_job(
+            status_db, job_id, inputs,
+            "The connection %s of the project cannot be used (%s). Ask an administrator to check the "
+            "project's external connection." % (error.field, error.cause))
+
     def _status_db_after_failed_resolve(self, course_name):
         """The database with the status rows of a job whose resolve() failed every time.
 
-        resolve() builds all the connections of the project. Ask only for the documents
-        database: when a different part failed, the rows can still be updated. Returns None
-        when that fails too. No row is written then: a failed row in the host database is in
-        the wrong place for a project with its own documents database.
+        Only a transient error gets here (the host row read, most often): a stored connection
+        that cannot be used ends the job at once (_fail_broken_connection). resolve() builds
+        all the connections of the project, so ask only for the documents database. Returns
+        None when that fails too. No row is written then: a failed row in the host database
+        is in the wrong place for a project with its own documents database.
         """
         try:
             engine = self.resolver.resolve_documents_engine(course_name)
@@ -353,26 +406,40 @@ class Worker:
         return SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
 
     @staticmethod
-    def _record_discarded_job(status_db, job_id, inputs, error, attempts):
-        """Best effort: move a discarded job from documents_in_progress to documents_failed,
-        so the dashboard stops showing the file as ingesting. The database may be the thing
-        that failed, so this can fail as well; then it only logs."""
-        if status_db is None:
-            return
+    def _record_discarded_job(status_db, job_id, inputs, error):
+        """Move a job that will not run from documents_in_progress to documents_failed, so the
+        dashboard stops showing the file as ingesting. `error` is the row's text.
+
+        Returns None when both writes worked, else what went wrong, for the caller's ERROR
+        line. rmsql logs its own ERROR when one of its writes fails. After a failed insert
+        the in-progress row is kept: deleting it would make the file vanish with no failure.
+        """
         s3_paths = inputs.get('s3_paths', '')
         try:
-            status_db.insert_failed_document({
+            inserted, why = status_db.insert_failed_document({
                 "s3_path": s3_paths[0] if isinstance(s3_paths, list) and s3_paths else str(s3_paths or ''),
                 "readable_filename": inputs.get('readable_filename', ''),
                 "course_name": inputs.get('course_name', ''),
                 "url": inputs.get('url'),
                 "base_url": inputs.get('base_url'),
                 "doc_groups": inputs.get('groups', ''),
-                "error": "Job discarded after %d attempts: %s" % (attempts, error),
-            })
-            status_db.delete_document_in_progress(job_id)
-        except Exception:  # pylint: disable=broad-except
-            logger.warning("could not record the discarded job in the database", exc_info=True)
+                "error": error,
+            }), ""
+        except Exception as e:  # pylint: disable=broad-except
+            # The type only in the ERROR line: the text of a driver error names the database
+            # host and user. The traceback goes to DEBUG.
+            logger.debug("insert into documents_failed raised", exc_info=True)
+            inserted, why = False, " (%s)" % type(e).__name__
+        if not inserted:
+            return "not recorded: the insert into documents_failed failed%s; its documents_in_progress row stays" % why
+        try:
+            removed, why = status_db.delete_document_in_progress(job_id), ""
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug("delete from documents_in_progress raised", exc_info=True)
+            removed, why = False, " (%s)" % type(e).__name__
+        if not removed:
+            return "recorded, but its documents_in_progress row could not be removed%s" % why
+        return None
 
     def listen_for_jobs(self):
         """Consume until the process exits. A lost connection (broker restart, an idle time-out
