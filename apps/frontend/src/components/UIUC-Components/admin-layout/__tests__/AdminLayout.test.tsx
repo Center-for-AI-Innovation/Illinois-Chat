@@ -12,6 +12,10 @@ vi.mock('~/hooks/queries/useFetchCourseMetadata', () => ({
   useFetchCourseMetadata: () => metadataState.value,
 }))
 
+vi.mock('~/components/UIUC-Components/navbars/Navbar', () => ({
+  default: () => <div data-testid="navbar" />,
+}))
+
 const OWNER = 'owner@example.com'
 const ADMIN = 'admin@example.com'
 
