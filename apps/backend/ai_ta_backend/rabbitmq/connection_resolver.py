@@ -4,6 +4,14 @@ WorkerConnectionResolver: Lightweight per-project connection resolution for the 
 Queries project_external_connections to resolve Qdrant and S3 overrides per project.
 Projects without external configs get None values (caller uses env-based defaults).
 
+A field that is present but cannot be used (it cannot be decrypted, is not a
+non-empty JSON object, or the client cannot be built from it) raises
+ConnectionConfigError, which names the project and the field, instead of
+leaving that field to the host's resources. An envelope with nothing in
+`encrypted` still means no override, and so do the embedding fallbacks in
+_resolve_embedding (a provider that is not allowed, ollama with no server URL).
+The resolver logs nothing for a ConnectionConfigError: the caller logs it once.
+
 Nothing is cached (issue #228): each resolve() reads the project's row and
 builds fresh clients, so a connection edit takes effect on the next job
 instead of up to 30 minutes later. External engines use a NullPool, matching
@@ -20,6 +28,7 @@ import json
 import logging
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -66,6 +75,52 @@ def _parse_allowed_embedding_providers() -> tuple:
 ALLOWED_EMBEDDING_PROVIDERS: tuple = _parse_allowed_embedding_providers()
 
 
+class ConnectionConfigError(ValueError):
+    """A stored connection field of a project is present but cannot be used.
+
+    ``field`` is the column (database_config, qdrant_config, s3_config or
+    embedding_config). ``cause`` is an exception type name or a fixed phrase,
+    never config text: the text of a decrypt, JSON or driver error can quote the
+    stored config, a URI or a key. Always raised ``from None`` for the same reason.
+
+    A ValueError, so code that already handles the documents-engine builder's
+    ValueError keeps working.
+    """
+
+    def __init__(self, project_name: str, field: str, cause: str, message: Optional[str] = None):
+        self.project_name = project_name
+        self.field = field
+        self.cause = cause
+        super().__init__(message or "the connection %s of project %s cannot be used (%s)" %
+                         (field, project_name, cause))
+
+    def __reduce__(self):
+        # The default rebuilds the error from args, which is the message alone.
+        return type(self), (self.project_name, self.field, self.cause, str(self))
+
+
+class _KeyNotSet(Exception):
+    """ENCRYPTION_MASTER_KEY is unset, so no stored connection can be decrypted."""
+
+
+@contextmanager
+def _field_errors(project_name: str, field: str):
+    """Turn any error while reading or building one field into ConnectionConfigError for it."""
+    try:
+        yield
+    except ConnectionConfigError:
+        raise
+    except Exception as e:
+        # The type only: the text of the error can hold the decrypted config.
+        raise ConnectionConfigError(project_name, field, _type_name(e)) from None
+
+
+def _type_name(error: Exception) -> str:
+    """The class name, with its module when the name alone says nothing (binascii.Error)."""
+    name = type(error).__name__
+    return "%s.%s" % (type(error).__module__, name) if name == "Error" else name
+
+
 # ── Embedded Decryption (mirrors ai_ta_backend/utils/crypto.py) ──────────
 
 def _decrypt(encrypted_text: str, key: str) -> str:
@@ -88,20 +143,16 @@ def _decrypt(encrypted_text: str, key: str) -> str:
     return (decryptor.update(ciphertext) + decryptor.finalize()).decode('utf-8')
 
 
-def _decrypt_config(stored: dict) -> Optional[dict]:
-    """Decrypt a {"encrypted": "v1.xxx.yyy"} blob from project_external_connections."""
-    if not stored:
-        return None
-    encrypted_str = stored.get("encrypted")
-    if not encrypted_str:
-        return None
+def _decrypt_config(stored: dict):
+    """Decrypt a {"encrypted": "v1.xxx.yyy"} blob from project_external_connections.
+
+    Returns whatever JSON value the blob holds; the caller checks that it is an object.
+    Raises _KeyNotSet when ENCRYPTION_MASTER_KEY is unset.
+    """
     key = os.environ.get('ENCRYPTION_MASTER_KEY', '')
     if not key:
-        # ERROR: the job then runs on the host defaults, not on the project's own connection.
-        logger.error("ENCRYPTION_MASTER_KEY is not set: cannot decrypt the project's external connection")
-        return None
-    plaintext = _decrypt(encrypted_str, key)
-    return json.loads(plaintext)
+        raise _KeyNotSet()
+    return json.loads(_decrypt(stored["encrypted"], key))
 
 
 # ── Resolved Connections Dataclass ────────────────────────────────────────
@@ -143,6 +194,11 @@ class ResolvedConnections:
         )
 
 
+def _fresh(error: ConnectionConfigError) -> ConnectionConfigError:
+    """The same error, to raise again from the public method's frame."""
+    return ConnectionConfigError(error.project_name, error.field, error.cause, str(error))
+
+
 # ── WorkerConnectionResolver ─────────────────────────────────────────────
 
 class WorkerConnectionResolver:
@@ -161,22 +217,28 @@ class WorkerConnectionResolver:
                        field: str) -> Optional[dict]:
         """Decrypt one field of an already-read config row.
 
-        A decrypt failure logs and returns None so the project falls back to
-        env defaults: one misconfigured project must not kill the consumer
-        loop (this diverges from the request-time backend, which raises).
+        None when the field has no value: no row, a NULL column, or an envelope
+        with nothing in `encrypted` (the frontend and the request-time backend
+        read that envelope as absent too). Any other value must decrypt to a
+        non-empty JSON object, or this raises; the caller turns an error that is not
+        ConnectionConfigError into one for the field.
         """
         if not config:
             return None
         encrypted_blob = config.get(field)
         if not encrypted_blob:
             return None
-        try:
-            return _decrypt_config(encrypted_blob)
-        except Exception as e:
-            # Only the type: the text of a decrypt or JSON error can hold the decrypted config.
-            logger.error("cannot decrypt %s course=%s (%s); using the host default for it", field, project_name,
-                         type(e).__name__)
+        if isinstance(encrypted_blob, dict) and not encrypted_blob.get("encrypted"):
             return None
+        try:
+            value = _decrypt_config(encrypted_blob)
+        except _KeyNotSet:
+            raise ConnectionConfigError(project_name, field, "ENCRYPTION_MASTER_KEY is not set") from None
+        if not isinstance(value, dict):
+            raise ConnectionConfigError(project_name, field, "not a JSON object") from None
+        if not value:
+            raise ConnectionConfigError(project_name, field, "empty") from None
+        return value
 
     # ── Public API ──
 
@@ -187,41 +249,63 @@ class WorkerConnectionResolver:
           - 'qdrant'  when ``qdrant_config`` is present
           - 'pgvector' otherwise; ``database_config`` (if present) binds
             ``documents_sql_engine`` and ``pgvector_store`` to the external pg.
+
+        Raises ConnectionConfigError when a field is present but cannot be used.
+        An error reading the host's project_external_connections row is not one:
+        it keeps its own type, so the worker retries it.
         """
         if not project_name:
             return ResolvedConnections()
-
-        result = ResolvedConnections()
         config = self._get_raw_config(project_name)
+        try:
+            return self._resolve(project_name, config)
+        except ConnectionConfigError as e:
+            error = _fresh(e)
+            config = None  # the stored row stays out of this frame's locals in the traceback
+        # Raised here, outside the handler: the error then has no context, and its traceback
+        # has no frame below this one. Those frames hold the decrypted config (Sentry reads
+        # frame locals), and the context is the error that quotes it.
+        raise error from None
 
-        qdrant_config = self._decrypt_field(config, project_name, "qdrant_config")
-        if qdrant_config:
-            result.engine_kind = 'qdrant'
-            result.qdrant_client = self._create_qdrant(project_name, qdrant_config)
-            result.qdrant_collection_name = qdrant_config.get("default_collection")
+    def _resolve(self, project_name: str, config: Optional[dict]) -> ResolvedConnections:
+        result = ResolvedConnections()
+
+        with _field_errors(project_name, "qdrant_config"):
+            qdrant_config = self._decrypt_field(config, project_name, "qdrant_config")
+            if qdrant_config:
+                result.engine_kind = 'qdrant'
+                result.qdrant_client = self._create_qdrant(project_name, qdrant_config)
+                result.qdrant_collection_name = qdrant_config.get("default_collection")
 
         # database_config can coexist with qdrant_config (SQL stays on the
         # external pg even when vector lives in Qdrant).
-        db_config = self._decrypt_field(config, project_name, "database_config")
-        if db_config:
-            engine = self._create_engine(project_name, db_config)
-            result.documents_sql_engine = engine
-            if result.engine_kind == 'pgvector':
-                result.pgvector_store = PgVectorStore(engine=engine)
+        with _field_errors(project_name, "database_config"):
+            db_config = self._decrypt_field(config, project_name, "database_config")
+            if db_config:
+                engine = self._create_engine(project_name, db_config)
+                result.documents_sql_engine = engine
+                if result.engine_kind == 'pgvector':
+                    result.pgvector_store = PgVectorStore(engine=engine)
 
-        s3_config = self._decrypt_field(config, project_name, "s3_config")
-        if s3_config:
-            result.s3_client = self._create_s3(project_name, s3_config)
-            result.s3_bucket_name = s3_config.get("bucket_name")
+        with _field_errors(project_name, "s3_config"):
+            s3_config = self._decrypt_field(config, project_name, "s3_config")
+            if s3_config:
+                result.s3_client = self._create_s3(project_name, s3_config)
+                result.s3_bucket_name = s3_config.get("bucket_name")
 
         # Embedding override. Mirrors retrieval_service._resolve_embedding_client
-        # (ingest-only: no query_instruction). Legacy fallback: an ``embedding``
-        # block nested in qdrant_config, used by projects predating the column.
-        emb_cfg = self._decrypt_field(config, project_name, "embedding_config")
+        # (ingest-only: no query_instruction). Legacy: an ``embedding`` block nested
+        # in qdrant_config, used by projects predating the column; an error in it
+        # names qdrant_config.
+        with _field_errors(project_name, "embedding_config"):
+            emb_cfg = self._decrypt_field(config, project_name, "embedding_config")
+            if emb_cfg:
+                self._resolve_embedding(result, project_name, emb_cfg)
         if not emb_cfg and qdrant_config:
-            emb_cfg = qdrant_config.get("embedding")
-        if emb_cfg:
-            self._resolve_embedding(result, project_name, emb_cfg)
+            with _field_errors(project_name, "qdrant_config"):
+                legacy_cfg = qdrant_config.get("embedding")
+                if legacy_cfg:
+                    self._resolve_embedding(result, project_name, legacy_cfg)
 
         if result.has_overrides:
             logger.debug(
@@ -237,11 +321,23 @@ class WorkerConnectionResolver:
         For the worker's failure path. resolve() can fail on a part that is not the
         documents database (Qdrant, S3, the embedding config), and the status rows of the
         job must still be updated in the database where the producer wrote them.
+        Raises ConnectionConfigError, as resolve() does, when database_config cannot be used.
         """
         if not project_name:
             return None
-        db_config = self._decrypt_field(self._get_raw_config(project_name), project_name, "database_config")
-        return self._create_engine(project_name, db_config) if db_config else None
+        config = self._get_raw_config(project_name)
+        try:
+            return self._documents_engine(project_name, config)
+        except ConnectionConfigError as e:
+            error = _fresh(e)
+            config = None  # the stored row stays out of this frame's locals in the traceback
+        # Outside the handler, for the reason given in resolve().
+        raise error from None
+
+    def _documents_engine(self, project_name: str, config: Optional[dict]) -> Optional[SAEngine]:
+        with _field_errors(project_name, "database_config"):
+            db_config = self._decrypt_field(config, project_name, "database_config")
+            return self._create_engine(project_name, db_config) if db_config else None
 
     # ── Embedding ──
 
@@ -316,15 +412,20 @@ class WorkerConnectionResolver:
             if scheme in ("postgresql", "postgresql+psycopg2"):
                 # The scheme is good. What cannot be loaded is something else in the string,
                 # a `plugin=` in the query for example.
-                raise ValueError("the connection_uri of project %s is not a valid database URL" %
-                                 project_name) from None
-            raise ValueError("the connection_uri of project %s has the scheme %s://, which the backend cannot "
-                             "use; use postgresql://" % (project_name, scheme)) from None
-        except (ArgumentError, ValueError):
+                raise ConnectionConfigError(
+                    project_name, "database_config", "NoSuchModuleError",
+                    "the connection_uri of project %s is not a valid database URL" % project_name) from None
+            raise ConnectionConfigError(
+                project_name, "database_config", "NoSuchModuleError",
+                "the connection_uri of project %s has the scheme %s://, which the backend cannot use; use "
+                "postgresql://" % (project_name, scheme)) from None
+        except (ArgumentError, ValueError) as e:
             # SQLAlchemy writes the string, or the part of it after the user name, into these
             # errors, and that text holds the password. `from None` keeps it out of the
             # traceback too.
-            raise ValueError("the connection_uri of project %s is not a valid database URL" % project_name) from None
+            raise ConnectionConfigError(
+                project_name, "database_config", type(e).__name__,
+                "the connection_uri of project %s is not a valid database URL" % project_name) from None
 
     # ── S3 ──
 

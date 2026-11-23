@@ -48,6 +48,7 @@ Environment (identical to the worker):
 | `RABBITMQ_QUEUE` | Queue name (default `uiuc-chat`) |
 | `RABBITMQ_SSL` | Set truthy for TLS brokers (e.g. Amazon MQ) |
 | `POSTGRES_ENDPOINT` / `POSTGRES_PORT` / `POSTGRES_DATABASE` / `POSTGRES_USERNAME` / `POSTGRES_PASSWORD` | Documents DB for the `documents_in_progress` status rows |
+| `ENCRYPTION_MASTER_KEY` | Decrypts the project's external connection, which decides where the status row goes. Must be the same key as the backend's and the worker's, or every `/ingest` for a project with an encrypted connection answers 500. |
 | `INGEST_API_KEY` | Optional bearer token. If set, callers must send `Authorization: Bearer <key>`. Strongly recommended for anything internet-facing; if unset the endpoint is open. |
 
 For local experiments, `apps/backend/ai_ta_backend/rabbitmq/docker-compose.yml` brings up RabbitMQ, Postgres, and the worker container in one network.
