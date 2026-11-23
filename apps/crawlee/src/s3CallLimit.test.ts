@@ -35,6 +35,19 @@ test('a result that comes after the limit is not an unhandled rejection', async 
     await new Promise((resolve) => setTimeout(resolve, 50));
 });
 
+test('a call that throws at once is a rejection, and its timer does not stay', async () => {
+    const boom = new Error('bad input');
+    await assert.rejects(withS3CallLimit(() => { throw boom; }, 60_000), (error: unknown) => error === boom);
+    // With a timer of 60 seconds left behind, this test file would not end in time.
+});
+
+test('the signal is not aborted when the call ends in time', async () => {
+    let signal: AbortSignal | undefined;
+    await withS3CallLimit(async (options) => { signal = options.abortSignal; }, 50);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(signal?.aborted, false);
+});
+
 test('the limit of a call is 10 minutes', () => {
     assert.equal(S3_CALL_TIMEOUT_MS, 600_000);
 });

@@ -9,17 +9,23 @@ export const S3_CALL_TIMEOUT_MS = 10 * 60_000;
 // Runs one S3 call with that limit. The signal makes the client stop its work. The race
 // makes the limit hard: for a reply that starts and never ends, the client does not settle
 // its promise when the signal fires, and crawl() would wait for it with no end.
+//
+// The timer is a usual one, not AbortSignal.timeout(): that one does not keep the process
+// alive, so the limit would not fire in a process that has no other work. It is cleared
+// when the call ends.
 export function withS3CallLimit<T>(
   call: (options: { abortSignal: AbortSignal }) => Promise<T>,
   limitMs: number = S3_CALL_TIMEOUT_MS,
 ): Promise<T> {
-  const signal = AbortSignal.timeout(limitMs);
+  const controller = new AbortController();
+  // In a promise, so that a call that throws at once is a rejection like each other failure.
+  const pending = new Promise<T>((resolve) => resolve(call({ abortSignal: controller.signal })));
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const limit = new Promise<never>((_, reject) => {
-    signal.addEventListener(
-      'abort',
-      () => reject(new Error(`the S3 call hit the time limit of ${limitMs / 1000} s`)),
-      { once: true },
-    );
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`the S3 call hit the time limit of ${limitMs / 1000} s`));
+    }, limitMs);
   });
-  return Promise.race([call({ abortSignal: signal }), limit]);
+  return Promise.race([pending, limit]).finally(() => clearTimeout(timer));
 }
