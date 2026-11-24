@@ -143,8 +143,9 @@ const TypingAnimation: React.FC = () => {
 interface HomeProps {
   /**
    * The runtime announcement banner, or `null` when Redis holds no usable
-   * configuration. Not rendered here: `_app` hands it to the site-wide
-   * `SiteAnnouncementBanner` so the bar is in the first paint on this page.
+   * configuration. Not rendered here: `_app` seeds it into the shared
+   * site-status cache that the site-wide `SiteAnnouncementBanner` reads, so the
+   * bar is in the first paint on this page.
    */
   announcementBanner?: AnnouncementBannerValue | null
   /** Epoch ms of the Redis read, so the client knows how stale it is. */

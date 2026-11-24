@@ -3,13 +3,6 @@ import { useRouter } from 'next/router'
 import { getSiteNavbarOptions } from '~/components/Layout/site-header-routes'
 import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import Navbar from '~/components/UIUC-Components/navbars/Navbar'
-import type { AnnouncementBanner } from '~/utils/platformSettings.schema'
-
-interface SiteHeaderProps {
-  /** Forwarded to SiteAnnouncementBanner; see that component for details. */
-  initialBanner?: AnnouncementBanner | null
-  initialBannerReadAt?: number
-}
 
 /**
  * `sticky` keeps the header on screen while the page scrolls. `scroll` leaves
@@ -36,21 +29,18 @@ const siteHeaderVariants = cva('z-50', {
  *
  * The block is sticky on every route except the splash page, where it scrolls
  * away with the page.
+ *
+ * The banner's first paint comes from the shared site-status cache, which
+ * `_app` seeds from the page props; this component takes no seed props.
  */
-export function SiteHeader({
-  initialBanner,
-  initialBannerReadAt,
-}: SiteHeaderProps) {
+export function SiteHeader() {
   const router = useRouter()
   const navbar = getSiteNavbarOptions(router.pathname)
   const position = navbar?.variant === 'splash' ? 'scroll' : 'sticky'
 
   return (
     <div data-position={position} className={siteHeaderVariants({ position })}>
-      <SiteAnnouncementBanner
-        initialBanner={initialBanner}
-        initialBannerReadAt={initialBannerReadAt}
-      />
+      <SiteAnnouncementBanner />
       {navbar && <Navbar {...navbar} />}
     </div>
   )
