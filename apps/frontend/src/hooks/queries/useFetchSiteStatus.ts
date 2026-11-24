@@ -55,9 +55,54 @@ async function parseSiteStatus(response: Response): Promise<SiteStatus> {
   return (await response.json()) as SiteStatus
 }
 
+/**
+ * Longest a status request may take, including reading the body. A hung request
+ * then fails like any other failed poll: the tab keeps its last good status and
+ * the next poll tries again. Well under the 60s poll interval.
+ */
+export const SITE_STATUS_TIMEOUT_MS = 10 * 1000
+
+/**
+ * Fetches and parses one status response under the request timeout.
+ *
+ * The caller's signal (React Query cancels superseded fetches through it) still
+ * aborts the request. A timeout rejects with `TimeoutError`, not a
+ * cancellation, so React Query treats it as a failed fetch and keeps the last
+ * good data. Built on one AbortController and a timer rather than
+ * `AbortSignal.any`, which older browsers lack.
+ */
+async function requestSiteStatus(
+  url: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+): Promise<SiteStatus> {
+  const controller = new AbortController()
+  const timer = setTimeout(
+    () =>
+      controller.abort(
+        new DOMException('Site status request timed out', 'TimeoutError'),
+      ),
+    SITE_STATUS_TIMEOUT_MS,
+  )
+  const forwardAbort = () => controller.abort(signal?.reason)
+  if (signal?.aborted) forwardAbort()
+  else signal?.addEventListener('abort', forwardAbort, { once: true })
+
+  try {
+    return await parseSiteStatus(
+      await fetch(url, { ...init, signal: controller.signal }),
+    )
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', forwardAbort)
+  }
+}
+
 /** An ordinary poll on the bare URL, so the shared cache may answer it. */
-export async function fetchSiteStatus(signal?: AbortSignal): Promise<SiteStatus> {
-  return parseSiteStatus(await fetch(SITE_STATUS_ENDPOINT, { signal }))
+export async function fetchSiteStatus(
+  signal?: AbortSignal,
+): Promise<SiteStatus> {
+  return requestSiteStatus(SITE_STATUS_ENDPOINT, {}, signal)
 }
 
 let refreshCount = 0
@@ -74,7 +119,7 @@ export async function fetchFreshSiteStatus(
   refreshCount += 1
   const nonce = `${Date.now()}-${refreshCount}`
   const url = `${SITE_STATUS_ENDPOINT}?${SITE_STATUS_FRESH_PARAM}=${nonce}`
-  return parseSiteStatus(await fetch(url, { cache: 'no-store', signal }))
+  return requestSiteStatus(url, { cache: 'no-store' }, signal)
 }
 
 /**
