@@ -1,6 +1,10 @@
 # Build context is apps/backend (not this directory) so the image can see pyproject.toml and uv.lock.
-FROM python:3.12-slim-bookworm
-COPY --from=ghcr.io/astral-sh/uv:0.12.8 /uv /uvx /bin/
+# uv is only needed to install: it is mounted into the sync step below, not copied into the image.
+FROM ghcr.io/astral-sh/uv:0.12.8 AS uv
+
+# trixie is the Debian release the python:3.10-slim images were already built on, so ffmpeg,
+# tesseract and git stay at the versions that have been running.
+FROM python:3.12-slim-trixie
 
 # ffmpeg: pydub and subprocess calls in ingest.py. tesseract: pytesseract OCR. git: GitPython.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg tesseract-ocr git \
@@ -13,8 +17,11 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 
 # Dependency layer: only invalidated when the manifest or lock changes.
 COPY pyproject.toml uv.lock .python-version ./
+# --locked fails the build if uv.lock no longer matches pyproject.toml (--frozen would install
+# the stale lock without a word).
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --extra worker
+    --mount=from=uv,source=/uv,target=/bin/uv \
+    uv sync --locked --no-dev --extra worker
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Pre-download NLTK data so unstructured (Excel, PPTX, etc.) does not fetch at runtime (403 in many environments).
