@@ -35,9 +35,9 @@ export type NavbarContentWidth = 'workspace' | 'sidebar'
 
 interface NavbarProps {
   /**
-   * `splash` is the landing page header: no divider, and the page must set
-   * `--navbar-height` to its 72px row, since the header and content offset
-   * both read that token.
+   * `splash` is the landing page header: no divider. Its 72px row comes from
+   * `--navbar-height`, which `_app` sets for the `/` route, so the header and
+   * page offsets read the same value.
    */
   variant?: NavbarVariant
   /** Only applies to the `application` variant. */
@@ -66,12 +66,19 @@ const navLinkVariants = cva(
   },
 )
 
+// Laid out in normal flow. The SiteHeader around it owns sticky positioning, so
+// the navbar never needs to know how tall the announcement bar is.
+//
+// The divider is an inset line drawn over the bottom pixel of the row, not a
+// border. A border would add 1px of layout height on top of --navbar-height,
+// and --page-viewport-height subtracts exactly --navbar-height, so every
+// bordered page would overflow the viewport by 1px.
 const navbarVariants = cva(
-  'fixed top-(--announcement-banner-height) right-0 left-0 z-50 bg-white/95 backdrop-blur-xs dark:bg-[#13294b]',
+  'relative w-full bg-white/95 backdrop-blur-xs dark:bg-[#13294b]',
   {
     variants: {
       bordered: {
-        true: 'border-b border-border dark:border-[#32517a]',
+        true: 'after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border dark:after:bg-[#32517a]',
         false: '',
       },
     },

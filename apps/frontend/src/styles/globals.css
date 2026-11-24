@@ -99,6 +99,12 @@ button:disabled {
   top: 0;
 }
 
+/* The skip link scrolls this into view. Without a margin, the start of the page
+   lands under the sticky site header. _app sets the offset per route. */
+#main-content {
+  scroll-margin-top: var(--site-header-offset, 0px);
+}
+
 /*
  * Heading scale for every native <h1>-<h6>. h1/h2 carry this app's own
  * overrides; h3-h6 are the inherited defaults. See issue #232.
@@ -167,16 +173,19 @@ button:disabled {
      follow the app theme. */
   color-scheme: light;
 
-  /* Height of the site-wide announcement bar, set at runtime by
-     SiteAnnouncementBanner. Fixed/sticky chrome offsets by it and full-viewport
-     layouts subtract it; 0px whenever no bar is showing. */
+  /* Height of the announcement bar, published at runtime by
+     SiteAnnouncementBanner. Only fixed sidebars and sticky sub-bars read it;
+     the navbar does not, because the bar and navbar share one sticky header
+     in document flow (see SiteHeader). 0px whenever no bar is showing. */
   --announcement-banner-height: 0px;
 
   /* The viewport below the announcement bar. Full-height layouts use this
      instead of 100vh so the bar doesn't make them scroll. */
   --viewport-height: calc(100vh - var(--announcement-banner-height));
 
-  /* Height of the fixed site navbar. Pages pad and sticky chrome offsets by it. */
+  /* Fallback height of the site navbar row. _app overrides it per route on its
+     wrapper: 72px on the splash page, 80px elsewhere. The page below the header
+     gets --page-viewport-height, which _app also sets per route. */
   --navbar-height: 80px;
 
   /* Primary Colors */
@@ -682,8 +691,8 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The banner is sticky and the navbar is fixed, so trackpad rubber-banding
-   moves them apart and opens a gap between them. Touch devices keep their
+/* The site header is sticky, and fixed sidebars sit beneath it, so trackpad
+   rubber-banding moves them apart and opens a gap. Touch devices keep their
    bounce and pull-to-refresh. */
 @media (hover: hover) and (pointer: fine) {
   html {

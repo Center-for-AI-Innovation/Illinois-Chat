@@ -45,7 +45,6 @@ import {
   TabsTrigger,
 } from '~/components/shadcn/ui/tabs'
 import { LoadingSpinner } from '~/components/UIUC-Components/LoadingSpinner'
-import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import {
   AdminInlineError,
   adminTabsListClass,
@@ -99,12 +98,10 @@ export default function AdminPage() {
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
-      <Navbar />
-
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-h-(--viewport-height) bg-white pt-(--navbar-height) dark:bg-[#081735] [&_[role=switch]:not([data-disabled])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer"
+        className="min-h-(--page-viewport-height) bg-white dark:bg-[#081735] [&_[role=switch]:not([data-disabled])]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer"
       >
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {isAuthPending ? (

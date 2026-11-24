@@ -31,12 +31,11 @@ describe('Landing page (src/pages/index.tsx)', () => {
     expect(screen.getByRole('main')).toBeTruthy()
   })
 
-  it('opts into the splash navbar layout', () => {
+  it('leaves the navbar to the site header, so the splash bar and navbar share one block', () => {
+    // The page no longer mounts its own navbar. SiteHeader (in _app) renders the
+    // splash navbar for `/` together with the announcement bar; see SiteHeader.test.
     renderPage()
 
-    expect(screen.getByTestId('header')).toHaveAttribute(
-      'data-variant',
-      'splash',
-    )
+    expect(screen.queryByTestId('header')).not.toBeInTheDocument()
   })
 })

@@ -2,8 +2,13 @@ import { appWithTranslation } from 'next-i18next/pages'
 import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
+import { SiteHeader } from '~/components/Layout/SiteHeader'
+import {
+  getSiteHeaderOffset,
+  getSiteNavbarHeight,
+  routeHasSiteNavbar,
+} from '~/components/Layout/site-header-routes'
 import Maintenance from '~/components/UIUC-Components/Maintenance'
-import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import '~/styles/citation-tooltips.css'
 import '~/styles/globals.css'
 
@@ -12,7 +17,12 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useRouter } from 'next/router'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 
 // import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
@@ -134,8 +144,26 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
     }
   }, [])
 
+  // Layout tokens for the whole app, set from the route here (not in a head
+  // style) so the header and page offsets are right on the first render, and a
+  // splash-only value cannot leak into application routes.
+  //  - `--navbar-height`: 72px on the splash page, 80px elsewhere.
+  //  - `--page-viewport-height`: full-height page content below the header. It
+  //    subtracts the navbar only on routes that render one.
+  //  - `--site-header-offset`: how much of the viewport the sticky header
+  //    covers; the skip link's target scrolls clear of it.
+  const pageViewportHeight = routeHasSiteNavbar(router.pathname)
+    ? 'calc(var(--viewport-height) - var(--navbar-height))'
+    : 'var(--viewport-height)'
+  const layoutTokens = {
+    '--navbar-height': getSiteNavbarHeight(router.pathname),
+    '--page-viewport-height': pageViewportHeight,
+    '--site-header-offset': getSiteHeaderOffset(router.pathname),
+  } as CSSProperties
+
   return (
     <div
+      style={layoutTokens}
       onKeyDownCapture={(event) => {
         if (event.key === 'Tab') {
           document.documentElement.dataset.inputModality = 'keyboard'
@@ -180,7 +208,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               <ThemeProvider>
               <Toaster position="bottom-center" />
               <MaintenanceGate>
-                <SiteAnnouncementBanner
+                <SiteHeader
                   initialBanner={
                     (pageProps as SiteBannerPageProps).announcementBanner
                   }

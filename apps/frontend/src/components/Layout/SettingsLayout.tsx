@@ -1,7 +1,6 @@
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import NavigationSidebar from '~/components/Sidebar/NavigationSidebar'
-import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 
 interface SettingsLayoutProps {
   children: React.ReactNode
@@ -75,10 +74,8 @@ export default function SettingsLayout({
   }
 
   return (
-    <div className="min-h-(--viewport-height) bg-(--background) pt-(--navbar-height)">
-      {/* Main Navbar */}
-      <Navbar isPlain={false} contentWidth="sidebar" />
-
+    // The site navbar is rendered by SiteHeader, not here.
+    <div className="min-h-(--page-viewport-height) bg-(--background)">
       <div className="flex">
         {/* Navigation Sidebar */}
         <NavigationSidebar

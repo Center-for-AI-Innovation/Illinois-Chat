@@ -21,6 +21,25 @@ vi.mock('~/components/Sidebar/NavigationSidebar', () => ({
 }))
 
 describe('SettingsLayout', () => {
+  it('does not mount its own navbar, so the site header is the only one', () => {
+    // SiteHeader renders the navbar for every settings route (aligned to the
+    // sidebar). A second one here would stack two navbars on the page.
+    globalThis.__TEST_ROUTER__ = { asPath: '/CS101/api', isReady: true }
+
+    render(
+      <SettingsLayout
+        course_name="CS101"
+        sidebarCollapsed={false}
+        setSidebarCollapsed={vi.fn()}
+      >
+        <div>content</div>
+      </SettingsLayout>,
+    )
+
+    expect(screen.queryByTestId('navbar')).not.toBeInTheDocument()
+    expect(screen.getByText('content')).toBeInTheDocument()
+  })
+
   it('getInitialCollapsedState reads localStorage and falls back safely on errors', () => {
     localStorage.removeItem('sidebar-collapsed')
     expect(getInitialCollapsedState()).toBe(false)
