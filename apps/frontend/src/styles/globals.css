@@ -522,9 +522,7 @@ button:disabled {
 }
 
 /* shadcn primitives draw their own focus ring; beat the global !important outline. */
-[data-slot='button']:focus-visible,
 [data-slot='switch']:focus-visible,
-[data-slot='input']:focus-visible,
 [data-slot='textarea']:focus-visible,
 [data-slot='select-trigger']:focus-visible,
 [data-slot='combobox-input']:focus-visible,

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Button } from '../button'
+import { Button, buttonVariants } from '../button'
 
 describe('Button', () => {
   it('renders a button and handles clicks', async () => {
@@ -72,6 +72,27 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Dash' })).toHaveClass(
       'bg-(--dashboard-button)',
       'text-(--dashboard-button-foreground)',
+    )
+  })
+
+  it('suppresses the global focus outline even when data-slot is overridden', () => {
+    render(
+      <>
+        <Button data-slot="alert-dialog-action">Confirm</Button>
+        <a
+          href="https://example.com"
+          className={buttonVariants({ variant: 'secondary' })}
+        >
+          Link
+        </a>
+      </>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass(
+      'focus-visible:outline-hidden!',
+    )
+    expect(screen.getByRole('link', { name: 'Link' })).toHaveClass(
+      'focus-visible:outline-hidden!',
     )
   })
 
