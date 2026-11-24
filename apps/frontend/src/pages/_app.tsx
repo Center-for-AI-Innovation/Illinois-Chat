@@ -4,6 +4,7 @@ import { type AppType } from 'next/app'
 
 import { SiteHeader } from '~/components/Layout/SiteHeader'
 import {
+  getSiteHeaderOffset,
   getSiteNavbarHeight,
   routeHasSiteNavbar,
 } from '~/components/Layout/site-header-routes'
@@ -149,12 +150,15 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
   //  - `--navbar-height`: 72px on the splash page, 80px elsewhere.
   //  - `--page-viewport-height`: full-height page content below the header. It
   //    subtracts the navbar only on routes that render one.
+  //  - `--site-header-offset`: how much of the viewport the sticky header
+  //    covers; the skip link's target scrolls clear of it.
   const pageViewportHeight = routeHasSiteNavbar(router.pathname)
     ? 'calc(var(--viewport-height) - var(--navbar-height))'
     : 'var(--viewport-height)'
   const layoutTokens = {
     '--navbar-height': getSiteNavbarHeight(router.pathname),
     '--page-viewport-height': pageViewportHeight,
+    '--site-header-offset': getSiteHeaderOffset(router.pathname),
   } as CSSProperties
 
   return (

@@ -87,3 +87,20 @@ export const APP_NAVBAR_HEIGHT = '80px'
 export function getSiteNavbarHeight(pathname: string): string {
   return pathname === '/' ? SPLASH_NAVBAR_HEIGHT : APP_NAVBAR_HEIGHT
 }
+
+/**
+ * How much of the top of the viewport the sticky SiteHeader covers on a route.
+ * `_app` provides it as `--site-header-offset`, and `#main-content` uses it as
+ * `scroll-margin-top`, so "Skip to main content" does not scroll the start of
+ * the page under the header.
+ *
+ * The splash header scrolls away with the page (see SiteHeader), so it covers
+ * nothing. Routes without a navbar have only the sticky announcement bar.
+ */
+export function getSiteHeaderOffset(pathname: string): string {
+  const navbar = getSiteNavbarOptions(pathname)
+  if (navbar?.variant === 'splash') return '0px'
+  return navbar
+    ? 'calc(var(--announcement-banner-height) + var(--navbar-height))'
+    : 'var(--announcement-banner-height)'
+}
