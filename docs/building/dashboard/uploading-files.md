@@ -12,6 +12,6 @@ Drag files onto **Upload materials** (or click it to pick files). Files are uplo
 
 ## Monitoring ingest
 
-Each document in **Project Files** shows its ingest status. Large files and crawls process asynchronously; failed jobs are retried automatically. Duplicate documents are detected by content and skipped — see [duplicate handling](../../how-it-works/documents-ingest.md#duplicate-handling).
+Each document in **Project Files** shows its ingest status. Large files and crawls process asynchronously. A job that fails because a database or a connection did not answer is retried automatically; a job whose project's [external connection](../external-connections.md) cannot be used fails at once. Duplicate documents are detected by content and skipped — see [duplicate handling](../../how-it-works/documents-ingest.md#duplicate-handling).
 
 Other ways to add content: [Web crawling](web-crawling.md) and [Importing](importing.md) from Canvas or GitHub.

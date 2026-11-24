@@ -361,7 +361,10 @@ class Worker:
             logger.debug("recording the failed job raised", exc_info=True)
             outcome = "not recorded: %s; its documents_in_progress row stays" % type(other).__name__
         # The text, not the error: the record then keeps no traceback, and with it no frame.
-        logger.error("job failed attempt=%d: %s%s", attempt, str(error), "; " + outcome if outcome else "")
+        # The field and the cause are named apart from the text, which for a bad connection_uri
+        # names neither. Both are a column name and a type name or fixed phrase, never config text.
+        logger.error("job failed attempt=%d field=%s cause=%s: %s%s", attempt, error.field, error.cause, str(error),
+                     "; " + outcome if outcome else "")
 
     def _record_broken_connection(self, job_id, inputs, error):
         """Move the job to documents_failed in the project's documents database (the host one

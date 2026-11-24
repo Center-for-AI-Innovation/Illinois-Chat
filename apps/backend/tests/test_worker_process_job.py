@@ -388,7 +388,8 @@ def test_broken_connection_is_recorded_in_the_project_documents_database(worker,
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.published == [] and channel.acked == [7]
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (KeyError)"]
+        "job failed attempt=1 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError)"]
     # No traceback: its frames are the worker's, whose locals hold the whole message.
     assert errors(caplog)[0].exc_info is None
     [project_db] = project_dbs
@@ -421,7 +422,8 @@ def test_broken_connection_on_a_redelivered_job_names_its_attempt(worker, stored
     worker.process_job(channel, METHOD, HEADER, body(3))
     assert channel.published == [] and channel.acked == [7]
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=4: the connection qdrant_config of project ece120 cannot be used (KeyError)"]
+        "job failed attempt=4 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError)"]
 
 
 def test_broken_documents_database_writes_nothing_anywhere(worker, stored, project_dbs, caplog):
@@ -431,10 +433,28 @@ def test_broken_documents_database_writes_nothing_anywhere(worker, stored, proje
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.published == [] and channel.acked == [7]
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection database_config of project ece120 cannot be used (InvalidTag); "
+        "job failed attempt=1 field=database_config cause=InvalidTag: "
+        "the connection database_config of project ece120 cannot be used (InvalidTag); "
         "not recorded: the documents database of the project is the part that cannot be used; " + ROW_STAYS]
     # No second resolve, and no row on the host database in its place.
     assert resolver.documents_engine_calls == 0
+    assert project_dbs == []
+    assert worker.sql_session.failed == [] and worker.sql_session.deleted == []
+    assert_no_marker(caplog)
+
+
+def test_bad_connection_uri_names_its_field_and_cause(worker, stored, project_dbs, caplog):
+    # The error's own text for a bad connection_uri names neither the field nor a type.
+    bad_port = {"connection_uri": "postgresql://ext:" + MARKER + "@db.example.edu:notaport/docs"}
+    stored({"database_config": envelope(bad_port), "qdrant_config": envelope(GOOD["qdrant_config"])})
+    channel = FakeChannel()
+    worker.process_job(channel, METHOD, HEADER, body(0))
+    assert channel.published == [] and channel.acked == [7]
+    [record] = errors(caplog)
+    assert record.getMessage() == (
+        "job failed attempt=1 field=database_config cause=ValueError: "
+        "the connection_uri of project ece120 is not a valid database URL; "
+        "not recorded: the documents database of the project is the part that cannot be used; " + ROW_STAYS)
     assert project_dbs == []
     assert worker.sql_session.failed == [] and worker.sql_session.deleted == []
     assert_no_marker(caplog)
@@ -448,7 +468,8 @@ def test_every_field_under_another_key_names_both_and_writes_nothing(worker, sto
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.published == [] and channel.acked == [7]
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (InvalidTag); "
+        "job failed attempt=1 field=qdrant_config cause=InvalidTag: "
+        "the connection qdrant_config of project ece120 cannot be used (InvalidTag); "
         "not recorded: the connection database_config of project ece120 cannot be used (InvalidTag); "
         + ROW_STAYS]
     assert project_dbs == []
@@ -476,7 +497,8 @@ def test_an_error_while_recording_is_folded_into_the_one_error(worker, stored, p
     assert worker.process_job(channel, METHOD, HEADER, body(0)) is None
     assert channel.published == [] and channel.acked == [7]
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (KeyError); "
+        "job failed attempt=1 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError); "
         "not recorded: RuntimeError; " + ROW_STAYS]
     assert_traceback_only_at_debug(caplog)
     assert MARKER not in caplog.text
@@ -491,7 +513,8 @@ def test_broken_connection_keeps_the_in_progress_row_when_the_insert_fails(worke
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.acked == [7] and channel.published == []
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (KeyError); "
+        "job failed attempt=1 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError); "
         "not recorded: the insert into documents_failed failed; " + ROW_STAYS]
     assert project_dbs[0].deleted == []
 
@@ -503,7 +526,8 @@ def test_broken_connection_names_an_insert_that_raised(worker, stored, project_d
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.acked == [7] and channel.published == []
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (KeyError); "
+        "job failed attempt=1 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError); "
         "not recorded: the insert into documents_failed failed (RuntimeError); " + ROW_STAYS]
     assert project_dbs[0].deleted == []
     assert_traceback_only_at_debug(caplog, "server closed the connection")
@@ -518,7 +542,8 @@ def test_broken_connection_says_when_its_in_progress_row_could_not_be_removed(wo
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.acked == [7] and channel.published == []
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (KeyError); "
+        "job failed attempt=1 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError); "
         "recorded, but its documents_in_progress row could not be removed"]
     assert [row["error"] for row in project_dbs[0].failed] == [TERMINAL_ROW]
 
@@ -530,7 +555,8 @@ def test_broken_connection_names_a_delete_that_raised(worker, stored, project_db
     worker.process_job(channel, METHOD, HEADER, body(0))
     assert channel.acked == [7] and channel.published == []
     assert [r.getMessage() for r in errors(caplog)] == [
-        "job failed attempt=1: the connection qdrant_config of project ece120 cannot be used (KeyError); "
+        "job failed attempt=1 field=qdrant_config cause=KeyError: "
+        "the connection qdrant_config of project ece120 cannot be used (KeyError); "
         "recorded, but its documents_in_progress row could not be removed (RuntimeError)"]
     assert [row["error"] for row in project_dbs[0].failed] == [TERMINAL_ROW]
     assert_traceback_only_at_debug(caplog)
