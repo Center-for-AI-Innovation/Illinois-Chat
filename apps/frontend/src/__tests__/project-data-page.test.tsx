@@ -15,6 +15,12 @@ vi.mock('~/hooks/queries/useFetchCourseMetadata', () => ({
     return metadataState.value
   },
 }))
+vi.mock('~/components/UIUC-Components/navbars/Navbar', () => ({
+  default: () => <div data-testid="navbar" />,
+}))
+vi.mock('~/hooks/queries/useFetchIsSuperAdmin', () => ({
+  useFetchIsSuperAdmin: () => ({ data: false, isLoading: false }),
+}))
 vi.mock('~/components/UIUC-Components/MainPageBackground', () => ({
   LoadingPlaceholderForAdminPages: () => <div>Loading</div>,
 }))
