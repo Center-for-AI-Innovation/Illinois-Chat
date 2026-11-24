@@ -313,7 +313,9 @@ describe('writeCourseMetadata', () => {
   it('reports a CRITICAL rollback failure when Redis fails AND the restore also fails', async () => {
     // Seed Redis with a malformed prior value so the UPDATE rollback's
     // JSON.parse blows up inside rollbackPostgres.
-    redisState.store.set('bot-critical', '{not json')
+    // A name with format specifiers must not be interpreted by console.error.
+    const name = 'bot-critical-%s-%o'
+    redisState.store.set(name, '{not json')
     redisState.hSet.mockImplementationOnce(async () => {
       throw new Error('redis down')
     })
@@ -322,10 +324,13 @@ describe('writeCourseMetadata', () => {
       .mockImplementation(() => undefined)
     const { writeCourseMetadata, CourseMetadataWriteError } =
       await import('../courseMetadataStore')
-    await expect(
-      writeCourseMetadata('bot-critical', makeMetadata()),
-    ).rejects.toThrow(CourseMetadataWriteError)
-    expect(consoleError).toHaveBeenCalled()
+    await expect(writeCourseMetadata(name, makeMetadata())).rejects.toThrow(
+      CourseMetadataWriteError,
+    )
+    expect(consoleError).toHaveBeenCalledWith(
+      'CRITICAL: Postgres row could not be rolled back after Redis write failure. Manual reconciliation required.',
+      expect.objectContaining({ courseName: name }),
+    )
     consoleError.mockRestore()
   })
 })
@@ -494,8 +499,10 @@ describe('deleteCourseMetadata', () => {
   })
 
   it('logs CRITICAL when Redis delete fails AND the Postgres restore also fails', async () => {
-    dbState.rows.set('bot-w', { course_name: 'bot-w' })
-    redisState.store.set('bot-w', JSON.stringify(makeMetadata()))
+    // A name with format specifiers must not be interpreted by console.error.
+    const name = 'bot-w-%s-%o'
+    dbState.rows.set(name, { course_name: name })
+    redisState.store.set(name, JSON.stringify(makeMetadata()))
     redisState.hDel.mockImplementationOnce(async () => {
       throw new Error('redis down')
     })
@@ -507,10 +514,13 @@ describe('deleteCourseMetadata', () => {
       .mockImplementation(() => undefined)
     const { deleteCourseMetadata, CourseMetadataWriteError } =
       await import('../courseMetadataStore')
-    await expect(deleteCourseMetadata('bot-w')).rejects.toThrow(
+    await expect(deleteCourseMetadata(name)).rejects.toThrow(
       CourseMetadataWriteError,
     )
-    expect(consoleError).toHaveBeenCalled()
+    expect(consoleError).toHaveBeenCalledWith(
+      'CRITICAL: Could not restore Postgres row after Redis delete failure.',
+      expect.objectContaining({ courseName: name }),
+    )
     consoleError.mockRestore()
   })
 
