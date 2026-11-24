@@ -1,5 +1,7 @@
 # Illinois Chat Redesign — Implementation Plan
 
+> This plan is temporary and is removed in NCSA-30.
+
 This plan covers moving the whole frontend onto the new Illinois Chat design.
 
 ## Design sources (Figma)
@@ -105,8 +107,8 @@ Every page goes through the same steps:
 
 1. Build the new version at a new route that uses `AdminLayout`, with feature composites in a kebab-case folder.
 2. Reuse the existing React Query hooks. Rebuild only the presentation layer.
-3. Copy the page's auth gating: `PermissionGate`, metadata 401/403/404 handling, and special-course guards.
-4. Verify it against the Figma frames in light and dark mode, on desktop and at 375px.
+3. Access is decided by `AdminLayout`. Pages keep only the special-name check and put their data hooks inside the layout.
+4. Verify it against the Figma frames on desktop only, in light and dark mode. Figma deviations are listed in the PR.
 5. After approval, swap the routes. Move any shared helpers out of the old components, then delete what's unused.
 
 ### Pilot: AI Models (`/[course_name]/ai-models`, replaces `/llms`)
@@ -125,18 +127,26 @@ Every page goes through the same steps:
 
 ### Remaining pages, in the order they're expected to migrate
 
-| Page               | Route today                | Notes                                                                                                                 |
-| ------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Dashboard          | `/[course_name]/dashboard` | Upload, integrations, branding. Large page; may be split into the design's "Project Data" / "Project Identity" groups |
-| Prompting          | `/[course_name]/prompt`    | System prompt, behavior settings                                                                                      |
-| Tools              | `/[course_name]/tools`     |                                                                                                                       |
-| Analysis           | `/[course_name]/analysis`  | Charts: use the library's Chart page                                                                                  |
-| API                | `/[course_name]/api`       |                                                                                                                       |
-| Chat               | `/[course_name]/chat`      | Not an admin page, so it needs its own layout pass                                                                    |
-| Chatbots hub, home | `/chatbots`, `/`           | Global nav reuse                                                                                                      |
+Project Data → Project Identity → Access and Sharing → Prompting and Behavior, then Tools / Analysis / API, with Chat
+and the Chatbots hub/home after.
 
-When the design's own groupings (Project Data, Project Identity, User Access and Sharing) are ready, add them to the
-registry and retire `NavigationSidebar` and `SettingsLayout`.
+Project Identity and Access and Sharing are their own pages. They take the description, greeting, example questions,
+tags, banner and share settings.
+
+Base components are restyled in place, because the admin revamp ships together. When the pages are ready, retire
+`NavigationSidebar` and `SettingsLayout`.
+
+| Page               | Route today                | Notes                                                |
+| ------------------ | -------------------------- | ---------------------------------------------------- |
+| Project Data       | `/[course_name]/dashboard` | Upload, integrations, document groups, project files |
+| Project Identity   | `/[course_name]/dashboard` | Description, greeting, example questions, tags       |
+| Access and Sharing | `/[course_name]/dashboard` | Banner and share settings                            |
+| Prompting          | `/[course_name]/prompt`    | System prompt, behavior settings                     |
+| Tools              | `/[course_name]/tools`     |                                                      |
+| Analysis           | `/[course_name]/analysis`  | Charts: use the library's Chart page                 |
+| API                | `/[course_name]/api`       |                                                      |
+| Chat               | `/[course_name]/chat`      | Not an admin page, so it needs its own layout pass   |
+| Chatbots hub, home | `/chatbots`, `/`           | Global nav reuse                                     |
 
 ---
 
