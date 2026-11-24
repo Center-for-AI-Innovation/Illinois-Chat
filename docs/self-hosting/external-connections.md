@@ -221,15 +221,17 @@ Contributors: the convention for adding to that directory — and the rule that
 - `403`: the account is not in the super-admin allowlist.
 - A project whose stored connection cannot be decrypted, or from which a
   connection cannot be built, does not run on the shared defaults instead.
-  Its uploads fail with a 500. A job already queued for it gets one attempt:
-  it ends with a failed row, or, when the documents database is the part
-  that cannot be used, the file stays in progress. The backend or the worker
-  logs one ERROR that names the project and the field (`database_config`,
-  `qdrant_config`, `s3_config` or `embedding_config`), never the value. The
-  usual cause is an `ENCRYPTION_MASTER_KEY` that is unset or different in
-  one service: give the frontend, the backend and the worker the same key.
-  Then upload the failed files again; a file left in progress also needs
-  the connection fixed and the file uploaded again.
+  Its uploads fail with a 500; the crawler's ingest bridge answers 500 too.
+  A job already queued gets one attempt: it ends with a failed row, or, when
+  the documents database is the part that cannot be used, the file stays in
+  progress. One ERROR names the project and the field (`database_config` or
+  its `connection_uri`, `qdrant_config`, `s3_config` or `embedding_config`),
+  never the value. Usually `ENCRYPTION_MASTER_KEY` is unset or differs: give
+  the frontend, backend, bridge and worker the same key, then upload the
+  failed files again. Nothing removes the row of a file left in progress:
+  delete it from `documents_in_progress` on the project's documents
+  database. Showing these failures to the project's admins in the app is
+  planned.
 - Ingest writes fail against an external Postgres if it was not provisioned —
   the worker expects the RPCs and tables from
   `provision_external_pgvector_store.sql` to exist.
