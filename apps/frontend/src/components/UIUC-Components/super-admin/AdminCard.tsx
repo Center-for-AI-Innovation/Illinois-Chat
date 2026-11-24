@@ -199,13 +199,20 @@ export function AdminInlineError({
 }
 
 /** Non-blocking warning — the panel still works, but something is degraded. */
-export function AdminInlineWarning({ message }: { message: string }) {
+export function AdminInlineWarning({
+  title,
+  message,
+}: {
+  title?: string
+  message: string
+}) {
   return (
     <Alert
       role="status"
       className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/10 dark:text-amber-200"
     >
       <AlertTriangle aria-hidden="true" />
+      {title && <AlertTitle className="font-semibold">{title}</AlertTitle>}
       <AlertDescription className="wrap-break-word text-current">
         {message}
       </AlertDescription>
