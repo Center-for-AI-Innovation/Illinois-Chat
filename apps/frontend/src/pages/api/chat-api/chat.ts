@@ -9,7 +9,7 @@ import {
   type ToolOutput,
   type UIUCTool,
 } from '~/types/chat'
-import fetchCourseMetadataServer from '~/pages/api/chat-api/util/fetchCourseMetadataServer'
+import { readCourseMetadata } from '~/pages/api/UIUC-api/getCourseMetadata'
 import { determineAndValidateModelServer } from '~/server/determineAndValidateModelServer'
 import { validateApiKeyAndRetrieveData } from './keys/validate'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
@@ -43,6 +43,10 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { buildPrompt } from '~/app/utils/buildPromptUtils'
 import { type AuthContextProps } from 'react-oidc-context'
+import { getLogger } from '~/utils/server/log'
+import { runPagesRoute } from '~/utils/server/routeContext'
+
+const log = getLogger('api.chat-api.chat')
 
 /**
  * Run one Sim tool in-process and return its output in the shape the tool
@@ -69,13 +73,10 @@ async function executeToolFromApi(
  * @param {NextApiResponse} res - The Next.js API response object.
  * @returns {Promise<void>} A promise that resolves when the response is sent.
  */
-export default async function chat(
-  req: NextApiRequest,
-  res: NextApiResponse,
-): Promise<void> {
+async function chat(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   // Validate the HTTP method
   if (req.method !== 'POST') {
-    console.error('Invalid request method:', req.method)
+    log.warn('invalid request method', { method: req.method })
     posthog.capture('stream_api_invalid_method', {
       distinct_id: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
       method: req.method,
@@ -90,7 +91,11 @@ export default async function chat(
     await validateRequestBody(body)
   } catch (error: any) {
     // Log the error and capture it with PostHog
-    console.error('Invalid request body:', body, 'Error:', error.message)
+    // Never log the body: it carries the caller's API key and messages.
+    log.warn('invalid request body', {
+      course: body?.course_name,
+      reason: error.message,
+    })
     posthog.capture('Invalid Request Body', {
       distinct_id: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
       body: body,
@@ -125,7 +130,10 @@ export default async function chat(
 
   const email = authContext.user?.profile.email
 
-  console.debug('Received /chat request for: ', email)
+  log.debug('received /chat request', {
+    course: course_name,
+    user: authContext.user?.profile.sub,
+  })
 
   if (!isValidApiKey) {
     posthog.capture('stream_api_invalid_api_key', {
@@ -139,7 +147,7 @@ export default async function chat(
 
   // Retrieve course metadata
   const courseMetadata: CourseMetadata | null =
-    await fetchCourseMetadataServer(course_name)
+    await readCourseMetadata(course_name)
   if (!courseMetadata || null === courseMetadata) {
     res.status(404).json({ error: 'Course metadata not found' })
     return
@@ -163,6 +171,13 @@ export default async function chat(
     selectedModel = activeModel
     llmProviders = modelsWithProviders
   } catch (error) {
+    // The message goes to the caller as a 400. A model that is not enabled
+    // already has its WARNING line from determineAndValidateModelServer. A
+    // failure while the providers load ends here too, and has no line yet.
+    const reason = (error as Error)?.message ?? ''
+    if (!reason.startsWith('The requested model')) {
+      log.warn('could not select the model for the request', undefined, error)
+    }
     res.status(400).json({ error: (error as Error).message })
     return
   }
@@ -189,7 +204,7 @@ export default async function chat(
 
   // Ensure there are messages in the conversation
   if (messages.length === 0) {
-    console.error('No messages in conversation')
+    log.warn('no messages in conversation', { course: course_name })
     res.status(400).json({ error: 'No messages in conversation' })
     return
   }
@@ -206,7 +221,11 @@ export default async function chat(
       // could only ever return nothing on this path.
       availableTools = await fetchToolsServer(course_name!)
     } catch (error) {
-      console.error('Error fetching tools.', error)
+      log.warn(
+        'could not fetch tools; answering without them',
+        { course: course_name },
+        error,
+      )
       availableTools = []
     }
   }
@@ -286,10 +305,10 @@ export default async function chat(
   }
 
   // Fetch Contexts
-  console.log('Before context search:', {
-    courseName: course_name,
-    searchQuery,
-    documentGroups: doc_groups,
+  log.debug('starting context search', {
+    course: course_name,
+    query_chars: searchQuery?.length,
+    doc_groups,
   })
   const contexts = await handleContextSearch(
     lastMessage,
@@ -301,7 +320,7 @@ export default async function chat(
   )
   // Check if contexts were found
   if (contexts.length === 0) {
-    console.error('No contexts found')
+    log.warn('no contexts found', { course: course_name })
     posthog.capture('stream_api_no_contexts_found', {
       distinct_id: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
       user_id: email,
@@ -366,7 +385,14 @@ export default async function chat(
 
   // Handle errors from the chat handler API
   if (!apiResponse.ok) {
-    console.error('API error:', apiResponse.statusText)
+    // The provider code has written the ERROR with the stack; this line adds
+    // the project and the status that the caller gets.
+    log.warn('chat model request failed', {
+      course: course_name,
+      model,
+      status: apiResponse.status,
+      reason: apiResponse.statusText,
+    })
     posthog.capture('stream_api_error', {
       distinct_id: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
       error: apiResponse.statusText,
@@ -405,4 +431,14 @@ export default async function chat(
       course_name,
     )
   }
+}
+
+// Public API route with no auth wrapper: open the request context here so the
+// lines carry rid= and path=, the X-Request-ID header is sent, and a throw
+// becomes one ERROR line and a 500.
+export default async function chatRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => chat(req, res))
 }

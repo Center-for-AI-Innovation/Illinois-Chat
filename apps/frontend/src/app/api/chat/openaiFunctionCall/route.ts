@@ -9,6 +9,9 @@ import { persistMessageServer } from '~/pages/api/conversation'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
 import { callToolRouter, resolveToolRouter } from '~/utils/server/toolRouting'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.chat.openaiFunctionCall')
 
 // Change runtime to edge
 export const runtime = 'nodejs'
@@ -247,7 +250,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       ],
     })
   } catch (error) {
-    console.error('Error in openaiFunctionCall:', error)
+    log.error('tool routing request failed', undefined, error)
     return NextResponse.json(
       {
         error: 'Tool routing temporarily unavailable',

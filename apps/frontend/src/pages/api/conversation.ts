@@ -31,6 +31,9 @@ import {
 } from '~/db/schema'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getUserIdentifier } from '~/server/userIdentifier'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.conversation')
 
 export const config = {
   api: {
@@ -238,10 +241,10 @@ export function convertDBToChatConversation(
       //   isUser: firstMessage?.role === 'user'
       // });
     } else {
-      console.warn(
-        'No valid first message found in conversation:',
-        dbConversation.id,
-      )
+      // Runs for every conversation on the 20 s history poll: DEBUG, not WARNING.
+      log.debug('no valid first message found in conversation', {
+        conversation: dbConversation.id,
+      })
     }
   }
 
@@ -306,9 +309,9 @@ export function convertDBToChatConversation(
         try {
           parsedProcessedContent = JSON.parse(msg.processed_content)
         } catch (error) {
-          console.debug(
-            'Failed to parse processed_content for message:',
-            msg.id,
+          log.debug(
+            'could not parse processed_content',
+            { message: msg.id },
             error,
           )
         }
@@ -538,7 +541,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 },
               })
           } catch (error) {
-            console.error('Error upserting conversation (delta) to db:', error)
+            log.warn('could not upsert the conversation (delta save)')
             throw error
           }
 
@@ -581,10 +584,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                   ),
                 )
             } catch (error) {
-              console.error(
-                'Error deleting subsequent messages (delta):',
-                error,
-              )
+              log.warn('could not delete subsequent messages (delta save)')
               throw error
             }
           }
@@ -634,7 +634,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                   set: messageForInsert as any,
                 })
             } catch (error) {
-              console.error('Error inserting delta message to db:', error)
+              log.warn('could not insert a message (delta save)')
               throw error
             }
           }
@@ -698,7 +698,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               },
             })
         } catch (error) {
-          console.error('Error insert conversation to db:', error)
+          log.warn('could not insert the conversation')
           throw error
         }
 
@@ -752,7 +752,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 ),
               )
           } catch (error) {
-            console.error('Error deleting subsequent messages:', error)
+            log.warn('could not delete subsequent messages')
             throw error
           }
         }
@@ -817,7 +817,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 set: messageForInsert as any,
               })
           } catch (error) {
-            console.error('Error inserting message to db:', error)
+            log.warn('could not insert a message')
             throw error
           }
         }
@@ -829,7 +829,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         res
           .status(500)
           .json({ error: `Error saving conversation` + error?.toString() })
-        console.error('Error saving conversation:', error)
+        log.error('could not save the conversation', undefined, error)
       }
       break
 
@@ -839,7 +839,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const pageParam = parseInt(req.query.pageParam as string, 0)
       // Search term is optional
       if (!userIdentifier || !courseName || isNaN(pageParam)) {
-        console.error('Invalid query parameters:', req.query)
+        log.warn('invalid query parameters for conversation history', {
+          has_user: Boolean(userIdentifier),
+          has_course: Boolean(courseName),
+          page: req.query.pageParam,
+        })
         res.status(400).json({
           error: 'Invalid query parameters',
           message: 'userIdentifier, courseName, and pageParam are required',
@@ -958,10 +962,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         })
       } catch (error) {
         res.status(500).json({ error: 'Error fetching conversation history' })
-        console.error(
-          'pages/api/conversation.ts - Error fetching conversation history:',
-          error,
-        )
+        log.error('could not fetch conversation history', undefined, error)
       }
       break
 
@@ -1019,7 +1020,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
         res.status(200).json({ success: true })
       } catch (err) {
-        console.error('Error deleting conversations:', err)
+        log.error('could not delete conversations', undefined, err)
         res.status(500).json({ error: 'Internal server error' })
       }
       break

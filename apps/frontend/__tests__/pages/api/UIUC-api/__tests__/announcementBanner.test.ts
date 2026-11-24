@@ -26,9 +26,32 @@ beforeEach(() => {
 })
 
 describe('GET /api/UIUC-api/announcementBanner', () => {
+  it('sends the request id back and answers 500 when the handler throws', async () => {
+    mockedRedis.mockResolvedValue({
+      hGet: vi.fn().mockResolvedValue(undefined),
+    })
+    const res = createRes()
+    // The handler's first setHeader call (Cache-Control) throws.
+    res.setHeader = vi.fn((name: string) => {
+      if (name === 'Cache-Control') throw new Error('header bug')
+    })
+    await handler(
+      { headers: { 'x-request-id': 'abc123' }, method: 'GET' } as any,
+      res,
+    )
+
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'abc123')
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR   api rid=abc123 .*unhandled error in API route at=\S+:\d+\nError: header bug/,
+      ),
+    )
+  })
+
   it('405s on anything but GET', async () => {
     const res = createRes()
-    await handler({ method: 'POST' } as any, res)
+    await handler({ headers: {}, method: 'POST' } as any, res)
 
     expect(res.setHeader).toHaveBeenCalledWith('Allow', 'GET')
     expect(res.status).toHaveBeenCalledWith(405)
@@ -47,7 +70,7 @@ describe('GET /api/UIUC-api/announcementBanner', () => {
     )
 
     const res = createRes()
-    await handler({ method: 'GET' } as any, res)
+    await handler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
@@ -65,7 +88,7 @@ describe('GET /api/UIUC-api/announcementBanner', () => {
     storeBanner(undefined)
 
     const res = createRes()
-    await handler({ method: 'GET' } as any, res)
+    await handler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.json).toHaveBeenCalledWith({ banner: null })
@@ -75,7 +98,7 @@ describe('GET /api/UIUC-api/announcementBanner', () => {
     storeBanner('{not json')
 
     const res = createRes()
-    await handler({ method: 'GET' } as any, res)
+    await handler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.json).toHaveBeenCalledWith({ banner: null })
@@ -85,7 +108,7 @@ describe('GET /api/UIUC-api/announcementBanner', () => {
     mockedRedis.mockRejectedValue(new Error('redis down'))
 
     const res = createRes()
-    await handler({ method: 'GET' } as any, res)
+    await handler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(503)
     expect(res.json).toHaveBeenCalledWith({

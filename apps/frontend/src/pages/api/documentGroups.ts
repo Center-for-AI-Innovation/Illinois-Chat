@@ -13,6 +13,9 @@ import {
 
 import { updateDocGroupsInVectorStore } from '~/utils/vectorUtils'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.documentGroups')
 
 interface RequestBody {
   action:
@@ -36,7 +39,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     try {
       if (action === 'addDocumentsToDocGroup' && doc) {
-        console.log('Adding documents to doc group:', doc)
+        log.info('adding document to doc groups', {
+          file: doc.readable_filename,
+          groups: doc.doc_groups,
+        })
 
         posthog.capture('add_doc_group', {
           distinct_id:
@@ -76,7 +82,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           })
         }
       } else if (action === 'appendDocGroup' && doc && docGroup) {
-        console.log('Appending doc group:', docGroup, 'to doc:', doc)
+        log.info('appending doc group', {
+          group: docGroup,
+          file: doc.readable_filename,
+        })
 
         posthog.capture('append_doc_group', {
           distinct_id:
@@ -125,7 +134,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           })
         }
       } else if (action === 'removeDocGroup' && doc && docGroup) {
-        console.log('Removing doc group: ', docGroup, 'from doc: ', doc)
+        log.info('removing doc group', {
+          group: docGroup,
+          file: doc.readable_filename,
+        })
 
         posthog.capture('remove_doc_group', {
           distinct_id:
@@ -161,7 +173,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         docGroup &&
         enabled !== undefined
       ) {
-        console.log('Updating doc group status: ', docGroup, 'to: ', enabled)
+        log.info('updating doc group status', { group: docGroup, enabled })
         await updateDocGroupStatus(courseName, docGroup, enabled)
         res.status(200).json({ success: true })
       } else if (action === 'fetchEnabledDocGroups') {
@@ -171,7 +183,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         res.status(400).json({ success: false, error: 'Invalid action' })
       }
     } catch (error) {
-      console.error('Error in document group operation:', error)
+      log.error('document group operation failed', { action }, error)
       res.status(500).json({ success: false, error: 'An error occurred' })
     }
   } else {
