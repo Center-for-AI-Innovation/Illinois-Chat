@@ -60,7 +60,7 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // redirect and returns HTML, which we'd otherwise upload as a broken "PDF" that the
   // worker can't open ("cannot open broken document"), burning ~40s/each on retries.
   clog.debug(`Fetching candidate PDF. Filename: ${filename}, Url: ${url}`);
-  // downloadPdf has a time limit and a size limit, and throws a PdfDownloadError.
+  // downloadPdf has a time limit and no size limit, and throws a PdfDownloadError.
   const { data: pdfBuffer, contentType } = await downloadPdf(url);
   const head = pdfBuffer.subarray(0, 5).toString('latin1');
   if (!contentType.includes('application/pdf') && head !== '%PDF-') {

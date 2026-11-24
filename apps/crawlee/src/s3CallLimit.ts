@@ -3,7 +3,7 @@
 // crawl() waits for every PDF before /crawl answers, and a PDF waits for its S3 calls.
 // The client makes 3 tries, and its idle limit does not count a reply that starts and then
 // stops. So each call also has one limit for all its tries together. It is long, because
-// it also ends an upload of 100 MB that is slow but makes progress.
+// it also ends the upload of a large file that is slow but makes progress.
 export const S3_CALL_TIMEOUT_MS = 10 * 60_000;
 
 // Runs one S3 call with that limit. The signal makes the client stop its work. The race

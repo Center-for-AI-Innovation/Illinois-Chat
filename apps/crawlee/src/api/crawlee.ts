@@ -443,7 +443,7 @@ async function handlePdf(
     );
     return accepted ? "ingested" : "failed";
   } catch (error) {
-    // The message of a download error says which limit was hit, when one was.
+    // The message of a download error says so when the time limit was hit.
     if (error instanceof PdfDownloadError) {
       clog.error(`PDF download failed url=${oneLine(url)}: ${oneLine(error.message)}`);
     } else {
