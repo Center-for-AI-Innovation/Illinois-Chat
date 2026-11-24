@@ -193,6 +193,34 @@ describe('Navbar', () => {
     expect(screen.getByRole('banner')).toHaveAttribute('data-layout', 'splash')
   })
 
+  // A border adds layout height on top of --navbar-height, which
+  // --page-viewport-height does not subtract, so the page would overflow by 1px.
+  // jsdom has no layout, so this checks the classes that decide it.
+  it.each([
+    { name: 'application', props: {}, divider: true },
+    {
+      name: 'settings sidebar',
+      props: { contentWidth: 'sidebar' as const },
+      divider: true,
+    },
+    { name: 'hideBorder', props: { hideBorder: true }, divider: false },
+    { name: 'splash', props: { variant: 'splash' as const }, divider: false },
+  ])(
+    'keeps the $name navbar at exactly --navbar-height',
+    async ({ props, divider }) => {
+      superAdminIs(false)
+      await renderNavbar(props)
+
+      const wrapper = screen.getByRole('banner').parentElement!
+      const classes = wrapper.className.split(/\s+/)
+      expect(
+        classes.filter((c) => /^border(-[trblxy])?(-\d+)?$/.test(c)),
+      ).toEqual([])
+      expect(classes.includes('after:h-px')).toBe(divider)
+      expect(classes.includes('after:absolute')).toBe(divider)
+    },
+  )
+
   describe.each([
     { name: 'application', props: {} },
     { name: 'splash', props: { variant: 'splash' as const } },

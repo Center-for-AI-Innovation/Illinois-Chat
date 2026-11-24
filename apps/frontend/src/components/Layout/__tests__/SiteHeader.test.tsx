@@ -118,6 +118,47 @@ describe('SiteHeader', () => {
     expect(screen.getByRole('banner')).toHaveAttribute('data-variant', 'splash')
   })
 
+  // Production's splash strip and navbar scroll away with the page.
+  it.each([
+    { name: 'active announcement', banner: ENABLED },
+    { name: 'empty strip', banner: { ...ENABLED, enabled: false } },
+  ])('lets the splash header scroll with the page ($name)', ({ banner }) => {
+    query.banner = banner
+    const { container } = renderAt('/')
+
+    const header = container.firstElementChild as HTMLElement
+    expect(header).toHaveAttribute('data-position', 'scroll')
+    expect(header.className).not.toContain('sticky')
+  })
+
+  it.each([
+    '/chatbots',
+    '/admin',
+    '/[course_name]/chat',
+    '/[course_name]/upload',
+  ])('keeps the header sticky on %s', (pathname) => {
+    const { container } = renderAt(pathname)
+
+    const header = container.firstElementChild as HTMLElement
+    expect(header).toHaveAttribute('data-position', 'sticky')
+    expect(header.className).toContain('sticky')
+  })
+
+  // Its sticky search bar draws the divider, so the navbar must not add one.
+  it('draws no navbar divider on /chatbots', () => {
+    renderAt('/chatbots')
+
+    const navbarWrapper = screen.getByRole('banner').parentElement!
+    expect(navbarWrapper.className).not.toContain('after:h-px')
+  })
+
+  it('draws the navbar divider on bordered application routes', () => {
+    renderAt('/[course_name]/chat')
+
+    const navbarWrapper = screen.getByRole('banner').parentElement!
+    expect(navbarWrapper.className).toContain('after:h-px')
+  })
+
   it.each([
     '/[course_name]/analysis',
     '/[course_name]/api',
