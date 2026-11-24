@@ -15,7 +15,7 @@ import sys
 import time
 
 _RABBITMQ_DIR = os.path.join(os.path.dirname(__file__), "..", "ai_ta_backend", "rabbitmq")
-# worker.py uses bare imports (the worker image ships only that folder). Put the folder on the path
+# worker.py uses bare imports (the image runs it by path, which puts its folder first on sys.path). Put the folder on the path
 # just long enough to import it, so later tests don't resolve bare names like `models` to it.
 sys.path.insert(0, _RABBITMQ_DIR)
 try:
