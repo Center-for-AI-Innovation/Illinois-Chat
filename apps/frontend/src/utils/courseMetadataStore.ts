@@ -345,10 +345,10 @@ export async function writeCourseMetadata(
     try {
       await rollbackPostgres(courseName, priorRedisValue)
     } catch (rollbackErr) {
+      // Static message; the project name travels as data, never as a format string.
       console.error(
-        `CRITICAL: Postgres row for ${courseName} could not be rolled back after Redis write failure. ` +
-          `Manual reconciliation required.`,
-        { redisErr, rollbackErr },
+        'CRITICAL: Postgres row could not be rolled back after Redis write failure. Manual reconciliation required.',
+        { courseName, redisErr, rollbackErr },
       )
       throw new CourseMetadataWriteError(
         'rollback',
@@ -406,9 +406,10 @@ export async function deleteCourseMetadata(courseName: string): Promise<void> {
       try {
         await db.insert(courseMetadataTable).values(priorRow)
       } catch (rollbackErr) {
+        // Static message; the project name travels as data, never as a format string.
         console.error(
-          `CRITICAL: Could not restore Postgres row for ${courseName} after Redis delete failure.`,
-          { redisErr, rollbackErr },
+          'CRITICAL: Could not restore Postgres row after Redis delete failure.',
+          { courseName, redisErr, rollbackErr },
         )
         throw new CourseMetadataWriteError(
           'rollback',
