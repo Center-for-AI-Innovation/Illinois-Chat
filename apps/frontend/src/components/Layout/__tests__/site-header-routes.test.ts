@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   APP_NAVBAR_HEIGHT,
+  getSiteHeaderOffset,
   getSiteNavbarHeight,
   getSiteNavbarOptions,
   routeHasSiteNavbar,
@@ -102,6 +103,31 @@ describe('site header route config', () => {
       expect(getSiteNavbarHeight(pathname)).toBe(APP_NAVBAR_HEIGHT)
       expect(APP_NAVBAR_HEIGHT).toBe('80px')
     })
+  })
+
+  // The skip link's target scrolls clear of whatever the sticky header covers.
+  describe('site header offset token', () => {
+    it('is 0px on the splash page, whose header scrolls away', () => {
+      expect(getSiteHeaderOffset('/')).toBe('0px')
+    })
+
+    it.each(['/admin', '/chatbots', '/new', '/[course_name]/chat'])(
+      '%s clears the announcement bar and the navbar',
+      (pathname) => {
+        expect(getSiteHeaderOffset(pathname)).toBe(
+          'calc(var(--announcement-banner-height) + var(--navbar-height))',
+        )
+      },
+    )
+
+    it.each(['/terms', '/privacy'])(
+      '%s clears only the announcement bar, having no navbar',
+      (pathname) => {
+        expect(getSiteHeaderOffset(pathname)).toBe(
+          'var(--announcement-banner-height)',
+        )
+      },
+    )
   })
 
   describe('other routes', () => {

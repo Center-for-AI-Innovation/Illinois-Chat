@@ -539,10 +539,12 @@ export const projectExternalConnections = pgTable(
   },
 )
 
-// Append-only audit trail for super-admin CRUD on project_external_connections,
-// and for super-admin frozen-project recovery (action 'unfreeze').
+// Audit trail for super-admin CRUD on project_external_connections, and for
+// super-admin frozen-project recovery (action 'unfreeze'). Rows are never
+// deleted. Connection rows are never updated; a recovery row is inserted as
+// 'pending' and then updated to its outcome.
 // Never store values from the configs themselves — only field NAMES go in
-// `changed_fields`. See docs/external-connections.md.
+// `changed_fields`. See docs/EXTERNAL_CONNECTIONS.md.
 //
 // `project_name` is nullable so the test endpoint can write audit rows that
 // are not tied to a specific project (probes happen before a config is saved).

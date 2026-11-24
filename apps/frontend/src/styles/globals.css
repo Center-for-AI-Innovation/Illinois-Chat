@@ -99,6 +99,12 @@ button:disabled {
   top: 0;
 }
 
+/* The skip link scrolls this into view. Without a margin, the start of the page
+   lands under the sticky site header. _app sets the offset per route. */
+#main-content {
+  scroll-margin-top: var(--site-header-offset, 0px);
+}
+
 /*
  * Heading scale for every native <h1>-<h6>. h1/h2 carry this app's own
  * overrides; h3-h6 are the inherited defaults. See issue #232.
