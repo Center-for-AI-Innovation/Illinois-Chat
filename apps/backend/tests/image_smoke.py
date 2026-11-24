@@ -14,7 +14,8 @@ data, with no network:
     docker run --rm -i --network none <image> python - api < tests/image_smoke.py
 
 ``tests/test_image_smoke.py`` runs the same checks under pytest with ``--lenient``, which
-skips the checks that need tesseract, ffmpeg, git or the NLTK data on the host.
+skips the checks that need tesseract, ffmpeg, git or the NLTK data on the host and
+never downloads that data.
 
 Everything it reads is generated in a temp directory; nothing is fetched.
 """
@@ -312,6 +313,14 @@ def main(argv: list[str]) -> int:
     # import path; neither helps read a pass/fail list.
     warnings.filterwarnings("ignore")
     logging.disable(logging.WARNING)
+
+    if lenient:
+        # ingest.py downloads its NLTK data on import when it is missing. In an image that
+        # is the Dockerfile's job and the run has no network; on a developer machine or a
+        # CI runner the smoke test should not fetch anything either.
+        import nltk
+
+        nltk.download = lambda *args, **kwargs: False
 
     failed = 0
     for check in CHECKS[args[0]]:
