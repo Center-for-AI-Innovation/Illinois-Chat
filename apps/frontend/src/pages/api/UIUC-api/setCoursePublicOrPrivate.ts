@@ -4,6 +4,9 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.setCoursePublicOrPrivate')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const course_name = req.body.course_name as string
@@ -31,8 +34,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     await writeCourseMetadata(course_name, updated_course_metadata)
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.log(error)
-    console.log('removeUserFromCourse FAILURE')
+    log.error('failed to set project public or private', undefined, error)
     return res.status(500).json({ success: false })
   }
 }

@@ -8,6 +8,9 @@ import type { AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withSuperAdminOnly } from '~/utils/superAdminGuard'
 import { searchProjectsWithoutConnection } from '~/db/projectConnectionsRepo'
 import { formatZodError } from '~/utils/projectConnections/handlerShared'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.projectConnections.candidates')
 
 const CANDIDATE_LIMIT = 20
 
@@ -36,7 +39,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
     return res.status(200).json({ projects, limit: CANDIDATE_LIMIT })
   } catch (e) {
-    console.error('[projectConnections/candidates] failed:', e)
+    log.error('project search failed', undefined, e)
     return res.status(500).json({ error: 'Failed to search projects' })
   }
 }

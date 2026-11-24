@@ -27,6 +27,10 @@ import {
   ReasoningCapableModels,
 } from '~/utils/modelProviders/LLMProvider'
 import { decryptKeyIfNeeded } from '../crypto'
+import { getLogger } from './log'
+import { isClosedStreamError } from './streamErrors'
+
+const log = getLogger('openai')
 
 export class OpenAIError extends Error {
   constructor(
@@ -217,6 +221,11 @@ export const OpenAIStream = async (
                 return
               }
             } catch (e) {
+              // The reply has started, so no caller can catch this any more.
+              // A reader that went away is not a failure.
+              if (!isClosedStreamError(e)) {
+                log.error('LLM stream failed', { model: model.id }, e)
+              }
               if (!isStreamClosed) {
                 controller.error(e)
                 isStreamClosed = true // Update the flag if an error occurs
@@ -235,6 +244,9 @@ export const OpenAIStream = async (
             }
           }
         } catch (e) {
+          if (!isClosedStreamError(e)) {
+            log.error('LLM stream failed', { model: model.id }, e)
+          }
           if (!isStreamClosed) {
             controller.error(e)
             isStreamClosed = true
@@ -244,7 +256,7 @@ export const OpenAIStream = async (
     })
     return apiStream
   } else {
-    console.log('Non Streaming response from OpenAI')
+    log.debug('non-streaming response from OpenAI')
     const json = await res.json()
     return json
   }

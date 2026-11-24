@@ -7,11 +7,14 @@ import { chatbotTagKey, sanitizeChatbotTags } from '~/types/chatbotTags'
 import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { encrypt, isEncrypted } from '~/utils/crypto'
-import { getCourseMetadata } from './getCourseMetadata'
+import { readCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import { upsertChatbotTags } from '~/utils/chatbotTagsRegistry'
 import { superAdmins } from '~/utils/superAdmins'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.upsertCourseMetadata')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { courseName, courseMetadata } = req.body as {
@@ -21,13 +24,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   // Check if courseName is not null or undefined
   if (!courseName) {
-    console.error('Error: courseName is null or undefined')
+    log.warn('missing courseName')
     return res.status(400).json({ success: false, error: 'Missing courseName' })
   }
 
-  try {
-    const existing_metadata = await getCourseMetadata(courseName)
+  // Read outside the try: a failed read must stop the request with a 503 from
+  // the route wrapper. If it was merged as "no metadata", the save below would
+  // replace the stored settings with only the fields of this request.
+  const existing_metadata = await readCourseMetadata(courseName)
 
+  try {
     // Combine the existing metadata with the new metadata, prioritizing the new values (order matters!)
     const combined_metadata = { ...existing_metadata, ...courseMetadata }
 
@@ -60,7 +66,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Check if combined_metadata doesn't have anything in the field is_private
     if (!combined_metadata.is_private) {
       combined_metadata.is_private = false
-      console.log('is_private field was empty. Set to false.')
+      log.debug('is_private field was empty, set to false')
     }
 
     // Check if openai_api_key is present and if it is a plain string
@@ -69,7 +75,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       !isEncrypted(combined_metadata.openai_api_key)
     ) {
       // Encrypt the openai_api_key
-      console.log('Encrypting api key')
+      log.debug('encrypting api key')
       combined_metadata.openai_api_key = await encrypt(
         combined_metadata.openai_api_key,
         process.env.NEXT_PUBLIC_SIGNING_KEY as string,
@@ -88,8 +94,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error setting course metadata:', error)
-    return res.status(500).json({ success: false, error: error })
+    log.error('error setting course metadata', undefined, error)
+    return res
+      .status(500)
+      .json({ success: false, error: 'Internal server error' })
   }
 }
 

@@ -34,7 +34,7 @@ beforeEach(() => {
 describe('GET /api/UIUC-api/navbarBranding', () => {
   it('405s on anything but GET', async () => {
     const res = createRes()
-    await brandingHandler({ method: 'POST' } as any, res)
+    await brandingHandler({ headers: {}, method: 'POST' } as any, res)
 
     expect(res.setHeader).toHaveBeenCalledWith('Allow', 'GET')
     expect(res.status).toHaveBeenCalledWith(405)
@@ -52,7 +52,7 @@ describe('GET /api/UIUC-api/navbarBranding', () => {
     })
 
     const res = createRes()
-    await brandingHandler({ method: 'GET' } as any, res)
+    await brandingHandler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(200)
     expect(res.json).toHaveBeenCalledWith({
@@ -68,10 +68,14 @@ describe('GET /api/UIUC-api/navbarBranding', () => {
     storeFields({})
 
     const res = createRes()
-    await brandingHandler({ method: 'GET' } as any, res)
+    await brandingHandler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.json).toHaveBeenCalledWith({
-      branding: { primaryWord: 'Illinois', secondaryWord: 'Chat', logoUrl: null },
+      branding: {
+        primaryWord: 'Illinois',
+        secondaryWord: 'Chat',
+        logoUrl: null,
+      },
     })
   })
 
@@ -79,7 +83,7 @@ describe('GET /api/UIUC-api/navbarBranding', () => {
     mockedRedis.mockRejectedValue(new Error('redis down'))
 
     const res = createRes()
-    await brandingHandler({ method: 'GET' } as any, res)
+    await brandingHandler({ headers: {}, method: 'GET' } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(503)
   })
@@ -93,7 +97,11 @@ describe('GET /api/UIUC-api/navbarLogo', () => {
 
     const res = createRes()
     await logoHandler(
-      { method: 'GET', query: { v: logoVersionOf(SVG_LOGO) } } as any,
+      {
+        headers: {},
+        method: 'GET',
+        query: { v: logoVersionOf(SVG_LOGO) },
+      } as any,
       res,
     )
 
@@ -119,7 +127,7 @@ describe('GET /api/UIUC-api/navbarLogo', () => {
       storeFields({ navbar_logo: SVG_LOGO })
 
       const res = createRes()
-      await logoHandler({ method: 'GET', query } as any, res)
+      await logoHandler({ headers: {}, method: 'GET', query } as any, res)
 
       expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
       expect(res.redirect).toHaveBeenCalledWith(
@@ -134,7 +142,7 @@ describe('GET /api/UIUC-api/navbarLogo', () => {
     storeFields({ navbar_logo: '' })
 
     const res = createRes()
-    await logoHandler({ method: 'GET', query: {} } as any, res)
+    await logoHandler({ headers: {}, method: 'GET', query: {} } as any, res)
 
     expect(res.redirect).toHaveBeenCalledWith(307, '/media/logo_illinois.png')
   })
@@ -143,7 +151,7 @@ describe('GET /api/UIUC-api/navbarLogo', () => {
     mockedRedis.mockRejectedValue(new Error('redis down'))
 
     const res = createRes()
-    await logoHandler({ method: 'GET', query: {} } as any, res)
+    await logoHandler({ headers: {}, method: 'GET', query: {} } as any, res)
 
     expect(res.status).toHaveBeenCalledWith(503)
   })

@@ -5,6 +5,10 @@ import OpenAI from 'openai'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { decrypt } from '~/utils/crypto'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
+
+const log = getLogger('api.chat.openAI')
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -58,7 +62,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
           )
         }
       } catch (error) {
-        console.error('Error decrypting OpenAI key:', error)
+        log.error('could not decrypt the OpenAI key', undefined, error)
         return NextResponse.json(
           {
             error:
@@ -95,8 +99,17 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     }
 
     if (stream) {
-      const result = await streamText(commonParams as any)
-      const response = result.toTextStreamResponse()
+      const result = await streamText({
+        ...(commonParams as any),
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }: { error: unknown }) =>
+          log.error('LLM stream failed', { model }, error),
+      })
+      const response = logStreamFailure(result.toTextStreamResponse(), log, {
+        model,
+      })
       return new NextResponse(response.body, {
         status: response.status,
         headers: response.headers,

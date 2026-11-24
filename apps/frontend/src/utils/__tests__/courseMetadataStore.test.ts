@@ -327,9 +327,11 @@ describe('writeCourseMetadata', () => {
     await expect(writeCourseMetadata(name, makeMetadata())).rejects.toThrow(
       CourseMetadataWriteError,
     )
+    // The logger writes one finished line, so the name can only appear as data.
     expect(consoleError).toHaveBeenCalledWith(
-      'CRITICAL: Postgres row could not be rolled back after Redis write failure. Manual reconciliation required.',
-      expect.objectContaining({ courseName: name }),
+      expect.stringMatching(
+        /CRITICAL: Postgres row could not be rolled back after a Redis write failure.*bot-critical-%s-%o/,
+      ),
     )
     consoleError.mockRestore()
   })
@@ -517,9 +519,11 @@ describe('deleteCourseMetadata', () => {
     await expect(deleteCourseMetadata(name)).rejects.toThrow(
       CourseMetadataWriteError,
     )
+    // The logger writes one finished line, so the name can only appear as data.
     expect(consoleError).toHaveBeenCalledWith(
-      'CRITICAL: Could not restore Postgres row after Redis delete failure.',
-      expect.objectContaining({ courseName: name }),
+      expect.stringMatching(
+        /CRITICAL: Postgres row could not be restored after a Redis delete failure.*bot-w-%s-%o/,
+      ),
     )
     consoleError.mockRestore()
   })
