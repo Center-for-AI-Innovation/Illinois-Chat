@@ -111,12 +111,15 @@ const ChatbotsHubPage = () => {
   }, [])
 
   // Public Bots stays on the featured sample; Course and Department bots have their own sections.
+  // Bots you own or admin are in Your Bots, so they are left out here. That is
+  // stored membership, which is when the card carries raw metadata. `userRole`
+  // is not a membership signal: super admins get 'admin' on every card.
   const publicBots = useMemo(
     () =>
       (featuredChatbots ?? [])
         .filter(
           (bot) =>
-            !bot.userRole &&
+            !bot.metadata &&
             bot.accessLevel === 'public' &&
             (PROJECT_TYPE_TO_SECTION[bot.projectType as ChatbotProjectType] ??
               DEFAULT_ACCESSIBLE_SECTION) === DEFAULT_ACCESSIBLE_SECTION,
