@@ -11,6 +11,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarInput,
   SidebarInset,
   SidebarMenu,
   SidebarMenuAction,
@@ -201,5 +202,53 @@ describe('Sidebar design (Figma admin sidebar)', () => {
     expect(screen.getByRole('button', { name: 'Toggle Sidebar' })).toHaveClass(
       'size-7',
     )
+  })
+
+  it('shows only the ring on keyboard focus, not the global orange outline', () => {
+    render(
+      <SidebarProvider>
+        <Sidebar collapsible="none">
+          <SidebarContent>
+            <SidebarInput aria-label="Search" />
+            <SidebarGroup>
+              <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
+              <SidebarGroupAction aria-label="Add group" />
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton>AI Models</SidebarMenuButton>
+                  <SidebarMenuAction aria-label="More" />
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton href="#open-source">
+                        Open Source LLMs
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+        <SidebarTrigger />
+      </SidebarProvider>,
+    )
+
+    // These override the primitive's data-slot, so the class must carry this.
+    const toggle = screen.getByRole('button', { name: 'Toggle Sidebar' })
+    expect(toggle).toHaveAttribute('data-slot', 'sidebar-trigger')
+    const search = screen.getByRole('textbox', { name: 'Search' })
+    expect(search).toHaveAttribute('data-slot', 'sidebar-input')
+
+    for (const el of [
+      search,
+      screen.getByText('Project Settings'),
+      screen.getByRole('button', { name: 'Add group' }),
+      screen.getByRole('button', { name: 'AI Models' }),
+      screen.getByRole('button', { name: 'More' }),
+      screen.getByRole('link', { name: 'Open Source LLMs' }),
+      toggle,
+    ]) {
+      expect(el).toHaveClass('focus-visible:outline-hidden!')
+    }
   })
 })
