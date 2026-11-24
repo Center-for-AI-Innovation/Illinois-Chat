@@ -1,9 +1,13 @@
 import { documentsFailed } from '~/db/dbClient'
 import { connectionManager } from '~/utils/connectionManager'
-import { eq, sql, and, gte, InferSelectModel } from 'drizzle-orm'
+import { eq, sql, and, gte, InferSelectModel, type SQL } from 'drizzle-orm'
 import type { NextApiResponse, NextApiRequest } from 'next'
 import { AuthenticatedRequest } from '~/utils/authMiddleware'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import {
+  buildMaterialFilterConditions,
+  FilterValidationError,
+} from '~/server/materialFilters'
 
 // export const runtime = 'edge'
 
@@ -29,6 +33,7 @@ async function fetchFailedDocuments(
   const course_name = url.searchParams.get('course_name')
   const search_key = url.searchParams.get('filter_key') as string
   const search_value = url.searchParams.get('filter_value') as string
+  const rawFilters = url.searchParams.get('filters')
   let sort_column = url.searchParams.get('sort_column') as string
   let sort_direction = url.searchParams.get('sort_direction') === 'asc'
   if (fromStr === null || toStr === null) {
@@ -40,6 +45,19 @@ async function fetchFailedDocuments(
   }
   const from = parseInt(fromStr as string)
   const to = parseInt(toStr as string)
+  let filterConditions: SQL[]
+  try {
+    filterConditions = buildMaterialFilterConditions(rawFilters, {
+      readable_filename: documentsFailed.readable_filename,
+      url: documentsFailed.url,
+      base_url: documentsFailed.base_url,
+    })
+  } catch (error) {
+    if (error instanceof FilterValidationError) {
+      return res.status(400).json({ error: error.message })
+    }
+    throw error
+  }
   try {
     const db = await connectionManager.getDocumentsDb(course_name as string)
 
@@ -52,60 +70,46 @@ async function fetchFailedDocuments(
     let recentFailCount
     let recentFailError
 
+    const conditions: SQL[] = [
+      eq(documentsFailed.course_name, course_name as string),
+    ]
     if (search_key && search_value) {
-      try {
-        const data = await db
-          .select({
-            id: documentsFailed.id,
-            course_name: documentsFailed.course_name,
-            readable_filename: documentsFailed.readable_filename,
-            s3_path: documentsFailed.s3_path,
-            url: documentsFailed.url,
-            base_url: documentsFailed.base_url,
-            created_at: documentsFailed.created_at,
-            error: documentsFailed.error,
-          })
-          .from(documentsFailed)
-          .where(
-            and(
-              eq(documentsFailed.course_name, course_name as string),
-              sql`${sql.identifier(search_key as string)}
+      // Legacy single-filter parameters
+      conditions.push(sql`${sql.identifier(search_key as string)}
               ILIKE
-              ${`%${search_value}%`}`,
-            ),
-          )
-          .orderBy(
-            sql`${sql.identifier(sort_column as string)}
-          ${sort_direction ? sql`ASC` : sql`DESC`}`,
-          )
-          .limit(to - from + 1)
-          .offset(from)
+              ${`%${search_value}%`}`)
+    }
+    conditions.push(...filterConditions)
+    const whereClause = and(...conditions)
+    const listColumns = {
+      id: documentsFailed.id,
+      course_name: documentsFailed.course_name,
+      readable_filename: documentsFailed.readable_filename,
+      s3_path: documentsFailed.s3_path,
+      url: documentsFailed.url,
+      base_url: documentsFailed.base_url,
+      created_at: documentsFailed.created_at,
+      error: documentsFailed.error,
+    }
 
-        failedDocs = data as InferSelectModel<typeof documentsFailed>[]
-        finalError = null
-      } catch (err) {
-        failedDocs = null
-        finalError = err
-      }
-    } else {
-      try {
-        const data = await db
-          .select()
-          .from(documentsFailed)
-          .where(eq(documentsFailed.course_name, course_name as string))
-          .orderBy(
-            sql`${sql.identifier(sort_column as string)}
+    try {
+      // Unfiltered requests keep returning every column, as before
+      const filtered = Boolean(search_key && search_value) || filterConditions.length > 0
+      const data = await (filtered ? db.select(listColumns) : db.select())
+        .from(documentsFailed)
+        .where(whereClause)
+        .orderBy(
+          sql`${sql.identifier(sort_column as string)}
           ${sort_direction ? sql`ASC` : sql`DESC`}`,
-          )
-          .limit(to - from + 1)
-          .offset(from)
+        )
+        .limit(to - from + 1)
+        .offset(from)
 
-        failedDocs = data as InferSelectModel<typeof documentsFailed>[]
-        finalError = null
-      } catch (err) {
-        failedDocs = null
-        finalError = err
-      }
+      failedDocs = data as InferSelectModel<typeof documentsFailed>[]
+      finalError = null
+    } catch (err) {
+      failedDocs = null
+      finalError = err
     }
 
     if (finalError) {
@@ -115,39 +119,17 @@ async function fetchFailedDocuments(
       throw new Error('Failed to fetch failed documents')
     }
 
-    if (search_key && search_value) {
-      try {
-        const countResult = await db
-          .select({ count: sql`count(*)` })
-          .from(documentsFailed)
-          .where(
-            and(
-              eq(documentsFailed.course_name, course_name as string),
-              sql`${sql.identifier(search_key as string)}
-              ILIKE
-              ${`%${search_value}%`}`,
-            ),
-          )
-        count = countResult[0]?.count ?? 0
-        countError = null
-      } catch (err) {
-        count = 0
-        countError = err
-      }
-    } else {
-      // Fetch the total count of documents for the selected course
-      try {
-        const countResult = await db
-          .select({ count: sql`count(*)` })
-          .from(documentsFailed)
-          .where(eq(documentsFailed.course_name, course_name as string))
-
-        count = countResult[0]?.count ?? 0
-        countError = null
-      } catch (err) {
-        count = 0
-        countError = err
-      }
+    // Count uses the same conditions as the listing
+    try {
+      const countResult = await db
+        .select({ count: sql`count(*)` })
+        .from(documentsFailed)
+        .where(whereClause)
+      count = countResult[0]?.count ?? 0
+      countError = null
+    } catch (err) {
+      count = 0
+      countError = err
     }
     if (countError) {
       throw countError
