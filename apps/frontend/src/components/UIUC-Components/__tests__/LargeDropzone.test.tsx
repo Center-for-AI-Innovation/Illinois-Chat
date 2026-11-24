@@ -153,14 +153,14 @@ describe('LargeDropzone', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows "Upload materials" and drag-n-drop hint when enabled', async () => {
+  it('shows "Upload Materials" and drag-n-drop hint when enabled', async () => {
     const { default: LargeDropzone } = await import('../LargeDropzone')
     mockTimers()
     vi.spyOn(globalThis, 'fetch').mockImplementation(buildFetchMock({}))
 
     render(<LargeDropzone {...defaultProps()} />)
 
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
     expect(
       screen.getByText(/Drag.*drop files or a whole folder here/i),
     ).toBeInTheDocument()
@@ -190,14 +190,14 @@ describe('LargeDropzone', () => {
     render(<LargeDropzone {...defaultProps()} />)
 
     const dropzone = screen.getByTestId('dropzone')
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
 
     fireEvent.dragEnter(dropzone)
     expect(screen.getByText('Drop files here')).toBeInTheDocument()
-    expect(screen.queryByText('Upload materials')).not.toBeInTheDocument()
+    expect(screen.queryByText('Upload Materials')).not.toBeInTheDocument()
 
     fireEvent.dragLeave(dropzone)
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
   })
 
   it('stays in the dragging state while the cursor crosses a child element', async () => {
@@ -227,7 +227,7 @@ describe('LargeDropzone', () => {
 
     // Actually leaving the dropzone still resets the state correctly.
     fireEvent.dragLeave(dropzone)
-    expect(screen.getByText('Upload materials')).toBeInTheDocument()
+    expect(screen.getByText('Upload Materials')).toBeInTheDocument()
   })
 
   it('does not enter the dragging state when disabled', async () => {
