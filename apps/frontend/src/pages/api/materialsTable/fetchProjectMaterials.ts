@@ -1,5 +1,4 @@
 import { connectionManager } from '~/utils/connectionManager'
-import posthog from 'posthog-js'
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { type CourseDocument } from '~/types/courseMaterials'
@@ -7,6 +6,9 @@ import { and, eq, asc, desc, sql } from 'drizzle-orm'
 import { documents, documentsDocGroups, docGroups } from '~/db/schema'
 import { type PgColumn } from 'drizzle-orm/pg-core'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.materialsTable.fetchProjectMaterials')
 
 type FetchDocumentsResponse = {
   final_docs?: CourseDocument[]
@@ -200,11 +202,8 @@ async function fetchDocuments(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ final_docs, total_count: count ?? undefined })
   } catch (error) {
-    console.error('Failed to fetch documents:', error)
-    posthog.capture('fetch_materials_failed', {
-      error: (error as any).message,
-      course_name: course_name,
-    })
+    // Was a server-side posthog.capture, which never sends from Node.
+    log.error('failed to fetch project materials', undefined, error)
     return res.status(500).json({ error: (error as any).message })
   }
 }

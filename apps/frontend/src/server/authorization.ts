@@ -5,10 +5,20 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { withAuth } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
+import { getLogger } from '~/utils/server/log'
+import {
+  MetadataUnavailableError,
+  setLogCourse,
+} from '~/utils/server/requestContext'
+import { runPagesRoute } from '~/utils/server/routeContext'
 import {
   resolveCourseName,
   type ExtractedCourseName,
 } from '~/server/courseNameExtraction'
+
+export { MetadataUnavailableError }
+
+const log = getLogger('server.authorization')
 
 // Platform super admins get project access through a live check here rather
 // than by being written into each project's `course_admins`. A stored snapshot
@@ -27,18 +37,28 @@ import {
 // stay synchronous on purpose: roughly seventy files read `course_admins`
 // through them, and making them async would ripple through all of it.
 
-// Helper function to get course metadata from Redis
+// Helper function to get course metadata from Redis. Returns null when the
+// project does not exist; throws MetadataUnavailableError when Redis cannot be
+// read, so the wrappers answer 503 instead of a misleading 404.
 export async function getCourseMetadata(
   courseName: string,
 ): Promise<CourseMetadata | null> {
+  let rawMetadata: string | null | undefined
   try {
     const redisClient = await ensureRedisConnected()
-    const rawMetadata = await redisClient.hGet('course_metadatas', courseName)
-    if (!rawMetadata) return null
-    const parsed = JSON.parse(rawMetadata) as CourseMetadata
-    return parsed
+    rawMetadata = await redisClient.hGet('course_metadatas', courseName)
   } catch (error) {
-    console.error('Error fetching course metadata:', error)
+    throw new MetadataUnavailableError(courseName, error)
+  }
+  if (!rawMetadata) return null
+  try {
+    return JSON.parse(rawMetadata) as CourseMetadata
+  } catch (error) {
+    log.warn(
+      'project metadata is not valid JSON; treating the project as missing',
+      { course: courseName },
+      error,
+    )
     return null
   }
 }
@@ -109,6 +129,7 @@ export function withCourseAccess(courseName: string) {
       }
 
       // Get course metadata
+      setLogCourse(courseName)
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
@@ -155,6 +176,7 @@ export function withCourseAdminAccess(courseName: string) {
       }
 
       // Get course metadata
+      setLogCourse(courseName)
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
@@ -202,6 +224,7 @@ export function withCourseOwnerAccess(courseName: string) {
       }
 
       // Get course metadata
+      setLogCourse(courseName)
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
@@ -262,6 +285,7 @@ export function withCourseOwnerOrAdminAccess() {
       }
 
       // Get course metadata
+      setLogCourse(courseName)
       const courseMetadata = await getCourseMetadata(courseName)
       if (!courseMetadata) {
         return res.status(404).json({
@@ -348,82 +372,86 @@ export function withCourseAccessFromRequest(
       res: NextApiResponse,
     ) => Promise<void> | void,
   ) {
-    return async (req: AuthenticatedRequest, res: NextApiResponse) => {
-      // Extract course name from request
-      const { courseName, conflict } = extractCourseName(req)
-      if (conflict) {
-        return res.status(400).json({
-          error: 'Conflicting project names',
-          message:
-            'The request specifies more than one project name; they must match',
-        })
-      }
-      if (!courseName) {
-        return res.status(400).json({
-          error: 'Course name required',
-          message:
-            'Course name must be provided in query params, body, or headers',
-        })
-      }
+    // Outermost wrapper here (withAuth runs inside it), so it opens the log
+    // context and owns the catch-all itself.
+    return (req: AuthenticatedRequest, res: NextApiResponse) =>
+      runPagesRoute(req, res, async () => {
+        // Extract course name from request
+        const { courseName, conflict } = extractCourseName(req)
+        if (conflict) {
+          return res.status(400).json({
+            error: 'Conflicting project names',
+            message:
+              'The request specifies more than one project name; they must match',
+          })
+        }
+        if (!courseName) {
+          return res.status(400).json({
+            error: 'Course name required',
+            message:
+              'Course name must be provided in query params, body, or headers',
+          })
+        }
 
-      // Get course metadata
-      const courseMetadata = await getCourseMetadata(courseName)
-      if (!courseMetadata) {
-        return res.status(404).json({
-          error: 'Project not found',
-          message: `Project '${courseName}' does not exist`,
-        })
-      }
+        // Get course metadata
+        setLogCourse(courseName)
+        const courseMetadata = await getCourseMetadata(courseName)
+        if (!courseMetadata) {
+          return res.status(404).json({
+            error: 'Project not found',
+            message: `Project '${courseName}' does not exist`,
+          })
+        }
 
-      // Check if course is frozen/archived
-      if (courseMetadata.is_frozen === true) {
-        return res.status(403).json({
-          error: 'Project is temporarily frozen by the administrator',
-          message: `Project '${courseName}' has been temporarily frozen by the administrator`,
-        })
-      }
+        // Check if course is frozen/archived
+        if (courseMetadata.is_frozen === true) {
+          return res.status(403).json({
+            error: 'Project is temporarily frozen by the administrator',
+            message: `Project '${courseName}' has been temporarily frozen by the administrator`,
+          })
+        }
 
-      // For public courses, allow unauthenticated access
-      if (!courseMetadata.is_private) {
-        // Add course context to request
-        req.courseName = courseName
-        return await handler(req, res)
-      }
-
-      // For private courses, require authentication and access check
-      return withAuth(
-        async (req: AuthenticatedRequest, res: NextApiResponse) => {
-          if (!req.user) {
-            return res.status(401).json({ error: 'User not authenticated' })
-          }
-
-          // Determine required access for this HTTP method
-          const method = (req.method || 'GET').toUpperCase() as Method
-          const requiredLevel: AccessLevel =
-            typeof access === 'string' ? access : access[method] ?? 'any'
-
-          // Check access. The super-admin bypass is gated on the tier: at
-          // 'owner' the stored owner check is the only way through.
-          if (
-            !hasAccessForLevel(requiredLevel, req.user, courseMetadata) &&
-            !(
-              requiredLevel !== 'owner' &&
-              (await isSuperAdminAsync(req.user.email))
-            )
-          ) {
-            const label = requiredLevel
-            return res.status(403).json({
-              error: 'Access denied',
-              message: `This ${method} action requires ${label} access to course '${courseName}'`,
-            })
-          }
-
+        // For public courses, allow unauthenticated access
+        if (!courseMetadata.is_private) {
           // Add course context to request
           req.courseName = courseName
-
           return await handler(req, res)
-        },
-      )(req, res)
-    }
+        }
+
+        // For private courses, require authentication and access check
+        return withAuth(
+          async (req: AuthenticatedRequest, res: NextApiResponse) => {
+            if (!req.user) {
+              return res.status(401).json({ error: 'User not authenticated' })
+            }
+
+            // Determine required access for this HTTP method
+            const method = (req.method || 'GET').toUpperCase() as Method
+            const requiredLevel: AccessLevel =
+              typeof access === 'string' ? access : (access[method] ?? 'any')
+
+            // Check access. The super-admin bypass is gated on the tier: at
+            // 'owner' the stored owner check is the only way through.
+            if (
+              !hasAccessForLevel(requiredLevel, req.user, courseMetadata) &&
+              !(
+                requiredLevel !== 'owner' &&
+                (await isSuperAdminAsync(req.user.email))
+              )
+            ) {
+              const label = requiredLevel
+              return res.status(403).json({
+                error: 'Access denied',
+                message: `This ${method} action requires ${label} access to course '${courseName}'`,
+              })
+            }
+
+            // Add course context to request
+            req.courseName = courseName
+
+            return await handler(req, res)
+          },
+        )(req, res)
+      })
   }
 }

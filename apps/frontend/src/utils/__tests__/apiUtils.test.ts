@@ -163,6 +163,32 @@ describe('apiUtils (browser/jsdom)', () => {
     await expect(fetchCourseMetadata('CS101')).rejects.toThrow(/fail/i)
   })
 
+  it('fetchCourseMetadata puts the status and X-Request-ID on the error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('{}', {
+        status: 503,
+        headers: { 'X-Request-ID': 'rid-503' },
+      }),
+    )
+
+    await expect(fetchCourseMetadata('CS101')).rejects.toMatchObject({
+      status: 503,
+      requestId: 'rid-503',
+    })
+  })
+
+  it('fetchCourseMetadata leaves requestId unset when the header is missing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('nope', { status: 500 }),
+    )
+
+    const error = await fetchCourseMetadata('CS101').catch((e) => e)
+    expect(error.status).toBe(500)
+    expect(error.requestId).toBeUndefined()
+  })
+
   it('createProject returns true on success', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response('', { status: 200 }),

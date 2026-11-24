@@ -4,6 +4,10 @@ import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { type CoreMessage, generateText, streamText } from 'ai'
 import { NextResponse } from 'next/server'
+import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
+
+const log = getLogger('llm.bedrock')
 
 export async function runBedrockChat(
   conversation: Conversation,
@@ -58,15 +62,34 @@ export async function runBedrockChat(
           role: msg.role === 'tool' ? 'tool' : msg.role,
           content: msg.content,
         })) as CoreMessage[],
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }) =>
+          log.error(
+            'LLM stream failed',
+            { model: conversation.model.id },
+            error,
+          ),
       })
-      return result.toTextStreamResponse()
+      return logStreamFailure(result.toTextStreamResponse(), log, {
+        model: conversation.model.id,
+      })
     } else {
       const result = await generateText(commonParams)
       const choices = [{ message: { content: result.text } }]
       return NextResponse.json({ choices })
     }
   } catch (error) {
-    console.error('Error in runBedrockChat:', error)
+    log.error(
+      'Bedrock chat request failed',
+      {
+        provider: 'Bedrock',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     throw error
   }
 }

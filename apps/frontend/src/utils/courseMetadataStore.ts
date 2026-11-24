@@ -11,6 +11,11 @@ import { db, courseMetadata as courseMetadataTable } from '~/db/dbClient'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { sanitizeChatbotTags } from '~/types/chatbotTags'
 import type { CourseMetadata } from '~/types/courseMetadata'
+import { getLogger } from '~/utils/server/log'
+
+// Errors go through the logger: it cuts the query parameters, and here the
+// parameters are the full metadata row with its stored API key.
+const log = getLogger('courseMetadataStore')
 
 export const REDIS_HASH = 'course_metadatas'
 
@@ -345,10 +350,15 @@ export async function writeCourseMetadata(
     try {
       await rollbackPostgres(courseName, priorRedisValue)
     } catch (rollbackErr) {
-      // Static message; the project name travels as data, never as a format string.
-      console.error(
-        'CRITICAL: Postgres row could not be rolled back after Redis write failure. Manual reconciliation required.',
-        { courseName, redisErr, rollbackErr },
+      log.error(
+        'CRITICAL: Postgres row could not be rolled back after a Redis write failure; manual reconciliation required',
+        { course: courseName },
+        rollbackErr,
+      )
+      log.error(
+        'the Redis write failure that started the rollback',
+        { course: courseName },
+        redisErr,
       )
       throw new CourseMetadataWriteError(
         'rollback',
@@ -406,10 +416,15 @@ export async function deleteCourseMetadata(courseName: string): Promise<void> {
       try {
         await db.insert(courseMetadataTable).values(priorRow)
       } catch (rollbackErr) {
-        // Static message; the project name travels as data, never as a format string.
-        console.error(
-          'CRITICAL: Could not restore Postgres row after Redis delete failure.',
-          { courseName, redisErr, rollbackErr },
+        log.error(
+          'CRITICAL: Postgres row could not be restored after a Redis delete failure; manual reconciliation required',
+          { course: courseName },
+          rollbackErr,
+        )
+        log.error(
+          'the Redis delete failure that started the restore',
+          { course: courseName },
+          redisErr,
         )
         throw new CourseMetadataWriteError(
           'rollback',

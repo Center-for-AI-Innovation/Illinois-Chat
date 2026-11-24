@@ -1,6 +1,11 @@
 from flask_executor import Executor
 from injector import inject
 
+try:
+  from ai_ta_backend.rabbitmq.log_setup import current_context, run_with_context
+except ModuleNotFoundError:
+  from log_setup import current_context, run_with_context
+
 
 class ExecutorInterface:
 
@@ -20,4 +25,6 @@ class FlaskExecutorAdapter(ExecutorInterface):
     self.executor = executor
 
   def submit(self, fn, *args, **kwargs):
-    return self.executor.submit(fn, *args, **kwargs)
+    # Pool threads do not inherit the request's log context, so pass it along.
+    return self.executor.submit(run_with_context, current_context(), getattr(fn, '__name__', repr(fn)), fn, *args,
+                                **kwargs)
