@@ -22,8 +22,12 @@ async function fetchCourseMetadata({
   const response = await fetch(endpoint)
 
   if (!response.ok) {
-    throw new Error(
-      `Error fetching course metadata: ${response.statusText || response.status}`,
+    // Callers (the admin layout) tell "no such chatbot" (404) from "no access".
+    throw Object.assign(
+      new Error(
+        `Error fetching course metadata: ${response.statusText || response.status}`,
+      ),
+      { status: response.status },
     )
   }
 
