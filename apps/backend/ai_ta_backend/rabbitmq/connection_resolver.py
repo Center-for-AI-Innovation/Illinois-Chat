@@ -35,9 +35,9 @@ except ModuleNotFoundError:
     from ai_ta_backend.rabbitmq.vector_store import PgVectorStore
 
 try:
-    from rmsql import SQLAlchemyIngestDB
+    from rmsql import SQLAlchemyIngestDB, postgres_connect_args
 except ModuleNotFoundError:
-    from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB
+    from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB, postgres_connect_args
 
 logger = logging.getLogger(__name__)
 
@@ -286,12 +286,8 @@ class WorkerConnectionResolver:
         pooler), and this matches the worker's host engine in rmsql.py.
         """
         logger.info("Creating external SQL engine for project: %s", project_name)
-        # connect_timeout (libpq, honoured by psycopg2 and psycopg): a host that drops SYNs would
-        # otherwise block the worker's consumer thread for the OS timeout (about 2 min on Linux),
-        # longer than its AMQP heartbeat. Only set for the Postgres drivers that take it.
         uri = db_config["connection_uri"]
-        connect_args = {"connect_timeout": 10} if uri.startswith(("postgresql://", "postgresql+psycopg")) else {}
-        return create_engine(uri, poolclass=NullPool, connect_args=connect_args)
+        return create_engine(uri, poolclass=NullPool, connect_args=postgres_connect_args(uri))
 
     # ── S3 ──
 

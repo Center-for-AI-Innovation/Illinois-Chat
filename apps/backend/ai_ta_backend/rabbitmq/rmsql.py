@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from typing import List, TypeVar, Generic, TypedDict
 load_dotenv()
 
-from sqlalchemy import create_engine, NullPool, update
+from sqlalchemy import create_engine, event, NullPool, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import insert
 from sqlalchemy import delete
@@ -60,11 +61,54 @@ class ModelUsage(TypedDict):
   percentage: float
 
 
+DB_CONNECT_TIMEOUT = 10  # seconds
+# The drivers whose connect() takes libpq's connect_timeout. sqlite3 and the other Postgres
+# drivers refuse the argument.
+_LIBPQ_DRIVERS = ("postgresql", "postgresql+psycopg2", "postgresql+psycopg")
+
+
+def postgres_connect_args(uri: str) -> dict:
+    """connect_args for create_engine(uri): a connect timeout on a Postgres URI, else nothing.
+
+    Without it a host that drops SYNs blocks the caller for the OS timeout (about 2 min on
+    Linux), which on the worker's consumer thread is longer than its AMQP heartbeat. A
+    connect_timeout written in the URI itself wins: connect_args would silently replace it.
+    """
+    try:
+        url = make_url(uri)
+    except Exception:  # pylint: disable=broad-except
+        return {}  # create_engine reports the bad URI
+    if url.drivername not in _LIBPQ_DRIVERS or "connect_timeout" in url.query:
+        return {}
+    return {"connect_timeout": DB_CONNECT_TIMEOUT}
+
+
+def limit_statement_time(engine, seconds):
+    """Cancel any statement on this Postgres engine that runs longer than `seconds`.
+
+    SET LOCAL at the start of each transaction, not a session setting or a libpq `options`
+    start-up parameter: both break behind a transaction pooler (the documented Supabase
+    setup), where a session setting leaks to other clients and `options` can be refused.
+    Does nothing for 0/None or a database that is not Postgres.
+    """
+    if not seconds or engine.dialect.name != "postgresql":
+        return
+    milliseconds = int(seconds * 1000)
+
+    @event.listens_for(engine, "begin")
+    def _set_statement_timeout(conn):  # pylint: disable=unused-variable
+        conn.exec_driver_sql("SET LOCAL statement_timeout = %d" % milliseconds)
+
+
 class SQLAlchemyIngestDB:
-    def __init__(self, engine=None) -> None:
+    def __init__(self, engine=None, statement_timeout=None) -> None:
+        """`statement_timeout` (seconds) bounds every statement; see limit_statement_time.
+        Only the worker's consumer thread sets it: a statement there that outlasts the AMQP
+        heartbeat loses the broker connection. The ingest child and the backend do not."""
         if engine is not None:
             # Per-project documents engine supplied by the worker resolver.
             self.engine = engine
+            limit_statement_time(self.engine, statement_timeout)
             self.Session = sessionmaker(bind=self.engine)
             logging.info("IngestSQL using injected per-project SQL engine")
             return
@@ -94,9 +138,8 @@ class SQLAlchemyIngestDB:
 
         # Create engine and session
         logging.info("About to connect to DB from IngestSQL.py.")
-        # connect_timeout: a host that drops SYNs would otherwise block the worker's consumer
-        # thread for the OS timeout (about 2 min on Linux), longer than its AMQP heartbeat.
-        self.engine = create_engine(db_uri, poolclass=NullPool, connect_args={"connect_timeout": 10})
+        self.engine = create_engine(db_uri, poolclass=NullPool, connect_args=postgres_connect_args(db_uri))
+        limit_statement_time(self.engine, statement_timeout)
         self.Session = sessionmaker(bind=self.engine)
         logging.info("Successfully connected to DB from IngestSQL.py")
 
