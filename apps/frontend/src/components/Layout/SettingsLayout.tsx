@@ -77,7 +77,7 @@ export default function SettingsLayout({
   return (
     <div className="min-h-(--viewport-height) bg-(--background) pt-(--navbar-height)">
       {/* Main Navbar */}
-      <Navbar isPlain={false} />
+      <Navbar isPlain={false} contentWidth="sidebar" />
 
       <div className="flex">
         {/* Navigation Sidebar */}

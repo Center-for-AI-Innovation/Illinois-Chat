@@ -25,7 +25,23 @@ import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { AuthMenu } from './AuthMenu'
 import { NavbarBrandLink } from './NavbarBrand'
 
+export type NavbarVariant = 'application' | 'splash'
+
+/**
+ * How an application navbar lines up with the page below it. `workspace` spans
+ * the full width, and `sidebar` matches the settings sidebar's inset.
+ */
+export type NavbarContentWidth = 'workspace' | 'sidebar'
+
 interface NavbarProps {
+  /**
+   * `splash` is the landing page header: no divider, and the page must set
+   * `--navbar-height` to its 72px row, since the header and content offset
+   * both read that token.
+   */
+  variant?: NavbarVariant
+  /** Only applies to the `application` variant. */
+  contentWidth?: NavbarContentWidth
   isPlain?: boolean
   /** Lets a sticky sub-bar directly below own the divider instead. */
   hideBorder?: boolean
@@ -62,6 +78,19 @@ const navbarVariants = cva(
   },
 )
 
+const navbarHeaderVariants = cva(
+  'mx-auto flex h-(--navbar-height) w-full items-center gap-2 lg:gap-4',
+  {
+    variants: {
+      layout: {
+        splash: 'max-w-[1680px] px-4 sm:px-8',
+        workspace: 'px-4 sm:px-8',
+        sidebar: 'px-4',
+      },
+    },
+  },
+)
+
 const GLOBAL_NAV_ITEMS: readonly NavItem[] = [
   {
     label: 'Docs',
@@ -86,6 +115,8 @@ function externalLinkProps(item: NavItem) {
 }
 
 export default function Navbar({
+  variant = 'application',
+  contentWidth = 'workspace',
   isPlain = false,
   hideBorder = false,
 }: NavbarProps) {
@@ -110,10 +141,19 @@ export default function Navbar({
       ? [...GLOBAL_NAV_ITEMS, ADMIN_NAV_ITEM]
       : GLOBAL_NAV_ITEMS
   const activePath = router.asPath?.split('?')[0]
+  const layout = variant === 'splash' ? 'splash' : contentWidth
 
   return (
-    <div className={navbarVariants({ bordered: !hideBorder })}>
-      <header className="mx-auto flex h-(--navbar-height) w-full max-w-[1680px] items-center gap-2 px-4 sm:px-8 lg:gap-4">
+    <div
+      className={navbarVariants({
+        bordered: !hideBorder && variant !== 'splash',
+      })}
+    >
+      <header
+        data-variant={variant}
+        data-layout={layout}
+        className={navbarHeaderVariants({ layout })}
+      >
         <NavbarBrandLink />
 
         <div className="flex-1" />
