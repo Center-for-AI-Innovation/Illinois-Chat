@@ -74,6 +74,17 @@ RABBITMQ_HEARTBEAT = _heartbeat_from_env()
 KEEPALIVE_INTERVAL = 1.0  # seconds
 RECONNECT_MAX_DELAY = 60  # seconds; cap on the back-off between reconnect attempts
 STABLE_SESSION = 30  # seconds; a consume session shorter than this keeps the back-off growing
+# Wait before a job that failed before ingest is put back on the queue. Doubles with each retry
+# up to the cap: 1, 2, 4, 8, 16, then 30 seconds. With the default MAX_JOB_RETRIES that is about
+# 3 minutes in all, enough for a database restart or failover; retries with no wait used up all
+# the attempts within a second.
+RETRY_BASE_DELAY = 1.0  # seconds
+RETRY_MAX_DELAY = 30.0  # seconds; one wait. The wait sends heartbeats, so it need not fit in one
+
+
+def _retry_delay(retry_count):
+    """Seconds to wait before retry number `retry_count` + 1."""
+    return min(RETRY_MAX_DELAY, RETRY_BASE_DELAY * 2 ** min(retry_count, 30))
 
 
 def _ingest_child(job_id, rid, inputs):
@@ -223,7 +234,7 @@ class Worker:
             channel.basic_ack(delivery_tag=method.delivery_tag)
             return
         bind(rid=content.get('request_id'), job=job_id, course=course)
-        # Retries come back at once; keep their lines out of INFO.
+        # Keep the lines of a retry out of INFO.
         level = logging.INFO if retry_count == 0 else logging.DEBUG
         s3_path = inputs.get('s3_paths')
         if isinstance(s3_path, list):
@@ -320,6 +331,9 @@ class Worker:
                 else:
                     logger.debug("job failed before ingest (DB or connection resolve), attempt %d/%d: %s: %s",
                                  attempt, attempts, type(e).__name__, e)
+                if not self._wait_before_retry(_retry_delay(retry_count)):
+                    # Stopping: left unacked, the broker requeues it with the count it came with.
+                    return
                 content["retry_count"] = retry_count + 1
                 properties = pika.BasicProperties(delivery_mode=2, reply_to=header.reply_to)
                 # Republish on the delivering channel and ack the original. Reconnecting here
@@ -349,6 +363,23 @@ class Worker:
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:
             clear()
+
+    def _wait_before_retry(self, delay):
+        """Wait `delay` seconds on the consumer thread before a retry, and keep the broker
+        connection alive meanwhile. Returns False when the worker is stopping.
+
+        The delivery stays unacked during the wait, so with prefetch 1 this worker takes no
+        other job: when a database is down the next job would fail the same way. A lost
+        connection raises AMQPError, and the broker then redelivers the job by itself.
+        """
+        deadline = time.monotonic() + delay
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return True
+            if self._stop.wait(min(KEEPALIVE_INTERVAL, remaining)):
+                return False
+            self.connection.process_data_events(time_limit=0)
 
     def _fail_broken_connection(self, job_id, inputs, error, attempt):
         """End a job whose project has a stored connection that cannot be used.

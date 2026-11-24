@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 import traceback
 from types import SimpleNamespace
 
@@ -94,11 +96,16 @@ class FakeStatusDB:
 
 
 @pytest.fixture
-def worker():
+def worker(monkeypatch):
     w = worker_module.Worker.__new__(worker_module.Worker)  # skip connect()
     w.rabbitmq_queue = "test-queue"
     w.resolver = FailingResolver()
     w.sql_session = None
+    w._stop = threading.Event()
+    w.heartbeats = []
+    w.connection = SimpleNamespace(process_data_events=lambda time_limit: w.heartbeats.append(time_limit))
+    # No wait before a retry, except in the tests of the wait itself.
+    monkeypatch.setattr(worker_module, "RETRY_BASE_DELAY", 0)
     return w
 
 
@@ -625,3 +632,57 @@ def test_message_without_a_retry_count_is_a_first_attempt(worker, caplog):
     worker.process_job(channel, METHOD, HEADER, message)
     assert [m["retry_count"] for m in channel.published] == [1]
     assert channel.acked == [7]
+
+
+def test_retry_waits_double_up_to_the_cap():
+    waits = [worker_module._retry_delay(n) for n in range(worker_module.MAX_JOB_RETRIES)]
+    assert waits == [1, 2, 4, 8, 16, 30, 30, 30, 30, 30]
+    # About 3 minutes for a database to come back, where retries with no wait gave it under a second.
+    assert sum(waits) == 181
+    assert worker_module._retry_delay(10_000) == 30  # a huge count must not overflow
+
+
+def test_a_retry_is_republished_only_after_its_wait_and_heartbeats_are_sent(worker, monkeypatch):
+    monkeypatch.setattr(worker_module, "RETRY_BASE_DELAY", 0.2)
+    monkeypatch.setattr(worker_module, "KEEPALIVE_INTERVAL", 0.05)
+    channel = FakeChannel()
+    started = time.monotonic()
+    worker.process_job(channel, METHOD, HEADER, body(0))
+    assert time.monotonic() - started >= 0.2
+    assert len(worker.heartbeats) >= 2, "the broker connection must be serviced during the wait"
+    assert [m["retry_count"] for m in channel.published] == [1]
+    assert channel.acked == [7]
+
+
+def test_a_worker_that_is_stopping_leaves_the_retry_to_the_broker(worker, monkeypatch):
+    monkeypatch.setattr(worker_module, "RETRY_BASE_DELAY", 30)
+    worker._stop.set()
+    channel = FakeChannel()
+    started = time.monotonic()
+    worker.process_job(channel, METHOD, HEADER, body(3))
+    assert time.monotonic() - started < 1, "a shutdown must not wait out the back-off"
+    # Unacked and not republished: the broker requeues it with retry_count 3 when the connection closes.
+    assert channel.published == [] and channel.acked == []
+
+
+def test_a_connection_lost_during_the_wait_reaches_the_consumer(worker, monkeypatch):
+    monkeypatch.setattr(worker_module, "RETRY_BASE_DELAY", 0.2)
+    monkeypatch.setattr(worker_module, "KEEPALIVE_INTERVAL", 0.05)
+
+    def lost(time_limit):
+        raise worker_module.pika.exceptions.StreamLostError("simulated drop")
+
+    worker.connection = SimpleNamespace(process_data_events=lost)
+    channel = FakeChannel()
+    with pytest.raises(worker_module.pika.exceptions.AMQPError):
+        worker.process_job(channel, METHOD, HEADER, body(0))
+    assert channel.published == [] and channel.acked == []
+
+
+def test_the_last_attempt_does_not_wait(worker, monkeypatch):
+    monkeypatch.setattr(worker_module, "RETRY_BASE_DELAY", 30)
+    channel = FakeChannel()
+    started = time.monotonic()
+    worker.process_job(channel, METHOD, HEADER, body(worker_module.MAX_JOB_RETRIES))
+    assert time.monotonic() - started < 1
+    assert channel.published == [] and channel.acked == [7]
