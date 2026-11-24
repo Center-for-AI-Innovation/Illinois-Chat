@@ -16,6 +16,13 @@ vi.mock('~/components/UIUC-Components/navbars/Navbar', () => ({
   default: () => <div data-testid="navbar" />,
 }))
 
+const superAdminState = vi.hoisted(() => ({
+  value: { data: false, isLoading: false } as Record<string, unknown>,
+}))
+vi.mock('~/hooks/queries/useFetchIsSuperAdmin', () => ({
+  useFetchIsSuperAdmin: () => superAdminState.value,
+}))
+
 const OWNER = 'owner@example.com'
 const ADMIN = 'admin@example.com'
 
@@ -28,6 +35,7 @@ function signInAs(email: string) {
 
 describe('AdminLayout', () => {
   beforeEach(() => {
+    superAdminState.value = { data: false, isLoading: false }
     signInAs(OWNER)
     metadataState.value = {
       data: { course_owner: OWNER, course_admins: [ADMIN] },
@@ -177,6 +185,40 @@ describe('AdminLayout', () => {
       renderLayout()
 
       expect(screen.getByText('admin page content')).toBeInTheDocument()
+    })
+
+    it('shows the page to a super admin who is not on the chatbot', () => {
+      signInAs('root@example.com')
+      superAdminState.value = { data: true, isLoading: false }
+      renderLayout()
+
+      expect(screen.getByText('admin page content')).toBeInTheDocument()
+    })
+
+    it('lets a super admin in even when the chatbot metadata cannot be read', () => {
+      signInAs('root@example.com')
+      superAdminState.value = { data: true, isLoading: false }
+      metadataState.value = { data: undefined, isLoading: false, isError: true }
+      renderLayout()
+
+      expect(screen.getByText('admin page content')).toBeInTheDocument()
+    })
+
+    it('denies a user whose super-admin lookup failed', () => {
+      signInAs('student@example.com')
+      superAdminState.value = { data: undefined, isLoading: false }
+      renderLayout()
+
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
+
+    it('shows nothing of the page while the super-admin lookup is loading', () => {
+      signInAs('root@example.com')
+      superAdminState.value = { data: undefined, isLoading: true }
+      renderLayout()
+
+      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
     })
 
     it('shows the 403 permission screen to everyone else, without the page', () => {

@@ -5,6 +5,7 @@ import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { AdminSidebar } from './AdminSidebar'
 import { ADMIN_CONTENT_ID, followSectionUntilSettled } from './adminScroll'
 import { SubPageHeader } from './SubPageHeader'
@@ -51,7 +52,7 @@ function AdminShell({
 
 /**
  * Every admin page renders inside this layout, so the access check lives here:
- * only the chatbot owner or one of its admins sees the page. Everyone else
+ * only the chatbot owner, one of its admins or a super admin sees the page. Everyone else
  * gets the existing permission screen (403, or the sign-in prompt when signed
  * out), and the page's children are never rendered for them.
  *
@@ -74,8 +75,16 @@ export function AdminLayout({
     courseName,
     enabled: auth.isAuthenticated,
   })
+  // Same tiers as the server's get_user_permission: owner, course admin, or
+  // super admin. Asked of the server because a Redis-granted super admin is
+  // invisible to the client bundle.
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
 
-  if (auth.isLoading || (auth.isAuthenticated && isLoading)) {
+  if (
+    auth.isLoading ||
+    (auth.isAuthenticated && (isLoading || isSuperAdminLoading))
+  ) {
     return (
       <div role="status" aria-busy="true" className="bg-background h-svh">
         <span className="sr-only">Loading</span>
@@ -87,7 +96,8 @@ export function AdminLayout({
     return <PermissionGate course_name={courseName} />
   }
 
-  // Fail closed: if the metadata cannot be read, nobody is let through.
+  // Fail closed: if the metadata cannot be read, only a super admin gets in,
+  // and a failed super-admin lookup counts as "not a super admin".
   const isOwnerOrAdmin =
     !isError &&
     !!metadata &&
@@ -95,7 +105,7 @@ export function AdminLayout({
     (metadata.course_owner === email ||
       (metadata.course_admins ?? []).includes(email))
 
-  if (!isOwnerOrAdmin) {
+  if (!(isSuperAdmin === true || isOwnerOrAdmin)) {
     return <PermissionGate course_name={courseName} errorType={403} />
   }
 
