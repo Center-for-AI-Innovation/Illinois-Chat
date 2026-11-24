@@ -82,7 +82,7 @@ const Maintenance = () => {
       </div>
 
       <div className="relative flex w-full flex-1 items-center justify-center py-10 sm:py-16">
-        <Card className="w-full max-w-xl gap-6 rounded-[14px] bg-white py-8 shadow-[0_4px_20px_rgba(0,0,0,0.06)] ring-1 ring-[#e5e7eb] sm:py-10 dark:bg-[#13294b] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] dark:ring-[#32517a]">
+        <Card className="w-full max-w-xl gap-6 rounded-[14px] border-[#e5e7eb] bg-white py-8 shadow-[0_4px_20px_rgba(0,0,0,0.06)] sm:py-10 dark:border-[#32517a] dark:bg-[#13294b] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
           <CardHeader className="flex flex-col items-center gap-4 px-6 text-center sm:px-10">
             <div className="flex size-14 items-center justify-center rounded-full bg-(--illinois-orange)/10 text-(--illinois-orange) ring-8 ring-(--illinois-orange)/5">
               <Wrench className="size-6" aria-hidden="true" />
