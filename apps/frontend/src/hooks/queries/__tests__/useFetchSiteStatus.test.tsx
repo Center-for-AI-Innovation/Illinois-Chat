@@ -15,9 +15,12 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query'
 import {
+  fetchFreshSiteStatus,
+  fetchSiteStatus,
   isMaintenanceBypassRoute,
   isStatusPollExempt,
   SITE_STATUS_QUERY_KEY,
+  SITE_STATUS_TIMEOUT_MS,
   useFetchSiteStatus,
   type SiteStatus,
 } from '../useFetchSiteStatus'
@@ -258,5 +261,68 @@ describe('useFetchSiteStatus', () => {
 
     await settle()
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('site status request timeout', () => {
+  /** Never answers; rejects only when its signal aborts, like a real fetch. */
+  function hangingFetch(_input: RequestInfo | URL, init?: RequestInit) {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+    })
+  }
+
+  it('gives up on a hung poll and keeps the last good status', async () => {
+    const queryClient = createClient()
+    const good: SiteStatus = {
+      announcementBanner: BANNER,
+      isMaintenanceMode: false,
+    }
+    fetchSpy
+      .mockResolvedValueOnce(statusResponse(good))
+      .mockImplementation(hangingFetch)
+
+    const { result } = renderHook(() => useFetchSiteStatus(), {
+      wrapper: createWrapper(queryClient),
+    })
+    await settle()
+    expect(result.current.data).toEqual(good)
+
+    // The next poll and its one retry both hang, and each is abandoned after
+    // the timeout instead of holding the query in flight indefinitely.
+    await settle(POLL_MS)
+    await advanceUntil(() => result.current.isError)
+    expect(result.current.isError).toBe(true)
+    expect(result.current.isFetching).toBe(false)
+    expect(result.current.data).toEqual(good)
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+
+    // The next poll after that answers again.
+    fetchSpy.mockImplementation(async () =>
+      statusResponse({ announcementBanner: null, isMaintenanceMode: true }),
+    )
+    await settle(POLL_MS)
+    expect(result.current.data?.isMaintenanceMode).toBe(true)
+  })
+
+  it('times out the explicit refresh after a save too', async () => {
+    fetchSpy.mockImplementation(hangingFetch)
+
+    const request = fetchFreshSiteStatus()
+    const outcome = expect(request).rejects.toMatchObject({
+      name: 'TimeoutError',
+    })
+    await settle(SITE_STATUS_TIMEOUT_MS)
+    await outcome
+  })
+
+  it('still lets React Query cancel a request through its own signal', async () => {
+    fetchSpy.mockImplementation(hangingFetch)
+    const controller = new AbortController()
+
+    const request = fetchSiteStatus(controller.signal)
+    controller.abort()
+
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
