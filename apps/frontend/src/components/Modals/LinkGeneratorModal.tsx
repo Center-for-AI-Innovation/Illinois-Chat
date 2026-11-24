@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/shadcn/ui/dialog'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/shadcn/ui/dialog'
 import { Button } from '@/components/shadcn/ui/button'
 import { IconCheck, IconCopy } from '@tabler/icons-react'
 import { XIcon } from 'lucide-react'
@@ -94,18 +99,16 @@ export const LinkGeneratorModal = ({
         <div className="flex flex-col gap-6 px-6 pb-6">
           <p className="text-sm" style={{ lineHeight: 1.5 }}>
             Configure AI behavior settings for your shareable link. These
-            settings will enable specific behaviors when users access the
-            chat through this link. Note: If a setting is enabled
-            course-wide, enabling it here will ensure it stays active even if
-            course-wide settings change in the future.
+            settings will enable specific behaviors when users access the chat
+            through this link. Note: If a setting is enabled course-wide,
+            enabling it here will ensure it stays active even if course-wide
+            settings change in the future.
           </p>
 
           <div className="flex flex-col gap-2">
             <Switch
               variant="labeled"
               size="lg"
-              showLabels
-              showThumbIcon
               label="Guided Learning"
               tooltip={
                 currentSettings.guidedLearning
@@ -119,8 +122,6 @@ export const LinkGeneratorModal = ({
             <Switch
               variant="labeled"
               size="lg"
-              showLabels
-              showThumbIcon
               label="Document-Based References Only"
               tooltip={
                 currentSettings.documentsOnly
@@ -134,8 +135,6 @@ export const LinkGeneratorModal = ({
             <Switch
               variant="labeled"
               size="lg"
-              showLabels
-              showThumbIcon
               label="Bypass Illinois Chat's internal prompting"
               tooltip={
                 currentSettings.systemPromptOnly
@@ -154,7 +153,10 @@ export const LinkGeneratorModal = ({
               className="rounded-md border border-(--background-dark) bg-(--background-faded) p-4"
               style={{ wordBreak: 'break-all' }}
             >
-              <p className="text-sm text-(--modal-text)" style={{ lineHeight: 1.5 }}>
+              <p
+                className="text-sm text-(--modal-text)"
+                style={{ lineHeight: 1.5 }}
+              >
                 {generatedLink}
               </p>
             </div>

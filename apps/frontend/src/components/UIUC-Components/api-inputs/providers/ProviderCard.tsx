@@ -122,8 +122,6 @@ function ProviderSwitch({
   return (
     <Switch
       variant="labeled"
-      showLabels
-      showThumbIcon
       checked={checked}
       onCheckedChange={onCheckedChange}
       aria-label={`Enable ${providerName} provider`}
@@ -141,13 +139,8 @@ function ProviderError({
   if (!error || !enabled) return null
 
   return (
-    <Alert
-      variant="destructive"
-      className="mb-3 border-red-500/20 bg-red-500/10"
-    >
-      <AlertDescription className="text-sm text-red-500">
-        {error}
-      </AlertDescription>
+    <Alert variant="destructive" className="mb-3">
+      <AlertDescription>{error}</AlertDescription>
     </Alert>
   )
 }

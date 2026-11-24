@@ -1043,7 +1043,7 @@ export const ChatInput = ({
           {/* Stop generating and regenerate buttons */}
           {messageIsStreaming && (
             <button
-              className={`absolute -top-14 right-0 left-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-(--primary) bg-(--primary) px-4 py-2 text-(--background) opacity-[.85] hover:opacity-100 md:mt-2 md:mb-0`}
+              className={`absolute -top-14 right-0 left-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-(--primary) bg-(--primary) px-4 py-2 text-(--primary-foreground) opacity-[.85] hover:opacity-100 md:mt-2 md:mb-0`}
               onClick={handleStopConversation}
               style={{ pointerEvents: 'auto' }}
             >
@@ -1062,12 +1062,8 @@ export const ChatInput = ({
               <button
                 type="button"
                 disabled={isInputLockedByCoc}
-                className={`absolute -top-14 right-0 left-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-(--primary) bg-(--primary) px-4 py-2 text-(--illinois-white) hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100 md:mt-2 md:mb-0`}
-                style={{
-                  backgroundColor:
-                    'color-mix(in srgb, var(--primary), black 15%)',
-                  pointerEvents: 'auto',
-                }}
+                className={`absolute -top-14 right-0 left-0 mx-auto mb-12 flex w-fit items-center gap-3 rounded border border-(--primary) bg-(--primary) px-4 py-2 text-(--primary-foreground) hover:bg-(--primary)/90 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-(--primary) md:mt-2 md:mb-0`}
+                style={{ pointerEvents: 'auto' }}
                 onClick={() => {
                   if (isInputLockedByCoc) {
                     return
@@ -1510,7 +1506,7 @@ export const ChatInput = ({
               <button
                 className={`rounded-full px-3 py-1 text-xs transition-colors md:text-sm ${
                   agentModeEnabled
-                    ? 'bg-(--primary) text-(--background)'
+                    ? 'bg-(--primary) text-(--primary-foreground)'
                     : 'bg-(--background-faded) text-(--foreground)'
                 }`}
                 disabled={messageIsStreaming}
