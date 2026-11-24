@@ -78,7 +78,6 @@ export async function handleFunctionCall(
       }
       return []
     }
-    console.log('OpenAI tools to run: ', openaiResponse)
 
     const healToolArguments = (args: string): any => {
       try {
@@ -142,10 +141,6 @@ export async function handleFunctionCall(
       : [...validUiucToolsToRun]
     selectedConversation.messages[selectedConversation.messages.length - 1] =
       message
-    console.log(
-      'UIUC tools to run (with invocation IDs): ',
-      validUiucToolsToRun,
-    )
 
     return validUiucToolsToRun
   } catch (error) {
@@ -182,7 +177,7 @@ export async function handleToolCall(
 ) {
   try {
     if (uiucToolsToRun.length > 0) {
-      console.log('Running tools in parallel')
+      console.debug('Running tools in parallel')
       const toolResultsPromises = uiucToolsToRun.map(async (tool) => {
         if (!tool.invocationId) {
           console.error(
@@ -222,16 +217,6 @@ export async function handleToolCall(
       })
       await Promise.all(toolResultsPromises)
     }
-    const lastMessage =
-      selectedConversation.messages.length > 0
-        ? selectedConversation.messages[
-            selectedConversation.messages.length - 1
-          ]
-        : null
-    console.log(
-      'tool outputs:',
-      lastMessage ? lastMessage.tools : 'No last message found',
-    )
   } catch (error) {
     console.error('Error running tools from handleToolCall: ', error)
     throw error

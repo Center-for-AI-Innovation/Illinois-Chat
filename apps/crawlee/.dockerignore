@@ -8,3 +8,6 @@ storage
 
 # installed files
 node_modules
+
+# compiled output: the image builds its own dist in the builder stage
+dist

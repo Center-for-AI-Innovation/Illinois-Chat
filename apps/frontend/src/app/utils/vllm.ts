@@ -5,6 +5,10 @@ import {
 } from 'eventsource-parser'
 import { type CoreMessage } from 'ai'
 import { type Conversation } from '~/types/chat'
+import { getLogger } from '~/utils/server/log'
+import { isClosedStreamError } from '~/utils/server/streamErrors'
+
+const log = getLogger('llm.vllm')
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +64,8 @@ function normalizeVLLMStreamResponse(response: Response): Response {
     async start(controller) {
       let isThinkingOpen = false
       let hasStartedContent = false
+      // Set when [DONE] has closed the reply.
+      let isClosed = false
 
       const emit = (text: string) => {
         if (text.length > 0) {
@@ -79,6 +85,7 @@ function normalizeVLLMStreamResponse(response: Response): Response {
             isThinkingOpen = false
           }
           controller.close()
+          isClosed = true
           return
         }
 
@@ -118,6 +125,12 @@ function normalizeVLLMStreamResponse(response: Response): Response {
 
           emit(output)
         } catch (error) {
+          // The reply has started, so no caller can catch this any more. A
+          // reader that went away is not a failure, and it would be one line
+          // for every token that is left.
+          if (!isClosedStreamError(error)) {
+            log.error('LLM stream failed', undefined, error)
+          }
           controller.error(error)
         }
       }
@@ -129,6 +142,8 @@ function normalizeVLLMStreamResponse(response: Response): Response {
           const { done, value } = await reader.read()
 
           if (done) {
+            // [DONE] has closed the reply already; a second close would throw.
+            if (isClosed) return
             if (isThinkingOpen) {
               emit('</think>\n\n')
             }
@@ -140,6 +155,9 @@ function normalizeVLLMStreamResponse(response: Response): Response {
           parser.feed(decodedChunk)
         }
       } catch (error) {
+        if (!isClosedStreamError(error)) {
+          log.error('LLM stream failed', undefined, error)
+        }
         controller.error(error)
       }
     },
@@ -218,7 +236,11 @@ export async function runVLLM(conversation: Conversation, stream: boolean) {
         },
       )
     } catch (error) {
-      console.error('VLLM API error:', error)
+      log.warn('VLLM API error', {
+        provider: 'NCSAHostedVLM',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      })
       if (error instanceof Error && error.message.includes('timeout')) {
         throw new Error(`VLLM request timed out: ${error.message}`)
       } else if (error instanceof Error && error.message.includes('apiKey')) {
@@ -230,7 +252,15 @@ export async function runVLLM(conversation: Conversation, stream: boolean) {
       }
     }
   } catch (error) {
-    console.error('Error in runVLLM:', error)
+    log.error(
+      'VLLM chat request failed',
+      {
+        provider: 'NCSAHostedVLM',
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     return new Response(
       JSON.stringify({
         error:

@@ -271,14 +271,15 @@ function classifyUnknown(e: unknown): TestResult {
         ? cause
         : ''
   const errno = (e as { code?: string } | undefined)?.code
-  // Log the raw upstream error so operators can see what actually failed.
-  // The user-facing response keeps a sanitized code/message — secrets in
-  // upstream errors (e.g. presigned URLs, connection strings) never leave
-  // the server.
+  // Log the name and the code of the upstream error, and not its message:
+  // the message of a database or storage client can hold a presigned URL or
+  // the connection string that the person gave, and those are secrets. The
+  // code that the classification below gives is in the reply and in the audit
+  // row.
   console.warn(
     `[projectConnections/tester] upstream error name=${errName} errno=${
       errno ?? '(none)'
-    } msg=${rawMsg}${causeMsg ? ` cause=${causeMsg}` : ''}`,
+    }`,
   )
   // Include the Error name in the classification haystack — Qdrant's client
   // throws `QdrantClientTimeoutError` with the bland message "This operation
