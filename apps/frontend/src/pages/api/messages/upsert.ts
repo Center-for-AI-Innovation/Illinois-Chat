@@ -4,6 +4,9 @@ import { db, messages } from '~/db/dbClient'
 import { type NewMessages } from '~/db/schema'
 import { convertChatToDBMessage } from '@/pages/api/conversation'
 import { eq, desc, gt, asc, and, inArray } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.messages.upsert')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -58,7 +61,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           },
         })
     } catch (error: any) {
-      console.error('Error in message upsert:', error)
+      log.error(
+        'could not upsert the message',
+        { course: course_name, conversation: conversationId },
+        error,
+      )
       return res.status(500).json({ error: error.message })
     }
 
@@ -85,8 +92,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             ),
           )
         } catch (error: any) {
-          console.error(
-            'Error in deleting the following superseded messages:',
+          log.error(
+            'could not delete the superseded messages',
+            { course: course_name, conversation: conversationId },
             error,
           )
           return res.status(500).json({ error: error.message })
@@ -96,7 +104,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ success: true })
   } catch (error: any) {
-    console.error('Error in upsert handler:', error)
+    log.error(
+      'message upsert failed',
+      { course: req.body?.course_name },
+      error,
+    )
     return res.status(500).json({ error: error.message })
   }
 }

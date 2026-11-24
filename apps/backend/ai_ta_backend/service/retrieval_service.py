@@ -33,6 +33,10 @@ from ai_ta_backend.executors.thread_pool_executor import ThreadPoolExecutorAdapt
 from ai_ta_backend.service.posthog_service import PosthogService
 from ai_ta_backend.service.sentry_service import SentryService
 from ai_ta_backend.utils.trusted_hosts import is_same_origin_as_any
+import psycopg2
+import sqlalchemy.exc
+
+logger = logging.getLogger(__name__)
 
 # Qwen query instruction for Illinois Chat retrieval.
 # Docs are embedded without instruction during ingest; only queries get this prefix.
@@ -63,6 +67,9 @@ def _parse_allowed_embedding_providers() -> tuple[str, ...]:
 
 
 ALLOWED_EMBEDDING_PROVIDERS: tuple[str, ...] = _parse_allowed_embedding_providers()
+
+# RetrievalService is request-scoped, so the "not configured" line is guarded to log once per process.
+_embeddings_unset_logged = False
 
 
 class RetrievalService:
@@ -104,6 +111,11 @@ class RetrievalService:
             if os.getenv("EMBEDDING_API_BASE")
             else "https://api.openai.com/v1"
         )
+
+        global _embeddings_unset_logged
+        if not self.openai_api_key and not _embeddings_unset_logged:
+            _embeddings_unset_logged = True
+            logger.error("Embeddings not configured: OPENAI_API_KEY and NCSA_HOSTED_API_KEY are unset")
 
         if self.embedding_model == "text-embedding-ada-002":
             self.embeddings = OpenAIEmbeddings(
@@ -158,7 +170,7 @@ class RetrievalService:
         Returns
         JSON: A json response with TBD fields. See main.py:getTopContexts docs.
         or
-        String: An error message with traceback.
+        String: An error message with the exception type and the first line of its text (no traceback).
         """
         if doc_groups is None:
             doc_groups = []
@@ -179,7 +191,8 @@ class RetrievalService:
                 # no base_url). Surface a clean user-actionable message
                 # instead of a 500 with a raw traceback.
                 msg = f"Embedding configuration error for course '{course_name}': {e}"
-                print(msg)
+                logger.exception("embedding configuration error course=%s conversation_id=%s", course_name,
+                                 conversation_id)
                 self.sentry.capture_exception(e)
                 return msg
 
@@ -234,12 +247,13 @@ class RetrievalService:
             for doc in found_docs:
                 valid_docs.append(doc)
 
-            print(
-                f"Course: {course_name} ||| search_query: {search_query}\n"
-                f"⏰ Runtime of getTopContexts: {(time.monotonic() - start_time_overall):.2f} seconds\n"
-                f"Runtime for parallel operations: {time_for_parallel_operations:.2f} seconds, "
-                f"Runtime to complete vector_search: {time_to_retrieve_docs:.2f} seconds"
-            )
+            logger.debug(
+                "getTopContexts course=%s query_len=%d docs=%d total_ms=%d parallel_ms=%d vector_search_ms=%d "
+                "embed_ms=%d db_search_ms=%d process_results_ms=%d capture_event_ms=%d",
+                course_name, len(search_query), len(valid_docs), (time.monotonic() - start_time_overall) * 1000,
+                time_for_parallel_operations * 1000, time_to_retrieve_docs * 1000,
+                self.openai_embedding_latency * 1000, self.qdrant_latency_sec * 1000,
+                self.process_search_results_latency_sec * 1000, self.capture_search_succeeded_latency_sec * 1000)
             if len(valid_docs) == 0:
                 return []
 
@@ -258,10 +272,17 @@ class RetrievalService:
 
             return self.format_for_json(valid_docs)
         except Exception as e:
-            # return full traceback to front end
-            err: str = f"ERROR: In /getTopContexts. Course: {course_name} ||| search_query: {search_query}\nTraceback: {traceback.print_exc} \n{e}"  # type: ignore
-            traceback.print_exc()
-            print(err)
+            # Keep the 200-with-error-string contract, but send the client only
+            # the exception type and the first line of its text, cut to 300
+            # characters. Later lines can hold SQL and bound parameters. A
+            # connection error names the database host on its first line, so
+            # it gets a fixed text. The full traceback goes to the log.
+            if isinstance(e, (sqlalchemy.exc.OperationalError, psycopg2.OperationalError)):
+                first_line = "database connection failed"
+            else:
+                first_line = (str(e).splitlines() or [""])[0][:300]
+            err: str = f"ERROR: In /getTopContexts. Course: {course_name}. {type(e).__name__}: {first_line}"
+            logger.exception("getTopContexts failed course=%s conversation_id=%s", course_name, conversation_id)
             self.sentry.capture_exception(e)
             return err
 
@@ -414,7 +435,8 @@ class RetrievalService:
                     )
 
                     message_id = message.get("id")
-                    print(f"LLM Monitor Alert Triggered! Message ID: {message_id}")
+                    logger.info("LLM monitor alert triggered course=%s message_id=%s categories=%s", course_name,
+                                message_id, ",".join(alert_categories))
 
                     send_email(
                         subject=f"LLM Monitor Alert - {', '.join(alert_categories)}",
@@ -438,7 +460,6 @@ class RetrievalService:
 
     def delete_data(self, course_name: str, s3_path: str, source_url: str):
         """Delete file from S3, the vector store (Qdrant or pgvector), and Supabase."""
-        print(f"Deleting data for course {course_name}")
         # add delete from doc map logic here
         try:
             # Resolve per-project S3 client/bucket.
@@ -450,9 +471,8 @@ class RetrievalService:
             identifier_key, identifier_value = (
                 ("s3_path", s3_path) if s3_path else ("url", source_url)
             )
-            logging.info(
-                f"Deleting {identifier_value} from S3, vector store, and Database using {identifier_key}"
-            )
+            logger.info("deleting document course=%s %s=%s from S3, vector store and database", course_name,
+                        identifier_key, identifier_value)
 
             # Delete from S3
             if identifier_key == "s3_path":
@@ -465,17 +485,16 @@ class RetrievalService:
 
         except Exception as e:
             err: str = f"ERROR IN delete_data: Traceback: {traceback.extract_tb(e.__traceback__)}❌❌ Error in {inspect.currentframe().f_code.co_name}:{e}"  # type: ignore
-            print(err)
+            logger.exception("delete_data failed course=%s", course_name)
             self.sentry.capture_exception(e)
             return err
 
     def delete_from_s3(self, s3, bucket_name: str, s3_path: str):
         try:
-            print("Deleting from S3")
             response = s3.delete_object(bucket_name, s3_path)
-            print(f"AWS response: {response}")
+            logger.debug("S3 delete response for %s: %s", s3_path, response)
         except Exception as e:
-            print("Error in deleting file from s3:", e)
+            logger.exception("deleting file from S3 failed s3_path=%s", s3_path)
             self.sentry.capture_exception(e)
 
     def delete_from_qdrant(
@@ -488,7 +507,6 @@ class RetrievalService:
         delete from the host embeddings table.
         """
         try:
-            print("Deleting from vector store (Qdrant or pgvector)")
             vdb = self.conn_manager.get_vector_db(course_name)
             # Derive the kind from the instance we just resolved instead of
             # re-reading project_external_connections.
@@ -505,13 +523,15 @@ class RetrievalService:
             response = vdb.delete_data(
                 collection_name, identifier_key, identifier_value
             )
-            print(f"Vector store response: {response}")
+            logger.debug("vector store delete course=%s engine=%s response=%s", course_name, engine_kind, response)
         except Exception as e:
             if "timed out" in str(e):
-                # Timed out is fine. Still deletes.
-                pass
+                # The store usually still deletes after a timeout, but nothing confirms it.
+                logger.warning("vector store delete timed out course=%s %s=%s; not confirmed", course_name,
+                               identifier_key, identifier_value)
             else:
-                print("Error in deleting file from vector store:", e)
+                logger.exception("deleting file from vector store failed course=%s %s=%s", course_name, identifier_key,
+                                 identifier_value)
                 self.sentry.capture_exception(e)
 
     def getTopContextsWithMQR(
@@ -533,15 +553,13 @@ class RetrievalService:
         self, course_name: str, identifier_key: str, identifier_value: str
     ):
         try:
-            print(
-                f"Database Delete. course: {course_name} using {identifier_key}: {identifier_value}"
-            )
+            logger.debug("database delete course=%s %s=%s", course_name, identifier_key, identifier_value)
             project_sql_db = self.conn_manager.get_documents_sql_db(course_name)
             response = project_sql_db.deleteMaterialsForCourseAndKeyAndValue(
                 course_name, identifier_key, identifier_value
             )
         except Exception as e:
-            print(f"Database Error in delete. {identifier_key}: {identifier_value}", e)
+            logger.exception("database delete failed course=%s %s=%s", course_name, identifier_key, identifier_value)
             self.sentry.capture_exception(e)
 
     # ------------------------------------------------------------------
@@ -650,12 +668,9 @@ class RetrievalService:
             time.monotonic() - start_time_capture_search_succeeded_event
         )
 
-        print(
-            f"Runtime for embedding query: {self.openai_embedding_latency:.2f} seconds\n"
-            f"Runtime for vector search: {self.qdrant_latency_sec:.2f} seconds\n"
-            f"Runtime for process search results: {time_for_process_search_results:.2f} seconds\n"
-            f"Runtime for capture search succeeded event: {time_for_capture_search_succeeded_event:.2f} seconds"
-        )
+        # Read by getTopContexts, which logs all search timings in one DEBUG line.
+        self.process_search_results_latency_sec = time_for_process_search_results
+        self.capture_search_succeeded_latency_sec = time_for_capture_search_succeeded_event
         return found_docs
 
     def _embed_query_and_measure_latency(
@@ -792,9 +807,7 @@ class RetrievalService:
                     Document(page_content=page_content, metadata=metadata)
                 )
             except Exception as e:
-                print(
-                    f"Error in vector_search(), for course: `{course_name}`. Error: {e}"
-                )
+                logger.debug("skipping malformed search hit course=%s: %s", course_name, e)
                 self.sentry.capture_exception(e)
         return found_docs
 
@@ -936,7 +949,7 @@ class RetrievalService:
                     grouped_data["per_weekday"][day_of_week] += 1
                     grouped_data["heatmap"][day_of_week][str(hour)] += 1
                 except Exception as e:
-                    print(f"Error processing record: {str(e)}")
+                    logger.debug("skipping conversation stats record course=%s: %s", course_name, e)
                     continue
 
             return {
@@ -951,7 +964,7 @@ class RetrievalService:
             }
 
         except Exception as e:
-            print(f"Error in getConversationStats for course {course_name}: {str(e)}")
+            logger.exception("getConversationStats failed course=%s", course_name)
             self.sentry.capture_exception(e)
             return {
                 "per_day": {},
@@ -1032,7 +1045,7 @@ class RetrievalService:
             return self.conn_manager.get_sql_db().getModelUsageCounts(project_name)
 
         except Exception as e:
-            print(f"Error fetching model usage counts for {project_name}: {str(e)}")
+            logger.exception("fetching model usage counts failed course=%s", project_name)
             self.sentry.capture_exception(e)
             return []
 
@@ -1141,7 +1154,8 @@ class RetrievalService:
                     }
 
         except Exception as e:
-            traceback.print_exc()
+            logger.exception("processing chat file failed course=%s conversation_id=%s file=%s", course_name,
+                             conversation_id, readable_filename)
             return {
                 "success": False,
                 "chunks_created": 0,
@@ -1190,9 +1204,11 @@ class RetrievalService:
             elif file_extension == ".py":
                 return self._extract_python_content(file_path)
             else:
+                logger.warning("chat file has an unsupported type ext=%s", file_extension)
                 return f"Unsupported file type: {file_extension}"
 
         except Exception as e:
+            logger.exception("Error extracting content for %s", os.path.basename(file_path))
             return f"Error extracting content: {e}"
 
     def _extract_pdf_content(self, file_path: str) -> str:
@@ -1223,7 +1239,8 @@ class RetrievalService:
 
             except ImportError:
                 pass  # PyMuPDF not available, continue to fallback
-            except Exception:
+            except Exception as e:
+                logger.debug("PyMuPDF failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Try pdfplumber as fallback
@@ -1246,10 +1263,12 @@ class RetrievalService:
 
             except ImportError:
                 return self._ocr_pdf_content(file_path)
-            except Exception:
+            except Exception as e:
+                logger.debug("pdfplumber failed for %s, trying next: %s", os.path.basename(file_path), e)
                 return self._ocr_pdf_content(file_path)
 
         except Exception as e:
+            logger.exception("PDF processing error for %s", os.path.basename(file_path))
             return f"PDF processing error: {e}"
 
     def _extract_docx_content(self, file_path: str) -> str:
@@ -1285,7 +1304,8 @@ class RetrievalService:
 
             except ImportError:
                 pass
-            except Exception:
+            except Exception as e:
+                logger.debug("python-docx failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Try langchain as fallback
@@ -1302,11 +1322,15 @@ class RetrievalService:
                     return "No content found in DOCX file"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "DOCX processing libraries")
                 return "DOCX processing libraries not available"
             except Exception as e:
+                logger.exception("DOCX processing error for %s", os.path.basename(file_path))
                 return f"DOCX processing error: {e}"
 
         except Exception as e:
+            logger.exception("DOCX processing error for %s", os.path.basename(file_path))
             return f"DOCX processing error: {e}"
 
     def _store_conversation_content(
@@ -1342,6 +1366,7 @@ class RetrievalService:
             vectors: List[List[float]] = []
             payloads: List[dict] = []
 
+            first_chunk_error = None
             for i, chunk in enumerate(chunks):
                 try:
                     import uuid
@@ -1363,8 +1388,20 @@ class RetrievalService:
                     payloads.append(payload)
 
                 except Exception as e:
-                    print("Error in _store_conversation_content: ", e)
+                    logger.debug("embedding chunk %d failed for %s: %s", i, readable_filename, e)
+                    if first_chunk_error is None:
+                        first_chunk_error = e
                     continue
+
+            if len(ids) < len(chunks):
+                # The first cause, so the line says why and not only how many. Type and a cut
+                # first line: the chunk text and the provider's key are not in it.
+                cause = ("%s: %s" % (type(first_chunk_error).__name__,
+                                     (str(first_chunk_error).splitlines() or [''])[0][:300])
+                         if first_chunk_error is not None else "no embedding returned")
+                logger.log(logging.WARNING if ids else logging.ERROR,
+                           "embedded %d of %d chunks course=%s conversation_id=%s file=%s first_error=%s", len(ids),
+                           len(chunks), course_name, conversation_id, readable_filename, cause)
 
             if ids:
                 # Engine-aware ingest. ``upsert_main_collection`` routes to
@@ -1386,7 +1423,8 @@ class RetrievalService:
                 }
 
         except Exception as e:
-            traceback.print_exc()
+            logger.exception("storing chat file content failed course=%s conversation_id=%s file=%s", course_name,
+                             conversation_id, readable_filename)
             self.sentry.capture_exception(e)
             return {
                 "success": False,
@@ -1455,7 +1493,8 @@ class RetrievalService:
 
             except ImportError:
                 pass
-            except Exception:
+            except Exception as e:
+                logger.debug("openpyxl failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Fallback to langchain
@@ -1472,11 +1511,15 @@ class RetrievalService:
                     return "No content found in Excel file"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "Excel processing libraries")
                 return "Excel processing libraries not available"
             except Exception as e:
+                logger.exception("Excel processing error for %s", os.path.basename(file_path))
                 return f"Excel processing error: {e}"
 
         except Exception as e:
+            logger.exception("Excel processing error for %s", os.path.basename(file_path))
             return f"Excel processing error: {e}"
 
     def _extract_ppt_content(self, file_path: str) -> str:
@@ -1549,7 +1592,9 @@ class RetrievalService:
                                             slide_content.append(
                                                 f"CHART TITLE: {shape.chart.chart_title.text_frame.text}"
                                             )
-                                    except Exception:
+                                    except Exception as e:
+                                        logger.debug("pptx chart title failed for %s, trying next: %s",
+                                                     os.path.basename(file_path), e)
                                         pass
 
                             # Group shapes (nested content)
@@ -1574,7 +1619,9 @@ class RetrievalService:
                                             f"CONTENT: {paragraph.text.strip()}"
                                         )
 
-                        except Exception:
+                        except Exception as e:
+                            logger.debug("pptx shape failed for %s, trying next: %s", os.path.basename(file_path),
+                                         e)
                             continue
 
                     # Add slide notes if available
@@ -1590,14 +1637,13 @@ class RetrievalService:
                 content = "\n".join(all_content)
 
                 if content.strip():
-                    print(
-                        f"PowerPoint processed successfully with python-pptx - extracted {len(content)} characters"
-                    )
+                    logger.debug("PowerPoint processed with python-pptx chars=%d", len(content))
                     return content
 
             except ImportError:
                 pass
-            except Exception:
+            except Exception as e:
+                logger.debug("python-pptx failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Fallback to langchain
@@ -1609,19 +1655,21 @@ class RetrievalService:
                 text_content = "\n".join([doc.page_content for doc in documents])
 
                 if text_content.strip():
-                    print(
-                        f"PowerPoint processed with langchain - extracted {len(text_content)} characters"
-                    )
+                    logger.debug("PowerPoint processed with langchain chars=%d", len(text_content))
                     return text_content
                 else:
                     return "No content found in PowerPoint file"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "PowerPoint processing libraries")
                 return "PowerPoint processing libraries not available"
             except Exception as e:
+                logger.exception("PowerPoint processing error for %s", os.path.basename(file_path))
                 return f"PowerPoint processing error: {e}"
 
         except Exception as e:
+            logger.exception("PowerPoint processing error for %s", os.path.basename(file_path))
             return f"PowerPoint processing error: {e}"
 
     def _extract_csv_content(self, file_path: str) -> str:
@@ -1636,14 +1684,13 @@ class RetrievalService:
                 text_content = "\n".join([doc.page_content for doc in documents])
 
                 if text_content.strip():
-                    print(
-                        f"CSV processed with langchain - extracted {len(text_content)} characters"
-                    )
+                    logger.debug("CSV processed with langchain chars=%d", len(text_content))
                     return text_content
 
             except ImportError:
                 pass
-            except Exception:
+            except Exception as e:
+                logger.debug("langchain CSVLoader failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Fallback to basic csv reading
@@ -1663,9 +1710,11 @@ class RetrievalService:
                         return "No content found in CSV file"
 
             except Exception as e:
+                logger.exception("CSV processing error for %s", os.path.basename(file_path))
                 return f"CSV processing error: {e}"
 
         except Exception as e:
+            logger.exception("CSV processing error for %s", os.path.basename(file_path))
             return f"CSV processing error: {e}"
 
     def _extract_txt_content(self, file_path: str) -> str:
@@ -1680,6 +1729,7 @@ class RetrievalService:
                 return "No content found in text file"
 
         except Exception as e:
+            logger.exception("Text file processing error for %s", os.path.basename(file_path))
             return f"Text file processing error: {e}"
 
     def _extract_html_content(self, file_path: str) -> str:
@@ -1712,7 +1762,8 @@ class RetrievalService:
 
             except ImportError:
                 pass
-            except Exception:
+            except Exception as e:
+                logger.debug("BeautifulSoup failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Fallback to basic tag removal
@@ -1731,9 +1782,11 @@ class RetrievalService:
                     return "No content found in HTML file"
 
             except Exception as e:
+                logger.exception("HTML processing error for %s", os.path.basename(file_path))
                 return f"HTML processing error: {e}"
 
         except Exception as e:
+            logger.exception("HTML processing error for %s", os.path.basename(file_path))
             return f"HTML processing error: {e}"
 
     def _extract_image_content(self, file_path: str) -> str:
@@ -1751,11 +1804,15 @@ class RetrievalService:
                     return "No text found in image"
 
             except ImportError:
+                # The caller stores this text as the file content, so this line is the only sign of the failure.
+                logger.error("chat file extraction unavailable: a Python library is missing (%s)", "Image OCR libraries")
                 return "Image OCR libraries not available (pytesseract, PIL)"
             except Exception as e:
+                logger.exception("Image OCR error for %s", os.path.basename(file_path))
                 return f"Image OCR error: {e}"
 
         except Exception as e:
+            logger.exception("Image processing error for %s", os.path.basename(file_path))
             return f"Image processing error: {e}"
 
     def _extract_subtitle_content(self, file_path: str) -> str:
@@ -1776,6 +1833,7 @@ class RetrievalService:
                 except ImportError:
                     return self._extract_txt_content(file_path)
                 except Exception as e:
+                    logger.exception("SRT processing error for %s", os.path.basename(file_path))
                     return f"SRT processing error: {e}"
 
             else:  # VTT file
@@ -1789,9 +1847,11 @@ class RetrievalService:
                         return "No content found in VTT file"
 
                 except Exception as e:
+                    logger.exception("VTT processing error for %s", os.path.basename(file_path))
                     return f"VTT processing error: {e}"
 
         except Exception as e:
+            logger.exception("Subtitle processing error for %s", os.path.basename(file_path))
             return f"Subtitle processing error: {e}"
 
     def _extract_python_content(self, file_path: str) -> str:
@@ -1809,13 +1869,15 @@ class RetrievalService:
 
             except ImportError:
                 pass
-            except Exception:
+            except Exception as e:
+                logger.debug("langchain PythonLoader failed for %s, trying next: %s", os.path.basename(file_path), e)
                 pass
 
             # Fallback to basic text reading
             return self._extract_txt_content(file_path)
 
         except Exception as e:
+            logger.exception("Python processing error for %s", os.path.basename(file_path))
             return f"Python processing error: {e}"
 
     def _ocr_pdf_content(self, file_path: str) -> str:
@@ -1833,7 +1895,8 @@ class RetrievalService:
                         text = pytesseract.image_to_string(im.original)
                         if text.strip():
                             text_content.append(text)
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("OCR page failed for %s, trying next: %s", os.path.basename(file_path), e)
                         continue
 
             if text_content:
@@ -1843,6 +1906,9 @@ class RetrievalService:
                 return "No text found via OCR"
 
         except ImportError:
+            # The caller stores this text as the file content, so this line is the only sign of the failure.
+            logger.error("chat file extraction unavailable: a Python library is missing (%s)", "OCR libraries")
             return "OCR libraries not available: No module named 'pdfplumber'"
         except Exception as e:
+            logger.exception("OCR processing error for %s", os.path.basename(file_path))
             return f"OCR processing error: {e}"

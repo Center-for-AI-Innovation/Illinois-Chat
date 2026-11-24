@@ -6,6 +6,9 @@ import { db, courseMetadata } from '~/db/dbClient'
 import { sql } from 'drizzle-orm'
 import { toChatbotCardData } from '~/utils/chatbotCard'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getFeaturedChatbots')
 
 /**
  * Returns the curated set of chatbots shown on the default `/chatbots` page.
@@ -59,10 +62,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ results, total: results.length })
   } catch (error) {
-    console.error(
-      'Error in getFeaturedChatbots:',
-      error instanceof Error ? error.message : String(error),
-    )
+    log.error('error fetching featured chatbots', undefined, error)
     return res.status(500).json({ error: 'Failed to fetch featured chatbots' })
   }
 }

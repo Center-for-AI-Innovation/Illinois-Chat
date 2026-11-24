@@ -57,9 +57,23 @@ describe('app/api/chat/vlm POST', () => {
     const res = await POST(req as any)
     expect(res.status).toBe(200)
     await expect(res.text()).resolves.toContain('vlm-stream')
+
+    // streamText does not throw when the provider fails; it calls onError.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { onError } = (hoisted.streamText.mock.calls as any[]).at(-1)[0]
+    onError({ error: new Error('model not found') })
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        / ERROR   api\.chat\.vlm .*LLM stream failed model=\S+ at=src\/app\/api\/chat\/vlm\/route\.ts:\d+\nError: model not found/,
+      ),
+    )
+    consoleError.mockRestore()
   })
 
   it('returns 500 on handler errors', async () => {
+    // The handler used to crash on an empty messages array only because of a
+    // debug line that read messages[0]; that line is gone, so fail the model call.
+    hoisted.generateText.mockRejectedValueOnce(new Error('vlm down'))
     const req = new Request('http://localhost', {
       method: 'POST',
       body: JSON.stringify({

@@ -21,7 +21,7 @@ flowchart LR
 5. **Embedding** — each chunk is converted into a vector using the deployment's embedding model (see the [Configuration reference](../self-hosting/configuration.md)).
 6. **Storage** — vectors go to the vector store, text and metadata to SQL, and the original file stays in object storage.
 
-Ingest is asynchronous and queued, so large uploads do not overwhelm the system. A job that fails is re-queued immediately and retried up to `MAX_JOB_RETRIES` times (10 by default); meanwhile the Project Files table on the Dashboard polls for each document's success or failure.
+Ingest is asynchronous and queued, so large uploads do not overwhelm the system. A file that fails during ingest is tried up to 3 times in the same job and then recorded as failed. Only a job that fails before ingest starts (the database lookup or the connection resolve) goes back on the queue, right away, up to `MAX_JOB_RETRIES` times (10 by default, so 11 attempts in all) and is then dropped. Meanwhile the Project Files table on the Dashboard polls for each document's success or failure.
 
 ## Where vectors live
 

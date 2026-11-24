@@ -17,6 +17,9 @@ import {
   type SimDiscoveryResult,
   simUpstreamErrorResponse,
 } from '~/utils/simDiscovery'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.tools.upsertSimConfig')
 
 type SimProjectUpdate = Partial<
   Pick<
@@ -113,7 +116,11 @@ async function discoverWithConfig(config: {
         error: `Sim did not respond within ${DISCOVERY_TIMEOUT_MS / 1000} seconds`,
       }
     case 'request_failed':
-      console.error('[upsertSimConfig] Sim request failed', result.error)
+      log.error(
+        'Sim request failed',
+        { sim_base_url: result.simBaseUrl },
+        result.error,
+      )
       return {
         ok: false,
         status: 502,
@@ -168,7 +175,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       try {
         update.sim_api_key = await encryptProjectConfig(submittedKey)
       } catch (error) {
-        console.error('[upsertSimConfig] failed to encrypt Sim API key', error)
+        log.error('failed to encrypt the Sim API key', undefined, error)
         return res.status(503).json({
           error:
             'Server is missing ENCRYPTION_MASTER_KEY; cannot store the Sim API key',

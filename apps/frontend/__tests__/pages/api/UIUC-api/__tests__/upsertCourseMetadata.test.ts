@@ -16,7 +16,7 @@ vi.mock('~/server/authorization', () => ({
 }))
 
 vi.mock('~/pages/api/UIUC-api/getCourseMetadata', () => ({
-  getCourseMetadata: hoisted.getCourseMetadata,
+  readCourseMetadata: hoisted.getCourseMetadata,
 }))
 
 vi.mock('~/utils/courseMetadataStore', () => ({
@@ -46,6 +46,22 @@ describe('UIUC-api/upsertCourseMetadata', () => {
       res as any,
     )
     expect(res.status).toHaveBeenCalledWith(400)
+  })
+
+  it('does not save when the stored metadata cannot be read', async () => {
+    hoisted.writeCourseMetadata.mockClear()
+    hoisted.getCourseMetadata.mockRejectedValueOnce(new Error('redis down'))
+    const res = createMockRes()
+    await expect(
+      handler(
+        createMockReq({
+          method: 'POST',
+          body: { courseName: 'CS101', courseMetadata: { is_private: true } },
+        }) as any,
+        res as any,
+      ),
+    ).rejects.toThrow('redis down')
+    expect(hoisted.writeCourseMetadata).not.toHaveBeenCalled()
   })
 
   it('combines metadata, encrypts key, and writes to redis', async () => {

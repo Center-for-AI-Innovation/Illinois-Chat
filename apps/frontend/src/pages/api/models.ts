@@ -34,6 +34,9 @@ import {
   MODELS_CACHE_TTL_SECONDS,
   modelsCacheKey,
 } from '~/utils/modelProviders/modelsCache'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.models')
 
 // Cached so per-message callers skip the providers' model-listing fetches.
 export async function getModels(
@@ -147,7 +150,9 @@ async function resolveModels(projectName: string): Promise<AllLLMProviders> {
         )
         break
       default:
-        console.warn(`Unhandled provider: ${providerName}`)
+        log.warn('unhandled LLM provider in project settings', {
+          provider: providerName,
+        })
     }
   }
 
@@ -172,7 +177,7 @@ async function handler(
       .status(200)
       .json(redactProviderSecrets(allLLMProviders as AllLLMProviders))
   } catch (error) {
-    console.error(error)
+    log.error('could not load the project models', undefined, error)
     return res.status(500).json({ error: JSON.stringify(error) })
   }
 }

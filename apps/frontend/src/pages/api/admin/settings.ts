@@ -12,6 +12,9 @@ import {
 } from '~/utils/platformSettings.server'
 import { formatZodError } from '~/utils/projectConnections/handlerShared'
 import { withSuperAdminOnly } from '~/utils/superAdminGuard'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.admin.settings')
 
 // Exported for unit tests so they can call the handler with a pre-set
 // req.user, bypassing the JWT layer.
@@ -27,7 +30,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return res.status(405).json({ error: 'Method not allowed' })
     }
   } catch (err) {
-    console.error('[admin/settings] handler error:', err)
+    log.error('handler error', undefined, err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -54,15 +57,13 @@ async function handlePut(req: AuthenticatedRequest, res: NextApiResponse) {
     ))
   } catch (err) {
     if (err instanceof PlatformSettingsConflictError) {
-      return res
-        .status(409)
-        .json({
-          saved: false,
-          error: err.message,
-          current: await readPlatformSettings(),
-        })
+      return res.status(409).json({
+        saved: false,
+        error: err.message,
+        current: await readPlatformSettings(),
+      })
     }
-    console.error('[admin/settings] write failed:', err)
+    log.error('settings write failed', undefined, err)
     return res.status(503).json({
       saved: false,
       error: 'Could not write settings. The settings store is unreachable.',
@@ -85,10 +86,7 @@ async function handlePut(req: AuthenticatedRequest, res: NextApiResponse) {
     revalidated = true
   } catch (err) {
     revalidationError = err instanceof Error ? err.message : String(err)
-    console.warn(
-      '[admin/settings] revalidation of / failed:',
-      revalidationError,
-    )
+    log.warn('revalidation of / failed', { error: revalidationError })
   }
 
   return res.status(200).json({

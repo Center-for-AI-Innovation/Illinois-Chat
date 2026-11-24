@@ -8,9 +8,11 @@ import {
 import { and, inArray, sql } from 'drizzle-orm'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { getUserIdentifier } from '~/server/userIdentifier'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.deleteMessages')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
-  console.log('In deleteMessages handler')
   const { method } = req
   if (method !== 'DELETE') {
     res.setHeader('Allow', ['DELETE'])
@@ -22,7 +24,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     course_name: string
   }
   const userIdentifier = getUserIdentifier(req)
-  console.log('Deleting messages: ', messageIds)
+  log.debug('deleting messages', {
+    count: Array.isArray(messageIds) ? messageIds.length : 0,
+  })
 
   if (!messageIds || !Array.isArray(messageIds) || !messageIds.length) {
     res.status(400).json({ error: 'No valid message ids provided' })
@@ -65,6 +69,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ message: 'Messages deleted successfully' })
   } catch (error) {
+    log.error(
+      'could not delete messages',
+      { count: messageIds.length },
+      error,
+    )
     res.status(500).json({ error: (error as Error).message })
   }
 }
