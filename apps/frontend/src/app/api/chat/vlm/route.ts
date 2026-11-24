@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server'
 import { convertConversationToCoreMessagesWithoutSystem } from '~/utils/apiUtils'
 import { type AuthenticatedRequest } from '~/utils/appRouterAuth'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
+
+const log = getLogger('api.chat.vlm')
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,8 +18,6 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
   try {
     const { conversation, stream } = await req.json()
 
-    console.log('In POST handler for VLM', conversation.messages[0].content)
-
     const openai = createOpenAI({
       baseURL: process.env.NCSA_HOSTED_VLM_BASE_URL,
       apiKey: 'non-empty',
@@ -25,15 +27,25 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
     const messages =
       convertConversationToCoreMessagesWithoutSystem(conversation)
     // const messages = convertToCoreMessages(conversation)
-    console.log('⭐️ messages', JSON.stringify(messages, null, 2))
 
     if (stream) {
       const result = await streamText({
         model: openai(conversation.model.id) as any,
         temperature: conversation.temperature,
         messages,
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }) =>
+          log.error(
+            'LLM stream failed',
+            { model: conversation.model.id },
+            error,
+          ),
       })
-      const response = result.toTextStreamResponse()
+      const response = logStreamFailure(result.toTextStreamResponse(), log, {
+        model: conversation.model.id,
+      })
       return new NextResponse(response.body, {
         status: response.status,
         headers: response.headers,
@@ -48,7 +60,7 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       return NextResponse.json({ choices })
     }
   } catch (error) {
-    console.error('Error in POST request:', error)
+    log.error('NCSA hosted VLM chat request failed', undefined, error)
 
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

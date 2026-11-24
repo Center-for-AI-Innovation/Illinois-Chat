@@ -11,6 +11,9 @@
 import type { NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.admin.me')
 
 export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -25,7 +28,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       isSuperAdmin: await isSuperAdminAsync(email),
     })
   } catch (err) {
-    console.error('[admin/me] handler error:', err)
+    log.error('handler error', undefined, err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }

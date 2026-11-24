@@ -1,6 +1,10 @@
 import { type NextApiResponse } from 'next'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { getLogger } from '~/utils/server/log'
+import { runPagesRoute } from '~/utils/server/routeContext'
+
+const log = getLogger('api.getMaintenanceModeDetails')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const startTime = Date.now()
@@ -20,15 +24,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       maintenanceBodyText: bodyText,
     })
   } catch (error) {
-    console.error(
-      '[getMaintenanceMode] Failed to check maintenance mode:',
+    log.error(
+      'failed to read maintenance mode details',
+      { ms: Date.now() - startTime },
       error,
     )
     res.status(500).json({ error: 'Failed to check maintenance mode' })
-    console.log(
-      `[getMaintenanceMode] Failed request took ${Date.now() - startTime}ms`,
-    )
   }
 }
 
-export default handler
+export default async function getMaintenanceModeDetailsRoute(
+  req: AuthenticatedRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => handler(req, res))
+}

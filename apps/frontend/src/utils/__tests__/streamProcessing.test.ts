@@ -1070,6 +1070,31 @@ describe('updateConversationInDatabase', () => {
   })
 })
 
+describe('updateConversationInDatabase: error status', () => {
+  it('writes an ERROR line when the save answers with an error status', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response('{}', { status: 401 }),
+    )
+
+    await updateConversationInDatabase(
+      {
+        id: 'c1',
+        userEmail: 'u@example.com',
+        model: { id: OpenAIModelID.GPT_4o },
+        messages: [{ id: 'm1', role: 'assistant', content: 'hi' }],
+      } as any,
+      'CS101',
+      { headers: {}, socket: { remoteAddress: 'ra' } } as any,
+    )
+
+    const line = String(error.mock.calls[0]?.[0])
+    expect(line).toContain('could not save the conversation of an API chat')
+    expect(line).toContain('status=401')
+    expect(line).toContain('course=CS101')
+  })
+})
+
 describe('routeModelRequest', () => {
   function baseConversation(modelId: string) {
     return {
