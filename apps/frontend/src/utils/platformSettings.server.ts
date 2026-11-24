@@ -248,10 +248,10 @@ export async function readMaintenanceMode(): Promise<AvailabilityRead<boolean>> 
     return { state: 'configured', value: mode === 'true' }
   } catch (error) {
     const reason = describeError(error)
-    console.error(
-      '[platformSettings] Redis unavailable reading maintenance mode:',
+    log.error('Redis unavailable reading a platform setting', {
+      field: 'maintenance_mode',
       reason,
-    )
+    })
     return { state: 'unavailable', reason }
   }
 }
