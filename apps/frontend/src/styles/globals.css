@@ -252,6 +252,7 @@ button:disabled {
     var(--background) 25%
   );
   --foreground-subtle: #707372;
+  --border-card-highlight: #ff5f05;
 
   --background-dark: color-mix(in srgb, var(--background), black 25%);
   --background-faded: color-mix(
@@ -578,16 +579,13 @@ html[data-input-modality='keyboard']
   --background: #081735;
 
   /* Every token :root pins to a hex needs a dark value here, or light leaks in. */
-  --foreground-subtle: color-mix(
-    in srgb,
-    var(--foreground),
-    var(--background) 15%
-  );
+  --foreground-subtle: #c1cad7;
+  --border-card-highlight: #4a6ea1;
   --primary: #f1f6fe;
   --primary-foreground: #081735;
-  --secondary: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --secondary: #081735;
   --secondary-foreground: var(--foreground);
-  --muted: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --muted: #0b1d41;
   --muted-foreground: #8291a3;
   --destructive: #f87171;
   --destructive-foreground: #450a0a;
@@ -597,7 +595,7 @@ html[data-input-modality='keyboard']
   --border: #ffffff1a;
   --input: #ffffff26;
   --ring: color-mix(in srgb, var(--foreground) 40%, var(--background));
-  --card: var(--background);
+  --card: #13294b;
   --popover: var(--background);
   --sidebar-background: color-mix(in srgb, var(--background), black 15%);
   --sidebar-foreground: var(--foreground);

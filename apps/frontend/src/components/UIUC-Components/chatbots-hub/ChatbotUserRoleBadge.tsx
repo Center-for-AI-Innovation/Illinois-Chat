@@ -12,7 +12,7 @@ const userRoleBadgeVariants = cva('rounded-[8px]', {
   variants: {
     role: {
       owner:
-        'border-[#ff5f05] bg-white text-[#c2410c] hover:bg-white dark:border-[#32517a] dark:bg-[#081735] dark:text-white dark:hover:bg-[#081735]',
+        'border-[#ff5f05] bg-white text-[#c84113] hover:bg-white dark:border-[#4a6ea1] dark:bg-[#081735] dark:text-[#cad8eb] dark:hover:bg-[#081735]',
       // Admin uses the orange family (matches the orange rim) but a softer,
       // filled treatment so it reads distinct from the owner outline.
       admin:
