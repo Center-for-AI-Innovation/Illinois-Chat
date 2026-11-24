@@ -225,7 +225,7 @@ describe('AdminLayout', () => {
       }
       renderLayout()
 
-      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.getByTestId('admin-loading')).toBeInTheDocument()
       expect(
         screen.queryByRole('heading', { name: /sufficient permissions/ }),
       ).not.toBeInTheDocument()

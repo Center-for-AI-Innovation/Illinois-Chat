@@ -4,6 +4,7 @@ import { CircleAlert, FileSpreadsheet } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/shadcn/ui/alert'
 import { Separator } from '@/components/shadcn/ui/separator'
 import { Skeleton } from '@/components/shadcn/ui/skeleton'
+import { useScrollToHashWhenReady } from '~/components/UIUC-Components/admin-layout/adminScroll'
 import { type AllLLMProviders } from '~/utils/modelProviders/LLMProvider'
 import { AIModelsProviderCard } from './AIModelsProviderCard'
 import {
@@ -54,6 +55,26 @@ function Section({
   )
 }
 
+// Loading placeholders mirror the final layout (a card per provider, in the
+// same grid, at the height of a collapsed card) so the content above a
+// section heading keeps about the same height when the data arrives and the
+// one-shot scroll to the URL hash lands where it should.
+function SectionSkeleton({ id }: { id: string }) {
+  if (id === 'default-model') {
+    return <Skeleton className="h-40 w-full rounded-xl" />
+  }
+  const count = (
+    id === 'open-source' ? OPEN_SOURCE_PROVIDERS : CLOSED_SOURCE_PROVIDERS
+  ).length
+  return (
+    <div className="grid grid-cols-1 items-start gap-x-5 gap-y-4 lg:grid-cols-2">
+      {Array.from({ length: count }, (_, i) => (
+        <Skeleton key={i} className="h-28 w-full rounded-xl" />
+      ))}
+    </div>
+  )
+}
+
 function ProviderGrid({
   configs,
   llmProviders,
@@ -92,6 +113,10 @@ export function AIModelsContent({
   settings: AIModelsSettings
 }) {
   const { llmProviders, isLoading, isError } = settings
+
+  // Arriving on a section link: scroll once, when the data has loaded and the
+  // content above the heading has its final height.
+  useScrollToHashWhenReady(!isLoading)
 
   const body = (id: string) => {
     if (!llmProviders) return null
@@ -140,7 +165,7 @@ export function AIModelsContent({
             {index > 0 && <Separator className="my-10" />}
             <Section id={section.id} title={section.title}>
               {isLoading ? (
-                <Skeleton className="h-40 w-full rounded-xl" />
+                <SectionSkeleton id={section.id} />
               ) : (
                 body(section.id)
               )}
