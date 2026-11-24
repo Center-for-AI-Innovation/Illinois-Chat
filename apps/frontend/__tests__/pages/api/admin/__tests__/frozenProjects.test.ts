@@ -682,9 +682,9 @@ describe('remaining failure paths', () => {
     expect(res.body.error).toContain('Nothing was changed')
     expect(storedRecord('CS101').is_frozen).toBe(true)
     expect(consoleError).toHaveBeenCalledWith(
-      '[frozenProjects] audit row could not be marked failed; it remains pending',
-      { auditId: 42, courseName: 'CS101' },
-      expect.any(Error),
+      expect.stringMatching(
+        /audit row could not be marked failed; it remains pending course=CS101 audit_id=42/,
+      ),
     )
     consoleError.mockRestore()
   })
