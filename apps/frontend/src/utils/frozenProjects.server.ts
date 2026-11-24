@@ -18,7 +18,10 @@ import {
   writeCourseMetadata,
 } from '~/utils/courseMetadataStore'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { getLogger } from '~/utils/server/log'
 import type { CourseMetadata } from '~/types/courseMetadata'
+
+const log = getLogger('frozenProjects')
 
 // Bounded per round trip. HSCAN can return the same field more than once while
 // the hash is being modified, so results are keyed by project name.
@@ -97,9 +100,7 @@ export async function listFrozenProjects(): Promise<FrozenProjectSummary[]> {
       const metadata = parseStoredCourseMetadata(value)
       if (!metadata) {
         // One bad record must not take down the whole list.
-        console.error('[frozenProjects] skipping malformed metadata', {
-          courseName: field,
-        })
+        log.warn('skipping malformed project metadata', { course: field })
         continue
       }
       if (metadata.is_frozen !== true) continue
@@ -207,9 +208,9 @@ export async function recoverFrozenProject(args: {
     try {
       await closeAuditEntry(auditId, 'failure', reason)
     } catch (auditErr) {
-      console.error(
-        '[frozenProjects] audit row could not be marked failed; it remains pending',
-        { auditId, courseName },
+      log.error(
+        'audit row could not be marked failed; it remains pending',
+        { course: courseName, audit_id: auditId },
         auditErr,
       )
     }
@@ -219,9 +220,9 @@ export async function recoverFrozenProject(args: {
   try {
     await closeAuditEntry(auditId, 'success', null)
   } catch (err) {
-    console.error(
-      'CRITICAL: project was unfrozen but its audit row could not be marked success. Reconcile the audit log.',
-      { auditId, courseName },
+    log.error(
+      'CRITICAL: project was unfrozen but its audit row could not be marked success; reconcile the audit log',
+      { course: courseName, audit_id: auditId },
       err,
     )
     throw new FrozenProjectRecoveryError(

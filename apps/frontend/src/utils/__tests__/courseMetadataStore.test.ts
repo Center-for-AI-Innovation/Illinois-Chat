@@ -361,10 +361,11 @@ describe('compare-and-set failure boundaries', () => {
         expectedPriorRedisValue: STALE,
       }),
     ).rejects.toMatchObject({ stage: 'rollback' })
+    // The logger writes one finished line, so the name can only appear as data.
     expect(consoleError).toHaveBeenCalledWith(
-      'CRITICAL: Postgres row could not be reconciled to Redis. Manual reconciliation required.',
-      { courseName: name },
-      expect.any(Error),
+      expect.stringMatching(
+        /CRITICAL: Postgres row could not be reconciled to Redis.*bot-%s-%j-%o/,
+      ),
     )
     consoleError.mockRestore()
   })

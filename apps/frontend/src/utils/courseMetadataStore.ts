@@ -228,10 +228,9 @@ async function reconcilePostgresTo(
     }
     await upsertPostgres({ ...toRow(courseName, record), raw_metadata: record })
   } catch (err) {
-    // Static message; the project name travels as data, never as a format string.
-    console.error(
-      'CRITICAL: Postgres row could not be reconciled to Redis. Manual reconciliation required.',
-      { courseName },
+    log.error(
+      'CRITICAL: Postgres row could not be reconciled to Redis; manual reconciliation required',
+      { course: courseName },
       err,
     )
     throw new CourseMetadataWriteError(

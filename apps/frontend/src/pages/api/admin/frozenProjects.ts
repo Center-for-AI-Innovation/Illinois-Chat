@@ -19,7 +19,10 @@ import {
   listFrozenProjects,
   recoverFrozenProject,
 } from '~/utils/frozenProjects.server'
+import { getLogger } from '~/utils/server/log'
 import { withSuperAdminOnly } from '~/utils/superAdminGuard'
+
+const log = getLogger('api.admin.frozenProjects')
 
 // Bounds the body. Legacy names are not restricted to the current name
 // pattern, so the exact-match lookup in Redis is the real check.
@@ -35,7 +38,11 @@ export const recoverBodySchema = z.object({
     }),
 })
 
-function sendRecoveryError(res: NextApiResponse, err: unknown) {
+function sendRecoveryError(
+  res: NextApiResponse,
+  err: unknown,
+  courseName: string,
+) {
   if (err instanceof CourseMetadataWriteError) {
     if (err.stage === 'conflict') {
       return res.status(409).json({
@@ -44,14 +51,22 @@ function sendRecoveryError(res: NextApiResponse, err: unknown) {
       })
     }
     if (err.stage === 'rollback') {
-      console.error('[admin/frozenProjects] rollback failed:', err)
+      log.error(
+        'frozen project recovery left Postgres and Redis out of sync; manual reconciliation required',
+        { course: courseName },
+        err,
+      )
       return res.status(500).json({
         error:
           'The recovery could not be completed, and Postgres could not be reconciled to Redis. Reconcile this project by hand before retrying.',
       })
     }
     // 'postgres' and 'redis' both leave the stored state unchanged.
-    console.error('[admin/frozenProjects] write failed:', err)
+    log.error(
+      'frozen project recovery could not be saved',
+      { course: courseName, stage: err.stage },
+      err,
+    )
     return res.status(503).json({
       error:
         'Could not save the recovery. Nothing was changed; try again once the stores are reachable.',
@@ -98,7 +113,7 @@ export async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return res.status(405).json({ error: 'Method not allowed' })
     }
   } catch (err) {
-    console.error('[admin/frozenProjects] handler error:', err)
+    log.error('frozen projects request failed', { method: req.method }, err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -133,17 +148,17 @@ async function handleRecover(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     }
 
-    console.log('[admin/frozenProjects] project unfrozen', {
-      actorEmail,
-      courseName,
-      auditId: outcome.auditId,
+    log.info('project unfrozen', {
+      course: courseName,
+      actor: actorEmail,
+      audit_id: outcome.auditId,
     })
     return res.status(200).json({
       recovered: true,
       course_name: courseName,
     })
   } catch (err) {
-    return sendRecoveryError(res, err)
+    return sendRecoveryError(res, err, courseName)
   }
 }
 
