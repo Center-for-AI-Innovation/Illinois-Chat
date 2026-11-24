@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode } from 'react'
+import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
@@ -7,7 +8,7 @@ import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
 import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 import { AdminSidebar } from './AdminSidebar'
-import { ADMIN_CONTENT_ID, followSectionUntilSettled } from './adminScroll'
+import { ADMIN_CONTENT_ID } from './adminScroll'
 import { SubPageHeader } from './SubPageHeader'
 
 // Figma "Admin Sub-Pages": global nav over a bordered admin panel holding the
@@ -19,15 +20,6 @@ function AdminShell({
   courseName: string
   children: ReactNode
 }) {
-  // Arriving with a hash (a direct link, or a sidebar section link from
-  // another page): headings only exist once the page's access checks pass and
-  // this layout mounts, and the sections above keep growing as data loads, so
-  // follow the heading until the layout settles.
-  useEffect(() => {
-    const id = window.location.hash.slice(1)
-    return id ? followSectionUntilSettled(id) : undefined
-  }, [])
-
   return (
     <div className="bg-background flex h-(--viewport-height) flex-col pt-(--navbar-height)">
       <Navbar />
@@ -39,7 +31,7 @@ function AdminShell({
             <main
               id={ADMIN_CONTENT_ID}
               tabIndex={-1}
-              className="min-h-0 flex-1 overflow-y-auto outline-none"
+              className="min-h-0 flex-1 overflow-y-auto outline-none motion-safe:scroll-smooth"
             >
               {children}
             </main>
@@ -65,12 +57,14 @@ export function AdminLayout({
   courseName: string
   children: ReactNode
 }) {
+  const router = useRouter()
   const auth = useAuth()
   const email = auth.user?.profile.email
   const {
     data: metadata,
     isLoading,
     isError,
+    error,
   } = useFetchCourseMetadata({
     courseName,
     enabled: auth.isAuthenticated,
@@ -81,7 +75,11 @@ export function AdminLayout({
   const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
     useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
 
+  // Until the router has read the URL, courseName is empty and the metadata
+  // query is disabled (which reports isLoading: false), so wait for it rather
+  // than fall through to a 403.
   if (
+    !router.isReady ||
     auth.isLoading ||
     (auth.isAuthenticated && (isLoading || isSuperAdminLoading))
   ) {
@@ -93,7 +91,20 @@ export function AdminLayout({
   }
 
   if (!auth.isAuthenticated) {
-    return <PermissionGate course_name={courseName} />
+    // After signing in, come back to the admin page that was asked for.
+    return (
+      <PermissionGate course_name={courseName} signInRedirect={router.asPath} />
+    )
+  }
+
+  // Treat the chatbot the way the server does: a missing one is a 404, and a
+  // frozen (or forbidden) one rejects every save, so it gets the 403 screen.
+  const status = (error as { status?: number } | null)?.status
+  if (status === 404) {
+    return <PermissionGate course_name={courseName} errorType={404} />
+  }
+  if (metadata?.is_frozen === true || status === 403) {
+    return <PermissionGate course_name={courseName} errorType={403} />
   }
 
   // Fail closed: if the metadata cannot be read, only a super admin gets in,

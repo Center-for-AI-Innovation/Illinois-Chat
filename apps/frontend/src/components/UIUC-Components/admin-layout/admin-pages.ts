@@ -7,8 +7,8 @@ import {
   Wrench,
 } from 'lucide-react'
 
-import { AI_MODELS_SECTIONS } from '../ai-models/ai-models.sections'
-import { type AdminPage } from './admin-pages.types'
+import { AI_MODELS_SECTIONS } from '~/components/UIUC-Components/ai-models/ai-models.sections'
+import { type AdminPage } from '~/components/UIUC-Components/admin-layout/admin-pages.types'
 
 // Single registry for the admin sidebar. Only pages that exist today are
 // listed; a page gains sidebar sub-items by exporting a `sections` list and

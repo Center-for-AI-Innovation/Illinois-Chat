@@ -1,6 +1,7 @@
 import { type MouseEvent, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import { cva } from 'class-variance-authority'
 import { ChevronRight, Monitor, Moon, Sun, Undo2 } from 'lucide-react'
 
 import { Avatar, AvatarImage } from '@/components/shadcn/ui/avatar'
@@ -26,11 +27,15 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '@/components/shadcn/ui/sidebar'
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@/components/shadcn/ui/toggle-group'
 import { cn } from '@/components/shadcn/lib/utils'
 import { useTheme } from '~/contexts/ThemeContext'
 import { ADMIN_HOME_PAGE, ADMIN_SETTINGS_PAGES } from './admin-pages'
 import { type AdminPage } from './admin-pages.types'
-import { replaceHash, scrollContentToTop, scrollToSection } from './adminScroll'
+import { scrollContentToTop } from './adminScroll'
 
 /** Current URL hash, read after mount (SSR has none) and kept in sync. */
 function useLocationHash() {
@@ -41,14 +46,16 @@ function useLocationHash() {
     const update = () => setHash(window.location.hash.slice(1))
     update()
     router.events.on('hashChangeComplete', update)
+    router.events.on('routeChangeComplete', update)
     window.addEventListener('hashchange', update)
     return () => {
       router.events.off('hashChangeComplete', update)
+      router.events.off('routeChangeComplete', update)
       window.removeEventListener('hashchange', update)
     }
   }, [router.events])
 
-  return [hash, setHash] as const
+  return hash
 }
 
 // Leave cmd/ctrl/shift/middle clicks to the browser (open in new tab, etc.).
@@ -60,30 +67,28 @@ function PageItem({
   courseName,
   activePath,
   hash,
-  setHash,
 }: {
   page: AdminPage
   courseName: string
   activePath: string
   hash: string
-  setHash: (hash: string) => void
 }) {
+  const router = useRouter()
   const { isMobile, setOpenMobile } = useSidebar()
   const href = `/${courseName}/${page.path}`
   const isCurrent = activePath === page.path
   const Icon = page.icon
 
-  // On the current page, scroll in place instead of navigating: the page
-  // item goes back to the top, a section item to its heading. On other pages
-  // the Link navigates and AdminLayout scrolls to the hash once mounted.
-  const scrollInPlace = (sectionId?: string) => (e: MouseEvent) => {
+  // Section links are plain Links: the router updates the URL hash (history
+  // and asPath stay correct) and scrolls to the heading, smoothly via the
+  // content panel's scroll-smooth. Only the page item on the current page is
+  // handled here: back to the top, and the hash cleared through the router.
+  const onClick = (e: MouseEvent) => {
     if (isMobile) setOpenMobile(false)
     if (!isCurrent || !isPlainClick(e)) return
     e.preventDefault()
-    if (sectionId) scrollToSection(sectionId)
-    else scrollContentToTop()
-    replaceHash(sectionId ?? '')
-    setHash(sectionId ?? '')
+    scrollContentToTop()
+    void router.replace(href, undefined, { shallow: true, scroll: false })
   }
 
   if (!page.sections?.length) {
@@ -91,7 +96,7 @@ function PageItem({
       <SidebarMenuItem>
         <SidebarMenuButton
           isActive={isCurrent}
-          onClick={scrollInPlace()}
+          onClick={onClick}
           render={
             <Link href={href} aria-current={isCurrent ? 'page' : undefined} />
           }
@@ -109,7 +114,8 @@ function PageItem({
   return (
     <Collapsible defaultOpen={isCurrent} render={<SidebarMenuItem />}>
       <SidebarMenuButton
-        onClick={scrollInPlace()}
+        isActive={isCurrent}
+        onClick={onClick}
         render={
           <Link href={href} aria-current={isCurrent ? 'page' : undefined} />
         }
@@ -133,7 +139,7 @@ function PageItem({
             <SidebarMenuSubItem key={section.id}>
               <SidebarMenuSubButton
                 isActive={activeSection === section.id}
-                onClick={scrollInPlace(section.id)}
+                onClick={() => isMobile && setOpenMobile(false)}
                 render={
                   <Link
                     href={`${href}#${section.id}`}
@@ -162,36 +168,33 @@ const THEME_OPTIONS = [
 function ThemeSwitcher() {
   const { theme, setTheme } = useTheme()
   return (
-    <div
-      role="radiogroup"
+    <ToggleGroup
+      value={[theme]}
+      onValueChange={(value) => {
+        const next = THEME_OPTIONS.find((option) => option.value === value[0])
+        if (next) setTheme(next.value)
+      }}
       aria-label="Theme"
-      className="bg-muted flex rounded-lg p-1"
+      spacing={1}
+      className="bg-muted w-full rounded-lg p-1"
     >
       {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
-        <button
+        <ToggleGroupItem
           key={value}
-          type="button"
-          role="radio"
-          aria-checked={theme === value}
-          onClick={() => setTheme(value)}
-          className={cn(
-            'text-foreground flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-sm transition-colors [&_svg]:size-4',
-            theme === value
-              ? 'bg-background shadow-sm'
-              : 'hover:bg-background/60',
-          )}
+          value={value}
+          className="text-foreground data-pressed:bg-background flex-1 gap-1.5 data-pressed:shadow-sm [&_svg]:size-4"
         >
           <Icon aria-hidden="true" />
           {label}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }
 
 function SidebarBody({ courseName }: { courseName: string }) {
   const router = useRouter()
-  const [hash, setHash] = useLocationHash()
+  const hash = useLocationHash()
   // "/[course_name]/ai-models" -> "ai-models"
   const activePath = router.pathname.split('/').pop() ?? ''
 
@@ -227,7 +230,6 @@ function SidebarBody({ courseName }: { courseName: string }) {
               courseName={courseName}
               activePath={activePath}
               hash={hash}
-              setHash={setHash}
             />
           </SidebarMenu>
           <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
@@ -239,7 +241,6 @@ function SidebarBody({ courseName }: { courseName: string }) {
                 courseName={courseName}
                 activePath={activePath}
                 hash={hash}
-                setHash={setHash}
               />
             ))}
           </SidebarMenu>
@@ -251,6 +252,13 @@ function SidebarBody({ courseName }: { courseName: string }) {
     </>
   )
 }
+
+const desktopSidebarVariants = cva(
+  'overflow-hidden transition-[width] duration-200 ease-linear',
+  {
+    variants: { open: { true: '', false: 'w-0 border-r-0' } },
+  },
+)
 
 // Desktop: an in-panel column that the header trigger shows/hides.
 // Mobile: the shadcn Sidebar's built-in Sheet.
@@ -272,10 +280,7 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
       collapsible="none"
       aria-label="Project settings"
       inert={!open}
-      className={cn(
-        'overflow-hidden transition-[width] duration-200 ease-linear',
-        !open && 'w-0 border-r-0',
-      )}
+      className={desktopSidebarVariants({ open })}
     >
       <SidebarBody courseName={courseName} />
     </Sidebar>
