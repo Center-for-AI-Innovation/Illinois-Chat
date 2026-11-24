@@ -67,7 +67,8 @@ def test_a_child_that_finishes_is_not_reported_interrupted():
 class _StatusDB:
     """Stands in for SQLAlchemyIngestDB: one in-progress row, every call recorded."""
 
-    def __init__(self, error=None, fail_update_from=None):
+    def __init__(self, error=None, fail_update_from=None, insert_ok=True):
+        self.insert_ok = insert_ok
         self.row = {"beam_task_id": "job-1", "s3_path": "courses/c/a.pdf", "readable_filename": "a.pdf",
                     "course_name": "c", "url": None, "base_url": None, "doc_groups": "", "error": error}
         self.calls = []
@@ -87,7 +88,7 @@ class _StatusDB:
 
     def insert_failed_document(self, payload):
         self.calls.append("insert_failed")
-        return True
+        return self.insert_ok
 
     def delete_document_in_progress(self, job_id):
         self.calls.append("delete")
@@ -176,6 +177,19 @@ def test_a_failed_ingest_is_still_recorded_and_acked(monkeypatch):
     assert db.calls[-2:] == ["insert_failed", "delete"] and channel.acked == [7]
 
 
+@pytest.mark.parametrize("row_error, ingest_result", [
+    (None, "OCR/ingest subprocess exited abnormally"),  # the ingest failed
+    ("Attempting ingest", None),                        # redelivered after a crash; no ingest is run
+])
+def test_in_progress_row_is_kept_when_the_failure_cannot_be_recorded(monkeypatch, row_error, ingest_result):
+    # rmsql returns False when the insert fails, which a cancelled (timed-out) statement now does.
+    monkeypatch.setattr(worker, "run_ingest_isolated", lambda *a, **k: ingest_result)
+    db, channel = _StatusDB(error=row_error, insert_ok=False), _Channel()
+    _deliver(_worker(db), channel)
+    assert "insert_failed" in db.calls and "delete" not in db.calls, "the file must not vanish unrecorded"
+    assert channel.acked == [7]
+
+
 # ── SIGTERM ──
 
 
@@ -260,6 +274,12 @@ def test_no_statement_limit_unless_asked(seconds):
     assert _begin_sql(engine) == []
 
 
+def test_a_tiny_statement_limit_does_not_turn_the_limit_off():
+    engine = create_engine("postgresql://u:p@db.example/app")
+    rmsql.limit_statement_time(engine, 0.0001)
+    assert _begin_sql(engine) == ["SET LOCAL statement_timeout = 1"]
+
+
 def test_no_statement_limit_on_sqlite():
     engine = create_engine("sqlite://")
     rmsql.limit_statement_time(engine, 30)
@@ -267,6 +287,6 @@ def test_no_statement_limit_on_sqlite():
 
 
 def test_statement_timeout_env_parsing(monkeypatch):
-    for raw, expected in [("", 30), ("15", 15), ("0", 0), ("-1", 30), ("abc", 30)]:
+    for raw, expected in [("", 30), ("15", 15), ("0", 0), ("-1", 30), ("abc", 30), ("nan", 30), ("inf", 30)]:
         monkeypatch.setenv("INGEST_DB_STATEMENT_TIMEOUT", raw)
         assert worker._statement_timeout_from_env() == expected, raw

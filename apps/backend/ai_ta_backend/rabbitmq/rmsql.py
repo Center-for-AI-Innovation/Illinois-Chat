@@ -93,7 +93,7 @@ def limit_statement_time(engine, seconds):
     """
     if not seconds or engine.dialect.name != "postgresql":
         return
-    milliseconds = int(seconds * 1000)
+    milliseconds = max(1, int(seconds * 1000))  # 0 would mean "no limit" to Postgres
 
     @event.listens_for(engine, "begin")
     def _set_statement_timeout(conn):  # pylint: disable=unused-variable

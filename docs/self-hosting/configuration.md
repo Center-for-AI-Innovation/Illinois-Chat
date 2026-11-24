@@ -134,7 +134,7 @@ The worker reads these from its process environment. None is in the root templat
 | `MAX_JOB_RETRIES` | full, dev | `10`; a failed job is re-queued immediately until this many attempts | none |
 | `INGEST_SUBPROCESS_TIMEOUT` | full, dev | `300` seconds | none |
 | `RABBITMQ_HEARTBEAT` | full, dev | `60` seconds. AMQP heartbeat timeout the worker asks for; pika lets the client override the broker, so this value is what gets used. Keep it under 350 so idle connections survive AWS NAT gateways and load balancers. `broker` accepts the broker's proposal; `0` is refused | none |
-| `INGEST_DB_STATEMENT_TIMEOUT` | full, dev | `30` seconds. Longest a status query of the worker's consumer thread may run on Postgres before it is cancelled and the job retried. Keep this plus the 10-second connect timeout under `RABBITMQ_HEARTBEAT`, or a slow database costs the worker its broker connection. `0` turns the limit off. Does not apply to the ingest itself | none |
+| `INGEST_DB_STATEMENT_TIMEOUT` | full, dev | `30` seconds. Longest a status query of the worker's consumer thread may run on Postgres before it is cancelled. A query cancelled before the ingest starts sends the job to a retry; a failure record that cannot be written leaves the file shown as ingesting. Keep this plus the 10-second connect timeout under `RABBITMQ_HEARTBEAT`, or a slow database costs the worker its broker connection. `0` turns the limit off. Does not apply to the ingest itself | none |
 | `QDRANT_UPSERT_BATCH_SIZE` | full, dev | `100` | none |
 | `EMBEDDING_MAX_ATTEMPTS` | full, dev | `10` | none |
 | `CANVAS_ACCESS_TOKEN` | full, dev | empty; required by `/canvas_ingest`, which returns 500 without it. Not passed by Compose | worker |

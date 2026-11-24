@@ -7,6 +7,7 @@ from typing import List, Optional
 import pika
 import logging
 import json
+import math
 import sys
 import threading
 import time
@@ -82,7 +83,7 @@ def _statement_timeout_from_env():
         value = float(raw) if raw else 30.0
     except ValueError:
         value = -1.0
-    if value < 0:
+    if not math.isfinite(value) or value < 0:
         logging.warning("INGEST_DB_STATEMENT_TIMEOUT=%r is invalid; using 30", raw)
         value = 30.0
     if RABBITMQ_HEARTBEAT and (value == 0 or DB_CONNECT_TIMEOUT + value >= RABBITMQ_HEARTBEAT):
@@ -254,6 +255,20 @@ class Worker:
                           "the next delivery will record it as a worker crash:\n%s",
                           job_id, traceback.format_exc())
 
+    @staticmethod
+    def _remove_in_progress_if_recorded(status_db, job_id, recorded):
+        """Delete the job's in-progress row, but only once its documents_failed row is written.
+
+        insert_failed_document returns False when its statement fails, and with the statement
+        time limit a stalled database now makes it fail where it used to wait. Deleting the
+        in-progress row anyway would make the file vanish with no failure shown.
+        """
+        if recorded:
+            status_db.delete_document_in_progress(job_id)
+        else:
+            logging.error("Job %s failed, but its documents_failed row could not be written; "
+                          "its documents_in_progress row stays, so the file shows as ingesting", job_id)
+
     def process_job(self, channel, method, header, body):
         if self._stop.is_set():
             # Shutting down: do not start a job. Unacked, it is requeued when the connection closes.
@@ -293,7 +308,7 @@ class Worker:
                 channel.basic_ack(delivery_tag=method.delivery_tag)
             else:
                 if "error" in prog_doc and prog_doc["error"] == 'Attempting ingest':
-                    status_db.insert_failed_document({
+                    recorded = status_db.insert_failed_document({
                         "s3_path": str(prog_doc["s3_path"]),
                         "readable_filename": prog_doc["readable_filename"],
                         "course_name": prog_doc["course_name"],
@@ -302,7 +317,7 @@ class Worker:
                         "doc_groups": prog_doc["doc_groups"],
                         "error": "Ingest could not resolve successfully, worker crashed (e.g. ran out of memory)",
                     })
-                    status_db.delete_document_in_progress(job_id)
+                    self._remove_in_progress_if_recorded(status_db, job_id, recorded)
                     channel.basic_ack(delivery_tag=method.delivery_tag)
                 else:
                     previous_error = prog_doc.get("error")
@@ -321,7 +336,7 @@ class Worker:
                         self._release_interrupted_job(status_db, prog_doc, previous_error, job_id)
                         return
                     if failure is not None:
-                        status_db.insert_failed_document({
+                        recorded = status_db.insert_failed_document({
                             "s3_path": str(prog_doc["s3_path"]),
                             "readable_filename": prog_doc["readable_filename"],
                             "course_name": prog_doc["course_name"],
@@ -330,7 +345,7 @@ class Worker:
                             "doc_groups": prog_doc["doc_groups"],
                             "error": failure,
                         })
-                        status_db.delete_document_in_progress(job_id)
+                        self._remove_in_progress_if_recorded(status_db, job_id, recorded)
                     channel.basic_ack(delivery_tag=method.delivery_tag)
         except pika.exceptions.AMQPError:
             # The connection or channel is gone (lost mid-job, or the ack above failed). Don't
