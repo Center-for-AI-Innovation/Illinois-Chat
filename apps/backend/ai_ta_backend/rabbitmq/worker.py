@@ -383,11 +383,11 @@ class Worker:
         except ConnectionConfigError as second:
             return "not recorded: %s; its documents_in_progress row stays" % second
         status_db = SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
-        # The admin sees this text in the project's failed documents.
+        # The project's owner sees this text in the Failed tab of Project Files.
         return self._record_discarded_job(
             status_db, job_id, inputs,
-            "The connection %s of the project cannot be used (%s). Ask an administrator to check the "
-            "project's external connection." % (error.field, error.cause))
+            "The project's external connection (%s) cannot be used (%s). Check the connection in the "
+            "project settings." % (error.field, error.cause))
 
     def _status_db_after_failed_resolve(self, course_name):
         """The database with the status rows of a job whose resolve() failed every time.
