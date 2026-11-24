@@ -10,11 +10,20 @@ const hoisted = vi.hoisted(() => {
       toDataStreamResponse: () => new Response('data-stream'),
     })),
     generateText: vi.fn(async () => ({ text: 'generated' })),
+    getModels: vi.fn(
+      async (): Promise<any> => ({
+        Anthropic: { apiKey: 'stored-key' },
+      }),
+    ),
   }
 })
 
 vi.mock('~/app/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
+}))
+
+vi.mock('~/pages/api/models', () => ({
+  getModels: hoisted.getModels,
 }))
 
 vi.mock('~/utils/crypto', () => ({
@@ -143,7 +152,27 @@ describe('app/api/chat/anthropic POST', () => {
     expect(res.status).toBe(500)
   })
 
+  it('uses the stored key and ignores one sent in the request', async () => {
+    const req = new Request('http://localhost', {
+      method: 'POST',
+      body: JSON.stringify({
+        chatBody: {
+          conversation: makeConversation(),
+          llmProviders: { Anthropic: { apiKey: 'v1.attacker.supplied' } },
+          stream: false,
+        },
+      }),
+    })
+    const res = await POST(req as any)
+    expect(res.status).toBe(200)
+    expect(hoisted.decryptKeyIfNeeded).toHaveBeenCalledWith('stored-key')
+    expect(hoisted.createAnthropic).toHaveBeenCalledWith({
+      apiKey: 'stored-key',
+    })
+  })
+
   it('returns 500 when api key is missing', async () => {
+    hoisted.getModels.mockResolvedValueOnce({ Anthropic: {} })
     const req = new Request('http://localhost', {
       method: 'POST',
       body: JSON.stringify({

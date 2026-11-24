@@ -3,6 +3,7 @@ import nextI18NextConfig from '../../next-i18next.config.mjs'
 import { type AppType } from 'next/app'
 
 import Maintenance from '~/components/UIUC-Components/Maintenance'
+import { SiteAnnouncementBanner } from '~/components/UIUC-Components/SiteAnnouncementBanner'
 import '~/styles/citation-tooltips.css'
 import '~/styles/globals.css'
 
@@ -11,14 +12,57 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useRouter } from 'next/router'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 // import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
+import { useFetchMaintenanceMode } from '~/hooks/queries/useFetchMaintenanceMode'
+import { NAVBAR_BRANDING_QUERY_KEY } from '~/hooks/queries/useFetchNavbarBranding'
+import type {
+  AnnouncementBanner,
+  NavbarBranding,
+} from '~/utils/platformSettings.schema'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
 import { Toaster } from '@/components/shadcn/ui/sonner'
+
+// Routes that must stay reachable while maintenance mode is on.
+//
+// `/silent-renew` is the OIDC silent-renewal target and `/admin` is where an
+// operator turns maintenance back off — gating either one makes maintenance
+// unrecoverable. Note this list is only half the story: the gate itself now
+// lives *below* KeycloakProvider so the sign-in callback (which Keycloak
+// returns to `/`, not to an exempt path) is still processed. See MaintenanceGate.
+const MAINTENANCE_EXEMPT_PREFIXES = ['/admin', '/silent-renew']
+
+/**
+ * Swaps page content for the maintenance notice, leaving the surrounding
+ * provider tree — crucially KeycloakProvider and AuthCookie — mounted.
+ *
+ * This must NOT be hoisted above the auth provider. `redirect_uri` is the bare
+ * origin, so Keycloak returns users to `/` carrying `?code=&state=`, and it is
+ * KeycloakProvider that exchanges that code. Short-circuiting above it drops
+ * the code on the floor and locks everyone out, including whoever needs to
+ * disable maintenance.
+ *
+ * Fails open: while the check is in flight or errored, content renders. That
+ * matches the previous `useState(false)` default.
+ */
+function MaintenanceGate({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const isExempt = MAINTENANCE_EXEMPT_PREFIXES.some((prefix) =>
+    router.pathname.startsWith(prefix),
+  )
+  const { data: isMaintenanceMode } = useFetchMaintenanceMode({
+    enabled: !isExempt,
+  })
+
+  if (!isExempt && isMaintenanceMode === true) {
+    return <Maintenance />
+  }
+  return <>{children}</>
+}
 
 // Check that PostHog is client-side (used to handle Next.js SSR)
 if (typeof window !== 'undefined') {
@@ -52,11 +96,33 @@ if (typeof window !== 'undefined') {
   }
 }
 
+/** Set only by pages whose getStaticProps reads platform settings (home). */
+interface SiteBannerPageProps {
+  announcementBanner?: AnnouncementBanner | null
+  announcementBannerReadAt?: number
+  navbarBranding?: NavbarBranding
+  navbarBrandingReadAt?: number
+}
+
 const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
   const router = useRouter()
-  const queryClient = new QueryClient()
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false)
-  const effectRan = useRef(false)
+  // Held in state so the cache survives re-renders. The maintenance gate reads
+  // through React Query now, and a client rebuilt every render would drop that
+  // cache and refetch on each render.
+  const [queryClient] = useState(() => {
+    const client = new QueryClient()
+    // Seeded once so a statically generated page paints its navbar brand
+    // without waiting on a fetch; later navigations reuse the cache. Stamped
+    // with the read time so an old ISR page is refetched, not trusted.
+    const { navbarBranding, navbarBrandingReadAt } =
+      pageProps as SiteBannerPageProps
+    if (navbarBranding) {
+      client.setQueryData(NAVBAR_BRANDING_QUERY_KEY, navbarBranding, {
+        updatedAt: navbarBrandingReadAt ?? 0,
+      })
+    }
+    return client
+  })
 
   useEffect(() => {
     // Track page views in PostHog
@@ -68,80 +134,68 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
     }
   }, [])
 
-  useEffect(() => {
-    const checkMaintenanceMode = async () => {
-      if (effectRan.current) return
-
-      try {
-        const response = await fetch('/api/UIUC-api/getMaintenanceModeFast')
-        const data = await response.json()
-        setIsMaintenanceMode(data.isMaintenanceMode)
-      } catch (error) {
-        console.error('Failed to check maintenance mode:', error)
-        setIsMaintenanceMode(false)
-      }
-    }
-
-    checkMaintenanceMode()
-    effectRan.current = true
-  }, [])
-
-  if (isMaintenanceMode) {
-    return <Maintenance />
-  } else {
-    return (
-      <div
-        onKeyDownCapture={(event) => {
-          if (event.key === 'Tab') {
-            document.documentElement.dataset.inputModality = 'keyboard'
-          }
-        }}
-        onPointerDownCapture={() => {
-          document.documentElement.dataset.inputModality = 'pointer'
-        }}
-        onMouseDownCapture={() => {
-          document.documentElement.dataset.inputModality = 'pointer'
-        }}
-        onTouchStartCapture={() => {
-          document.documentElement.dataset.inputModality = 'pointer'
-        }}
-      >
-        <nav aria-label="Skip navigation">
-          <a
-            href="#main-content"
-            className="skip-nav-link"
-            onClick={(e) => {
-              const target = document.getElementById('main-content')
-              if (target) {
-                e.preventDefault()
-                target.focus()
-                target.scrollIntoView()
-              }
-            }}
-          >
-            Skip to main content
-          </a>
-        </nav>
-        <KeycloakProvider>
-          <QueryClientProvider client={queryClient}>
-            <PostHogProvider client={posthog}>
-              {/* <SpeedInsights /> */}
-              <Analytics />
-              <ReactQueryDevtools
-                initialIsOpen={false}
-                position="left"
-                buttonPosition="bottom-right"
-              />
+  return (
+    <div
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Tab') {
+          document.documentElement.dataset.inputModality = 'keyboard'
+        }
+      }}
+      onPointerDownCapture={() => {
+        document.documentElement.dataset.inputModality = 'pointer'
+      }}
+      onMouseDownCapture={() => {
+        document.documentElement.dataset.inputModality = 'pointer'
+      }}
+      onTouchStartCapture={() => {
+        document.documentElement.dataset.inputModality = 'pointer'
+      }}
+    >
+      <nav aria-label="Skip navigation">
+        <a
+          href="#main-content"
+          className="skip-nav-link"
+          onClick={(e) => {
+            const target = document.getElementById('main-content')
+            if (target) {
+              e.preventDefault()
+              target.focus()
+              target.scrollIntoView()
+            }
+          }}
+        >
+          Skip to main content
+        </a>
+      </nav>
+      <KeycloakProvider>
+        <QueryClientProvider client={queryClient}>
+          <PostHogProvider client={posthog}>
+            {/* <SpeedInsights /> */}
+            <Analytics />
+            <ReactQueryDevtools
+              initialIsOpen={false}
+              position="left"
+              buttonPosition="bottom-right"
+            />
               <ThemeProvider>
-                <Toaster position="bottom-center" />
+              <Toaster position="bottom-center" />
+              <MaintenanceGate>
+                <SiteAnnouncementBanner
+                  initialBanner={
+                    (pageProps as SiteBannerPageProps).announcementBanner
+                  }
+                  initialBannerReadAt={
+                    (pageProps as SiteBannerPageProps).announcementBannerReadAt
+                  }
+                />
                 <Component {...pageProps} />
-              </ThemeProvider>
-            </PostHogProvider>
-          </QueryClientProvider>
-        </KeycloakProvider>
-      </div>
-    )
-  }
+              </MaintenanceGate>
+            </ThemeProvider>
+          </PostHogProvider>
+        </QueryClientProvider>
+      </KeycloakProvider>
+    </div>
+  )
 }
 
 // export default .withTRPC(MyApp)

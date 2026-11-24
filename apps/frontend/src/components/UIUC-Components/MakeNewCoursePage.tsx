@@ -15,7 +15,7 @@ import {
 import { showToast } from '~/utils/toastUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type ChatbotProjectType, type ChatbotTag } from '~/types/chatbotTags'
-import { ChatbotsGlobalNav } from './chatbots-hub/ChatbotsGlobalNav'
+import Navbar from './navbars/Navbar'
 import UploadNotification, { type FileUpload } from './UploadNotification'
 
 import StepCreate from './MakeNewCoursePageSteps/StepCreate'
@@ -258,9 +258,17 @@ const MakeNewCoursePage = ({
       // Persist the wizard-set projectType/organization tags. Fire-and-forget:
       // a registry/tag failure should not block the wizard. The cache was
       // already updated above so the user sees them immediately.
-      if (initialTags.length > 0) {
-        void callSetCourseMetadata(project_name, { tags: initialTags } as never)
-      }
+      const tagsSaved =
+        initialTags.length > 0
+          ? callSetCourseMetadata(project_name, { tags: initialTags } as never)
+          : Promise.resolve(true)
+
+      // Refetch Your Bots after the tag save so the new card isn't cached without tags.
+      void tagsSaved.then(() =>
+        queryClient.invalidateQueries({
+          queryKey: ['pagedChatbots', 'yours'],
+        }),
+      )
 
       return true
     } catch (error) {
@@ -367,7 +375,7 @@ const MakeNewCoursePage = ({
 
   return (
     <>
-      <ChatbotsGlobalNav />
+      <Navbar />
       <Head>
         <title>{project_name || 'New Project'} — Illinois Chat</title>
         <meta name="description" content="Create a new project on UIUC.chat." />
@@ -376,12 +384,11 @@ const MakeNewCoursePage = ({
       <main
         id="main-content"
         tabIndex={-1}
-        className="course-page-main flex min-h-screen w-full flex-col items-center px-4 pt-20 pb-28 sm:px-6"
+        className="course-page-main flex min-h-(--viewport-height) w-full flex-col items-center px-4 pt-(--navbar-height) pb-28 sm:px-6"
       >
         <h1 className="sr-only">Create New Project</h1>
         <div className="flex w-full flex-1 flex-col items-center py-6">
           <Card className="my-auto flex w-full max-w-[720px] flex-col rounded-2xl border border-(--dashboard-border)! bg-(--background) px-6 py-8 text-(--foreground) sm:px-10 sm:py-10">
-
             <div
               ref={stepContainerRef}
               className="step_container flex min-h-88 flex-col"

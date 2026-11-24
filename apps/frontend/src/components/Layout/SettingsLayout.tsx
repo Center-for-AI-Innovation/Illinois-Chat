@@ -6,7 +6,6 @@ import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 interface SettingsLayoutProps {
   children: React.ReactNode
   course_name: string
-  bannerUrl?: string
   sidebarCollapsed: boolean
   setSidebarCollapsed: (collapsed: boolean) => void
 }
@@ -30,7 +29,6 @@ export const getInitialCollapsedState = (): boolean => {
 export default function SettingsLayout({
   children,
   course_name,
-  bannerUrl = '',
   sidebarCollapsed,
   setSidebarCollapsed,
 }: SettingsLayoutProps) {
@@ -77,9 +75,9 @@ export default function SettingsLayout({
   }
 
   return (
-    <div className="min-h-screen bg-(--background) pt-20">
+    <div className="min-h-(--viewport-height) bg-(--background) pt-(--navbar-height)">
       {/* Main Navbar */}
-      <Navbar course_name={course_name} bannerUrl={bannerUrl} isPlain={false} />
+      <Navbar isPlain={false} />
 
       <div className="flex">
         {/* Navigation Sidebar */}

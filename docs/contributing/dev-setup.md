@@ -82,6 +82,7 @@ This script:
 | `--create-schema` | Apply `infra/db/init-schema.sql` to an empty database. |
 | `--clean` | Remove the dev containers and volumes first, then recreate the schema. Cannot be combined with `--create-schema`. |
 | `--no-sim` | Start without the Sim AI tool stack. |
+| `--apps` | After infrastructure is up, also start the backend, ingest worker, and frontend in this terminal. `Ctrl+C` stops those three processes and leaves Docker running. Can be combined with `--create-schema` or `--clean`. |
 | `-h`, `--help` | Show usage. |
 
 ### 4. Set the model values in the app env files
@@ -122,7 +123,15 @@ MINIO_PUBLIC_ENDPOINT=http://localhost:10000
 
 ### 5. Run the apps
 
-Run each in its own terminal:
+To start the backend, ingest worker, and frontend together:
+
+```bash
+bash infra/scripts/start-dev.sh --apps
+```
+
+`Ctrl+C` stops those three processes. Docker stays up until `bash infra/scripts/stop-dev.sh`.
+
+Or run each in its own terminal:
 
 ```bash
 # Flask backend

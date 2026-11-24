@@ -12,6 +12,7 @@ export const revalidate = 0
 
 import { NextResponse } from 'next/server'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
+import { getModels } from '~/pages/api/models'
 
 function getAnthropicRequestConfig(conversation: Conversation) {
   const isThinking =
@@ -57,7 +58,8 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       throw new Error('Conversation is missing from the chat body')
     }
 
-    const apiKey = chatBody.llmProviders?.Anthropic?.apiKey
+    const storedProviders = await getModels(req.courseName!)
+    const apiKey = storedProviders?.Anthropic?.apiKey
     if (!apiKey) {
       throw new Error('Anthropic API  key is missing')
     }

@@ -7,6 +7,7 @@ import {
 } from '~/utils/modelProviders/LLMProvider'
 import { OllamaModelIDs } from '~/utils/modelProviders/ollama'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
+import { ncsaHostedAuthHeaders } from '~/utils/ncsaHostedAuth'
 import { NextResponse } from 'next/server'
 
 /**
@@ -30,7 +31,7 @@ async function handleOllamaReasoningStream(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.NCSA_HOSTED_API_KEY || ''}`,
+      ...ncsaHostedAuthHeaders(baseUrl),
     },
     body: JSON.stringify({
       model: conversation.model.id,
@@ -175,9 +176,9 @@ export async function runOllamaChat(
     try {
       const ollama = createOllama({
         baseURL: `${baseUrl}/api`,
-        headers: {
-          Authorization: `Bearer ${process.env.NCSA_HOSTED_API_KEY || ''}`,
-        },
+        // Only NCSA's own endpoint gets NCSA_HOSTED_API_KEY; a project-supplied
+        // baseUrl must never receive server credentials.
+        headers: ncsaHostedAuthHeaders(baseUrl),
       })
 
       if (conversation.messages.length === 0) {

@@ -7,6 +7,19 @@ import { getCourseMetadata } from './getCourseMetadata'
 import { writeCourseMetadata } from '~/utils/courseMetadataStore'
 import type { CourseMetadata } from '~/types/courseMetadata'
 
+const MIRROR_ATTEMPTS = 3
+
+async function withRetry(fn: () => Promise<void>): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (attempt >= MIRROR_ATTEMPTS) throw err
+      await new Promise((resolve) => setTimeout(resolve, 200 * attempt))
+    }
+  }
+}
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -93,7 +106,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     try {
       const seeded = (await getCourseMetadata(project_name)) as CourseMetadata
       if (seeded) {
-        await writeCourseMetadata(project_name, seeded)
+        // The hub's Your Bots reads Postgres, so retry before accepting drift.
+        await withRetry(() => writeCourseMetadata(project_name, seeded))
       } else {
         console.warn(
           `createProject: Redis metadata missing for ${project_name} after backend create; Postgres not mirrored`,
@@ -101,7 +115,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     } catch (pgErr) {
       console.error(
-        `createProject: failed to mirror ${project_name} to Postgres; search index may lag until backfill runs`,
+        `createProject: failed to mirror ${project_name} to Postgres after retries; search and the hub may miss it until backfill runs`,
         pgErr,
       )
     }

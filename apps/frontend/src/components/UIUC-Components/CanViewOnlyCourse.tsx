@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import GlobalHeader from './navbars/GlobalHeader'
+import Navbar from './navbars/Navbar'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import React from 'react'
 import { useRouter } from 'next/router'
@@ -34,11 +34,11 @@ export const CanViewOnlyCourse = ({
 
   return (
     <>
-      <GlobalHeader />
+      <Navbar />
       <main
         id="main-content"
         tabIndex={-1}
-        className="justify-center; course-page-main flex min-h-screen flex-col items-center"
+        className="justify-center; course-page-main flex min-h-(--viewport-height) flex-col items-center pt-(--navbar-height)"
       >
         <div className="container flex flex-col items-center justify-center gap-8 px-4 py-8">
           <Link href="/">

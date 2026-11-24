@@ -7,7 +7,6 @@ import { useFetchUserLastAccess } from '../queries/useFetchUserLastAccess'
 import { useFetchMaintainerProfiles } from '../queries/useFetchMaintainerProfiles'
 import { useFetchDocumentSummary } from '../queries/useFetchDocumentSummary'
 import { useSearchChatbots } from '../queries/useSearchChatbots'
-import { useFetchAllCourseMetadata } from '../queries/useFetchAllCourseMetadata'
 
 const originalFetch = globalThis.fetch
 afterEach(() => {
@@ -67,6 +66,25 @@ describe('useFetchUserLastAccess', () => {
 })
 
 describe('useFetchMaintainerProfiles', () => {
+  it('does not fetch until enabled', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    }) as unknown as typeof fetch
+
+    const { Wrapper } = createWrapper()
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useFetchMaintainerProfiles('CS101', { enabled }),
+      { wrapper: Wrapper, initialProps: { enabled: false } },
+    )
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+    rerender({ enabled: true })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('returns profiles[] on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -115,6 +133,25 @@ describe('useFetchMaintainerProfiles', () => {
 })
 
 describe('useFetchDocumentSummary', () => {
+  it('does not fetch until enabled', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    }) as unknown as typeof fetch
+
+    const { Wrapper } = createWrapper()
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useFetchDocumentSummary('CS101', { enabled }),
+      { wrapper: Wrapper, initialProps: { enabled: false } },
+    )
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+
+    rerender({ enabled: true })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('returns documentSummary on success', async () => {
     const summary = { total_file_count: 3, total_size_bytes: 9, by_type: [] }
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -199,53 +236,5 @@ describe('useSearchChatbots', () => {
     })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(String(result.current.error)).toMatch(/Search failed/)
-  })
-})
-
-describe('useFetchAllCourseMetadata', () => {
-  it('flattens the per-course payload into {course_name, metadata}', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [
-        {
-          CS101: {
-            course_owner: 'owner@example.com',
-            course_admins: [],
-            is_private: false,
-          },
-        },
-        {
-          CS102: {
-            course_owner: 'owner@example.com',
-            course_admins: [],
-            // Coerces string booleans coming back from Redis.
-            is_private: 'true',
-          },
-        },
-      ],
-    }) as unknown as typeof fetch
-
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useFetchAllCourseMetadata(), {
-      wrapper: Wrapper,
-    })
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(result.current.data).toHaveLength(2)
-    expect(result.current.data?.[0]?.course_name).toBe('CS101')
-    expect(result.current.data?.[0]?.metadata.is_private).toBe(false)
-    expect(result.current.data?.[1]?.metadata.is_private).toBe(true)
-  })
-
-  it('throws on non-ok responses', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 502,
-    }) as unknown as typeof fetch
-
-    const { Wrapper } = createWrapper()
-    const { result } = renderHook(() => useFetchAllCourseMetadata(), {
-      wrapper: Wrapper,
-    })
-    await waitFor(() => expect(result.current.isError).toBe(true))
   })
 })

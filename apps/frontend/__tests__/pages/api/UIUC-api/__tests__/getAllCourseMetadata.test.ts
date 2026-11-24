@@ -23,6 +23,7 @@ const hoisted = vi.hoisted(() => {
   return {
     ensureRedisConnected: vi.fn(),
     hGetAll: vi.fn(),
+    isSuperAdminAsync: vi.fn(async () => false),
     getBatchProjectTimestamps: vi.fn(
       async () =>
         new Map<
@@ -40,6 +41,13 @@ vi.mock('~/utils/authMiddleware', () => ({
 
 vi.mock('~/utils/redisClient', () => ({
   ensureRedisConnected: hoisted.ensureRedisConnected,
+}))
+
+// Mocked rather than left to hit the redis mock: the super-admin lookup is its
+// own Redis read, and letting it share `ensureRedisConnected` would consume the
+// one-shot `mockResolvedValueOnce` these tests set up for `hGetAll`.
+vi.mock('~/utils/superAdmins.server', () => ({
+  isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
 vi.mock('~/utils/projectTimestamps', () => ({
@@ -69,6 +77,8 @@ describe('UIUC-api/getAllCourseMetadata', () => {
     hoisted.hGetAll.mockReset()
     hoisted.getBatchProjectTimestamps.mockReset()
     hoisted.getBatchProjectTimestamps.mockResolvedValue(new Map())
+    hoisted.isSuperAdminAsync.mockReset()
+    hoisted.isSuperAdminAsync.mockResolvedValue(false)
   })
 
   it('getCoursesByOwnerOrAdmin filters by owner/admin and ignores invalid JSON', async () => {
@@ -87,6 +97,36 @@ describe('UIUC-api/getAllCourseMetadata', () => {
     })
     const out = await getCoursesByOwnerOrAdmin('admin@example.com')
     expect(out.length).toBe(1)
+  })
+
+  it('getCoursesByOwnerOrAdmin returns every non-frozen project for a super admin', async () => {
+    hoisted.isSuperAdminAsync.mockResolvedValue(true)
+    hoisted.ensureRedisConnected.mockResolvedValueOnce({
+      hGetAll: hoisted.hGetAll.mockResolvedValueOnce({
+        CS101: JSON.stringify({
+          course_owner: 'owner@example.com',
+          course_admins: [],
+        }),
+        CS102: JSON.stringify({
+          course_owner: 'x@example.com',
+          course_admins: ['someone@example.com'],
+        }),
+        FROZEN: JSON.stringify({
+          course_owner: 'x@example.com',
+          course_admins: [],
+          is_frozen: true,
+        }),
+      }),
+    })
+
+    const out = await getCoursesByOwnerOrAdmin('super@example.com')
+
+    // Both unowned projects, and the frozen one still excluded — the
+    // is_frozen filter sits above the role check and is not bypassed.
+    expect(out.map((entry) => Object.keys(entry)[0]).sort()).toEqual([
+      'CS101',
+      'CS102',
+    ])
   })
 
   it('getAllCourseMetadata returns [] when redis is empty and parses entries when present', async () => {

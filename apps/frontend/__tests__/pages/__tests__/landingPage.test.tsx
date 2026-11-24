@@ -6,8 +6,8 @@ vi.mock('~/components/UIUC-Components/GlobalFooter', () => ({
   default: () => <footer data-testid="footer" />,
 }))
 
-vi.mock('~/components/UIUC-Components/navbars/GlobalHeader', () => ({
-  LandingPageHeader: () => <header data-testid="header" />,
+vi.mock('~/components/UIUC-Components/navbars/Navbar', () => ({
+  default: () => <header data-testid="header" />,
 }))
 
 import Home from '~/pages/index'

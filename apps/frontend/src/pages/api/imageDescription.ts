@@ -4,6 +4,8 @@ import { type ImageBody, type OpenAIChatMessage } from '~/types/chat'
 
 import { OpenAIError, OpenAIStream } from '@/utils/server'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getModels } from '~/pages/api/models'
+import { type AllLLMProviders } from '~/utils/modelProviders/LLMProvider'
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
@@ -11,7 +13,9 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   }
 
   try {
-    const { contentArray, llmProviders, model } = req.body as ImageBody
+    const { contentArray, model } = req.body as ImageBody
+    // Get providers from redis store for safe-guarding and validation
+    const llmProviders = (await getModels(req.courseName!)) as AllLLMProviders
 
     const systemPrompt = getImageDescriptionSystemPrompt()
 
@@ -61,9 +65,9 @@ export function getImageDescriptionSystemPrompt() {
 	- Utilizing specific terminology relevant to the image's domain (e.g., medical, agricultural, technological).
 	- Categorizing the image and listing associated key terms.
 	- Summarizing with keywords or phrases reflecting the main themes based on the user query.
-	
-	Emphasize primary features before detailing secondary elements. For abstract or emotional content, infer the central message. Provide synonyms for technical terms where applicable. 
+
+	Emphasize primary features before detailing secondary elements. For abstract or emotional content, infer the central message. Provide synonyms for technical terms where applicable.
 	Ensure the description remains concise, precise and relevant for semantic retrieval, avoiding mention of non-present features. Don't be redundant or overly verbose as that may hurt the semantic retrieval."
-	
+
 	**Goal:** Create an accurate, focused description that enhances semantic document retrieval of the user query, using ONLY observable details in the form of keywords`
 }

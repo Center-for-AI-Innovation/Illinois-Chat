@@ -6,6 +6,7 @@ import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 import { ProviderNames } from '~/utils/modelProviders/LLMProvider'
 
 const hoisted = vi.hoisted(() => ({
+  isSuperAdminAsync: vi.fn(async () => false),
   validateRequestBody: vi.fn(async () => {}),
   validateApiKeyAndRetrieveData: vi.fn(async () => ({
     isValidApiKey: true,
@@ -41,6 +42,10 @@ const hoisted = vi.hoisted(() => ({
   handleStreamingResponse: vi.fn(async () => {}),
   handleNonStreamingResponse: vi.fn(async () => {}),
   getBaseUrl: vi.fn(() => 'http://localhost'),
+}))
+
+vi.mock('~/utils/superAdmins.server', () => ({
+  isSuperAdminAsync: hoisted.isSuperAdminAsync,
 }))
 
 vi.mock('~/pages/api/chat-api/util/fetchCourseMetadataServer', () => ({
@@ -92,6 +97,42 @@ vi.mock('~/utils/streamProcessing', async (importOriginal) => {
 })
 
 describe('chat-api/chat', () => {
+  const apiKeyChatReq = () =>
+    createMockReq({
+      method: 'POST',
+      body: {
+        model: 'gpt-4o',
+        messages: [],
+        temperature: 0.1,
+        course_name: 'CS101',
+        stream: false,
+        api_key: 'k',
+        retrieval_only: false,
+      },
+      socket: { remoteAddress: '127.0.0.1' } as any,
+    }) as any
+
+  it('passes live super-admin status for the validated API-key owner into the permission check', async () => {
+    hoisted.get_user_permission.mockReturnValueOnce('view')
+    hoisted.isSuperAdminAsync.mockResolvedValueOnce(true)
+    const res = createMockRes()
+    await chat(apiKeyChatReq(), res as any)
+    expect(hoisted.isSuperAdminAsync).toHaveBeenCalledWith('u@example.com')
+    expect(hoisted.get_user_permission).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      true,
+    )
+    expect(res.status).not.toHaveBeenCalledWith(403)
+  })
+
+  it('skips the super-admin lookup when project roles already grant edit', async () => {
+    hoisted.isSuperAdminAsync.mockClear()
+    const res = createMockRes()
+    await chat(apiKeyChatReq(), res as any)
+    expect(hoisted.isSuperAdminAsync).not.toHaveBeenCalled()
+  })
+
   it('returns 405 for non-POST methods', async () => {
     const res = createMockRes()
     await chat(

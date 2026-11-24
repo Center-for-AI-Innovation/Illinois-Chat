@@ -24,6 +24,7 @@ import { useRouter } from 'next/router'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { useAuth } from 'react-oidc-context'
 import { get_user_permission } from '~/components/UIUC-Components/runAuthCheck'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 interface Props<T> {
   isOpen: boolean
@@ -67,8 +68,11 @@ const Sidebar = <T,>({
   const { t } = useTranslation('promptbar')
   const nextRouter = useRouter()
   const auth = useAuth()
+  const { data: isPlatformSuperAdmin } = useFetchIsSuperAdmin({
+    enabled: auth.isAuthenticated,
+  })
   const permission = courseMetadata
-    ? get_user_permission(courseMetadata, auth)
+    ? get_user_permission(courseMetadata, auth, isPlatformSuperAdmin === true)
     : 'no_permission'
   const { data: presignedBannerUrl } = useQuery({
     queryKey: ['bannerUrl', courseName, courseMetadata?.banner_image_s3],
@@ -231,9 +235,9 @@ const Sidebar = <T,>({
                           word.length === 0
                             ? ''
                             : word.match(/^[A-Z0-9]+$/)
-                              ? word // keep acronym casing
-                              : word.charAt(0).toUpperCase() +
-                                word.slice(1).toLowerCase(),
+                            ? word // keep acronym casing
+                            : word.charAt(0).toUpperCase() +
+                              word.slice(1).toLowerCase(),
                         )
                         .join(' ')
                     })()}

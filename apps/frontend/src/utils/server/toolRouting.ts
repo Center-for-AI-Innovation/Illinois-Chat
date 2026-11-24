@@ -22,6 +22,7 @@ import type {
   ChatCompletionTool,
 } from 'openai/resources/chat/completions'
 import { type AllLLMProviders } from '~/utils/modelProviders/LLMProvider'
+import { REDACTED_SECRET } from '~/utils/modelProviders/providerSecrets'
 import { CURRENT_NCSA_DEFAULT_MODEL_ID } from '~/utils/modelProviders/types/NCSAHostedVLM'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { ensureRedisConnected } from '~/utils/redisClient'
@@ -168,7 +169,7 @@ export async function resolveToolRouter(params: {
       { key: llmProviders?.OpenAI?.apiKey?.trim(), requireEnabled: true },
     ]
   for (const candidate of candidateOpenAIKeys) {
-    if (!candidate.key) continue
+    if (!candidate.key || candidate.key === REDACTED_SECRET) continue
     if (candidate.requireEnabled && !llmProviders?.OpenAI?.enabled) continue
     const apiKey = await tryDecrypt(candidate.key, 'OpenAI')
     if (apiKey === null || !apiKey.trim()) continue

@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:22.23.4-alpine AS builder
 
 WORKDIR /app
 
@@ -42,7 +42,7 @@ ENV NEXT_PUBLIC_SUPER_ADMIN_EMAILS=$NEXT_PUBLIC_SUPER_ADMIN_EMAILS
 RUN npm run build:self-hosted
 
 # ---- 2) Runner Stage ----
-FROM node:22-alpine AS runner
+FROM node:22.23.4-alpine AS runner
 
 WORKDIR /app
 

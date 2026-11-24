@@ -29,11 +29,14 @@ async function fetchDocumentSummary({
   return data.documentSummary || {}
 }
 
-export function useFetchDocumentSummary(course_name: string) {
+export function useFetchDocumentSummary(
+  course_name: string,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ['documentSummary', course_name],
     queryFn: fetchDocumentSummary,
     retry: 1,
-    enabled: !!course_name,
+    enabled: enabled && !!course_name,
   })
 }

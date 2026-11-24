@@ -14,17 +14,20 @@ import { MainPageBackground } from '~/components/UIUC-Components/MainPageBackgro
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import { getOrCreateAnonymousUserId } from '~/utils/anonymousUserId'
+import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
 
 const ChatPage: NextPage = () => {
   const auth = useAuth()
   const router = useRouter()
+  const { data: isPlatformSuperAdmin, isLoading: isSuperAdminLoading } =
+    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
   const getCurrentPageName = () => {
     const raw = router.query.course_name
     return typeof raw === 'string'
       ? raw
       : Array.isArray(raw)
-        ? raw[0]
-        : undefined
+      ? raw[0]
+      : undefined
   }
   const courseName = getCurrentPageName() as string
   const [currentEmail, setCurrentEmail] = useState('')
@@ -142,7 +145,9 @@ const ChatPage: NextPage = () => {
       //   authUser: auth.user?.profile.email || 'No user email',
       // })
 
-      if (!auth.isLoading && router.isReady) {
+      // Waits on the super-admin answer as well, since the branches below
+      // redirect to /not_authorized.
+      if (!auth.isLoading && router.isReady && !isSuperAdminLoading) {
         const courseName = router.query.course_name as string
         try {
           // Fetch course metadata
@@ -187,7 +192,11 @@ const ChatPage: NextPage = () => {
             }
           }
 
-          const permission = get_user_permission(metadata, auth)
+          const permission = get_user_permission(
+            metadata,
+            auth,
+            isPlatformSuperAdmin === true,
+          )
 
           if (permission === 'no_permission') {
             router.replace(`/${courseName}/not_authorized`)
@@ -214,7 +223,15 @@ const ChatPage: NextPage = () => {
     }
 
     checkAuthorization()
-  }, [auth.isLoading, auth.isAuthenticated, router.isReady, auth, router])
+  }, [
+    auth.isLoading,
+    auth.isAuthenticated,
+    router.isReady,
+    auth,
+    router,
+    isPlatformSuperAdmin,
+    isSuperAdminLoading,
+  ])
 
   if (auth.isLoading) {
     return (

@@ -6,8 +6,20 @@ const hoisted = vi.hoisted(() => {
     buildPrompt: vi.fn(async ({ conversation }: any) => conversation),
     reconstructConversation: vi.fn((c: any) => c),
     persistMessageServer: vi.fn(async () => undefined),
+    getModels: vi.fn(async () => ({
+      OpenAICompatible: {
+        enabled: true,
+        baseUrl: 'https://stored.example/v1',
+        apiKey: 'v1.stored.key',
+        models: [],
+      },
+    })),
   }
 })
+
+vi.mock('~/pages/api/models', () => ({
+  getModels: hoisted.getModels,
+}))
 
 vi.mock('~/app/api/authorization', () => ({
   withCourseAccessFromRequest: () => (h: any) => h,
@@ -53,6 +65,39 @@ describe('app/api/allNewRoutingChat POST', () => {
     expect(res.status).toBe(200)
     await expect(res.text()).resolves.toContain('done')
     expect(hoisted.persistMessageServer).toHaveBeenCalled()
+  })
+
+  it('routes with stored providers, not ones sent in the request', async () => {
+    hoisted.buildPrompt.mockResolvedValueOnce({
+      id: 'c1',
+      messages: [{ id: 'm1', role: 'user', content: 'hi' }],
+    })
+    const req = new Request('http://localhost', {
+      method: 'POST',
+      body: JSON.stringify({
+        course_name: 'CS101',
+        conversation: { id: 'c1', messages: [] },
+        courseMetadata: {},
+        mode: 'chat',
+        llmProviders: {
+          OpenAICompatible: {
+            enabled: true,
+            baseUrl: 'https://attacker.example/v1',
+            apiKey: 'v1.victim.ciphertext',
+            models: [{ id: 'x', enabled: true }],
+          },
+        },
+      }),
+    })
+    await POST(req as any)
+    expect(hoisted.getModels).toHaveBeenCalledWith('CS101')
+    const routedBody = (hoisted.routeModelRequest.mock.calls as any[][])[0]![0]
+    expect(routedBody.llmProviders.OpenAICompatible.baseUrl).toBe(
+      'https://stored.example/v1',
+    )
+    expect(routedBody.llmProviders.OpenAICompatible.apiKey).toBe(
+      'v1.stored.key',
+    )
   })
 
   it('returns 500 response when route handler throws', async () => {
