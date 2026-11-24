@@ -44,6 +44,10 @@ export enum OpenAICompatibleModelID {
   // ============================================
   // DeepSeek Models
   // ============================================
+  DeepSeek_V4_Flash = 'deepseek-v4-flash',
+  DeepSeek_V4_1_Flash = 'deepseek-v4.1-flash',
+  DeepSeek = 'deepseek',
+  DeepSeek_V4_1 = 'deepseek-v4.1',
   DeepSeek_V3_0324 = 'deepseek/deepseek-chat-v3-0324',
   DeepSeek_V3_1 = 'deepseek/deepseek-chat-v3.1',
   DeepSeek_V3_1_Terminus = 'deepseek/deepseek-v3.1-terminus',
@@ -56,6 +60,10 @@ export enum OpenAICompatibleModelID {
   // ============================================
   // Qwen Models
   // ============================================
+  Qwen3_Coder_Next = 'qwen3-coder-next',
+  Qwen3_6_35B_A3B = 'qwen3.6-35b-a3b',
+  Qwen3_8_27B = 'qwen3.8-27b',
+  Qwen3_8_Flash = 'qwen3.8-flash',
   Qwen3_32B = 'qwen/qwen3-32b',
   Qwen3_235B_A22B = 'qwen/qwen3-235b-a22b',
   Qwen3_VL_235B_A22B_Thinking = 'qwen/qwen3-vl-235b-a22b-thinking',
@@ -89,6 +97,8 @@ export enum OpenAICompatibleModelID {
   // ============================================
   // GLM Models (Z.AI / THUDM)
   // ============================================
+  GLM_5_3 = 'glm-5.3',
+  GLM = 'glm',
   GLM_4_5 = 'z-ai/glm-4.5',
   GLM_4_5V = 'z-ai/glm-4.5v',
   GLM_4_5_Air = 'z-ai/glm-4.5-air',
@@ -139,6 +149,11 @@ export enum OpenAICompatibleModelID {
   // ============================================
   // Other Models
   // ============================================
+  Nemotron_3_Super_120B_A12B = 'nemotron-3-super-120b-a12b',
+  Gemma_4_31B = 'gemma-4-31b-it',
+  Ornith_1_0_35B = 'ornith-1.0-35b',
+  Muse_Glimmer_30B = 'muse-glimmer-30b',
+  Beam_1_0 = 'beam-1.0',
   MiniMax_M2 = 'minimax/minimax-m2',
 
   // ============================================
@@ -244,6 +259,30 @@ export const OpenAICompatibleModels: Record<
     tokenLimit: 128000,
     enabled: true,
   },
+  [OpenAICompatibleModelID.DeepSeek_V4_Flash]: {
+    id: OpenAICompatibleModelID.DeepSeek_V4_Flash,
+    name: 'DeepSeek V4 Flash',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.DeepSeek_V4_1_Flash]: {
+    id: OpenAICompatibleModelID.DeepSeek_V4_1_Flash,
+    name: 'DeepSeek V4.1 Flash',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.DeepSeek]: {
+    id: OpenAICompatibleModelID.DeepSeek,
+    name: 'DeepSeek (latest)',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.DeepSeek_V4_1]: {
+    id: OpenAICompatibleModelID.DeepSeek_V4_1,
+    name: 'DeepSeek V4.1',
+    tokenLimit: 1048570,
+    enabled: true,
+  },
   [OpenAICompatibleModelID.DeepSeek_V3_0324]: {
     id: OpenAICompatibleModelID.DeepSeek_V3_0324,
     name: 'DeepSeek: DeepSeek V3 0324',
@@ -298,6 +337,30 @@ export const OpenAICompatibleModels: Record<
     tokenLimit: 32000,
     enabled: true,
   },
+  [OpenAICompatibleModelID.Qwen3_Coder_Next]: {
+    id: OpenAICompatibleModelID.Qwen3_Coder_Next,
+    name: 'Qwen3 Coder Next',
+    tokenLimit: 131066,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Qwen3_6_35B_A3B]: {
+    id: OpenAICompatibleModelID.Qwen3_6_35B_A3B,
+    name: 'Qwen3.6 35B A3B',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Qwen3_8_27B]: {
+    id: OpenAICompatibleModelID.Qwen3_8_27B,
+    name: 'Qwen3.8 27B',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Qwen3_8_Flash]: {
+    id: OpenAICompatibleModelID.Qwen3_8_Flash,
+    name: 'Qwen3.8 Flash',
+    tokenLimit: 262138,
+    enabled: true,
+  },
   [OpenAICompatibleModelID.Qwen3_32B]: {
     id: OpenAICompatibleModelID.Qwen3_32B,
     name: 'Qwen: Qwen3 32B',
@@ -334,6 +397,18 @@ export const OpenAICompatibleModels: Record<
     tokenLimit: 262144,
     enabled: true,
   },
+  [OpenAICompatibleModelID.GLM_5_3]: {
+    id: OpenAICompatibleModelID.GLM_5_3,
+    name: 'GLM 5.3',
+    tokenLimit: 524282,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.GLM]: {
+    id: OpenAICompatibleModelID.GLM,
+    name: 'GLM (latest)',
+    tokenLimit: 524282,
+    enabled: true,
+  },
   [OpenAICompatibleModelID.GLM_4_5]: {
     id: OpenAICompatibleModelID.GLM_4_5,
     name: 'Z.AI: GLM 4.5',
@@ -362,6 +437,36 @@ export const OpenAICompatibleModels: Record<
     id: OpenAICompatibleModelID.GLM_4_6,
     name: 'Z.AI: GLM 4.6',
     tokenLimit: 202752,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Nemotron_3_Super_120B_A12B]: {
+    id: OpenAICompatibleModelID.Nemotron_3_Super_120B_A12B,
+    name: 'Nemotron 3 Super 120B A12B',
+    tokenLimit: 262144,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Gemma_4_31B]: {
+    id: OpenAICompatibleModelID.Gemma_4_31B,
+    name: 'Gemma 4 31B IT',
+    tokenLimit: 136737,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Ornith_1_0_35B]: {
+    id: OpenAICompatibleModelID.Ornith_1_0_35B,
+    name: 'Ornith 1.0 35B',
+    tokenLimit: 262138,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Muse_Glimmer_30B]: {
+    id: OpenAICompatibleModelID.Muse_Glimmer_30B,
+    name: 'Muse Glimmer 30B',
+    tokenLimit: 131066,
+    enabled: true,
+  },
+  [OpenAICompatibleModelID.Beam_1_0]: {
+    id: OpenAICompatibleModelID.Beam_1_0,
+    name: 'Beam 1.0',
+    tokenLimit: 524282,
     enabled: true,
   },
   [OpenAICompatibleModelID.MiniMax_M2]: {
