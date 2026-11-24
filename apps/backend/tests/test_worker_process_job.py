@@ -309,8 +309,8 @@ GOOD = {
 }
 # A config from before the port was stored: the Qdrant builder raises KeyError('port').
 QDRANT_WITHOUT_PORT = {"url": "http://127.0.0.1:9", "api_key": MARKER, "default_collection": "c"}
-TERMINAL_ROW = ("The connection qdrant_config of the project cannot be used (KeyError). Ask an administrator "
-                "to check the project's external connection.")
+TERMINAL_ROW = ("The project's external connection (qdrant_config) cannot be used (KeyError). Check the "
+                "connection in the project settings.")
 ROW_STAYS = "its documents_in_progress row stays"
 
 
