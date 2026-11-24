@@ -272,24 +272,31 @@ Zod validators are in `src/utils/projectConnections/validation.ts`.
 
 ## 5. Audit log
 
-Every mutation writes a row to `project_connection_audit_log`:
+Every mutation writes a row to `project_connection_audit_log`. Super-admin
+frozen-project recovery records its `unfreeze` actions in the same table.
 
 | field            | meaning                                                                                           |
 | ---------------- | ------------------------------------------------------------------------------------------------- |
 | `occurred_at`    | timestamptz, defaults to `now()`                                                                  |
 | `actor_email`    | from the verified JWT                                                                             |
-| `action`         | `upsert` \| `delete` \| `set_active` \| `test`                                                    |
+| `action`         | `upsert` \| `delete` \| `set_active` \| `test` \| `unfreeze`                                      |
 | `project_name`   | target project; NULL for supplied-config `/test` probes (stored-config probes record the project) |
 | `kind`           | `s3` \| `database` \| `qdrant` \| NULL                                                            |
-| `outcome`        | `success` \| `failure`                                                                            |
+| `outcome`        | `success` \| `failure` \| `pending` (`unfreeze` only, until the recovery finishes)                |
 | `failure_reason` | short reason code; never an upstream error body                                                   |
 | `changed_fields` | **field NAMES only** — never values. Helpful for "who rotated what when?"                         |
 | `source_ip`      | `X-Forwarded-For` first hop, else socket peer                                                     |
 | `user_agent`     | request header                                                                                    |
 | `request_id`     | `X-Request-Id` or `X-Correlation-Id` if present                                                   |
 
-Operational rule: **do not grant `UPDATE` or `DELETE` to the application
-role on this table.** Treat it as append-only.
+Connection mutations insert their row once and never change it.
+
+Frozen-project recovery updates its own row. It inserts the row as `pending`
+before changing anything, then updates that row's `outcome` and
+`failure_reason` to `success` or `failure`. A row still `pending` means the
+outcome is unknown and needs checking by hand. So the application role needs
+`UPDATE` on this table, but nothing should update rows other than that
+recovery flow, and nothing should delete rows. Do not grant `DELETE`.
 
 ---
 
