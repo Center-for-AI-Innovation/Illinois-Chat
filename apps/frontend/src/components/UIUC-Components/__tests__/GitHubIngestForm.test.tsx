@@ -150,7 +150,9 @@ describe('GitHubIngestForm', () => {
     // Gated poller: no interval while nothing is being ingested.
     expect(setIntervalSpy).not.toHaveBeenCalled()
 
-    await user.click(screen.getByText(/^GitHub$/i))
+    const trigger = screen.getByRole('button', { name: /GitHub/ })
+    expect(screen.getByText('Configure Import')).toBeInTheDocument()
+    await user.click(trigger)
     expect(
       await screen.findByText(/Ingest GitHub Website/i),
     ).toBeInTheDocument()

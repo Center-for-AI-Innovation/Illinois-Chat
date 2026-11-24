@@ -1,4 +1,5 @@
-import { Fragment, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Fragment, useState, type ReactNode } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
 
 import { Separator } from '@/components/shadcn/ui/separator'
@@ -6,6 +7,11 @@ import { type CourseMetadata } from '~/types/courseMetadata'
 import UploadNotification from '../UploadNotification'
 import { useUploadNotifications } from '~/hooks/useUploadNotifications'
 import { DocumentUploadSection } from './DocumentUploadSection'
+import {
+  IntegrationsLayoutToggle,
+  IntegrationsSection,
+  type IntegrationsLayout,
+} from './IntegrationsSection'
 import { PROJECT_DATA_SECTIONS } from './project-data.sections'
 
 // Page shell: header plus the four section headings. Only the upload body
@@ -21,6 +27,10 @@ export function ProjectDataContent({
   // Lives here so later section bodies (integrations) share the same list.
   const { uploadFiles, setUploadFiles, closeNotification } =
     useUploadNotifications()
+  const queryClient = useQueryClient()
+  // Local only: the choice is not persisted.
+  const [integrationsLayout, setIntegrationsLayout] =
+    useState<IntegrationsLayout>('gallery')
 
   const sectionBodies: Partial<Record<string, ReactNode>> = {
     'document-upload': (
@@ -29,6 +39,24 @@ export function ProjectDataContent({
         courseMetadata={courseMetadata}
         uploadFiles={uploadFiles}
         setUploadFiles={setUploadFiles}
+      />
+    ),
+    integrations: (
+      <IntegrationsSection
+        layout={integrationsLayout}
+        projectName={projectName}
+        uploadFiles={uploadFiles}
+        setUploadFiles={setUploadFiles}
+        queryClient={queryClient}
+      />
+    ),
+  }
+
+  const sectionActions: Partial<Record<string, ReactNode>> = {
+    integrations: (
+      <IntegrationsLayoutToggle
+        layout={integrationsLayout}
+        onLayoutChange={setIntegrationsLayout}
       />
     ),
   }
@@ -54,12 +82,15 @@ export function ProjectDataContent({
               aria-labelledby={section.id}
               className="flex flex-col gap-5"
             >
-              <h2
-                id={section.id}
-                className="text-foreground scroll-mt-6 text-lg leading-7 font-semibold"
-              >
-                {section.title}
-              </h2>
+              <div className="flex items-center justify-between gap-4">
+                <h2
+                  id={section.id}
+                  className="text-foreground scroll-mt-6 text-lg leading-7 font-semibold"
+                >
+                  {section.title}
+                </h2>
+                {sectionActions[section.id]}
+              </div>
               {sectionBodies[section.id]}
             </section>
           </Fragment>
