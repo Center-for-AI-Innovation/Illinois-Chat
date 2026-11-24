@@ -49,7 +49,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -100,15 +100,15 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: uiuc-chat-frontend
           IMAGE_TAG: ${{ github.sha }}
-          NEXT_PUBLIC_KEYCLOAK_URL: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_URL }}
-          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_REALM }}
-          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
+          NEXT_PUBLIC_KEYCLOAK_URL: ${{ vars.NEXT_PUBLIC_KEYCLOAK_URL }}
+          NEXT_PUBLIC_KEYCLOAK_REALM: ${{ vars.NEXT_PUBLIC_KEYCLOAK_REALM }}
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${{ vars.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_API_KEY }}
-          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
           NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG: ${{ vars.NEXT_PUBLIC_USE_ILLINOIS_CHAT_CONFIG || 'True' }}
           NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT: ${{ vars.NEXT_PUBLIC_ILLINOIS_CHAT_BANNER_CONTENT }}
-          NEXT_PUBLIC_SUPER_ADMIN_EMAILS: ${{ vars.NEXT_PUBLIC_SUPER_ADMIN_EMAILS }}
+          NEXT_PUBLIC_SUPER_ADMIN_EMAILS: ${{ secrets.NEXT_PUBLIC_SUPER_ADMIN_EMAILS }}
         run: |
           cd apps/frontend
 
@@ -122,6 +122,13 @@ jobs:
             */) ;;
             *) echo "::error::NEXT_PUBLIC_KEYCLOAK_URL must end with a trailing slash."; exit 1 ;;
           esac
+          # The rest are repository variables; a deleted or renamed one would bake in empty.
+          for name in NEXT_PUBLIC_KEYCLOAK_REALM NEXT_PUBLIC_KEYCLOAK_CLIENT_ID NEXT_PUBLIC_POSTHOG_HOST; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is empty; set the repository variable before building."
+              exit 1
+            fi
+          done
 
           docker build --platform=linux/amd64 -f Dockerfile \
             --build-arg NEXT_PUBLIC_KEYCLOAK_URL="$NEXT_PUBLIC_KEYCLOAK_URL" \
@@ -166,11 +173,11 @@ jobs:
 
       - name: Update ECS services
         env:
-          CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
-          FRONTEND_SERVICE_NAME: ${{ secrets.ECS_FRONTEND_SERVICE_NAME }}
-          BACKEND_SERVICE_NAME: ${{ secrets.ECS_BACKEND_SERVICE_NAME }}
-          WORKER_SERVICE_NAME: ${{ secrets.ECS_WORKER_SERVICE_NAME }}
-          CRAWLEE_SERVICE_NAME: ${{ secrets.ECS_CRAWLEE_SERVICE_NAME }}
+          CLUSTER_NAME: ${{ vars.ECS_CLUSTER_NAME }}
+          FRONTEND_SERVICE_NAME: ${{ vars.ECS_FRONTEND_SERVICE_NAME }}
+          BACKEND_SERVICE_NAME: ${{ vars.ECS_BACKEND_SERVICE_NAME }}
+          WORKER_SERVICE_NAME: ${{ vars.ECS_WORKER_SERVICE_NAME }}
+          CRAWLEE_SERVICE_NAME: ${{ vars.ECS_CRAWLEE_SERVICE_NAME }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           aws ecs update-service --cluster "$CLUSTER_NAME" --service "$FRONTEND_SERVICE_NAME" --force-new-deployment
