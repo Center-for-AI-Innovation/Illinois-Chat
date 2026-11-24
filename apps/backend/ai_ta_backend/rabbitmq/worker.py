@@ -210,6 +210,11 @@ class Worker:
             job_id = content['job_id']
             inputs = content['inputs']
             course = inputs.get('course_name')
+            # The retry path compares and adds to it: any other type would raise there, out of
+            # the except handler, and the message would come back for ever.
+            retry_count = content.get('retry_count', 0)
+            if not isinstance(retry_count, int) or isinstance(retry_count, bool) or retry_count < 0:
+                raise ValueError("retry_count is not a count")
         except Exception as e:  # pylint: disable=broad-except
             # Ack it: a message we cannot read would otherwise kill the consumer.
             # Log the shape, not the bytes: a job's inputs can hold a whole document.
@@ -218,7 +223,6 @@ class Worker:
             channel.basic_ack(delivery_tag=method.delivery_tag)
             return
         bind(rid=content.get('request_id'), job=job_id, course=course)
-        retry_count = content['retry_count'] if 'retry_count' in content else 0
         # Retries come back at once; keep their lines out of INFO.
         level = logging.INFO if retry_count == 0 else logging.DEBUG
         s3_path = inputs.get('s3_paths')

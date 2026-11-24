@@ -602,3 +602,26 @@ def test_a_failed_ack_after_a_broken_connection_reaches_the_consumer(worker, sto
     chain = "".join(traceback.format_exception(raised.type, raised.value, raised.tb))
     assert "ConnectionConfigError" in chain
     assert MARKER not in chain
+
+
+@pytest.mark.parametrize("retry_count", ["3", None, 1.5, True, -1, [2]])
+def test_message_with_a_retry_count_that_is_not_a_count_is_logged_and_acked(worker, caplog, retry_count):
+    # The retry path does `retry_count < MAX_JOB_RETRIES` and `retry_count + 1` inside its except
+    # handler. A value it cannot compare would raise out of process_job, unacked, and come back.
+    caplog.set_level(logging.DEBUG)
+    channel = FakeChannel()
+    worker.process_job(channel, METHOD, HEADER, body(retry_count))
+    messages = [r.getMessage() for r in errors(caplog)]
+    assert messages == ["discarding unparseable message (ValueError: retry_count is not a count) "
+                        "keys=['inputs', 'job_id', 'request_id', 'retry_count']"]
+    assert channel.published == []
+    assert channel.acked == [7]
+
+
+def test_message_without_a_retry_count_is_a_first_attempt(worker, caplog):
+    caplog.set_level(logging.DEBUG)
+    channel = FakeChannel()
+    message = json.dumps({"job_id": "job-1", "inputs": {"course_name": "ece120"}}).encode()
+    worker.process_job(channel, METHOD, HEADER, message)
+    assert [m["retry_count"] for m in channel.published] == [1]
+    assert channel.acked == [7]
