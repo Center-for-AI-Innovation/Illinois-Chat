@@ -8,24 +8,79 @@ import {
 } from "crawlee";
 import { Page } from "playwright";
 
+import { CrawlSummary, emptySummary, PageDecisions } from "../crawlOutcome.js";
 import { oneLine } from "../logSetup.js";
+import { PdfDownloadError } from "../pdfDownload.js";
 import { Config, configSchema } from "./configValidation.js";
 import { ingestPdf, uploadPdfToS3 } from "./uploadToS3.js";
 
+// An ingest request that gets no answer in this time counts as refused. Without a limit,
+// one request that hangs would keep the crawl, and its reply, open with no end.
+const INGEST_TIMEOUT_MS = 60_000;
+
 // clog carries the "rid=<id> course=<name>" prefix for this crawl. requestId is forwarded
 // to the backend /ingest as X-Request-ID so the ingest job logs the same id.
+// Returns what the crawl did. It returns after every ingest request and every PDF of the
+// crawl has an answer, so the counts are final and no line of the crawl comes after its
+// "crawl done" line.
 export async function crawl(
   rawConfig: Config,
   clog: Log = rootLog,
   requestId?: string,
-) {
+): Promise<CrawlSummary> {
   const config = configSchema.parse(removeUndefinedFromObject(rawConfig));
 
-  let pageCounter = 0;
+  const summary = emptySummary();
+  // The work that goes on after a page handler returns: ingest requests and PDFs.
+  const pending: Promise<void>[] = [];
+  const seenPdfs = new Set<string>();
+  // Crawlee runs the handler of a page again when it throws. This keeps a page from a
+  // second send to ingest and from a second count.
+  const pageDecisions = new PageDecisions();
+  const noteError = (text: string) => {
+    summary.firstError ??= text.slice(0, 300);
+  };
+
+  // One PDF is often linked from many pages. Handle each link once per crawl.
+  const queuePdf = (url: string, log: Log) => {
+    if (seenPdfs.has(url)) return;
+    seenPdfs.add(url);
+    summary.pdfsFound++;
+    log.debug(`Downloading PDF: ${oneLine(url)}`);
+    pending.push(
+      handlePdf(
+        config.courseName,
+        config.url,
+        url,
+        config.documentGroups,
+        log,
+        requestId,
+      ).then((result) => {
+        if (result === "ingested") summary.pdfsIngested++;
+        else if (result === "skipped") summary.pdfsSkipped++;
+        else {
+          summary.pdfsFailed++;
+          noteError(`PDF failed url=${oneLine(url)}`);
+        }
+      }),
+    );
+  };
 
   if (config.url) {
-    clog.debug(`Crawling URL: ${config.url}`);
-    if (process.env.NO_CRAWL !== "true") {
+    clog.debug(`Crawling URL: ${oneLine(config.url)}`);
+    if (process.env.NO_CRAWL === "true") {
+      summary.disabled = true;
+      return summary;
+    }
+    // Checked once, before the crawl: without it no page can get to the backend, and
+    // the crawl would read every page for nothing.
+    const ingestUrl = process.env.INGEST_URL;
+    if (!ingestUrl) {
+      throw new Error(
+        "INGEST_URL is not set, so the crawler cannot send pages to ingest.",
+      );
+    }
+    {
       // PlaywrightCrawler crawls the web using a headless
       // browser controlled by the Playwright library.
 
@@ -50,9 +105,8 @@ export async function crawl(
             async requestHandler({ request, response, page, enqueueLinks, log }) {
               log.debug(`Crawling: ${request.loadedUrl}...`);
               const title = await page.title();
-              pageCounter++;
               log.debug(
-                `Crawling: Page ${pageCounter} / ${config.maxPagesToCrawl} - URL: ${request.loadedUrl}...`,
+                `Crawling: Page ${summary.pagesLoaded + 1} / ${config.maxPagesToCrawl} - URL: ${request.loadedUrl}...`,
               );
 
               // Use custom handling for XPath selector
@@ -82,24 +136,39 @@ export async function crawl(
                 // the corpus. The ingest POST is fire-and-forget, so we log every skip with a
                 // greppable SKIP-INGEST prefix to keep the pipeline monitorable from the logs.
                 const skipReason = shouldSkipIngest(title, html, response?.status());
-                if (skipReason) {
+                const decision = pageDecisions.decide(
+                  request.uniqueKey,
+                  Boolean(skipReason),
+                  summary,
+                );
+                if (decision === "sent-before") {
+                  // An earlier try of this handler threw after the send. The links
+                  // of the page are still read below.
+                  log.debug(
+                    `Page was sent to ingest on an earlier try, not sent again url=${oneLine(request.loadedUrl)}`,
+                  );
+                } else if (decision === "skip-again") {
+                  log.debug(
+                    `SKIP-INGEST again on a later try (${skipReason}): url=${oneLine(request.loadedUrl)}`,
+                  );
+                } else if (decision === "skip") {
                   log.warning(
                     `SKIP-INGEST (${skipReason}): status=${response?.status() ?? "n/a"} ` +
-                      `base_url=${config.url} url=${request.loadedUrl} title=${JSON.stringify(title)}`,
+                      `base_url=${oneLine(config.url)} url=${oneLine(request.loadedUrl)} title=${JSON.stringify(title)}`,
                   );
                 } else {
-                  const ingestUrl = process.env.INGEST_URL;
-
-                  if (!ingestUrl) {
-                    log.error(
-                      "INGEST_URL is not set, so the page cannot be sent to ingest.",
+                  if (decision === "send-after-skip") {
+                    // The SKIP-INGEST line of the earlier try no longer holds.
+                    log.info(
+                      `Page that an earlier try skipped has content now and is sent to ingest url=${oneLine(request.loadedUrl)}`,
                     );
-                    return;
                   }
-
                   const pageUrl = request.loadedUrl;
-                  fetch(ingestUrl, {
+                  // Not awaited here, so the crawler goes on to the next page. crawl()
+                  // waits for it before it returns.
+                  const sent = fetch(ingestUrl, {
                     method: "POST",
+                    signal: AbortSignal.timeout(INGEST_TIMEOUT_MS),
                     headers: {
                       Accept: "*/*",
                       "Accept-Encoding": "gzip, deflate",
@@ -118,18 +187,29 @@ export async function crawl(
                     .then(async (response) => {
                       const text = await response.text();
                       if (!response.ok) {
+                        summary.pagesRefused++;
+                        noteError(
+                          `ingest answered ${response.status} for ${oneLine(pageUrl)}`,
+                        );
                         log.error(
                           `Ingest request failed url=${pageUrl} status=${response.status} ` +
                             `body=${oneLine(text.slice(0, 500))}`,
                         );
+                        return;
                       }
+                      summary.pagesIngested++;
                     })
-                    .catch((err) =>
+                    .catch((err) => {
+                      summary.pagesRefused++;
+                      noteError(
+                        `ingest request failed for ${oneLine(pageUrl)}: ${oneLine(err)}`,
+                      );
                       log.error(
                         `Ingest request failed url=${pageUrl}: ${oneLine(err)}` +
                           (err?.cause ? ` (cause: ${oneLine(err.cause)})` : ""),
-                      ),
-                    );
+                      );
+                    });
+                  pending.push(sent);
                 }
               }
 
@@ -156,15 +236,7 @@ export async function crawl(
                   transformRequestFunction(req) {
                     if (req.url.endsWith(".pdf")) {
                       // Download PDFs specially
-                      log.debug(`Downloading PDF: ${req.url}`);
-                      handlePdf(
-                        config.courseName,
-                        config.url,
-                        req.url,
-                        config.documentGroups,
-                        log,
-                        requestId,
-                      );
+                      queuePdf(req.url, log);
                       return false;
                     } else {
                       return req;
@@ -188,15 +260,7 @@ export async function crawl(
                   transformRequestFunction(req) {
                     if (req.url.endsWith(".pdf")) {
                       // Download PDFs specially
-                      log.debug(`Downloading PDF: ${req.url}`);
-                      handlePdf(
-                        config.courseName,
-                        config.url,
-                        req.url,
-                        config.documentGroups,
-                        log,
-                        requestId,
-                      );
+                      queuePdf(req.url, log);
                       return false;
                     } else {
                       return req;
@@ -204,6 +268,9 @@ export async function crawl(
                   },
                 });
               }
+              // Counted at the end: a handler that throws is tried again, and a count
+              // at the start would count that page one time for each try.
+              summary.pagesLoaded++;
             },
             // Comment this option to scrape the full website.
             maxRequestsPerCrawl: config.maxPagesToCrawl,
@@ -244,6 +311,10 @@ export async function crawl(
             ],
             // Called once a page has failed every retry. The crawl goes on with the other pages.
             failedRequestHandler({ request, log }, error) {
+              summary.pagesFailed++;
+              noteError(
+                `${oneLine(request.url)}: ${error.name}: ${oneLine(error.message.split("\n")[0])}`,
+              );
               log.warning(
                 `Page failed after all retries url=${request.url}: ` +
                   `${error.name}: ${oneLine(error.message.split("\n")[0])}`,
@@ -276,13 +347,16 @@ export async function crawl(
           // const store = await KeyValueStore.open();
           // await store.drop();
         }
-      } catch (error) {
-        // Do not swallow: /crawl in main.ts logs it once and returns 500.
-        throw error;
+      } finally {
+        // Also when the crawler throws: the requests that were sent still get their
+        // answer inside this crawl, with its request id. None of them rejects.
+        await Promise.all(pending);
       }
+      // An error from the crawler is not caught here: /crawl in main.ts logs it once
+      // and returns 500.
     }
   }
-  return pageCounter;
+  return summary;
 }
 
 // ----- HELPERS -----
@@ -344,6 +418,7 @@ function shouldSkipIngest(
   return null;
 }
 
+// Never rejects: crawl() waits for it with the other work of the crawl.
 async function handlePdf(
   courseName: string,
   base_url: string,
@@ -351,14 +426,30 @@ async function handlePdf(
   documentGroups: string[],
   clog: Log,
   requestId?: string,
-) {
+): Promise<"ingested" | "skipped" | "failed"> {
   try {
     const s3Key = await uploadPdfToS3(url, courseName, clog);
-    if (!s3Key) return; // URL didn't serve a real PDF (redirected to HTML) — skip ingest
+    // Not a real PDF (redirected to HTML), or already in storage: no ingest.
+    if (!s3Key) return "skipped";
     await new Promise((resolve) => setTimeout(resolve, 3000));
-    await ingestPdf(s3Key, courseName, base_url, url, documentGroups, clog, requestId);
+    const accepted = await ingestPdf(
+      s3Key,
+      courseName,
+      base_url,
+      url,
+      documentGroups,
+      clog,
+      requestId,
+    );
+    return accepted ? "ingested" : "failed";
   } catch (error) {
-    clog.error(`PDF upload failed url=${url}: ${oneLine(error)}`);
+    // The message of a download error says so when the time limit was hit.
+    if (error instanceof PdfDownloadError) {
+      clog.error(`PDF download failed url=${oneLine(url)}: ${oneLine(error.message)}`);
+    } else {
+      clog.error(`PDF upload failed url=${oneLine(url)}: ${oneLine(error)}`);
+    }
+    return "failed";
   }
 }
 function getPageHtml(page: Page, selector = "body") {

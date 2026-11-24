@@ -14,5 +14,9 @@
     },
     "include": [
         "./src/**/*"
+    ],
+    // Tests run through tsx (npm test) and must not land in dist.
+    "exclude": [
+        "./src/**/*.test.ts"
     ]
 }

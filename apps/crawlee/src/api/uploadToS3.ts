@@ -1,10 +1,16 @@
 // upload.ts
 import * as path from 'path';
-import axios from 'axios';
 import { Log, log as rootLog } from 'crawlee';
 import { oneLine } from '../logSetup.js';
+import { downloadPdf } from '../pdfDownload.js';
+import { withS3CallLimit } from '../s3CallLimit.js';
 import { S3Client, PutObjectCommand, HeadObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
 
+// The S3 client has no time limit of its own, and crawl() waits for every PDF. So each try
+// of a call fails when it gets no connection in 10 seconds, or when no data goes in or out
+// for 60 seconds. That idle limit does not cut off a large upload that still makes progress.
+const S3_CONNECT_TIMEOUT_MS = 10_000;
+const S3_IDLE_TIMEOUT_MS = 60_000;
 function createS3Client(): S3Client {
   const region = process.env.AWS_REGION
   const accessKeyId = process.env.AWS_KEY
@@ -13,6 +19,11 @@ function createS3Client(): S3Client {
   const baseConfig: any = region
     ? { region }
     : {}
+
+  baseConfig.requestHandler = {
+    connectionTimeout: S3_CONNECT_TIMEOUT_MS,
+    socketTimeout: S3_IDLE_TIMEOUT_MS,
+  }
 
   if (accessKeyId && secretAccessKey) {
     baseConfig.credentials = { accessKeyId, secretAccessKey }
@@ -49,10 +60,9 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // redirect and returns HTML, which we'd otherwise upload as a broken "PDF" that the
   // worker can't open ("cannot open broken document"), burning ~40s/each on retries.
   clog.debug(`Fetching candidate PDF. Filename: ${filename}, Url: ${url}`);
-  const response = await axios.get(url, { responseType: 'arraybuffer' });
-  const pdfBuffer = response.data;
-  const contentType = String(response.headers['content-type'] || '').toLowerCase();
-  const head = Buffer.from(pdfBuffer).subarray(0, 5).toString('latin1');
+  // downloadPdf has a time limit and no size limit, and throws a PdfDownloadError.
+  const { data: pdfBuffer, contentType } = await downloadPdf(url);
+  const head = pdfBuffer.subarray(0, 5).toString('latin1');
   if (!contentType.includes('application/pdf') && head !== '%PDF-') {
     clog.warning(`SKIP-PDF (not-a-pdf, content-type=${contentType || 'n/a'}): url=${url}`);
     return null;
@@ -62,14 +72,14 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
 
   // Check if the bucket exists, and create it if it does not
   try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: s3BucketName }));
+    await withS3CallLimit((limit) => s3Client.send(new HeadBucketCommand({ Bucket: s3BucketName }), limit));
     clog.debug(`Bucket ${s3BucketName} already exists.`);
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'NotFound') {
         clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
         try {
-          await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }));
+          await withS3CallLimit((limit) => s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), limit));
           clog.debug(`Bucket ${s3BucketName} created.`);
         } catch (createError) {
           if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
@@ -87,6 +97,8 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   }
 
   const s3Key = `courses/${courseName}/${filename}`;
+  // For log lines: the course name comes from the request.
+  const key = oneLine(s3Key);
 
   // Dedup across crawls: a popular PDF (e.g. a site-wide handbook) is linked from many pages,
   // so many separate crawl jobs target the SAME s3 key. Without dedup, the duplicate ingest
@@ -95,43 +107,53 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   // the PDF fails. If the object already exists, an earlier crawl already uploaded + ingested
   // it, so skip ingest (return null) instead of enqueuing a duplicate job.
   try {
-    await s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }));
-    clog.debug(`SKIP-PDF (dup, already in S3): key=${s3Key}, url=${url}`);
+    await withS3CallLimit((limit) => s3Client.send(new HeadObjectCommand({ Bucket: s3BucketName, Key: s3Key }), limit));
+    clog.debug(`SKIP-PDF (dup, already in S3): key=${key}, url=${oneLine(url)}`);
     return null;
   } catch (headErr) {
     // NotFound → first crawl to see this PDF; fall through to upload + ingest.
+    // Anything else (no access, expired credentials, no network) is not expected: say so.
+    // The upload below is still tried, as before.
+    const name = headErr instanceof Error ? headErr.name : '';
+    const status = (headErr as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (name !== 'NotFound' && status !== 404) {
+      // S3 answers 403 for a key that does not exist when the role cannot list the bucket.
+      // That would be one line for every new PDF, so it is a DEBUG line.
+      const say = status === 403 ? clog.debug.bind(clog) : clog.warning.bind(clog);
+      say(`Could not check S3 for an earlier copy key=${key}: ${oneLine(headErr)}`);
+    }
   }
 
   try {
-    await s3Client.send(new PutObjectCommand({
+    await withS3CallLimit((limit) => s3Client.send(new PutObjectCommand({
       Bucket: s3BucketName,
       Key: s3Key,
       Body: pdfBuffer,
-    }));
-    clog.debug(`PDF uploaded to S3 at key: ${s3Key}`);
+    }), limit));
+    clog.debug(`PDF uploaded to S3 at key: ${key}`);
   } catch (error) {
     if (error instanceof Error && error.name === 'NoSuchBucket') {
       clog.debug(`Bucket ${s3BucketName} does not exist. Creating bucket.`);
       try {
-        await s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }));
+        await withS3CallLimit((limit) => s3Client.send(new CreateBucketCommand({ Bucket: s3BucketName }), limit));
         clog.debug(`Bucket ${s3BucketName} created.`);
         // Retry the upload after creating the bucket
-        await s3Client.send(new PutObjectCommand({
+        await withS3CallLimit((limit) => s3Client.send(new PutObjectCommand({
           Bucket: s3BucketName,
           Key: s3Key,
           Body: pdfBuffer,
-        }));
-        clog.debug(`PDF uploaded to S3 at key: ${s3Key}`);
+        }), limit));
+        clog.debug(`PDF uploaded to S3 at key: ${key}`);
       } catch (createError) {
         if (createError instanceof Error && createError.name === 'BucketAlreadyOwnedByYou') {
           clog.debug(`Bucket ${s3BucketName} already owned by you.`);
           // Retry the upload after confirming the bucket is owned by you
-          await s3Client.send(new PutObjectCommand({
+          await withS3CallLimit((limit) => s3Client.send(new PutObjectCommand({
             Bucket: s3BucketName,
             Key: s3Key,
             Body: pdfBuffer,
-          }));
-          clog.debug(`PDF uploaded to S3 at key: ${s3Key}`);
+          }), limit));
+          clog.debug(`PDF uploaded to S3 at key: ${key}`);
         } else {
           throw createError;
         }
@@ -144,16 +166,19 @@ export async function uploadPdfToS3(url: string, courseName: string, clog: Log =
   return s3Key;
 }
 
-export async function ingestPdf(s3Key: string, courseName: string, base_url: string, url: string, documentGroups: string[], clog: Log = rootLog, requestId?: string) {
+// Returns true when the backend accepted the PDF. Never throws: each failure is one ERROR line.
+export async function ingestPdf(s3Key: string, courseName: string, base_url: string, url: string, documentGroups: string[], clog: Log = rootLog, requestId?: string): Promise<boolean> {
   const ingestUrl = process.env.INGEST_URL;
   if (!ingestUrl) {
     clog.error('INGEST_URL is not set, so the PDF cannot be sent to ingest.');
-    return;
+    return false;
   }
 
   try {
-    fetch(ingestUrl, {
+    const response = await fetch(ingestUrl, {
       "method": "POST",
+      // No answer in 60 seconds counts as a failure, so a request that hangs cannot keep the crawl open.
+      "signal": AbortSignal.timeout(60_000),
       "headers": {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate",
@@ -168,16 +193,16 @@ export async function ingestPdf(s3Key: string, courseName: string, base_url: str
         course_name: courseName,
         groups: documentGroups,
       })
-    })
-      .then(async response => {
-        const text = await response.text();
-        if (!response.ok) {
-          clog.error(`PDF ingest request failed url=${url} key=${s3Key} status=${response.status} body=${oneLine(text.slice(0, 500))}`);
-        }
-      })
-      .catch(err => clog.error(`PDF ingest request failed url=${url} key=${s3Key}: ${oneLine(err)}` + (err?.cause ? ` (cause: ${oneLine(err.cause)})` : '')));
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)} status=${response.status} body=${oneLine(text.slice(0, 500))}`);
+      return false;
+    }
+    return true;
   } catch (error) {
-    // Only reached if fetch() throws before sending (for example an invalid INGEST_URL).
-    clog.error(`Could not send PDF ingest request url=${url} key=${s3Key}: ${oneLine(error)}`);
+    const cause = (error as { cause?: unknown })?.cause;
+    clog.error(`PDF ingest request failed url=${oneLine(url)} key=${oneLine(s3Key)}: ${oneLine(error)}` + (cause ? ` (cause: ${oneLine(cause)})` : ''));
+    return false;
   }
 }
