@@ -90,10 +90,7 @@ export function AdminLayout({
   }
 
   if (!auth.isAuthenticated) {
-    // After signing in, come back to the admin page that was asked for.
-    return (
-      <PermissionGate course_name={courseName} signInRedirect={router.asPath} />
-    )
+    return <PermissionGate course_name={courseName} />
   }
 
   // Treat the chatbot the way the server does: a missing one is a 404, and a
