@@ -391,9 +391,51 @@ describe('PromptEditor', () => {
         string,
         unknown
       >
-      expect(payload.vector_search_rewrite_disabled).toBe(true)
-      expect(payload).not.toHaveProperty('system_prompt')
-      expect(payload).not.toHaveProperty('course_admins')
+      // Only the switch that changed.
+      expect(payload).toEqual({ vector_search_rewrite_disabled: true })
+    })
+
+    it('a prompt-rewriting switch sends only that switch and the prompt', async () => {
+      const user = userEvent.setup()
+      const { GUIDED_LEARNING_PROMPT } = await import('~/utils/app/const')
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'Base prompt',
+          guidedLearning: false,
+        }),
+      })
+
+      await user.click(await screen.findByLabelText('Guided Learning'))
+
+      await waitFor(
+        () => expect(mockCallSetCourseMetadata).toHaveBeenCalled(),
+        { timeout: 2000 },
+      )
+      expect(mockCallSetCourseMetadata.mock.calls[0]![1]).toEqual({
+        guidedLearning: true,
+        system_prompt: `Base prompt${GUIDED_LEARNING_PROMPT}`,
+      })
+    })
+
+    it('Update System Prompt sends only the prompt when no switch changed', async () => {
+      await renderPromptEditor({
+        metadata: makeCourseMetadata({ system_prompt: 'Just the prompt' }),
+      })
+      await waitFor(() =>
+        expect(screen.getByLabelText('System Prompt')).toHaveValue(
+          'Just the prompt',
+        ),
+      )
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: /Update System Prompt/i })[0]!,
+      )
+
+      await waitFor(() => expect(mockCallSetCourseMetadata).toHaveBeenCalled())
+      expect(mockCallSetCourseMetadata.mock.calls[0]![1]).toEqual({
+        system_prompt: 'Just the prompt',
+      })
     })
   })
 

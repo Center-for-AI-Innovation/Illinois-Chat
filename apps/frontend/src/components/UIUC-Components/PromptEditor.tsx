@@ -68,6 +68,7 @@ import { findDefaultModel } from '~/components/UIUC-Components/api-inputs/LLMsAp
 import { type ChatBody } from '~/types/chat'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { callSetCourseMetadata, fetchCourseMetadata } from '~/utils/apiUtils'
+import { changedSwitchFields } from '~/utils/promptSwitchChanges'
 import {
   CITATION_DISABLED_PROMPT,
   CITATION_GUIDELINES_PROMPT,
@@ -466,13 +467,20 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     if (courseMetadataRef.current && project_name) {
       // Send only the fields this editor owns; the server merges them over
       // what it has stored.
+      // The prompt, plus any switch not yet saved by the debounced save.
       const changes = {
         system_prompt: newSystemPrompt,
-        guidedLearning,
-        documentsOnly,
-        disableCitations,
-        systemPromptOnly,
-        agent_mode_enabled: agentModeFeatureEnabled,
+        ...changedSwitchFields(
+          {
+            guidedLearning,
+            documentsOnly,
+            disableCitations,
+            systemPromptOnly,
+            vectorSearchRewrite,
+            agentModeFeatureEnabled,
+          },
+          initialSwitchStateRef.current,
+        ),
       }
       success = await callSetCourseMetadata(project_name, changes)
       if (success) {
@@ -592,13 +600,9 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
     // save never overwrites a prompt another admin saved meanwhile.
     const togglePrompt = courseMetadataRef.current.system_prompt
     const promptChanged = togglePrompt !== courseMetadata?.system_prompt
+    // Only the switches that changed since the last save.
     const settingChanges = {
-      guidedLearning,
-      documentsOnly,
-      disableCitations,
-      systemPromptOnly,
-      vector_search_rewrite_disabled: !vectorSearchRewrite,
-      agent_mode_enabled: agentModeFeatureEnabled,
+      ...changedSwitchFields(currentSwitchState, initialSwitchState),
       ...(promptChanged ? { system_prompt: togglePrompt } : {}),
     }
     const updatedMetadata = {
