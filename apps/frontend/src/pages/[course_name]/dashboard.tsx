@@ -27,6 +27,7 @@ const DashboardPage: NextPageWithLayout = () => {
     queryKey: ['dashboardCourseMetadata', courseName],
     queryFn: () => fetchCourseMetadata(courseName),
     retry: 1,
+    gcTime: 0,
     enabled: Boolean(courseName),
   })
 

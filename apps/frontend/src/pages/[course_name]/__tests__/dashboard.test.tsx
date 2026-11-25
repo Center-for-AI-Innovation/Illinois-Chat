@@ -37,6 +37,7 @@ vi.mock('~/components/UIUC-Components/ProjectDashboard', () => ({
 }))
 
 import DashboardPage from '../dashboard'
+import { fetchCourseMetadata } from '~/utils/apiUtils'
 
 describe('DashboardPage', () => {
   it('stays on the dashboard after its children write raw metadata to the shared cache', async () => {
@@ -58,5 +59,27 @@ describe('DashboardPage', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(screen.queryByText('permission-gate')).toBeNull()
     expect(screen.getByText('dashboard-content')).toBeTruthy()
+  })
+
+  it('fetches fresh metadata on a return visit instead of rendering the cached copy', async () => {
+    const fetchMock = vi.mocked(fetchCourseMetadata)
+    fetchMock.mockClear()
+    const queryClient = new QueryClient()
+    const renderPage = () =>
+      render(
+        <QueryClientProvider client={queryClient}>
+          <DashboardPage />
+        </QueryClientProvider>,
+      )
+
+    const first = renderPage()
+    expect(await screen.findByText('dashboard-content')).toBeTruthy()
+    first.unmount()
+    await new Promise((r) => setTimeout(r, 0))
+
+    renderPage()
+    expect(screen.getByText('loading')).toBeTruthy()
+    expect(await screen.findByText('dashboard-content')).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
