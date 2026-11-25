@@ -9,6 +9,16 @@ export const ADMIN_CONTENT_ID = 'admin-panel-content'
 const prefersReducedMotion = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
 
+// Decoded so it compares equal to section ids; a malformed escape falls back to raw.
+export function readLocationHash() {
+  const raw = window.location.hash.slice(1)
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 export function scrollContentToTop() {
   document.getElementById(ADMIN_CONTENT_ID)?.scrollTo({
     top: 0,
@@ -28,7 +38,7 @@ export function useScrollToHashWhenReady(ready: boolean) {
   useEffect(() => {
     if (!ready || done.current) return
     done.current = true
-    const id = decodeURIComponent(window.location.hash.slice(1))
+    const id = readLocationHash()
     if (!id) return
     requestAnimationFrame(() =>
       document.getElementById(id)?.scrollIntoView({ block: 'start' }),

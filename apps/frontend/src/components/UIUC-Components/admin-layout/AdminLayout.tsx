@@ -63,7 +63,6 @@ export function AdminLayout({
   const {
     data: metadata,
     isLoading,
-    isError,
     error,
   } = useFetchCourseMetadata({
     courseName,
@@ -107,10 +106,8 @@ export function AdminLayout({
     return <PermissionGate course_name={courseName} errorType={403} />
   }
 
-  // Fail closed: if the metadata cannot be read, only a super admin gets in,
-  // and a failed super-admin lookup counts as "not a super admin".
+  // Cached metadata survives a failed refetch; with none, fail closed.
   const isOwnerOrAdmin =
-    !isError &&
     !!metadata &&
     !!email &&
     (metadata.course_owner === email ||
