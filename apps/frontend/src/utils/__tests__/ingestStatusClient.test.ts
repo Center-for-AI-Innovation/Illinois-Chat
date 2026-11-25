@@ -114,12 +114,16 @@ describe('fetchIngestStatus', () => {
   })
 
   it('returns null and stops when the in-progress request is not ok', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     fetchMock.mockResolvedValueOnce(errorResponse())
 
     expect(
       await fetchIngestStatus('course', { filenames: ['a.pdf'] }),
     ).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Ingest status poll failed: endpoint=docsInProgress status=500',
+    )
   })
 
   it('returns null when the completed request is not ok', async () => {

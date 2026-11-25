@@ -11,6 +11,8 @@ import { useQuery } from '@tanstack/react-query'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 
+type MetadataError = Error & { status?: number; requestId?: string }
+
 const DashboardPage: NextPageWithLayout = () => {
   const router = useRouter()
   const auth = useAuth()
@@ -22,7 +24,7 @@ const DashboardPage: NextPageWithLayout = () => {
     isLoadingError,
     error,
     refetch,
-  } = useQuery<CourseMetadata, Error & { status?: number }>({
+  } = useQuery<CourseMetadata, MetadataError>({
     // Own key: UploadCard and others write raw metadata to ['courseMetadata', name]
     queryKey: ['dashboardCourseMetadata', courseName],
     queryFn: () => fetchCourseMetadata(courseName),
@@ -46,6 +48,7 @@ const DashboardPage: NextPageWithLayout = () => {
         onRetry={() => void refetch()}
         title="We couldn't load this dashboard"
         message="Something went wrong while loading the project. Try again in a moment."
+        requestId={error?.requestId}
       />
     )
   }

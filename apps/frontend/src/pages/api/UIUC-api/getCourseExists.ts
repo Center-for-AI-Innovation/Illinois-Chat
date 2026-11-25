@@ -1,6 +1,9 @@
 import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { ensureRedisConnected } from '~/utils/redisClient'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getCourseExists')
 
 /**
  * Check if a course/project name already exists in Redis
@@ -20,7 +23,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const courseExists = await checkCourseExists(course_name)
     return res.status(200).json(courseExists)
   } catch (error) {
-    console.log(error)
+    log.error(
+      'failed to check whether the project exists',
+      { course: course_name },
+      error,
+    )
     return res.status(500).json(false)
   }
 }
