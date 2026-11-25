@@ -15,3 +15,5 @@ npm start        # http://localhost:3345
 ```
 
 It reads `apps/crawlee/.env`, which `infra/scripts/start-dev.sh` writes.
+
+The log format and the rules for a log line are in [Logging](../../docs/contributing/logging.md), section "Crawler". Run the logger tests with `npm test`.

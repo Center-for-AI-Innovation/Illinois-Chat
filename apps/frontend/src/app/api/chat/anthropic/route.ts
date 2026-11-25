@@ -13,6 +13,10 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { withCourseAccessFromRequest } from '~/app/api/authorization'
 import { getModels } from '~/pages/api/models'
+import { getLogger } from '~/utils/server/log'
+import { logStreamFailure } from '~/utils/server/streamErrors'
+
+const log = getLogger('api.chat.anthropic')
 
 function getAnthropicRequestConfig(conversation: Conversation) {
   const isThinking =
@@ -84,22 +88,33 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
           experimental_transform: experimentalTransform,
         }),
         ...(providerOptions && { providerOptions }),
+        // streamText does not throw when the provider fails: the error comes
+        // as a part of the stream, and the reply is an empty 200. onError is
+        // the one place that sees it.
+        onError: ({ error }) =>
+          log.error('LLM stream failed', { model: modelId }, error),
       })
 
       if (isThinking) {
-        console.log('Using Claude with reasoning enabled')
-        const response = result.toDataStreamResponse({
-          sendReasoning: true,
-          getErrorMessage: () => {
-            return `An error occurred while streaming the response.`
-          },
-        })
+        log.debug('using Claude with reasoning enabled', { model: modelId })
+        const response = logStreamFailure(
+          result.toDataStreamResponse({
+            sendReasoning: true,
+            getErrorMessage: () => {
+              return `An error occurred while streaming the response.`
+            },
+          }),
+          log,
+          { model: modelId },
+        )
         return new NextResponse(response.body, {
           status: response.status,
           headers: response.headers,
         })
       } else {
-        const response = result.toTextStreamResponse()
+        const response = logStreamFailure(result.toTextStreamResponse(), log, {
+          model: modelId,
+        })
         return new NextResponse(response.body, {
           status: response.status,
           headers: response.headers,
@@ -124,9 +139,17 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
       typeof error.data === 'object' &&
       'error' in error.data
     ) {
-      console.error('error.data.error', error.data.error)
       const errValue: unknown = (error as { data: { error: unknown } }).data
         .error
+      log.error(
+        'Anthropic chat request failed',
+        {
+          provider: 'Anthropic',
+          status: (error as { statusCode?: number }).statusCode,
+          reason: errValue,
+        },
+        error,
+      )
       const message = typeof errValue === 'string' ? errValue : 'Unknown error'
       return NextResponse.json(
         { error: message },
@@ -135,6 +158,11 @@ async function handler(req: AuthenticatedRequest): Promise<NextResponse> {
         },
       )
     } else {
+      log.error(
+        'Anthropic chat request failed',
+        { provider: 'Anthropic' },
+        error,
+      )
       return NextResponse.json(
         {
           error: 'An error occurred while processing the chat request',

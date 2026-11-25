@@ -15,6 +15,10 @@ import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { AllSupportedModels } from '~/utils/modelProviders/LLMProvider'
 import { eq } from 'drizzle-orm'
+import { getLogger } from '~/utils/server/log'
+import { backendFetch } from '~/utils/server/backendFetch'
+
+const log = getLogger('api.logConversation')
 
 export const config = {
   api: {
@@ -92,7 +96,11 @@ const logConversation = async (
         existingConversation = existingRecord[0].convo as Conversation
       }
     } catch (error) {
-      console.error('Error fetching existing conversation for merge:', error)
+      log.warn(
+        'could not fetch the existing conversation to merge, saving the delta only',
+        { conversation: conversationId },
+        error,
+      )
       // Continue with delta-only conversation if fetch fails
     }
 
@@ -186,6 +194,9 @@ const logConversation = async (
   const latestAssistantMessage = messagesForLog[messagesForLog.length - 1]
   const previousUserMessage = messagesForLog[messagesForLog.length - 2]
 
+  // Set when a step fails; the remaining steps still run, then we answer 500.
+  let failedStep: string | undefined
+
   try {
     const result = await db
       .insert(llmConvoMonitor)
@@ -205,30 +216,49 @@ const logConversation = async (
         },
       })
   } catch (error: any) {
-    console.log('new error from database in logConversation:', error)
+    failedStep = 'database'
+    log.error(
+      'could not save the conversation to the database',
+      { conversation: conversationId },
+      error,
+    )
   }
 
   // Send to our custom monitor
   try {
-    const response = await fetch(getBackendUrl() + '/llm-monitor-message', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await backendFetch(
+      getBackendUrl() + '/llm-monitor-message',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // messages: sanitizedConversation.messages, // we get these from database on the backend.
+          course_name: course_name,
+          conversation_id: conversationId,
+          model_name: sanitizedConversation.model?.name,
+          user_email: sanitizedConversation.userEmail,
+        }),
       },
-      body: JSON.stringify({
-        // messages: sanitizedConversation.messages, // we get these from database on the backend.
-        course_name: course_name,
-        conversation_id: conversationId,
-        model_name: sanitizedConversation.model?.name,
-        user_email: sanitizedConversation.userEmail,
-      }),
-    })
+    )
 
     if (!response.ok) {
-      console.error('Error sending to AI TA backend:', response.statusText)
+      failedStep = failedStep ?? 'llm-monitor'
+      const body = (await response.text().catch(() => '')).slice(0, 500)
+      log.error('backend llm-monitor-message failed', {
+        conversation: conversationId,
+        status: response.status,
+        body,
+      })
     }
   } catch (error) {
-    console.error('Error sending to AI TA backend:', error)
+    failedStep = failedStep ?? 'llm-monitor'
+    log.error(
+      'could not reach the backend llm-monitor-message',
+      { conversation: conversationId },
+      error,
+    )
   }
 
   // console.log('👇👇👇👇👇👇👇👇👇👇👇👇👇')
@@ -298,6 +328,12 @@ const logConversation = async (
   }
   // console.log('✅✅✅✅✅✅✅✅ AFTER ALL LANGSMITH CALLS')
 
+  if (failedStep) {
+    return res.status(500).json({
+      success: false,
+      error: `Conversation logging failed at step: ${failedStep}`,
+    })
+  }
   return res.status(200).json({ success: true })
 }
 
