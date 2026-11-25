@@ -260,7 +260,27 @@ const MakeNewCoursePage = ({
       // already updated above so the user sees them immediately.
       const tagsSaved =
         initialTags.length > 0
-          ? callSetCourseMetadata(project_name, { tags: initialTags })
+          ? callSetCourseMetadata(project_name, { tags: initialTags }).then(
+              (ok) => {
+                if (!ok) {
+                  // Saves now send only their own fields, so nothing later
+                  // re-sends these tags. Take them back out of the cache so
+                  // the wizard doesn't show tags the server doesn't have.
+                  queryClient.setQueryData<CourseMetadata>(
+                    ['courseMetadata', project_name],
+                    (prev) => (prev ? { ...prev, tags: [] } : prev),
+                  )
+                  showToast({
+                    title: 'Tags could not be saved',
+                    message:
+                      'The project was created, but its project type and organization tags were not saved. You can add them again on the Branding step.',
+                    type: 'warning',
+                    autoClose: 8000,
+                  })
+                }
+                return ok
+              },
+            )
           : Promise.resolve(true)
 
       // Refetch Your Bots after the tag save so the new card isn't cached without tags.

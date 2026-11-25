@@ -53,6 +53,22 @@ const BrandingForm = ({
     'idle' | 'uploading' | 'success' | 'error'
   >(cachedMetadata?.banner_image_s3 ? 'success' : 'idle')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // True while the greeting has edits that aren't saved yet (including while
+  // a save is in flight). Cache updates must not replace that text.
+  const greetingDirtyRef = useRef(false)
+
+  // Merge saved fields into the latest cached copy, not the copy this form
+  // captured earlier, so data fetched in the meantime isn't overwritten. The
+  // cache subscription below then updates this form's state.
+  const mergeIntoCache = (changes: Partial<CourseMetadata>) => {
+    queryClient.setQueryData<CourseMetadata>(
+      ['courseMetadata', project_name],
+      (latest) => {
+        const base = latest ?? metadata
+        return base ? { ...base, ...changes } : latest
+      },
+    )
+  }
 
   // Subscribe to future query cache changes — but only react to events for
   // this course's metadata key. Without this guard, *any* query observer
@@ -74,7 +90,9 @@ const BrandingForm = ({
       ]) as CourseMetadata | undefined
       if (latestData) {
         setMetadata(latestData)
-        setIntroMessage(latestData.course_intro_message || '')
+        if (!greetingDirtyRef.current) {
+          setIntroMessage(latestData.course_intro_message || '')
+        }
       }
     })
 
@@ -121,15 +139,7 @@ const BrandingForm = ({
         setLogoStatus('error')
         return
       }
-      const updatedMetadata = {
-        ...metadata,
-        banner_image_s3: banner_s3_image,
-      }
-      setMetadata(updatedMetadata)
-      queryClient.setQueryData(
-        ['courseMetadata', project_name],
-        updatedMetadata,
-      )
+      mergeIntoCache({ banner_image_s3: banner_s3_image })
       setLogoStatus('success')
     } else {
       setLogoStatus('error')
@@ -157,6 +167,7 @@ const BrandingForm = ({
                 ) : null
               }
               onChange={(e) => {
+                greetingDirtyRef.current = true
                 setIntroMessage(e.target.value)
                 setIsIntroMessageUpdated(true)
                 setGreetingSaved(false)
@@ -173,23 +184,17 @@ const BrandingForm = ({
                   setIsIntroMessageUpdated(false)
 
                   if (metadata) {
-                    const updatedMetadata = {
-                      ...metadata,
-                      course_intro_message: introMessage,
-                    }
-
                     const resp = await callSetCourseMetadata(project_name, {
                       course_intro_message: introMessage,
                     })
 
                     if (resp) {
-                      setMetadata(updatedMetadata)
-                      queryClient.setQueryData(
-                        ['courseMetadata', project_name],
-                        updatedMetadata,
-                      )
+                      greetingDirtyRef.current = false
+                      mergeIntoCache({ course_intro_message: introMessage })
                       setGreetingSaved(true)
                     } else {
+                      // Keep the typed text and let the user retry.
+                      setIsIntroMessageUpdated(true)
                       console.log(
                         'Error upserting course metadata for course: ',
                         project_name,

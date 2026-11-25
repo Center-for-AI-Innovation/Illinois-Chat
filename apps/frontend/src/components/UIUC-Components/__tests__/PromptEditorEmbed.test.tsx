@@ -460,6 +460,10 @@ describe('PromptEditorEmbed', () => {
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
       })
+      // A failed load shows an error, not an empty editor.
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /Couldn't load this project's prompt settings/,
+      )
     })
 
     it('uses DEFAULT_SYSTEM_PROMPT when system_prompt is undefined', async () => {
@@ -481,6 +485,10 @@ describe('PromptEditorEmbed', () => {
       await waitFor(() => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
       })
+      // A failed load shows an error, not an empty editor.
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /Couldn't load this project's prompt settings/,
+      )
       spy.mockRestore()
     })
   })

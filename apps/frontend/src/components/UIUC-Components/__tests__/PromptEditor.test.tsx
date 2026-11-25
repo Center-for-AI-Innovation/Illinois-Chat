@@ -439,6 +439,23 @@ describe('PromptEditor', () => {
     })
   })
 
+  describe('metadata load failure', () => {
+    it('shows an error and still loads providers', async () => {
+      // setupFetchHandlers also mocks the metadata fetch, so override after.
+      setupFetchHandlers(makeCourseMetadata(), mockLLMProviders)
+      mockFetchCourseMetadata.mockRejectedValue(new Error('fail'))
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const PromptEditor = (await import('../PromptEditor')).default
+      renderWithProviders(<PromptEditor project_name="TestProject" />)
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /Couldn't load this project's prompt settings/,
+      )
+      expect(screen.queryByLabelText('System Prompt')).not.toBeInTheDocument()
+    })
+  })
+
   describe('Update System Prompt button', () => {
     it('calls callSetCourseMetadata when Update System Prompt is clicked', async () => {
       const user = userEvent.setup()

@@ -265,7 +265,10 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   const isSmallScreen = useMediaQuery('(max-width: 1280px)')
 
   // State
-  const [isLoading, setIsLoading] = useState(true)
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
+  const [metadataFailed, setMetadataFailed] = useState(false)
+  const [providersLoaded, setProvidersLoaded] = useState(false)
+  const isLoading = !metadataLoaded || !providersLoaded
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
@@ -393,7 +396,9 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
           queryClient.setQueryData(['courseMetadata', project_name], metadata)
         }
 
-        if (metadata) {
+        if (!metadata) {
+          setMetadataFailed(true)
+        } else {
           setCourseMetadata(metadata)
           setBaseSystemPrompt(
             metadata.system_prompt ?? DEFAULT_SYSTEM_PROMPT ?? '',
@@ -414,26 +419,47 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
             agentModeFeatureEnabled: metadata.agent_mode_enabled ?? false,
           }
         }
-
-        // Fetch LLM providers
-        const response = await fetch('/api/models', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectName: project_name }),
-        })
-        if (response.ok) {
-          const providers = await response.json()
-          setLLMProviders(providers)
-        }
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('Error fetching course metadata:', error)
+        // Show an error instead of an empty editor; saves stay blocked.
+        setMetadataFailed(true)
       } finally {
-        setIsLoading(false)
+        setMetadataLoaded(true)
       }
     }
 
     fetchData()
   }, [project_name, queryClient])
+
+  // Load LLM providers on their own, so a metadata failure doesn't also break
+  // Optimize.
+  useEffect(() => {
+    if (!project_name) {
+      setProvidersLoaded(true)
+      return
+    }
+    let cancelled = false
+    const loadProviders = async () => {
+      try {
+        const response = await fetch('/api/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectName: project_name }),
+        })
+        if (response.ok && !cancelled) {
+          setLLMProviders(await response.json())
+        }
+      } catch (error) {
+        console.error('Error fetching LLM providers:', error)
+      } finally {
+        if (!cancelled) setProvidersLoaded(true)
+      }
+    }
+    void loadProviders()
+    return () => {
+      cancelled = true
+    }
+  }, [project_name])
 
   // Set default model when providers load
   useEffect(() => {
@@ -992,6 +1018,17 @@ CRITICAL: The optimized prompt must:
     return (
       <div className="flex items-center justify-center p-8">
         <p className="text-(--foreground-faded)">Loading...</p>
+      </div>
+    )
+  }
+
+  if (metadataFailed) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p role="alert" className="text-(--error)">
+          Couldn&apos;t load this project&apos;s prompt settings. Refresh the
+          page to try again.
+        </p>
       </div>
     )
   }
