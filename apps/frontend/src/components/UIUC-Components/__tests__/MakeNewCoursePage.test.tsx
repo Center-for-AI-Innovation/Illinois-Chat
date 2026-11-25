@@ -12,6 +12,7 @@ import {
 // Mocks
 // ---------------------------------------------------------------------------
 
+import type { CourseMetadata } from '~/types/courseMetadata'
 vi.mock('../navbars/Navbar', () => ({
   __esModule: true,
   default: () => <div data-testid="navbar" />,
@@ -625,6 +626,51 @@ describe('MakeNewCoursePage', () => {
           queryKey: ['pagedChatbots', 'yours'],
         }),
       )
+    })
+
+    it('warns and removes the tags when the initial tag save fails', async () => {
+      const user = userEvent.setup()
+      mockFetchCourseAvailable(false)
+
+      const apiUtils = await import('~/utils/apiUtils')
+      const { showToast } = await import('~/utils/toastUtils')
+      ;(
+        apiUtils.callSetCourseMetadata as ReturnType<typeof vi.fn>
+      ).mockResolvedValueOnce(false)
+
+      const queryClient = createTestQueryClient()
+      const MakeNewCoursePage = await importComponent()
+
+      renderWithProviders(
+        <MakeNewCoursePage
+          project_name="NewBot"
+          current_user_email="owner@example.com"
+          is_new_course={true}
+        />,
+        { queryClient },
+      )
+
+      await user.click(screen.getByTestId('mock-set-type'))
+      const continueBtn = await screen.findByRole('button', {
+        name: /Continue to next step/i,
+      })
+      await waitFor(() => expect(continueBtn).not.toBeDisabled(), {
+        timeout: 3000,
+      })
+      await user.click(continueBtn)
+
+      await waitFor(() =>
+        expect(showToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: 'Tags could not be saved',
+            type: 'warning',
+          }),
+        ),
+      )
+      expect(
+        queryClient.getQueryData<CourseMetadata>(['courseMetadata', 'NewBot'])
+          ?.tags,
+      ).toEqual([])
     })
 
     it('warns and caches nothing when fetchCourseMetadata fails', async () => {

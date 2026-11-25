@@ -134,8 +134,14 @@ describe('UploadCard', () => {
       'My project',
     )
     await user.click(screen.getByRole('button', { name: /^Update$/i }))
+    // Each save sends only the field it edits.
     await waitFor(() =>
-      expect((apiUtils as any).callSetCourseMetadata).toHaveBeenCalled(),
+      expect((apiUtils as any).callSetCourseMetadata).toHaveBeenLastCalledWith(
+        'CS101',
+        {
+          project_description: 'My project',
+        },
+      ),
     )
 
     await user.type(
@@ -144,8 +150,16 @@ describe('UploadCard', () => {
     )
     await user.click(screen.getByRole('button', { name: /^Submit$/i }))
     await waitFor(() =>
-      expect((apiUtils as any).callSetCourseMetadata).toHaveBeenCalled(),
+      expect((apiUtils as any).callSetCourseMetadata).toHaveBeenLastCalledWith(
+        'CS101',
+        {
+          course_intro_message: 'Hello students',
+        },
+      ),
     )
+    // The metadata prop is no longer changed in place.
+    expect(baseMetadata.project_description).toBe('')
+    expect(baseMetadata.course_intro_message).toBe('')
 
     const fileInput = document.querySelector(
       'input[type="file"]',
@@ -156,6 +170,14 @@ describe('UploadCard', () => {
       new File(['x'], 'logo.png', { type: 'image/png' }),
     )
     await waitFor(() => expect((apiUtils as any).uploadToS3).toHaveBeenCalled())
+    await waitFor(() =>
+      expect((apiUtils as any).callSetCourseMetadata).toHaveBeenLastCalledWith(
+        'CS101',
+        {
+          banner_image_s3: 'cs101/logo.png',
+        },
+      ),
+    )
   })
 
   it('handles failed metadata upserts gracefully', async () => {

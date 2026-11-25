@@ -66,6 +66,7 @@ import { findDefaultModel } from '~/components/UIUC-Components/api-inputs/LLMsAp
 import { type ChatBody } from '~/types/chat'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { callSetCourseMetadata, fetchCourseMetadata } from '~/utils/apiUtils'
+import { changedSwitchFields } from '~/utils/promptSwitchChanges'
 import {
   DEFAULT_SYSTEM_PROMPT,
   DOCUMENT_FOCUS_PROMPT,
@@ -247,7 +248,10 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   const queryClient = useQueryClient()
   const isSmallScreen = useMediaQuery('(max-width: 1280px)')
 
-  const [isLoading, setIsLoading] = useState(true)
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
+  const [metadataFailed, setMetadataFailed] = useState(false)
+  const [providersLoaded, setProvidersLoaded] = useState(false)
+  const isLoading = !metadataLoaded || !providersLoaded
   const [courseMetadata, setCourseMetadata] = useState<CourseMetadata | null>(
     null,
   )
@@ -357,22 +361,17 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       if (!project_name) return
 
       try {
-        const cachedMetadata = queryClient.getQueryData([
-          'courseMetadata',
-          project_name,
-        ]) as CourseMetadata | undefined
-
-        let metadata: CourseMetadata | null = null
-        if (cachedMetadata) {
-          metadata = cachedMetadata
-        } else {
-          metadata = await fetchCourseMetadata(project_name)
-          if (metadata) {
-            queryClient.setQueryData(['courseMetadata', project_name], metadata)
-          }
+        // Always fetch on mount. The query cache lasts the whole session, so a
+        // cached copy can be minutes old and miss other admins' changes.
+        const metadata: CourseMetadata | null =
+          await fetchCourseMetadata(project_name)
+        if (metadata) {
+          queryClient.setQueryData(['courseMetadata', project_name], metadata)
         }
 
-        if (metadata) {
+        if (!metadata) {
+          setMetadataFailed(true)
+        } else {
           setCourseMetadata(metadata)
           setBaseSystemPrompt(
             metadata.system_prompt ?? DEFAULT_SYSTEM_PROMPT ?? '',
@@ -391,25 +390,47 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
             agentModeFeatureEnabled: metadata.agent_mode_enabled ?? false,
           }
         }
-
-        const response = await fetch('/api/models', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectName: project_name }),
-        })
-        if (response.ok) {
-          const providers = await response.json()
-          setLLMProviders(providers)
-        }
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('Error fetching course metadata:', error)
+        // Show an error instead of an empty editor; saves stay blocked.
+        setMetadataFailed(true)
       } finally {
-        setIsLoading(false)
+        setMetadataLoaded(true)
       }
     }
 
     fetchData()
   }, [project_name, queryClient])
+
+  // Load LLM providers on their own, so a metadata failure doesn't also break
+  // Optimize.
+  useEffect(() => {
+    if (!project_name) {
+      setProvidersLoaded(true)
+      return
+    }
+    let cancelled = false
+    const loadProviders = async () => {
+      try {
+        const response = await fetch('/api/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectName: project_name }),
+        })
+        if (response.ok && !cancelled) {
+          setLLMProviders(await response.json())
+        }
+      } catch (error) {
+        console.error('Error fetching LLM providers:', error)
+      } finally {
+        if (!cancelled) setProvidersLoaded(true)
+      }
+    }
+    void loadProviders()
+    return () => {
+      cancelled = true
+    }
+  }, [project_name])
 
   useEffect(() => {
     if (llmProviders) {
@@ -438,16 +459,25 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   ) => {
     let success = false
     if (courseMetadata && project_name) {
-      const updatedCourseMetadata = {
-        ...courseMetadata,
+      // Send only the fields this editor owns; the server merges them over
+      // what it has stored.
+      // The prompt, plus any switch not yet saved by the debounced save.
+      const changes = {
         system_prompt: newSystemPrompt,
-        guidedLearning,
-        documentsOnly,
-        systemPromptOnly,
+        ...changedSwitchFields(
+          {
+            guidedLearning,
+            documentsOnly,
+            systemPromptOnly,
+            vectorSearchRewrite,
+            agentModeFeatureEnabled,
+          },
+          initialSwitchStateRef.current,
+        ),
       }
-      success = await callSetCourseMetadata(project_name, updatedCourseMetadata)
+      success = await callSetCourseMetadata(project_name, changes)
       if (success) {
-        setCourseMetadata(updatedCourseMetadata)
+        setCourseMetadata({ ...courseMetadata, ...changes })
       }
     }
     if (!success) {
@@ -460,17 +490,14 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
 
   const resetSystemPrompt = async () => {
     if (courseMetadata && project_name) {
-      const updatedCourseMetadata = {
-        ...courseMetadata,
+      const resetFields = {
         system_prompt: null,
         guidedLearning: false,
         documentsOnly: false,
         systemPromptOnly: false,
       }
-      const success = await callSetCourseMetadata(
-        project_name,
-        updatedCourseMetadata,
-      )
+      const updatedCourseMetadata = { ...courseMetadata, ...resetFields }
+      const success = await callSetCourseMetadata(project_name, resetFields)
       if (!success) {
         alert('Error resetting system prompt')
         showToastOnPromptUpdate(true, true)
@@ -534,17 +561,23 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       return
     }
 
+    // Prompt toggles (Guided Learning, etc.) also rewrite the prompt text.
+    // Include system_prompt only when a toggle changed it, so a settings-only
+    // save never overwrites a prompt another admin saved meanwhile.
+    const togglePrompt = courseMetadataRef.current.system_prompt
+    const promptChanged = togglePrompt !== courseMetadata?.system_prompt
+    // Only the switches that changed since the last save.
+    const settingChanges = {
+      ...changedSwitchFields(currentSwitchState, initialSwitchState),
+      ...(promptChanged ? { system_prompt: togglePrompt } : {}),
+    }
     const updatedMetadata = {
       ...courseMetadataRef.current,
-      guidedLearning,
-      documentsOnly,
-      systemPromptOnly,
-      vector_search_rewrite_disabled: !vectorSearchRewrite,
-      agent_mode_enabled: agentModeFeatureEnabled,
+      ...settingChanges,
     } as CourseMetadata
 
     try {
-      const success = await callSetCourseMetadata(project_name, updatedMetadata)
+      const success = await callSetCourseMetadata(project_name, settingChanges)
       if (!success) {
         showPromptToast('Error', 'Failed to update settings', true)
         return
@@ -908,6 +941,17 @@ CRITICAL: The optimized prompt must:
     return (
       <div className="flex items-center justify-center p-8">
         <p className="text-(--foreground-faded)">Loading...</p>
+      </div>
+    )
+  }
+
+  if (metadataFailed) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p role="alert" className="text-(--error)">
+          Couldn&apos;t load this project&apos;s prompt settings. Refresh the
+          page to try again.
+        </p>
       </div>
     )
   }

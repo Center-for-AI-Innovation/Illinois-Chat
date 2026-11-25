@@ -42,7 +42,9 @@ export const getBackendUrl = (): string => {
  */
 export const callSetCourseMetadata = async (
   courseName: string,
-  courseMetadata: CourseMetadata | CourseMetadataOptionalForUpsert,
+  // Send only the fields being changed. The server merges this over the
+  // stored metadata, so every field included here overwrites the stored value.
+  courseMetadata: Partial<CourseMetadata | CourseMetadataOptionalForUpsert>,
 ): Promise<boolean> => {
   try {
     const endpoint = '/api/UIUC-api/upsertCourseMetadata'

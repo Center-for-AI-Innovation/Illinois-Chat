@@ -54,7 +54,7 @@ export function useFetchCourseMetadata({
   enabled = true,
 }: UseFetchCourseMetadataOptions) {
   const query = useQuery({
-    queryKey: ['courseMetadata', courseName],
+    queryKey: ['courseMetadataWithAccess', courseName],
     queryFn: () => fetchCourseMetadata({ courseName }),
     retry: 1,
     enabled: enabled && Boolean(courseName),

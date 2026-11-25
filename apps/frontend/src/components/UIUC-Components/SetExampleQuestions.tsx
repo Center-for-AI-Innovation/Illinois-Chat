@@ -77,7 +77,6 @@ export default function SetExampleQuestions({
 
       try {
         const success = await callSetCourseMetadata(course_name, {
-          ...course_metadata,
           example_questions: validQuestions,
         })
 
@@ -157,7 +156,6 @@ export default function SetExampleQuestions({
 
       try {
         const success = await callSetCourseMetadata(course_name, {
-          ...course_metadata,
           example_questions: allQuestions,
         })
 
@@ -208,7 +206,6 @@ export default function SetExampleQuestions({
 
     try {
       const success = await callSetCourseMetadata(course_name, {
-        ...course_metadata,
         example_questions: validQuestions,
       })
 

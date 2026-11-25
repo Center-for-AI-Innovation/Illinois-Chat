@@ -114,10 +114,9 @@ export default function ChatbotTagsEditor({
       setStatus('saving')
       setErrorMessage(null)
 
-      const ok = await callSetCourseMetadata(course_name, {
-        ...course_metadata,
-        tags: nextTags,
-      })
+      // Send only the tags so a stale copy of the rest of the metadata can't
+      // overwrite newer values on the server.
+      const ok = await callSetCourseMetadata(course_name, { tags: nextTags })
 
       if (!ok) {
         setStatus('error')
@@ -262,9 +261,7 @@ export default function ChatbotTagsEditor({
       >
         <span className="label-text-unused text-lg">Tags</span>
       </label>
-      <p
-        className={`mt-0! px-1 py-2 text-sm ${montserrat_light.className}`}
-      >
+      <p className={`mt-0! px-1 py-2 text-sm ${montserrat_light.className}`}>
         Add up to {MAX_CHATBOT_TAGS} tags to help people discover your bot in
         the chatbot hub. Project Type and Organization are set when you create
         the chatbot.

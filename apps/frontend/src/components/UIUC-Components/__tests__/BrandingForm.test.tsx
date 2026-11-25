@@ -14,6 +14,9 @@ import type { CourseMetadata } from '~/types/courseMetadata'
 
 vi.mock('~/utils/apiUtils', () => ({
   callSetCourseMetadata: vi.fn(async () => true),
+  // Mount refresh returns nothing by default so tests drive the form through
+  // the query cache.
+  fetchCourseMetadata: vi.fn(async () => null),
   uploadToS3: vi.fn(async () => 'https://s3.example.com/logo.png'),
 }))
 
@@ -209,9 +212,9 @@ describe('BrandingForm', () => {
       await waitFor(() => {
         expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
           'TestProject',
-          expect.objectContaining({
+          {
             course_intro_message: 'New greeting',
-          }),
+          },
         )
       })
     })
@@ -316,9 +319,9 @@ describe('BrandingForm', () => {
       await waitFor(() => {
         expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
           'TestProject',
-          expect.objectContaining({
+          {
             course_intro_message: 'Test input',
-          }),
+          },
         )
       })
     })
@@ -471,6 +474,92 @@ describe('BrandingForm', () => {
 
       // Should not call callSetCourseMetadata since metadata is null
       expect(vi.mocked(callSetCourseMetadata)).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('mount refresh races (review of #435 fix)', () => {
+    it('keeps a greeting the user is typing when the refresh lands', async () => {
+      const user = userEvent.setup()
+      const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+      let resolveFetch: (m: CourseMetadata) => void = () => {}
+      vi.mocked(fetchCourseMetadata).mockImplementationOnce(
+        () => new Promise((resolve) => (resolveFetch = resolve)),
+      )
+
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(
+        ['courseMetadata', 'TestProject'],
+        makeCourseMetadata({ course_intro_message: 'cached greeting' }),
+      )
+      renderWithProviders(
+        <BrandingForm project_name="TestProject" user_id="user-123" />,
+        { queryClient },
+      )
+
+      const textarea = screen.getByPlaceholderText(/enter a greeting/i)
+      await user.clear(textarea)
+      await user.type(textarea, 'my typed greeting')
+
+      resolveFetch(
+        makeCourseMetadata({ course_intro_message: 'server greeting' }),
+      )
+      await waitFor(() =>
+        expect(
+          queryClient.getQueryData<CourseMetadata>([
+            'courseMetadata',
+            'TestProject',
+          ])?.course_intro_message,
+        ).toBe('server greeting'),
+      )
+
+      expect(textarea).toHaveValue('my typed greeting')
+    })
+
+    it('a logo save keeps data that arrived during the upload', async () => {
+      const { uploadToS3 } = await import('~/utils/apiUtils')
+      let finishUpload: (key: string) => void = () => {}
+      vi.mocked(uploadToS3).mockImplementationOnce(
+        () => new Promise((resolve) => (finishUpload = resolve)),
+      )
+
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(
+        ['courseMetadata', 'TestProject'],
+        makeCourseMetadata({ tags: [{ category: 'general', value: 'old' }] }),
+      )
+      renderWithProviders(
+        <BrandingForm project_name="TestProject" user_id="user-123" />,
+        { queryClient },
+      )
+
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
+      fireEvent.change(fileInput, {
+        target: { files: [new File(['x'], 'logo.png', { type: 'image/png' })] },
+      })
+
+      // Fresh data lands while the upload is still running.
+      queryClient.setQueryData(
+        ['courseMetadata', 'TestProject'],
+        makeCourseMetadata({ tags: [{ category: 'general', value: 'fresh' }] }),
+      )
+      finishUpload('https://s3.example.com/logo.png')
+
+      await waitFor(() =>
+        expect(
+          queryClient.getQueryData<CourseMetadata>([
+            'courseMetadata',
+            'TestProject',
+          ])?.banner_image_s3,
+        ).toBe('https://s3.example.com/logo.png'),
+      )
+      expect(
+        queryClient.getQueryData<CourseMetadata>([
+          'courseMetadata',
+          'TestProject',
+        ])?.tags,
+      ).toEqual([{ category: 'general', value: 'fresh' }])
     })
   })
 

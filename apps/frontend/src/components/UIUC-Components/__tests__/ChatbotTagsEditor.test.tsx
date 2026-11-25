@@ -104,9 +104,9 @@ describe('ChatbotTagsEditor', () => {
     await waitFor(() => {
       expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
         'TestProject',
-        expect.objectContaining({
+        {
           tags: [{ category: 'general', value: 'beta-cohort' }],
-        }),
+        },
       )
     })
   })
@@ -121,9 +121,9 @@ describe('ChatbotTagsEditor', () => {
     await waitFor(() => {
       expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
         'TestProject',
-        expect.objectContaining({
+        {
           tags: [{ category: 'general', value: 'launch' }],
-        }),
+        },
       )
     })
   })
@@ -190,9 +190,9 @@ describe('ChatbotTagsEditor', () => {
     await waitFor(() => {
       expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
         'TestProject',
-        expect.objectContaining({
+        {
           tags: [{ category: 'projectType', value: 'Course' }],
-        }),
+        },
       )
     })
   })
