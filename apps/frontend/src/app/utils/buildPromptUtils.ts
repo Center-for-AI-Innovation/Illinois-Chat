@@ -19,6 +19,9 @@ import { persistMessageServer } from '~/pages/api/conversation'
 
 import { encodingForModel } from 'js-tiktoken'
 import { v4 as uuidv4 } from 'uuid'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('buildPrompt')
 
 // Define interface for URL link parameters
 interface LinkParameters {
@@ -250,7 +253,8 @@ export const buildPrompt = async ({
 
       // Check if encoding is initialized
       if (!encoding) {
-        console.error('Encoding is not initialized.')
+        // The caller logs the ERROR with the stack; this line names the step.
+        log.warn('token encoding is not initialized')
         throw new Error('Encoding initialization failed.')
       }
 
@@ -343,7 +347,7 @@ export const buildPrompt = async ({
 
     return conversation
   } catch (error) {
-    console.error('Error in buildPrompt:', error)
+    log.warn('could not build the prompt', { course: projectName })
     throw error
   }
 }
@@ -478,9 +482,10 @@ export const truncateToolOutputToBudget = (
     .decode(encoding.encode(entriesRegion).slice(0, allowance))
     .replace(/�+$/, '')
 
-  console.warn(
-    `Tool output truncated to fit the model's context window: ${totalTokens} tokens exceeded the ${maxTokens}-token budget`,
-  )
+  log.warn("tool output truncated to fit the model's context window", {
+    tokens: totalTokens,
+    budget: maxTokens,
+  })
   return (
     TOOL_OUTPUTS_PREFIX +
     truncatedEntries +
@@ -599,7 +604,8 @@ function _buildQueryTopContext({
 
     return contextText
   } catch (e) {
-    console.error(`Error in getStuffedPrompt: ${e}`)
+    // The route logs the ERROR with the stack; this line names the step.
+    log.warn('could not build the stuffed prompt')
     throw e
   }
 }
@@ -623,7 +629,11 @@ export const _getSystemPrompt = async ({
     userDefinedSystemPrompt = await getCourseMetadata(projectName)
       .then((metadata) => metadata?.system_prompt)
       .catch((error) => {
-        console.warn('Failed to fetch course metadata:', error)
+        log.warn(
+          'could not fetch project metadata; using no system prompt',
+          { course: projectName },
+          error,
+        )
         return undefined
       })
   }

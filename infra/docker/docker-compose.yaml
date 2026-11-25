@@ -229,6 +229,8 @@ services:
     networks:
       - uiuc-chat-network
     environment:
+      # Server log level (DEBUG, INFO, WARNING, ERROR); see src/utils/server/log.ts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # backend
       RAILWAY_URL: "http://backend:8001"
       INGEST_URL: "http://backend:8001/ingest"

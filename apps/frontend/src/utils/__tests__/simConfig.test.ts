@@ -189,7 +189,7 @@ describe('resolveSimCredentials', () => {
       reason: 'decrypt_failed',
     })
     expect(hoisted.updateCalls).toHaveLength(0)
-    expect(String(error.mock.calls[0]?.[1])).toMatch(/0017/)
+    expect(String(error.mock.calls[0]?.[0])).toMatch(/0017/)
   })
 
   it('resolveStoredSimApiKey returns null for an absent key', async () => {

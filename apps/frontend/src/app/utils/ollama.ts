@@ -9,6 +9,13 @@ import { OllamaModelIDs } from '~/utils/modelProviders/ollama'
 import { decryptKeyIfNeeded } from '~/utils/crypto'
 import { ncsaHostedAuthHeaders } from '~/utils/ncsaHostedAuth'
 import { NextResponse } from 'next/server'
+import { getLogger } from '~/utils/server/log'
+import {
+  isClosedStreamError,
+  logStreamFailure,
+} from '~/utils/server/streamErrors'
+
+const log = getLogger('llm.ollama')
 
 /**
  * Handle Ollama reasoning models with streaming
@@ -112,6 +119,15 @@ async function handleOllamaReasoningStream(
           }
         }
       } catch (error) {
+        // The reply has started, so no caller can catch this any more. A
+        // reader that went away is not a failure.
+        if (!isClosedStreamError(error)) {
+          log.error(
+            'LLM stream failed',
+            { model: conversation.model.id },
+            error,
+          )
+        }
         if (isThinkingOpen) controller.enqueue(encoder.encode('</think>\n'))
         controller.error(error)
       }
@@ -196,8 +212,21 @@ export async function runOllamaChat(
       }
 
       if (stream) {
-        const result = await streamText(commonParams)
-        return result.toTextStreamResponse()
+        const result = await streamText({
+          ...commonParams,
+          // streamText does not throw when the provider fails: the error comes
+          // as a part of the stream, and the reply is an empty 200. onError is
+          // the one place that sees it.
+          onError: ({ error }) =>
+            log.error(
+              'LLM stream failed',
+              { model: conversation.model.id },
+              error,
+            ),
+        })
+        return logStreamFailure(result.toTextStreamResponse(), log, {
+          model: conversation.model.id,
+        })
       } else {
         const result = await generateText(commonParams)
         const choices = [{ message: { content: result.text } }]
@@ -208,7 +237,11 @@ export async function runOllamaChat(
         })
       }
     } catch (apiError) {
-      console.error('Ollama API error:', apiError)
+      log.warn('Ollama API error', {
+        provider: ollamaProvider?.provider,
+        model: conversation?.model?.id,
+        status: (apiError as { statusCode?: number })?.statusCode,
+      })
 
       // Handle specific API errors
       if (apiError instanceof Error) {
@@ -235,7 +268,15 @@ export async function runOllamaChat(
       }
     }
   } catch (error) {
-    console.error('Error in runOllamaChat:', error)
+    log.error(
+      'Ollama chat request failed',
+      {
+        provider: ollamaProvider?.provider,
+        model: conversation?.model?.id,
+        status: (error as { statusCode?: number })?.statusCode,
+      },
+      error,
+    )
     // return error
     return new Response(
       JSON.stringify({

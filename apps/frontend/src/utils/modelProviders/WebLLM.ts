@@ -10,7 +10,6 @@ import {
   type WebLLMProvider,
 } from '~/utils/modelProviders/LLMProvider'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import buildPrompt from '~/pages/api/buildPrompt'
 
 // TODO: finish this message interface. Write a converter between `Message` and `WebLLMMessage`
 export interface WebLLMMessage {

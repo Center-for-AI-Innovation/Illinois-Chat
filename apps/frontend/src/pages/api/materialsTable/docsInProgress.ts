@@ -5,6 +5,9 @@ import { documentsInProgress } from '~/db/dbClient'
 import { connectionManager } from '~/utils/connectionManager'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import { parseIngestStatusFilters } from '~/utils/ingestStatusFilters'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.materialsTable.docsInProgress')
 
 // This is for "Documents in Progress" table, docs that are still being ingested.
 // POST-only: callers must send the filenames/base_urls they are tracking.
@@ -65,7 +68,7 @@ async function docsInProgress(
       })),
     })
   } catch (error) {
-    console.error('Failed to fetch documents:', error)
+    log.error('failed to fetch documents in progress', undefined, error)
     return res.status(500).json({
       error: (error as Error).message,
     })

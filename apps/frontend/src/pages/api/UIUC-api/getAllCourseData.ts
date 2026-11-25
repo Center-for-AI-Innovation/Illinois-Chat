@@ -1,6 +1,10 @@
 import { withAuth } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+import { backendFetch, statusForBrowser } from '~/utils/server/backendFetch'
+
+const log = getLogger('api.getAllCourseData')
 
 async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
@@ -14,13 +18,13 @@ async function handler(req: any, res: any) {
   }
 
   try {
-    const response = await fetch(
+    const response = await backendFetch(
       `${getBackendUrl()}/getAll?course_name=${course_name}`,
     )
 
     if (!response.ok) {
-      console.error('Failed to fetch course data. Err status:', response.status)
-      return res.status(response.status).json({
+      log.error('backend getAll failed', { status: response.status })
+      return res.status(statusForBrowser(response.status)).json({
         error: `Failed to fetch course data. Status: ${response.status}`,
       })
     }
@@ -28,7 +32,7 @@ async function handler(req: any, res: any) {
     const data = await response.json()
     return res.status(200).json(data)
   } catch (error) {
-    console.error('Error fetching course data:', error)
+    log.error('error fetching course data', undefined, error)
     return res.status(500).json({
       error: 'Internal server error while fetching course data',
     })

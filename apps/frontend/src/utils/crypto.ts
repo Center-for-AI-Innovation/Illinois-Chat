@@ -1,11 +1,11 @@
 // src/utils/crypto.ts
 export const encrypt = async (text: string, key: string) => {
   if (!text || !key) {
-    console.error(
-      'Error encrypting because text or key is not available',
-      text,
-      key,
-    )
+    // Never print the text or the key: one is a secret to protect, the other protects it.
+    console.error('Error encrypting because text or key is not available', {
+      has_text: Boolean(text),
+      has_key: Boolean(key),
+    })
     return
   }
   const pwUtf8 = new TextEncoder().encode(key)
@@ -30,10 +30,10 @@ export const encrypt = async (text: string, key: string) => {
 
 export const decrypt = async (encryptedText: string, key: string) => {
   if (!encryptedText || !key) {
+    // Never print the encrypted text or the key.
     console.error(
       'Error decrypting because encryptedText or key is not available',
-      encryptedText,
-      key,
+      { has_text: Boolean(encryptedText), has_key: Boolean(key) },
     )
     return
   }
@@ -141,8 +141,9 @@ export async function decryptProjectConfig<T = unknown>(
   try {
     return JSON.parse(plaintext) as T
   } catch (e) {
+    // No parser message: it quotes a piece of the decrypted config.
     throw new Error(
-      'Failed to JSON-parse decrypted project config: ' + (e as Error).message,
+      'Failed to JSON-parse decrypted project config: ' + (e as Error).name,
     )
   }
 }
