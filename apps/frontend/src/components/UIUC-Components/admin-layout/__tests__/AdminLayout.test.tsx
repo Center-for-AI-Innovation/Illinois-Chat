@@ -242,7 +242,7 @@ describe('AdminLayout', () => {
       expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
     })
 
-    it('sends signed-out users back to the admin page they asked for', async () => {
+    it('sends signed-out users to the chatbot dashboard after signing in', async () => {
       globalThis.__TEST_AUTH__ = { isAuthenticated: false, user: null }
       globalThis.__TEST_ROUTER__ = {
         pathname: '/[course_name]/ai-models',
@@ -254,10 +254,7 @@ describe('AdminLayout', () => {
         .setup()
         .click(screen.getByRole('button', { name: /sign in/i }))
 
-      expect(signIn).toHaveBeenCalledWith(
-        expect.anything(),
-        '/CS101/ai-models#commercial',
-      )
+      expect(signIn).toHaveBeenCalledWith(expect.anything(), '/CS101/dashboard')
     })
 
     it('shows nothing of the page while the access check is loading', () => {
