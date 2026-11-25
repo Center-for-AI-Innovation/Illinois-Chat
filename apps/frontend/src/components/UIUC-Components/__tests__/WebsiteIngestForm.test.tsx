@@ -567,7 +567,18 @@ describe('WebsiteIngestForm', () => {
     const toastUtils = await import('~/utils/toastUtils')
     const axiosMod = await import('axios')
     ;(axiosMod as any).default.post.mockImplementationOnce(async () => {
-      throw new Error('scrape failed')
+      // An axios error from /api/scrapeWeb: the server puts the cause in
+      // `message` and our API routes set X-Request-ID on the response.
+      throw Object.assign(new Error('Request failed with status code 500'), {
+        response: {
+          status: 500,
+          data: {
+            error: 'Web scraping failed. Please try again later.',
+            message: 'scrape failed',
+          },
+          headers: { 'x-request-id': 'rid-web1' },
+        },
+      })
     })
 
     const originalSetTimeout = globalThis.setTimeout
@@ -608,7 +619,7 @@ describe('WebsiteIngestForm', () => {
     expect(toastUtils.showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Error during web scraping. Please try again.',
-        message: 'scrape failed',
+        message: 'scrape failed (ref: rid-web1)',
         type: 'error',
         autoClose: 12000,
       }),

@@ -11,11 +11,9 @@ import {
   NAVBAR_LOGO_ENDPOINT,
   readNavbarLogo,
 } from '~/utils/platformSettings.server'
+import { runPagesRoute } from '~/utils/server/routeContext'
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
     return res.status(405).json({ error: 'Method not allowed' })
@@ -53,4 +51,13 @@ export default async function handler(
   )
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
   return res.status(200).send(Buffer.from(parsed.base64, 'base64'))
+}
+
+// Opens the request context: a request id, the X-Request-ID response header
+// and one ERROR line with a 500 when the handler throws.
+export default async function navbarLogoRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => handler(req, res))
 }

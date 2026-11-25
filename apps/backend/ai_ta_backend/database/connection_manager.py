@@ -24,12 +24,14 @@ Do not re-add write helpers to this service.
 
 import logging
 import os
+import re
 
 import boto3
 from botocore.config import Config
 from injector import inject
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
+from sqlalchemy.exc import ArgumentError, NoSuchModuleError
 from sqlalchemy.pool import NullPool
 
 
@@ -124,8 +126,29 @@ class ConnectionManager:
         database pooler's job (the documented setup is a Supabase transaction
         pooler), and this matches the host engines in `database/sql.py`.
         """
-        logger.info(f"Creating external DB engine for project: {project_name}")
-        return create_engine(db_config["connection_uri"], poolclass=NullPool)
+        logger.debug("Creating external DB engine course=%s", project_name)
+        uri = db_config["connection_uri"]
+        try:
+            return create_engine(uri, poolclass=NullPool, hide_parameters=True)
+        except NoSuchModuleError:
+            # The scheme names a driver that SQLAlchemy cannot load, for example postgres://.
+            # The scheme holds no secret, so the message names it. `from None` for the same
+            # reason as below.
+            scheme = uri.split("://", 1)[0] if isinstance(uri, str) and "://" in uri else ""
+            if not re.fullmatch(r"[A-Za-z0-9+.\-]{1,40}", scheme):
+                scheme = "?"
+            if scheme in ("postgresql", "postgresql+psycopg2"):
+                # The scheme is good. What cannot be loaded is something else in the string,
+                # a `plugin=` in the query for example.
+                raise ValueError("the connection_uri of project %s is not a valid database URL" %
+                                 project_name) from None
+            raise ValueError("the connection_uri of project %s has the scheme %s://, which the backend cannot "
+                             "use; use postgresql://" % (project_name, scheme)) from None
+        except (ArgumentError, ValueError):
+            # SQLAlchemy writes the string, or the part of it after the user name, into these
+            # errors, and that text holds the password. `from None` keeps it out of the
+            # traceback too.
+            raise ValueError("the connection_uri of project %s is not a valid database URL" % project_name) from None
 
     # ── Vector Engine Resolution ──
     #
@@ -189,7 +212,7 @@ class ConnectionManager:
 
     @staticmethod
     def _create_qdrant(project_name: str, qdrant_config: dict) -> QdrantClient:
-        logger.info(f"Creating external Qdrant client for project: {project_name}")
+        logger.debug("Creating external Qdrant client course=%s", project_name)
         return QdrantClient(
             url=qdrant_config["url"],
             api_key=qdrant_config["api_key"],
@@ -215,7 +238,7 @@ class ConnectionManager:
 
     @staticmethod
     def _create_s3(project_name: str, s3_config: dict) -> AWSStorage:
-        logger.info(f"Creating external S3 client for project: {project_name}")
+        logger.debug("Creating external S3 client course=%s", project_name)
         endpoint_url = s3_config.get("endpoint_url")
         region = s3_config.get("region")
         client_kwargs = dict(

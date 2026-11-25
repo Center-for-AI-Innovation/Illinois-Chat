@@ -1,3 +1,4 @@
+import { getLogger } from '~/utils/server/log'
 import {
   type AzureProvider,
   preferredModelIds,
@@ -6,6 +7,8 @@ import {
 import { OPENAI_API_VERSION } from '../app/const'
 import { decryptKeyIfNeeded } from '../crypto'
 import { type AzureModel, AzureModelID, AzureModels } from './types/azure'
+
+const log = getLogger('modelProviders.azure')
 
 // OMG azure sucks
 // the azureDeploymentID is require to make requests. Grab it from the /deployments list in getAzureModels()
@@ -45,6 +48,10 @@ export const getAzureModels = async (
     })
 
     if (!response.ok) {
+      log.warn('model list request failed', {
+        status: response.status,
+        reason: response.statusText,
+      })
       azureProvider.error = `Error ${response.status}. Azure OpenAI failed to fetch models. ${response.statusText}`
       azureProvider.models = [] // clear any previous models.
       return azureProvider
@@ -111,7 +118,7 @@ export const getAzureModels = async (
     return azureProvider
   } catch (error: any) {
     azureProvider.error = error.message
-    console.warn('Error fetching Azure models:', error)
+    log.warn('could not fetch the model list', undefined, error)
     azureProvider.models = [] // clear any previous models.
     return azureProvider
   }

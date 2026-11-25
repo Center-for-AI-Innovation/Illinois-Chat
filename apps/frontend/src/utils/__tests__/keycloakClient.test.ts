@@ -31,6 +31,49 @@ describe('keycloakClient', () => {
     )
   })
 
+  it('initializeKeycloakAdmin does not keep a client whose login failed', async () => {
+    vi.stubEnv('KEYCLOAK_ADMIN_CLIENT_SECRET', 'secret')
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const auth = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('login refused'))
+      .mockResolvedValue(undefined)
+    const ctor = vi.fn().mockImplementation(() => ({ auth }))
+    vi.doMock('@keycloak/keycloak-admin-client', () => ({ default: ctor }))
+
+    vi.resetModules()
+    const { initializeKeycloakAdmin } = await import('../keycloakClient')
+
+    await expect(initializeKeycloakAdmin('https://kc/')).rejects.toThrow(
+      'login refused',
+    )
+    const line = String(error.mock.calls[0]?.[0])
+    expect(line).toContain('Keycloak admin login failed')
+    expect(line).not.toContain('secret')
+
+    // The next call logs in again; it does not get the failed client back.
+    await initializeKeycloakAdmin('https://kc/')
+    expect(ctor).toHaveBeenCalledTimes(2)
+    expect(auth).toHaveBeenCalledTimes(2)
+  })
+
+  it('initializeKeycloakAdmin warns when there is no client secret', async () => {
+    vi.stubEnv('KEYCLOAK_ADMIN_CLIENT_SECRET', '')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const auth = vi.fn()
+    const ctor = vi.fn().mockImplementation(() => ({ auth }))
+    vi.doMock('@keycloak/keycloak-admin-client', () => ({ default: ctor }))
+
+    vi.resetModules()
+    const { initializeKeycloakAdmin } = await import('../keycloakClient')
+
+    await initializeKeycloakAdmin('https://kc/')
+    expect(auth).not.toHaveBeenCalled()
+    expect(String(warn.mock.calls[0]?.[0])).toContain(
+      'KEYCLOAK_ADMIN_CLIENT_SECRET is not set',
+    )
+  })
+
   it('getSigningKey returns an error when kid is missing', async () => {
     vi.resetModules()
     const { getSigningKey } = await import('../keycloakClient')

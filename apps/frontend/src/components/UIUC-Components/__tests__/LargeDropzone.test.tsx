@@ -470,6 +470,53 @@ describe('LargeDropzone', () => {
     expect(consoleSpy).toHaveBeenCalled()
   }, 10000)
 
+  it('sends X-Request-ID to our API routes only and shows the ingest error with its ref', async () => {
+    const { default: LargeDropzone } = await import('../LargeDropzone')
+    mockTimers()
+
+    let uploads: FileUpload[] = []
+    const setUploadFiles = vi.fn((updater: any) => {
+      uploads = typeof updater === 'function' ? updater(uploads) : updater
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      buildFetchMock({
+        ingest: () =>
+          new Response(JSON.stringify({ error: 'Ingest queue unavailable' }), {
+            status: 502,
+            headers: {
+              'content-type': 'application/json',
+              'x-request-id': 'uuid1',
+            },
+          }),
+      }),
+    )
+
+    render(<LargeDropzone {...defaultProps({ setUploadFiles })} />)
+
+    await dropDefaultFile()
+
+    await waitFor(() => {
+      expect(uploads).toContainEqual(
+        expect.objectContaining({
+          name: 'My-File.pdf',
+          status: 'error',
+          error: 'Ingest queue unavailable (ref: uuid1)',
+        }),
+      )
+    })
+
+    const headersFor = (match: string) =>
+      fetchSpy.mock.calls.find(([input]) => String(input).includes(match))?.[1]
+        ?.headers as Record<string, string> | undefined
+    expect(headersFor('/api/UIUC-api/uploadToS3')?.['X-Request-ID']).toBe(
+      'uuid1',
+    )
+    expect(headersFor('/api/UIUC-api/ingest')?.['X-Request-ID']).toBe('uuid1')
+    expect(headersFor('http://localhost/upload')).toBeUndefined()
+  }, 10000)
+
   // -----------------------------------------------------------------------
   // Non-new-course redirects
   // -----------------------------------------------------------------------

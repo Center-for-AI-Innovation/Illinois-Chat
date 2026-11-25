@@ -3,6 +3,10 @@ import { type NextApiResponse } from 'next'
 import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import { getBackendUrl } from '~/utils/apiUtils'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+import { requestIdHeaders } from '~/utils/server/backendFetch'
+
+const log = getLogger('api.exportAllDocuments')
 
 export default withCourseOwnerOrAdminAccess()(handler)
 
@@ -24,6 +28,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const response = await axios.get(`${getBackendUrl()}/exportDocuments`, {
       params: { course_name },
       responseType: 'arraybuffer',
+      headers: requestIdHeaders(),
     })
 
     // Check content type from response headers
@@ -56,13 +61,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(200).send(Buffer.from(response.data))
     } else {
       // Handle unexpected content types
-      console.log('Unexpected content type:', contentType)
+      log.error('unexpected content type from backend export', {
+        content_type: contentType,
+      })
       return res.status(500).json({
         message: `Unexpected response format from backend: ${contentType}`,
       })
     }
   } catch (error) {
-    console.error('Error exporting documents:', error)
+    log.error('error exporting documents', undefined, error)
     return res.status(500).json({ message: 'Error exporting documents.' })
   }
 }

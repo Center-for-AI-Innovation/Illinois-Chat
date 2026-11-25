@@ -2,6 +2,71 @@
 
 Symptoms seen on self-hosted stacks, with the page that owns the fix. Sim-specific problems are in "Troubleshooting" on [Tools Platform (Sim AI)](sim.md); problems with external stores are in "Verifying and troubleshooting" on [External connections (operators)](external-connections.md).
 
+## Reading the logs
+
+The backend and the ingest worker write one line per event to their container output. To watch both while you repeat the problem, run this from the repository root:
+
+```bash
+docker compose --project-directory . -f infra/docker/docker-compose.yaml logs -f backend worker
+```
+
+The frontend and the web crawler write their lines to their container output too. To watch them, for example while you repeat an upload or a website import:
+
+```bash
+docker compose --project-directory . -f infra/docker/docker-compose.yaml logs -f frontend crawlee
+```
+
+Every line has the same shape: the time in UTC, the level, the part of the code that wrote it, the ids that are known, then the message.
+
+```text
+2026-11-02T14:03:01.050Z INFO    api.ingest rid=5f3a9c1e0b2d path=/api/UIUC-api/ingest course=ece120 submitted to ingest queue file=courses/ece120/5f3a9c1e-0b2d-4c1a-9e2f-3b7d6a8c1f04-lecture1.pdf status=200 task_id=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17
+2026-11-02T14:03:09.410Z INFO    ingest rid=5f3a9c1e0b2d job=7b0c2e64-91d3-4f0e-a6c8-2d5e1b9f4a17 course=ece120 done handler=_ingest_single_pdf file=courses/ece120/lecture1.pdf result=Success ms=5321
+```
+
+- `rid=` is the request id. An upload keeps the same id from the API call, through the queue, to the worker.
+- `job=` is the ingest job and `course=` the chatbot's project name. A field that is not known is left out.
+- `path=` is on frontend lines only: the API route that was called.
+- A failure is logged at `ERROR`. The line says what failed and why; when there is a traceback, it follows on the next lines.
+- A frontend `ERROR` line ends with `at=<file>:<line>`, the line of the frontend code that reported the failure. The lines that follow name the file and line where the error started.
+
+The web crawler's lines look a little different. The time has a space instead of `T` and no `Z`, the level names are short (`WARN` instead of `WARNING`), and the ids come first, followed by `:`:
+
+```text
+2026-11-03 00:16:29.261 INFO  rid=3c9e51b07a24 course=ece120: crawl started url=https://ece.illinois.edu/ strategy=same-hostname maxPages=50
+```
+
+**What a healthy start looks like.** The backend writes `logging configured level=INFO` and `Sentry disabled: SENTRY_DSN unset` (or `Sentry configured (initialised on first request)`) once per gunicorn worker. The worker writes `Worker connected to RabbitMQ queue=uiuc-chat` and then `Waiting for messages`. Gunicorn's first line, `Starting gunicorn`, and Flask's two banner lines in the worker, ` * Serving Flask app 'worker'` and ` * Debug mode: off`, are the only lines without the time in front.
+
+**What one upload looks like.** The backend writes `ingest request`, `job enqueued job=<id>` and the `request method=POST route=/ingest status=200` line. The worker then writes `job received file=<name>`, `start handler=<handler>`, `done handler=<handler> ... result=Success` (or `result=failed err=<reason>` at `ERROR`) and `job done ms=<n>`. `job done` means the job ran to the end; whether the file made it is on the `done handler=` line.
+
+**Follow one request.** The backend sends the request id back in the `X-Request-ID` header of every reply. A caller may also send its own id in an `X-Request-ID` request header (letters, digits, `-` and `_`, up to 64 characters), and the backend then uses it. To see everything that happened for one id, in every container:
+
+```bash
+docker compose --project-directory . -f infra/docker/docker-compose.yaml logs backend worker | grep rid=5f3a9c1e0b2d
+```
+
+If you do not have the id, find the failing line first and copy its `rid=` value:
+
+```bash
+docker compose --project-directory . -f infra/docker/docker-compose.yaml logs backend worker | grep -E ' (ERROR|CRITICAL) '
+```
+
+Add `frontend crawlee` to the list of services to include their lines. The frontend's API routes under `/api/` also send the request id back in the `X-Request-ID` response header (every route that checks sign-in or project access, and the public routes for the health check, the announcement banner, the navbar brand and the maintenance text). The Network tab of the browser's developer tools shows it for each call.
+
+**Ids in error messages.** When a file upload, a Canvas import, or a website or GitHub import fails, the error text in the app ends with the request id, for example `(ref: 5f3a9c1e0b2d)`. Ask the person who saw the error for that text, then search the logs for `rid=5f3a9c1e0b2d` as above. There is no `(ref: ...)` when the request never reached the server, for example after a network error.
+
+**More detail from one service.** `LOG_LEVEL` sets how much each service writes; the default is `INFO`. To switch the worker to `DEBUG` and leave the backend as it is:
+
+```bash
+LOG_LEVEL=DEBUG docker compose --project-directory . -f infra/docker/docker-compose.yaml up -d --no-deps worker
+```
+
+This recreates only the worker container. Run the same command without `LOG_LEVEL=DEBUG` to go back. `DEBUG` writes a line for every file, page and Canvas item, so do not leave it on. On the dev stack, put the variable in front of the command instead, for example `LOG_LEVEL=DEBUG python ai_ta_backend/rabbitmq/worker.py`.
+
+The same command works for the frontend: name `frontend` instead of `worker`. The web crawler reads `LOG_LEVEL` from `.env` instead. Set `LOG_LEVEL=DEBUG` there and run `docker compose --project-directory . -f infra/docker/docker-compose.yaml up -d --no-deps crawlee`. Set it back to `INFO` when you are done, because the other services also take the value from `.env` the next time they are recreated.
+
+What each level means is on [Logging](../contributing/logging.md).
+
 ## Starting the stack
 
 **`start-all.sh` prints "Database is empty. Re-run with --create-schema".** The database volume is new and the script never applies the schema on its own. Run `start-all.sh --create-schema` once; later runs need no flag. See [Self-Hosting](index.md).
@@ -32,11 +97,45 @@ Symptoms seen on self-hosted stacks, with the page that owns the fix. Sim-specif
 
 **Tools show the "Offline" badge.** No tool-routing model is available to the chatbot: it has no OpenAI-compatible provider or OpenAI key enabled and `NCSA_HOSTED_VLM_BASE_URL` is unset on the frontend. See [Tool routing](../how-it-works/tool-routing.md).
 
-**Canvas import returns 500.** `CANVAS_ACCESS_TOKEN` is not passed by any Compose file; see "Ingest worker" in the [Configuration reference](configuration.md).
+**Canvas import returns 500.** The reply says `CANVAS_ACCESS_TOKEN is not configured.`: the token is unset. Set it in `.env` (Compose passes it to the backend) and recreate the backend with `docker compose --project-directory . -f infra/docker/docker-compose.yaml up -d --no-deps backend`; see "Backend API" in the [Configuration reference](configuration.md). A 500 that says `Canvas ingest failed: <error type>` is an unexpected error. The reply names only the type of the error, and the backend log has the traceback. One known cause is `Canvas ingest needs S3_BUCKET_NAME, which is unset` in that log: the backend has no bucket name, so set `S3_BUCKET_NAME` (Compose sets it to `uiuc-chat` by default).
+
+**Canvas import returns 400.** The request has no `canvas_url`, or it is not a course link of the form `https://canvas.illinois.edu/courses/<id>`. Copy the link from the course home page in Canvas.
+
+**Canvas import returns 502 "Canvas rejected the configured access token".** Canvas refused the token in `CANVAS_ACCESS_TOKEN`: it is wrong, expired or revoked. The reply passes on what Canvas said:
+
+```json
+{
+  "error": "Canvas rejected the configured access token",
+  "upstream": "canvas",
+  "upstream_status": 401,
+  "upstream_message": "{\"errors\":[{\"message\":\"Revoked access token.\"}]}"
+}
+```
+
+`upstream_status` is the status Canvas returned and `upstream_message` the start of its reply as Canvas sent it (up to 500 characters). The backend writes one `ERROR` line from `ai_ta_backend.rabbitmq.ingest_canvas` with the same status and text. Create a new token in Canvas, set it in `.env` and recreate the backend as above. Other 502 replies from a Canvas import have the same shape with a different `error`, for example when the token's Canvas account has no pending invitation to the course, or `Canvas unreachable` when the backend cannot reach Canvas at all (then `upstream_status` is empty). `Canvas ingest queued no documents` means a section failed to download and nothing could be imported; its `section_results` field gives the result for each section.
+
+**Canvas import returns 422.** Canvas answered, but the import found no document to add. The `error` text gives the cause, and `section_results` gives the result for each section:
+
+- `Canvas gives the Illinois Chat account no access to: files, pages.` Canvas answered 401 or 403 for those sections, which `section_results` shows as `No access! Canvas 403 for <path>`. The token is good, but the course does not let the token's account read them, for example because the tab is hidden from students. Ask the instructor to open those sections, or select only the sections the account can read.
+- `Canvas import found no documents in the selected sections.` Canvas let the account read the sections, and no document came out of them. Either they are empty (`Success` with no item, or `none found`), or each item was skipped. The backend log has the `skipped=` count in the `section=<name> downloaded=<n> skipped=<n>` line, and a `WARNING` line `section=modules: <n> item(s) failed and were skipped` with the first cause when an item of a module failed, for example an external link that the backend cannot reach. The reason for each skipped item, and each item that has no content, is a `DEBUG` line: run the import again with `LOG_LEVEL=DEBUG` on the backend to see them.
+
+The backend writes one `WARNING` line, `canvas ingest found no documents`, with the project, the Canvas course id and the sections with no access. When at least one document is queued, the reply is 200 also if a section had no access; `section_results` still names it.
 
 **A large export finishes but nobody receives the download link.** The backend's SMTP variables are unset, so the email step fails silently and the file stays in object storage. See "Email (SMTP)" in the [Configuration reference](configuration.md).
 
 **Uploads fail or presigned URLs point at the wrong port.** The app is using the object-storage console port instead of the API port. See "Ports" on [Services, ports & architecture](architecture.md).
+
+**Project settings cannot be loaded: API calls answer 503 "Project metadata store unavailable".** The frontend cannot read the project settings from Redis: Redis is down, or `REDIS_URL` does not reach it. Pages of the project then do not load. The frontend log has one `ERROR` line for each failed request, with the Redis error under `Caused by:`:
+
+```text
+2026-11-02T14:05:12.337Z ERROR   api rid=8c41d7a2e9f0 path=/api/UIUC-api/ingest course=ece120 project metadata store unavailable at=src/utils/server/routeContext.ts:28
+MetadataUnavailableError: could not read the metadata of project ece120
+    at src/server/authorization.ts:51:11
+    ...
+Caused by: Error: connect ECONNREFUSED 172.18.0.5:6379
+```
+
+The first failure also writes `Redis client error:` with the reason, once. Check Redis with `docker compose --project-directory . -f infra/docker/docker-compose.yaml ps redis` and start it again with `docker compose --project-directory . -f infra/docker/docker-compose.yaml up -d --no-deps redis`.
 
 ## Development and deployment
 

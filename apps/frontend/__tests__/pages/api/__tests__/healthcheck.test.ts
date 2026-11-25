@@ -40,13 +40,23 @@ describe('healthcheck API', () => {
       disconnect: vi.fn(),
     })
 
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = createMockRes()
-    await handler(createMockReq() as any, res as any)
+    await handler(
+      createMockReq({ headers: { 'x-request-id': 'abc123' } }) as any,
+      res as any,
+    )
 
     expect(res.status).toHaveBeenCalledWith(500)
     const payload = (res.json as any).mock.calls[0]?.[0]
     expect(payload.status).toBe('DOWN')
     expect(payload.checks.redis.status).toBe('error')
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'abc123')
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /ERROR   api\.healthcheck rid=abc123 .*health check failed check=redis at=\S+:\d+\nError: boom/,
+      ),
+    )
 
     process.env.REDIS_URL = old
   })
