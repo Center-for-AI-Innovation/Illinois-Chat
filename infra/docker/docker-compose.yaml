@@ -229,6 +229,8 @@ services:
     networks:
       - uiuc-chat-network
     environment:
+      # Server log level (DEBUG, INFO, WARNING, ERROR); see src/utils/server/log.ts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # backend
       RAILWAY_URL: "http://backend:8001"
       INGEST_URL: "http://backend:8001/ingest"
@@ -333,6 +335,8 @@ services:
       # other
       POSTHOG_API_KEY: ${POSTHOG_API_KEY:-not_a_key}
       POSTHOG_HOST: ${POSTHOG_HOST:-}
+      CANVAS_ACCESS_TOKEN: ${CANVAS_ACCESS_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
   worker:
     build:
@@ -374,6 +378,7 @@ services:
       # other
       POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
       POSTHOG_HOST: ${POSTHOG_HOST:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       rabbitmq:
         condition: service_healthy

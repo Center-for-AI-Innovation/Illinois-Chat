@@ -39,9 +39,11 @@ vi.mock('drizzle-orm', () => ({
   sql: (strings: any, ...values: any[]) => ({ strings, values }),
 }))
 
-import handler, {
+import validateRoute, {
+  handler,
   validateApiKeyAndRetrieveData,
 } from '~/pages/api/chat-api/keys/validate'
+import { createMockReq, createMockRes } from '~/test-utils/nextApi'
 
 describe('chat-api/keys/validate', () => {
   it('validateApiKeyAndRetrieveData returns invalid when key not found', async () => {
@@ -87,6 +89,21 @@ describe('chat-api/keys/validate', () => {
     const r1 = await handler(req1 as any)
     expect(r1.status).toBe(403)
 
+    // A body with no api_key, or one that is not JSON, is a caller mistake:
+    // 400 and no ERROR line.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const body of ['{}', 'not json', '{"api_key":7}', 'null']) {
+      const bad = await handler(
+        new Request('http://localhost', { method: 'POST', body }) as any,
+      )
+      expect(bad.status).toBe(400)
+      await expect(bad.json()).resolves.toEqual({
+        error: 'api_key is required',
+      })
+    }
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+
     hoisted.selectWhere.mockResolvedValueOnce([{ email: 'a@b.com' }])
     hoisted.client.mockResolvedValueOnce([{ id: '123', email: 'a@b.com' }])
     hoisted.updateWhere.mockResolvedValueOnce(undefined)
@@ -98,5 +115,19 @@ describe('chat-api/keys/validate', () => {
     expect(r2.status).toBe(200)
     const body = await r2.json()
     expect(body.authContext?.isAuthenticated).toBe(true)
+  })
+
+  it('the route echoes the X-Request-ID header', async () => {
+    hoisted.selectWhere.mockResolvedValueOnce([])
+    const res = createMockRes()
+    await validateRoute(
+      createMockReq({
+        method: 'POST',
+        headers: { 'x-request-id': 'val1' },
+        json: async () => ({ api_key: 'k', course_name: 'CS101' }),
+      }) as any,
+      res,
+    )
+    expect(res.setHeader).toHaveBeenCalledWith('X-Request-ID', 'val1')
   })
 })

@@ -24,4 +24,7 @@ The built-in crawler discovers and ingests linked pages starting from a URL you 
 - **HTML pages** — visible text is extracted and stored directly in the database (not object storage), with the source URL preserved for citations.
 - **Files found during the crawl** (PDF, Word, PowerPoint, Excel) — uploaded to object storage as a backup, but citations still link to the original source; the local copy is used as a fallback if the original goes missing (404).
 
+!!! note "Time limits for PDFs"
+    The crawler stops the download of a PDF after 120 seconds, and each step of its copy to object storage after 10 minutes. A PDF that hits a limit is not added to your chatbot; the other pages and files of the crawl are. There is no limit on the size of a PDF. To add a PDF that was left out, download it and [upload it as a file](uploading-files.md).
+
 How the crawler itself works is described in [Documents & ingest](../../how-it-works/documents-ingest.md).

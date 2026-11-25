@@ -9,6 +9,9 @@ import { compareChatbotTagPrecedence } from '~/utils/chatbotTagSort'
 import { toChatbotCardData, chatbotUserTier } from '~/utils/chatbotCard'
 import { accessiblePredicate } from '~/utils/getChatbots'
 import { isSuperAdminAsync } from '~/utils/superAdmins.server'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.searchChatbots')
 
 const MAX_QUERY_LENGTH = 200
 const MAX_RESULTS = 500
@@ -178,10 +181,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({ results, total: results.length })
   } catch (error) {
-    console.error(
-      'Error in searchChatbots:',
-      error instanceof Error ? error.message : String(error),
-    )
+    log.error('error searching chatbots', undefined, error)
     return res.status(500).json({ error: 'Failed to search chatbots' })
   }
 }

@@ -3,6 +3,9 @@ import { eq, and, sql, asc } from 'drizzle-orm'
 import { connectionManager } from '~/utils/connectionManager'
 import { docGroups } from './schema'
 import { CourseDocument } from '~/types/courseMaterials'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('db.helpers')
 
 // Db queries — document-scoped helpers route through ConnectionManager so a
 // project with an external Postgres override hits its own DB. Conversation,
@@ -20,7 +23,7 @@ export async function fetchEnabledDocGroups(courseName: string) {
 
     return documentGroups
   } catch (error) {
-    console.error('Error in fetchEnabledDocGroups:', error)
+    log.error('db operation failed', { op: 'fetchEnabledDocGroups' }, error)
     throw new Error(
       `Failed to fetch enabled document groups: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -42,7 +45,7 @@ export async function fetchDocumentGroups(courseName: string) {
     })
     return documentGroups
   } catch (error) {
-    console.error('Error in fetchDocumentGroups:', error)
+    log.error('db operation failed', { op: 'fetchDocumentGroups' }, error)
     throw error
   }
 }
@@ -124,7 +127,7 @@ export async function addDocumentsToDocGroup(
       return success
     }
   } catch (error) {
-    console.error('Error in addDocumentsToDocGroup:', error)
+    log.error('db operation failed', { op: 'addDocumentsToDocGroup' }, error)
     throw error
   }
 }
@@ -145,7 +148,7 @@ export async function removeDocGroup(
       );
     `)
   } catch (error) {
-    console.error('Error in removeDocGroup:', error)
+    log.error('db operation failed', { op: 'removeDocGroup' }, error)
     throw error
   }
 }
@@ -167,7 +170,7 @@ export async function updateDocGroupStatus(
         ),
       )
   } catch (error) {
-    console.error('Error in updateDocGroupStatus:', error)
+    log.error('db operation failed', { op: 'updateDocGroupStatus' }, error)
     throw error
   }
 }

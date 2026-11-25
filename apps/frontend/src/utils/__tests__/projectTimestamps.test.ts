@@ -101,7 +101,7 @@ describe('getProjectTimestamps', () => {
 
   it('returns nulls and logs on db error', async () => {
     const consoleError = vi
-      .spyOn(console, 'error')
+      .spyOn(console, 'warn')
       .mockImplementation(() => undefined)
     const projectChain = hoisted.enqueueChain()
     projectChain.__set(new Error('boom'))
@@ -161,7 +161,7 @@ describe('getBatchProjectTimestamps', () => {
 
   it('returns whatever was accumulated so far (empty) and logs on db error', async () => {
     const consoleError = vi
-      .spyOn(console, 'error')
+      .spyOn(console, 'warn')
       .mockImplementation(() => undefined)
     const projectChain = hoisted.enqueueChain()
     const docChain = hoisted.enqueueChain()

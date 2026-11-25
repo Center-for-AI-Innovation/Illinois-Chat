@@ -3,6 +3,10 @@ import { withAuth, type AuthenticatedRequest } from '~/utils/authMiddleware'
 import axios, { type AxiosResponse } from 'axios'
 import { type ContextWithMetadata } from '~/types/chat'
 import { withCourseAccessFromRequest } from '~/server/authorization'
+import { getLogger } from '~/utils/server/log'
+import { requestIdHeaders } from '~/utils/server/backendFetch'
+
+const log = getLogger('api.getContextsMQR')
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -34,6 +38,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const response: AxiosResponse<ContextWithMetadata[]> = await axios.get(
       `${mqrUrl}/getTopContextsWithMQR`,
       {
+        headers: requestIdHeaders(),
         params: {
           course_name: course_name,
           search_query: search_query,
@@ -47,7 +52,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
     return res.status(200).json(response.data)
   } catch (error) {
-    console.error('Error fetching MQR contexts:', error)
+    log.error('could not fetch MQR contexts', undefined, error)
     return res.status(500).json({
       error: 'Internal server error while fetching MQR contexts',
       data: [],

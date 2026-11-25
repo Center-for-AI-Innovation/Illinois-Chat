@@ -31,6 +31,9 @@ RUN mkdir -p "$NLTK_DATA" && chmod -R 755 "$NLTK_DATA" \
 
 COPY ai_ta_backend ./ai_ta_backend
 
+# Send print() and log output straight to the container log (no buffering).
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8001
 
 # Running worker.py by path puts ai_ta_backend/rabbitmq on sys.path, which its bare imports need.

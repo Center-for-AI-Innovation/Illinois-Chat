@@ -24,12 +24,12 @@ finally:
     sys.path.remove(_RABBITMQ_DIR)
 
 
-def _child_sleep(job_id, inputs):
+def _child_sleep(job_id, rid, inputs):
     time.sleep(inputs["seconds"])
     sys.exit(0)
 
 
-def _child_exit_3(job_id, inputs):
+def _child_exit_3(job_id, rid, inputs):
     sys.exit(3)
 
 
@@ -46,7 +46,7 @@ class _Keepalive:
 
 def test_keepalive_is_serviced_while_child_runs():
     ka = _Keepalive()
-    failure = worker.run_ingest_isolated("job", {"seconds": 2.5}, keepalive=ka, _target=_child_sleep)
+    failure = worker.run_ingest_isolated("job", None, {"seconds": 2.5}, keepalive=ka, _target=_child_sleep)
     assert failure is None
     # One call per KEEPALIVE_INTERVAL; allow for spawn start-up and scheduler slack.
     assert ka.calls >= 2
@@ -54,7 +54,7 @@ def test_keepalive_is_serviced_while_child_runs():
 
 def test_connection_loss_mid_job_does_not_abort_the_child():
     ka = _Keepalive(fail_on=1)
-    failure = worker.run_ingest_isolated("job", {"seconds": 2.5}, keepalive=ka, _target=_child_sleep)
+    failure = worker.run_ingest_isolated("job", None, {"seconds": 2.5}, keepalive=ka, _target=_child_sleep)
     assert failure is None, "the child's result must still be reported after the keepalive failed"
     assert ka.calls == 1, "keepalive must not be retried once the connection is known to be gone"
 
@@ -63,7 +63,7 @@ def test_timeout_still_kills_the_child(monkeypatch):
     monkeypatch.setattr(worker, "INGEST_TIMEOUT", 2)
     ka = _Keepalive()
     started = time.monotonic()
-    failure = worker.run_ingest_isolated("job", {"seconds": 30}, keepalive=ka, _target=_child_sleep)
+    failure = worker.run_ingest_isolated("job", None, {"seconds": 30}, keepalive=ka, _target=_child_sleep)
     elapsed = time.monotonic() - started
     assert failure is not None and "exceeded 2s" in failure
     assert elapsed < 15, f"kill happened too late: {elapsed:.1f}s"
@@ -71,7 +71,7 @@ def test_timeout_still_kills_the_child(monkeypatch):
 
 
 def test_abnormal_exit_is_reported():
-    failure = worker.run_ingest_isolated("job", {}, keepalive=None, _target=_child_exit_3)
+    failure = worker.run_ingest_isolated("job", None, {}, keepalive=None, _target=_child_exit_3)
     assert failure is not None and "exit 3" in failure
 
 
