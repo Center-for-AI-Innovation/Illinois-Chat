@@ -11,6 +11,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarInput,
   SidebarInset,
   SidebarMenu,
   SidebarMenuAction,
@@ -143,5 +144,111 @@ describe('shadcn sidebar', () => {
     // Depending on Radix portal behavior, it may or may not be inside this container; so keep this as a soft assertion.
     const maybeSheet = container.querySelector('[data-mobile="true"]')
     expect(maybeSheet === null || maybeSheet instanceof HTMLElement).toBe(true)
+  })
+})
+
+describe('Sidebar design (Figma admin sidebar)', () => {
+  it('styles menu, sub-menu and labels to the Figma spec', () => {
+    render(
+      <SidebarProvider>
+        <Sidebar collapsible="none">
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
+              <SidebarMenu data-testid="menu">
+                <SidebarMenuItem>
+                  <SidebarMenuButton>AI Models</SidebarMenuButton>
+                  <SidebarMenuSub data-testid="sub">
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton href="#open-source" isActive>
+                        Open Source LLMs
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+        <SidebarTrigger />
+      </SidebarProvider>,
+    )
+
+    expect(screen.getByText('Project Settings')).toHaveClass(
+      'h-8',
+      'pt-3',
+      'text-xs',
+      'font-medium',
+      'text-(--foreground-subtle)',
+    )
+    expect(screen.getByTestId('menu')).not.toHaveClass('gap-1')
+    expect(screen.getByRole('button', { name: 'AI Models' })).toHaveClass(
+      'h-8',
+      'p-2',
+      'gap-2',
+      'text-sm',
+      'font-medium',
+      'leading-none',
+    )
+    expect(screen.getByTestId('sub')).toHaveClass(
+      'mx-4',
+      'border-l',
+      'pl-[7px]',
+      'pr-2',
+    )
+    const sub = screen.getByRole('link', { name: 'Open Source LLMs' })
+    expect(sub).toHaveClass('h-7', 'px-2', 'data-active:bg-sidebar-accent')
+    expect(sub).toHaveAttribute('data-active')
+    expect(screen.getByRole('button', { name: 'Toggle Sidebar' })).toHaveClass(
+      'size-7',
+    )
+  })
+
+  it('shows only the ring on keyboard focus, not the global orange outline', () => {
+    render(
+      <SidebarProvider>
+        <Sidebar collapsible="none">
+          <SidebarContent>
+            <SidebarInput aria-label="Search" />
+            <SidebarGroup>
+              <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
+              <SidebarGroupAction aria-label="Add group" />
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton>AI Models</SidebarMenuButton>
+                  <SidebarMenuAction aria-label="More" />
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton href="#open-source">
+                        Open Source LLMs
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+        <SidebarTrigger />
+      </SidebarProvider>,
+    )
+
+    // These override the primitive's data-slot, so the class must carry this.
+    const toggle = screen.getByRole('button', { name: 'Toggle Sidebar' })
+    expect(toggle).toHaveAttribute('data-slot', 'sidebar-trigger')
+    const search = screen.getByRole('textbox', { name: 'Search' })
+    expect(search).toHaveAttribute('data-slot', 'sidebar-input')
+
+    for (const el of [
+      search,
+      screen.getByText('Project Settings'),
+      screen.getByRole('button', { name: 'Add group' }),
+      screen.getByRole('button', { name: 'AI Models' }),
+      screen.getByRole('button', { name: 'More' }),
+      screen.getByRole('link', { name: 'Open Source LLMs' }),
+      toggle,
+    ]) {
+      expect(el).toHaveClass('focus-visible:outline-hidden!')
+    }
   })
 })

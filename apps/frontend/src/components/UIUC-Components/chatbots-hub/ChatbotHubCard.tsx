@@ -74,9 +74,9 @@ export function ChatbotHubCard(card: ChatbotCardData) {
   return (
     <>
       <Card
-        className={`group relative flex min-h-[380px] w-full flex-col gap-0 overflow-hidden rounded-[14px] bg-white py-0 transition-transform duration-200 ease-out hover:scale-[1.03] dark:bg-[#13294b] [&:has(a:focus-visible)]:ring-2 [&:has(a:focus-visible)]:ring-(--illinois-orange) [&:has(a:focus-visible)]:ring-offset-2 ${
+        className={`group dark:bg-card relative flex min-h-[380px] w-full flex-col gap-0 overflow-hidden rounded-[14px] bg-white py-0 transition-transform duration-200 ease-out hover:scale-[1.03] [&:has(a:focus-visible)]:ring-2 [&:has(a:focus-visible)]:ring-(--illinois-orange) [&:has(a:focus-visible)]:ring-offset-2 ${
           hasAdminAccess
-            ? 'border border-(--illinois-orange-branding) dark:border-[#32517a]'
+            ? 'border border-(--border-card-highlight)'
             : 'border border-[#e5e7eb] shadow-[0_4px_20px_rgba(0,0,0,0.08)] dark:border-[#32517a] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]'
         }`}
       >
@@ -91,7 +91,7 @@ export function ChatbotHubCard(card: ChatbotCardData) {
           ) : (
             <div className="absolute inset-0 bg-linear-to-br from-[#e8edf4] via-[#f0ebe4] to-[#dde5ed] dark:from-[#1a3a6b] dark:via-[#152e55] dark:to-[#0f2340]" />
           )}
-          <div className="absolute inset-0 bg-linear-to-b from-transparent to-white/55 dark:from-transparent dark:via-[#13294b]/45 dark:to-[#13294b]/95" />
+          <div className="dark:via-card/45 dark:to-card/95 absolute inset-0 bg-linear-to-b from-transparent to-white/55 dark:from-transparent" />
 
           <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
             <ProjectTypeIcon className="h-16 w-16 text-(--illinois-blue) dark:text-white" />
@@ -187,7 +187,7 @@ export function ChatbotHubCard(card: ChatbotCardData) {
           </div>
 
           <div className="mt-auto">
-            <Separator className="my-3 dark:bg-[#32517a]" />
+            <Separator className="my-3" />
             <div className="flex items-center justify-between gap-2">
               {/* `min-w-0` is required for the owner-email <span>'s `truncate`
                   to actually shrink inside this flex row — without it, the

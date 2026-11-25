@@ -15,11 +15,11 @@ const accessLevelBadgeVariants = cva(
     variants: {
       level: {
         private:
-          'border-transparent bg-[#f9ecec] text-[#b3261e] hover:bg-[#f9ecec] dark:bg-[#3b1f2b] dark:text-[#fda4af] dark:hover:bg-[#3b1f2b]',
+          'border-transparent bg-[#fef2f2] text-[#b91c1c] hover:bg-[#fef2f2] dark:bg-[#ef444433] dark:text-[#f87171] dark:hover:bg-[#ef444433]',
         unlisted:
-          'border-transparent bg-[#f2efde] text-[#a16207] hover:bg-[#f2efde] dark:bg-[#3a2f1f] dark:text-[#facc15] dark:hover:bg-[#3a2f1f]',
+          'border-transparent bg-[#fefce8] text-[#a16207] hover:bg-[#fefce8] dark:bg-[#eab30833] dark:text-[#facc15] dark:hover:bg-[#eab30833]',
         public:
-          'border-transparent bg-[#ddece3] text-[#15803d] hover:bg-[#ddece3] dark:bg-[#1f3a2e] dark:text-[#86efac] dark:hover:bg-[#1f3a2e]',
+          'border-transparent bg-[#f0fdf4] text-[#15803d] hover:bg-[#f0fdf4] dark:bg-[#22c55e33] dark:text-[#4ade80] dark:hover:bg-[#22c55e33]',
       },
     },
   },

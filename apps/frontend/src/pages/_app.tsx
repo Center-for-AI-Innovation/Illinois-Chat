@@ -26,6 +26,7 @@ import type {
 } from '~/utils/platformSettings.schema'
 import { KeycloakProvider } from '../providers/KeycloakProvider'
 import { Toaster } from '@/components/shadcn/ui/sonner'
+import { source_sans } from '../../fonts'
 
 // Routes that must stay reachable while maintenance mode is on.
 //
@@ -134,6 +135,16 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
     }
   }, [])
 
+  // next/font can't run in _document, so the font variable is set on :root
+  // here (Next's documented Pages Router pattern) to reach portals too.
+  const fontVariables = (
+    <style jsx global>{`
+      :root {
+        --font-source-sans: ${source_sans.style.fontFamily};
+      }
+    `}</style>
+  )
+
   return (
     <div
       onKeyDownCapture={(event) => {
@@ -151,6 +162,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
         document.documentElement.dataset.inputModality = 'pointer'
       }}
     >
+      {fontVariables}
       <nav aria-label="Skip navigation">
         <a
           href="#main-content"
@@ -177,7 +189,7 @@ const MyApp: AppType = ({ Component, pageProps: { ...pageProps } }) => {
               position="left"
               buttonPosition="bottom-right"
             />
-              <ThemeProvider>
+            <ThemeProvider>
               <Toaster position="bottom-center" />
               <MaintenanceGate>
                 <SiteAnnouncementBanner

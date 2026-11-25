@@ -9,7 +9,7 @@ import { cn } from '@/components/shadcn/lib/utils'
 const formInputGroupVariants = cva(
   [
     'flex w-full items-center rounded-md border bg-(--background) transition-colors',
-    'focus-within:outline-solid focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--illinois-orange)',
+    'focus-within:ring-[3px] focus-within:ring-ring/50',
     'has-[>textarea]:items-stretch',
   ],
   {
