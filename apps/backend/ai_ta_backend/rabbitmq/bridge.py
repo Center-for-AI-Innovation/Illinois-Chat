@@ -13,6 +13,9 @@ service simply overrides the command to `python bridge.py`.
 Environment (identical to the worker):
   RABBITMQ_URL / RABBITMQ_QUEUE / RABBITMQ_SSL   -> Amazon MQ broker + queue
   POSTGRES_ENDPOINT/PORT/DATABASE/USERNAME/PASSWORD -> documents DB
+  ENCRYPTION_MASTER_KEY                          -> decrypts a project's stored
+                                                    connections; the same key as
+                                                    the backend and the worker
 """
 import logging
 import os

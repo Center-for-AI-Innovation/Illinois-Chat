@@ -22,7 +22,7 @@ configure_logging()
 logger = logging.getLogger('worker')
 
 from rmsql import SQLAlchemyIngestDB
-from connection_resolver import WorkerConnectionResolver
+from connection_resolver import ConnectionConfigError, WorkerConnectionResolver
 from flask import Flask, jsonify
 
 
@@ -74,6 +74,17 @@ RABBITMQ_HEARTBEAT = _heartbeat_from_env()
 KEEPALIVE_INTERVAL = 1.0  # seconds
 RECONNECT_MAX_DELAY = 60  # seconds; cap on the back-off between reconnect attempts
 STABLE_SESSION = 30  # seconds; a consume session shorter than this keeps the back-off growing
+# Wait before a job that failed before ingest is put back on the queue. Doubles with each retry
+# up to the cap: 1, 2, 4, 8, 16, then 30 seconds. With the default MAX_JOB_RETRIES that is about
+# 3 minutes in all, enough for a database restart or failover; retries with no wait used up all
+# the attempts within a second.
+RETRY_BASE_DELAY = 1.0  # seconds
+RETRY_MAX_DELAY = 30.0  # seconds; one wait. The wait sends heartbeats, so it need not fit in one
+
+
+def _retry_delay(retry_count):
+    """Seconds to wait before retry number `retry_count` + 1."""
+    return min(RETRY_MAX_DELAY, RETRY_BASE_DELAY * 2 ** min(retry_count, 30))
 
 
 def _ingest_child(job_id, rid, inputs):
@@ -223,7 +234,7 @@ class Worker:
             channel.basic_ack(delivery_tag=method.delivery_tag)
             return
         bind(rid=content.get('request_id'), job=job_id, course=course)
-        # Retries come back at once; keep their lines out of INFO.
+        # Keep the lines of a retry out of INFO.
         level = logging.INFO if retry_count == 0 else logging.DEBUG
         s3_path = inputs.get('s3_paths')
         if isinstance(s3_path, list):
@@ -301,8 +312,16 @@ class Worker:
             # republish: the broker redelivers the unacked message itself once it notices the
             # connection dropped, and listen_for_jobs reconnects.
             raise
+        except ConnectionConfigError as e:
+            # Only resolve() raises this: a stored connection of the project cannot be used.
+            # Trying again cannot fix it, so the first attempt is the last.
+            try:
+                self._fail_broken_connection(job_id, inputs, e, retry_count + 1)
+            finally:
+                channel.basic_ack(delivery_tag=method.delivery_tag)
         except Exception as e:  # pylint: disable=broad-except
-            # Only resolver and status-DB errors get here: run_ingest_isolated never raises.
+            # Transient resolver and status-DB errors get here (the host row read, a database
+            # that does not answer): run_ingest_isolated never raises.
             # One first try plus MAX_JOB_RETRIES retries.
             attempt, attempts = retry_count + 1, MAX_JOB_RETRIES + 1
             if retry_count < MAX_JOB_RETRIES:
@@ -312,6 +331,9 @@ class Worker:
                 else:
                     logger.debug("job failed before ingest (DB or connection resolve), attempt %d/%d: %s: %s",
                                  attempt, attempts, type(e).__name__, e)
+                if not self._wait_before_retry(_retry_delay(retry_count)):
+                    # Stopping: left unacked, the broker requeues it with the count it came with.
+                    return
                 content["retry_count"] = retry_count + 1
                 properties = pika.BasicProperties(delivery_mode=2, reply_to=header.reply_to)
                 # Republish on the delivering channel and ack the original. Reconnecting here
@@ -327,24 +349,89 @@ class Worker:
                                  attempt)
                 if status_db is None:
                     status_db = self._status_db_after_failed_resolve(inputs.get('course_name', ''))
-                self._record_discarded_job(status_db, job_id, inputs,
-                                           # The admin sees this text. The error type only: the text of
-                                           # a driver error names the database host and user. The worker
-                                           # log has the full error.
-                                           "the database or the connections of the project could not be "
-                                           "reached (%s)" % type(e).__name__,
-                                           attempt)
+                if status_db is not None:
+                    # The admin sees this text. The error type only: the text of a driver error
+                    # names the database host and user. The worker log has the full error.
+                    outcome = self._record_discarded_job(
+                        status_db, job_id, inputs,
+                        "Job discarded after %d attempts: the database or the connections of the project "
+                        "could not be reached (%s)" % (attempt, type(e).__name__))
+                    if outcome:
+                        where = "the host" if status_db is self.sql_session else "the project's documents"
+                        logger.error("discarded job %s; course=%s, %s database", outcome,
+                                     inputs.get('course_name', ''), where)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
         finally:
             clear()
 
+    def _wait_before_retry(self, delay):
+        """Wait `delay` seconds on the consumer thread before a retry, and keep the broker
+        connection alive meanwhile. Returns False when the worker is stopping.
+
+        The delivery stays unacked during the wait, so with prefetch 1 this worker takes no
+        other job: when a database is down the next job would fail the same way. A lost
+        connection raises AMQPError, and the broker then redelivers the job by itself.
+        """
+        deadline = time.monotonic() + delay
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return True
+            if self._stop.wait(min(KEEPALIVE_INTERVAL, remaining)):
+                return False
+            self.connection.process_data_events(time_limit=0)
+
+    def _fail_broken_connection(self, job_id, inputs, error, attempt):
+        """End a job whose project has a stored connection that cannot be used.
+
+        Records the failure where the producer wrote the job's status rows, then logs one
+        ERROR with what happened to them. Never raises: the caller acks the delivery, and
+        the consumer must keep going.
+        """
+        try:
+            outcome = self._record_broken_connection(job_id, inputs, error)
+        except Exception as other:  # pylint: disable=broad-except
+            # The type only: the text of a driver error names the database host and user.
+            # The traceback goes to DEBUG.
+            logger.debug("recording the failed job raised", exc_info=True)
+            outcome = "not recorded: %s; its documents_in_progress row stays" % type(other).__name__
+        # The text, not the error: the record then keeps no traceback, and with it no frame.
+        # The field and the cause are named apart from the text, which for a bad connection_uri
+        # names neither. Both are a column name and a type name or fixed phrase, never config text.
+        logger.error("job failed attempt=%d field=%s cause=%s: %s%s", attempt, error.field, error.cause, str(error),
+                     "; " + outcome if outcome else "")
+
+    def _record_broken_connection(self, job_id, inputs, error):
+        """Move the job to documents_failed in the project's documents database (the host one
+        when the project has none). Returns what to add to the ERROR line, or None when the
+        job was recorded and its in-progress row removed.
+
+        Never the host database for a project with its own documents database: when that
+        database is the broken part, or cannot be resolved either, nothing is written. Any
+        other error is the caller's to fold into its ERROR line.
+        """
+        if error.field == "database_config":
+            return ("not recorded: the documents database of the project is the part that cannot be used; "
+                    "its documents_in_progress row stays")
+        try:
+            engine = self.resolver.resolve_documents_engine(inputs.get('course_name', ''))
+        except ConnectionConfigError as second:
+            return "not recorded: %s; its documents_in_progress row stays" % second
+        status_db = SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
+        # The project's owner sees this text in the Failed tab of Project Files.
+        return self._record_discarded_job(
+            status_db, job_id, inputs,
+            "The project's external connection (%s) cannot be used (%s). Check the connection in the "
+            "project settings." % (error.field, error.cause))
+
     def _status_db_after_failed_resolve(self, course_name):
         """The database with the status rows of a job whose resolve() failed every time.
 
-        resolve() builds all the connections of the project. Ask only for the documents
-        database: when a different part failed, the rows can still be updated. Returns None
-        when that fails too. No row is written then: a failed row in the host database is in
-        the wrong place for a project with its own documents database.
+        Only a transient error gets here (the host row read, most often): a stored connection
+        that cannot be used ends the job at once (_fail_broken_connection). resolve() builds
+        all the connections of the project, so ask only for the documents database. Returns
+        None when that fails too. No row is written then: a failed row in the host database
+        is in the wrong place for a project with its own documents database.
         """
         try:
             engine = self.resolver.resolve_documents_engine(course_name)
@@ -357,26 +444,40 @@ class Worker:
         return SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
 
     @staticmethod
-    def _record_discarded_job(status_db, job_id, inputs, error, attempts):
-        """Best effort: move a discarded job from documents_in_progress to documents_failed,
-        so the dashboard stops showing the file as ingesting. The database may be the thing
-        that failed, so this can fail as well; then it only logs."""
-        if status_db is None:
-            return
+    def _record_discarded_job(status_db, job_id, inputs, error):
+        """Move a job that will not run from documents_in_progress to documents_failed, so the
+        dashboard stops showing the file as ingesting. `error` is the row's text.
+
+        Returns None when both writes worked, else what went wrong, for the caller's ERROR
+        line. rmsql logs its own ERROR when one of its writes fails. After a failed insert
+        the in-progress row is kept: deleting it would make the file vanish with no failure.
+        """
         s3_paths = inputs.get('s3_paths', '')
         try:
-            status_db.insert_failed_document({
+            inserted, why = status_db.insert_failed_document({
                 "s3_path": s3_paths[0] if isinstance(s3_paths, list) and s3_paths else str(s3_paths or ''),
                 "readable_filename": inputs.get('readable_filename', ''),
                 "course_name": inputs.get('course_name', ''),
                 "url": inputs.get('url'),
                 "base_url": inputs.get('base_url'),
                 "doc_groups": inputs.get('groups', ''),
-                "error": "Job discarded after %d attempts: %s" % (attempts, error),
-            })
-            status_db.delete_document_in_progress(job_id)
-        except Exception:  # pylint: disable=broad-except
-            logger.warning("could not record the discarded job in the database", exc_info=True)
+                "error": error,
+            }), ""
+        except Exception as e:  # pylint: disable=broad-except
+            # The type only in the ERROR line: the text of a driver error names the database
+            # host and user. The traceback goes to DEBUG.
+            logger.debug("insert into documents_failed raised", exc_info=True)
+            inserted, why = False, " (%s)" % type(e).__name__
+        if not inserted:
+            return "not recorded: the insert into documents_failed failed%s; its documents_in_progress row stays" % why
+        try:
+            removed, why = status_db.delete_document_in_progress(job_id), ""
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug("delete from documents_in_progress raised", exc_info=True)
+            removed, why = False, " (%s)" % type(e).__name__
+        if not removed:
+            return "recorded, but its documents_in_progress row could not be removed%s" % why
+        return None
 
     def listen_for_jobs(self):
         """Consume until the process exits. A lost connection (broker restart, an idle time-out
