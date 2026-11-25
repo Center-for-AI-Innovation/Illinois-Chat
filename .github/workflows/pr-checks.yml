@@ -42,11 +42,6 @@ jobs:
         with:
           check-mode: pull_request
 
-      # Backend tests placeholder
-      - name: Backend tests
-        run: |
-          echo "TODO: add backend tests (e.g., pytest) here"
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -108,12 +103,15 @@ jobs:
         working-directory: apps/crawlee
         run: npm test
 
-  # Only PRs that touch what the backend images are built from need to prove they still build.
+  # Which backend jobs this PR needs: the images only when what they are built from changed,
+  # the tests only when the code, the tests or the schema they run against changed. A PR that
+  # touches neither skips both, so a backend failure never turns a frontend-only PR red.
   backend-changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
+      tests: ${{ steps.filter.outputs.tests }}
     steps:
       - uses: actions/checkout@v4
 
@@ -127,6 +125,66 @@ jobs:
               - '.github/workflows/pr-checks.yml'
               - '.github/workflows/illinois-chat-dev.yml'
               - '.github/workflows/release-images.yml'
+            tests:
+              - 'apps/backend/**'
+              - 'infra/db/init-schema.sql'
+              - 'infra/scripts/add_external_project_script/**'
+              - '.github/workflows/pr-checks.yml'
+
+  # The backend pytest suite, in its own job so lint and frontend failures do not hide it
+  # and it does not hide them.
+  backend-tests:
+    needs: backend-changes
+    if: needs.backend-changes.outputs.tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # tests/test_pgvector_store.py round-trips through a real pgvector database and skips
+    # itself without TEST_POSTGRES_URI. Same image as the compose stack. The database lives
+    # for one job on the runner, so it takes connections without a password.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_POSTGRES_URI: postgresql://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same uv release as the two Dockerfiles (ghcr.io/astral-sh/uv:<version>).
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.8"
+          cache-dependency-glob: apps/backend/uv.lock
+
+      - name: Create the database schema
+        run: psql "$TEST_POSTGRES_URI" -v ON_ERROR_STOP=1 -q -f infra/db/init-schema.sql
+
+      # --locked fails the job if pyproject.toml changed without re-locking (--frozen
+      # would install the stale lock). --all-extras: the suite covers both the API and
+      # the worker. The Python version comes from apps/backend/.python-version.
+      - name: Install backend dependencies
+        working-directory: apps/backend
+        run: uv sync --locked --all-extras
+
+      # -rs lists every skipped test with its reason, so a skip is visible in the log.
+      - name: Backend tests
+        working-directory: apps/backend
+        run: uv run --locked pytest -rs
+
+      # unittest cases for the external-connections CLI; they stub python-dotenv and
+      # need nothing installed.
+      - name: External connections CLI tests
+        working-directory: infra/scripts/add_external_project_script
+        run: uv run --no-project python -m unittest -v test_external_connections_cli
 
   # Build (no push) both backend images and run tests/image_smoke.py inside each, so a
   # broken Dockerfile, a stale uv.lock (the Dockerfiles sync with --locked) or a package
