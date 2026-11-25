@@ -1,4 +1,4 @@
-import { type AdminPageSection } from '../admin-layout/admin-pages.types'
+import { type AdminPageSection } from '~/components/UIUC-Components/admin-layout/admin-pages.types'
 
 // Rendered as the page's section headings AND as the page's sub-items in the
 // admin sidebar, so the two cannot drift apart.

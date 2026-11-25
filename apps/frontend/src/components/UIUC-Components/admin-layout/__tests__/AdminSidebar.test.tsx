@@ -7,8 +7,8 @@ import { ThemeProvider } from '~/contexts/ThemeContext'
 import { AdminSidebar } from '../AdminSidebar'
 import { ADMIN_SETTINGS_PAGES } from '../admin-pages'
 
-function renderSidebar(pathname: string) {
-  globalThis.__TEST_ROUTER__ = { pathname }
+function renderSidebar(pathname: string, replace = vi.fn()) {
+  globalThis.__TEST_ROUTER__ = { pathname, replace }
   return render(
     <ThemeProvider>
       <SidebarProvider>
@@ -98,29 +98,39 @@ describe('AdminSidebar', () => {
     expect(tools).toHaveAttribute('aria-current', 'page')
   })
 
-  it('scrolls to a section heading in place when on that page', async () => {
-    const user = userEvent.setup()
+  it('leaves a section link to the router, without scrolling itself', () => {
     renderSidebar('/[course_name]/ai-models')
-
-    await user.click(screen.getByRole('link', { name: 'Closed Source LLMs' }))
-
-    expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView.mock.contexts[0]).toBe(
-      document.getElementById('closed-source'),
+    const link = screen.getByRole('link', { name: 'Closed Source LLMs' })
+    let handlerPrevented: boolean | undefined
+    document.addEventListener(
+      'click',
+      (e) => {
+        handlerPrevented = e.defaultPrevented
+        e.preventDefault()
+      },
+      { once: true },
     )
-    expect(scrollIntoView).toHaveBeenCalledWith(
-      expect.objectContaining({ block: 'start' }),
+    link.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
     )
-    expect(window.location.hash).toBe('#closed-source')
-    expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
-    ).toHaveAttribute('aria-current', 'location')
+
+    expect(handlerPrevented).toBe(false)
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
-  it('scrolls back to the top when the current page item is clicked', async () => {
-    const user = userEvent.setup()
-    window.location.hash = '#closed-source'
+  it('highlights a page that has sections when it is current', () => {
     renderSidebar('/[course_name]/ai-models')
+
+    expect(
+      screen.getByRole('link', { name: 'AI Models (LLMs)' }),
+    ).toHaveAttribute('data-active')
+  })
+
+  it('scrolls back to the top and clears the hash through the router when the current page item is clicked', async () => {
+    const user = userEvent.setup()
+    const replace = vi.fn()
+    window.location.hash = '#closed-source'
+    renderSidebar('/[course_name]/ai-models', replace)
 
     await user.click(screen.getByRole('link', { name: 'AI Models (LLMs)' }))
 
@@ -128,10 +138,10 @@ describe('AdminSidebar', () => {
       document.getElementById('admin-panel-content'),
     )
     expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }))
-    expect(window.location.hash).toBe('')
-    expect(
-      screen.getByRole('link', { name: 'Set the Default Model' }),
-    ).toHaveAttribute('aria-current', 'location')
+    expect(replace).toHaveBeenCalledWith('/CS101/ai-models', undefined, {
+      shallow: true,
+      scroll: false,
+    })
   })
 
   it('lets links to other pages navigate normally', async () => {
@@ -164,22 +174,16 @@ describe('AdminSidebar', () => {
     expect(handlerPrevented).toBe(false)
   })
 
-  it('keeps the active section after an in-place click and a re-render', async () => {
+  it('changes the theme with the toggle group', async () => {
     const user = userEvent.setup()
-    const { rerender } = renderSidebar('/[course_name]/ai-models')
+    renderSidebar('/[course_name]/ai-models')
 
-    await user.click(screen.getByRole('link', { name: 'Closed Source LLMs' }))
-    rerender(
-      <ThemeProvider>
-        <SidebarProvider>
-          <AdminSidebar courseName="CS101" />
-        </SidebarProvider>
-      </ThemeProvider>,
+    await user.click(screen.getByRole('button', { name: 'Dark' }))
+
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     )
-
-    expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
-    ).toHaveAttribute('data-active')
   })
 
   it('hides the desktop sidebar from the tab order when closed, without unmounting', () => {
