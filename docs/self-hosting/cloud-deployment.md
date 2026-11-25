@@ -101,19 +101,36 @@ Environment variables for each service are set in its task definition; keep secr
 
 Every push to `main` that touches the application paths deploys. `update-service --force-new-deployment` is a rolling deployment: new tasks start with the new image, pass their health checks, and the old tasks are stopped. Expect two to five minutes.
 
-A deployment registers no new task definition: the service keeps its current definition and pulls the image tag it names (`latest` or `main`) again. To roll back, point the service at an image tag that is known good, or at an earlier task-definition revision if one exists:
+`illinois-chat-dev.yml` is the only pipeline that deploys to the cluster. A deployment registers no new task definition: the service keeps its current definition and pulls the image tag it names (`main` on the hosted instance) again. This is deliberate. Every deploy ships the same tag, so a new revision per deploy would only add identical copies. A new revision appears only when someone changes the definition itself (environment variables, CPU and memory, log settings), and the revision history then records configuration changes, not deploys.
+
+The cost is that the tag is mutable: any task that starts later, for example after a crash or when the service scales out, also pulls whatever `main` points to at that moment. Rolling back to an earlier revision does not roll back the code either, because that revision names the same `main` tag. To roll back, move the tag back to a known-good image. Every image is also pushed under its commit SHA, so the target is always in ECR:
+
+```bash
+# point `main` at a known-good commit's image
+REPO=uiuc-chat-backend
+GOOD=<good-sha>
+MANIFEST=$(aws ecr batch-get-image --repository-name "$REPO" \
+  --image-ids imageTag="$GOOD" --query 'images[0].imageManifest' --output text)
+MEDIA_TYPE=$(aws ecr batch-get-image --repository-name "$REPO" \
+  --image-ids imageTag="$GOOD" --query 'images[0].imageManifestMediaType' --output text)
+aws ecr put-image --repository-name "$REPO" --image-tag main \
+  --image-manifest "$MANIFEST" --image-manifest-media-type "$MEDIA_TYPE"
+
+# restart the service so it pulls the retagged image
+aws ecs update-service --cluster <cluster> --service <service> --force-new-deployment
+```
+
+Repeat for each image you need to roll back (the backend and worker are built from the same commit, so roll them back together). The next push to `main` moves the tag forward again. Use an earlier task-definition revision only to undo a configuration change:
 
 ```bash
 # which task definition is the service running?
 aws ecs describe-services --cluster <cluster> --services <service> \
   --query 'services[0].taskDefinition'
 
-# roll back to an earlier revision
+# undo a configuration change
 aws ecs update-service --cluster <cluster> --service <service> \
   --task-definition <family>:<previous-revision>
 ```
-
-Because the workflow tags every image with its commit SHA, a revision that pins `uiuc-chat-backend:<sha>` instead of `latest` gives an exact rollback target.
 
 ## Monitoring
 
