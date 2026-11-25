@@ -8,7 +8,6 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { Montserrat } from 'next/font/google'
 import { montserrat_heading } from 'fonts'
@@ -37,7 +36,8 @@ import type {
   CourseMetadata,
   CourseMetadataOptionalForUpsert,
 } from '~/types/courseMetadata'
-import { callSetCourseMetadata } from '~/utils/apiUtils'
+import { useCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
+import { useUpdateCourseMetadata } from '~/hooks/queries/useUpdateCourseMetadata'
 
 interface ChatbotTagsEditorProps {
   course_name: string
@@ -78,18 +78,18 @@ export default function ChatbotTagsEditor({
   course_name,
   course_metadata,
 }: ChatbotTagsEditorProps) {
-  const queryClient = useQueryClient()
+  // Read tags from the shared metadata query; the prop is only shown until
+  // the first fetch finishes.
+  const { data: metadata } = useCourseMetadata(course_name, {
+    placeholderData: course_metadata as CourseMetadata,
+  })
+  const { save } = useUpdateCourseMetadata(course_name)
 
-  // Local copy of the attached tag list. We seed it from the incoming
-  // course_metadata prop and re-sync whenever that prop changes (so an
-  // external edit, e.g. via the parent's cache subscription, still shows
-  // up here), but persistTags also updates this locally and immediately
-  // so the badges row reflects a save even if the parent's prop refresh
-  // is delayed for any reason.
-  const propTags = useMemo(
-    () => sanitizeChatbotTags(course_metadata.tags),
-    [course_metadata.tags],
-  )
+  // Local copy of the attached tag list, re-synced whenever the query's tags
+  // change. persistTags also updates it right away so the badges row reflects
+  // a save immediately.
+  const sourceTags = (metadata ?? course_metadata).tags
+  const propTags = useMemo(() => sanitizeChatbotTags(sourceTags), [sourceTags])
   const [tags, setTags] = useState<ChatbotTag[]>(propTags)
   useEffect(() => {
     setTags(propTags)
@@ -114,9 +114,8 @@ export default function ChatbotTagsEditor({
       setStatus('saving')
       setErrorMessage(null)
 
-      // Send only the tags so a stale copy of the rest of the metadata can't
-      // overwrite newer values on the server.
-      const ok = await callSetCourseMetadata(course_name, { tags: nextTags })
+      // Send only the tags; the mutation updates the shared cache.
+      const ok = await save({ tags: nextTags })
 
       if (!ok) {
         setStatus('error')
@@ -124,20 +123,11 @@ export default function ChatbotTagsEditor({
         return false
       }
 
-      // Local state first so the badges row updates immediately, even
-      // before the parent's cache subscription notices the change.
       setTags(nextTags)
-      queryClient.setQueryData(
-        ['courseMetadata', course_name],
-        (prev: CourseMetadata | undefined) =>
-          prev
-            ? { ...prev, tags: nextTags }
-            : { ...course_metadata, tags: nextTags },
-      )
       setStatus('idle')
       return true
     },
-    [course_name, course_metadata, queryClient],
+    [save],
   )
 
   const flashError = useCallback((message: string) => {

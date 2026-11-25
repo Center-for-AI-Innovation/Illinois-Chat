@@ -6,12 +6,13 @@ import { Card } from '@/components/shadcn/ui/card'
 import { Button } from '@/components/shadcn/ui/button'
 import { LoaderCircle } from 'lucide-react'
 import { useDebounce } from '~/hooks/useDebounce'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  callSetCourseMetadata,
-  createProject,
-  fetchCourseMetadata,
-} from '~/utils/apiUtils'
+  courseMetadataQueryKey,
+  useCourseMetadata,
+} from '~/hooks/queries/useFetchCourseMetadata'
+import { useUpdateCourseMetadata } from '~/hooks/queries/useUpdateCourseMetadata'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { createProject, fetchCourseMetadata } from '~/utils/apiUtils'
 import { showToast } from '~/utils/toastUtils'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { type ChatbotProjectType, type ChatbotTag } from '~/types/chatbotTags'
@@ -57,6 +58,11 @@ const MakeNewCoursePage = ({
   )
   const [isLoading, setIsLoading] = useState(false)
   const [hasCreatedProject, setHasCreatedProject] = useState(false)
+  // The new project's settings, shared with the editors in later steps.
+  const { data: createdMetadata } = useCourseMetadata(projectName, {
+    enabled: hasCreatedProject,
+  })
+  const { save: saveMetadata } = useUpdateCourseMetadata(projectName)
   const [uploadFiles, setUploadFiles] = useState<FileUpload[]>([])
   const [currentStep, setStep] = useState(0)
 
@@ -147,11 +153,7 @@ const MakeNewCoursePage = ({
       project_name={projectName}
       uploadFiles={uploadFiles}
       setUploadFiles={handleSetUploadFiles}
-      courseMetadata={
-        queryClient.getQueryData(['courseMetadata', projectName]) as
-          | CourseMetadata
-          | undefined
-      }
+      courseMetadata={createdMetadata}
     />,
     <StepBranding
       key="branding"
@@ -236,10 +238,12 @@ const MakeNewCoursePage = ({
           const metadata = (await fetchCourseMetadata(
             project_name,
           )) as CourseMetadata
-          if (initialTags.length > 0) {
-            metadata.tags = initialTags
-          }
-          queryClient.setQueryData(['courseMetadata', project_name], metadata)
+          // Seed the shared query with the new project's settings so the
+          // following steps don't fetch them again.
+          queryClient.setQueryData(
+            courseMetadataQueryKey(project_name),
+            metadata,
+          )
         } catch (metadataError) {
           console.error(
             'Error fetching course metadata after creation:',
@@ -256,31 +260,23 @@ const MakeNewCoursePage = ({
       }
 
       // Persist the wizard-set projectType/organization tags. Fire-and-forget:
-      // a registry/tag failure should not block the wizard. The cache was
-      // already updated above so the user sees them immediately.
+      // a registry/tag failure should not block the wizard. The mutation shows
+      // the tags right away and removes them again if the save fails, so the
+      // wizard never displays tags the server doesn't have.
       const tagsSaved =
         initialTags.length > 0
-          ? callSetCourseMetadata(project_name, { tags: initialTags }).then(
-              (ok) => {
-                if (!ok) {
-                  // Saves now send only their own fields, so nothing later
-                  // re-sends these tags. Take them back out of the cache so
-                  // the wizard doesn't show tags the server doesn't have.
-                  queryClient.setQueryData<CourseMetadata>(
-                    ['courseMetadata', project_name],
-                    (prev) => (prev ? { ...prev, tags: [] } : prev),
-                  )
-                  showToast({
-                    title: 'Tags could not be saved',
-                    message:
-                      'The project was created, but its project type and organization tags were not saved. You can add them again on the Branding step.',
-                    type: 'warning',
-                    autoClose: 8000,
-                  })
-                }
-                return ok
-              },
-            )
+          ? saveMetadata({ tags: initialTags }).then((ok) => {
+              if (!ok) {
+                showToast({
+                  title: 'Tags could not be saved',
+                  message:
+                    'The project was created, but its project type and organization tags were not saved. You can add them again on the Branding step.',
+                  type: 'warning',
+                  autoClose: 8000,
+                })
+              }
+              return ok
+            })
           : Promise.resolve(true)
 
       // Refetch Your Bots after the tag save so the new card isn't cached without tags.

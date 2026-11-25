@@ -667,10 +667,14 @@ describe('MakeNewCoursePage', () => {
           }),
         ),
       )
-      expect(
-        queryClient.getQueryData<CourseMetadata>(['courseMetadata', 'NewBot'])
-          ?.tags,
-      ).toEqual([])
+      // The save's rollback restores the previous value: the new project's
+      // entry is still cached and has no tags.
+      const cached = queryClient.getQueryData<CourseMetadata>([
+        'courseMetadata',
+        'NewBot',
+      ])
+      expect(cached).toBeDefined()
+      expect(cached?.tags).toBeUndefined()
     })
 
     it('warns and caches nothing when fetchCourseMetadata fails', async () => {
@@ -710,10 +714,17 @@ describe('MakeNewCoursePage', () => {
       // Creation succeeded, so the wizard still advances
       expect(await screen.findByTestId('step-success')).toBeInTheDocument()
 
-      // No fabricated metadata is cached; a visible warning is shown instead
-      expect(
-        queryClient.getQueryData(['courseMetadata', 'NewBot']),
-      ).toBeUndefined()
+      // Creation doesn't fabricate metadata after the failed fetch. The only
+      // cached copy is the one the shared metadata query fetches on its own
+      // once the project exists, i.e. real server data.
+      await waitFor(() =>
+        expect(apiUtils.fetchCourseMetadata).toHaveBeenCalledTimes(2),
+      )
+      await waitFor(() =>
+        expect(queryClient.getQueryData(['courseMetadata', 'NewBot'])).toEqual(
+          expect.objectContaining({ course_owner: 'owner@example.com' }),
+        ),
+      )
       await waitFor(() => {
         expect(showToast).toHaveBeenCalledWith(
           expect.objectContaining({

@@ -1,6 +1,6 @@
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '~/test-utils/renderWithProviders'
@@ -46,7 +46,7 @@ describe('EmailListAccordion', () => {
 
   it('adds, validates, pastes, and deletes member emails', async () => {
     const user = userEvent.setup()
-    const onEmailAddressesChange = vi.fn()
+    const onSaved = vi.fn()
 
     renderWithProviders(
       <EmailListAccordion
@@ -60,7 +60,7 @@ describe('EmailListAccordion', () => {
         }
         is_private
         is_for_admins={false}
-        onEmailAddressesChange={onEmailAddressesChange}
+        onSaved={onSaved}
       />,
     )
 
@@ -76,8 +76,9 @@ describe('EmailListAccordion', () => {
     await user.type(input, 'b@example.com')
     await user.keyboard('{Enter}')
 
-    expect(callSetCourseMetadata).toHaveBeenCalled()
-    expect(onEmailAddressesChange).toHaveBeenCalled()
+    // Saves go through the shared mutation, which runs asynchronously.
+    await waitFor(() => expect(callSetCourseMetadata).toHaveBeenCalled())
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
 
     // Paste multiple emails (should de-dupe existing a@example.com)
     await user.clear(input)

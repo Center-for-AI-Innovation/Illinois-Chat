@@ -6,7 +6,9 @@ import {
   type CourseMetadata,
   type CourseMetadataOptionalForUpsert,
 } from '~/types/courseMetadata'
-import { callSetCourseMetadata, uploadToS3 } from '~/utils/apiUtils'
+import { uploadToS3 } from '~/utils/apiUtils'
+import { useCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
+import { useUpdateCourseMetadata } from '~/hooks/queries/useUpdateCourseMetadata'
 import { useResponsiveCardWidth } from '~/utils/responsiveGrid'
 import SetExampleQuestions from './SetExampleQuestions'
 import ChatbotTagsEditor from './ChatbotTagsEditor'
@@ -61,7 +63,6 @@ export const UploadCard = memo(function UploadCard({
   const [projectDescription, setProjectDescription] = useState(
     initialMetadata?.project_description || '',
   )
-  const queryClient = useQueryClient()
   const [introMessage, setIntroMessage] = useState(
     initialMetadata?.course_intro_message || '',
   )
@@ -69,51 +70,27 @@ export const UploadCard = memo(function UploadCard({
   const [isIntroMessageUpdated, setIsIntroMessageUpdated] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [uploadFiles, setUploadFiles] = useState<FileUpload[]>([])
-  const [metadata, setMetadata] = useState(initialMetadata)
+  // The shared metadata query re-renders this card (and the editors below it)
+  // whenever any of them saves. The page's copy is shown until it loads.
+  const { data: queriedMetadata } = useCourseMetadata(projectName, {
+    placeholderData: initialMetadata,
+  })
+  const metadata = queriedMetadata ?? initialMetadata
+  const { save } = useUpdateCourseMetadata(projectName)
+  // Passed to the ingest forms below.
+  const queryClient = useQueryClient()
   const descriptionRef = useAutosizeTextarea(projectDescription)
   const greetingRef = useAutosizeTextarea(introMessage)
 
-  useEffect(() => {
-    // Set initial query data
-    queryClient.setQueryData(['courseMetadata', projectName], initialMetadata)
-  }, [])
-
-  // Update local state when query data changes
-  useEffect(() => {
-    const unsubscribe = queryClient.getQueryCache().subscribe(() => {
-      const latestData = queryClient.getQueryData([
-        'courseMetadata',
-        projectName,
-      ])
-      if (latestData) {
-        setMetadata(latestData as CourseMetadata)
-      }
-    })
-
-    return () => {
-      unsubscribe()
-    }
-  }, [projectName, queryClient])
-
-  // Save only the changed fields (the server merges them over what it has),
-  // then merge them into local state and the shared cache without mutating
-  // the existing object.
+  // Save only the changed fields; the server merges them over what it has.
   const saveMetadataFields = async (
     changes: Partial<CourseMetadata>,
   ): Promise<boolean> => {
-    const resp = await callSetCourseMetadata(projectName, changes)
-    if (!resp) {
+    const ok = await save(changes)
+    if (!ok) {
       console.log('Error upserting course metadata for course: ', projectName)
-      return false
     }
-    const latest =
-      (queryClient.getQueryData(['courseMetadata', projectName]) as
-        | CourseMetadata
-        | undefined) ?? metadata
-    const updated = { ...latest, ...changes } as CourseMetadata
-    setMetadata(updated)
-    queryClient.setQueryData(['courseMetadata', projectName], updated)
-    return true
+    return ok
   }
 
   const handleCloseNotification = () => {

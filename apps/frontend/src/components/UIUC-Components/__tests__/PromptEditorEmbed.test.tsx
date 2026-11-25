@@ -457,9 +457,12 @@ describe('PromptEditorEmbed', () => {
       mockFetchCourseMetadata.mockResolvedValue(null)
       const PromptEditorEmbed = (await import('../PromptEditorEmbed')).default
       renderWithProviders(<PromptEditorEmbed project_name="Empty" />)
-      await waitFor(() => {
-        expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+        },
+        { timeout: 3000 },
+      ) // the metadata query retries once
       // A failed load shows an error, not an empty editor.
       expect(screen.getByRole('alert')).toHaveTextContent(
         /Couldn't load this project's prompt settings/,
@@ -482,9 +485,12 @@ describe('PromptEditorEmbed', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const PromptEditorEmbed = (await import('../PromptEditorEmbed')).default
       renderWithProviders(<PromptEditorEmbed project_name="Fail" />)
-      await waitFor(() => {
-        expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
-      })
+      await waitFor(
+        () => {
+          expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+        },
+        { timeout: 3000 },
+      ) // the metadata query retries once
       // A failed load shows an error, not an empty editor.
       expect(screen.getByRole('alert')).toHaveTextContent(
         /Couldn't load this project's prompt settings/,

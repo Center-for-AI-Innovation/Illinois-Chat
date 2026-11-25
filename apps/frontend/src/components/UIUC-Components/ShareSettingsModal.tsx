@@ -9,8 +9,9 @@ import {
 } from '@tabler/icons-react'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import EmailListAccordion from './EmailListAccordion'
-import { callSetCourseMetadata } from '~/utils/apiUtils'
-import { showSuccessToast } from '~/utils/toastUtils'
+import { useCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
+import { useUpdateCourseMetadata } from '~/hooks/queries/useUpdateCourseMetadata'
+import { showErrorToast, showSuccessToast } from '~/utils/toastUtils'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
 import { motion } from 'framer-motion'
 import { Accordion } from '@/components/shadcn/ui/accordion'
@@ -63,14 +64,40 @@ export default function ShareSettingsModal({
   metadata: initialMetadata,
 }: ShareSettingsModalProps) {
   const queryClient = useQueryClient()
-  const [metadata, setMetadata] = useState<CourseMetadata>(initialMetadata)
+  // Read the project's current settings from the shared query. The prop can
+  // be an old copy (the hub card passes one from the chatbot list), and a
+  // cached entry can be old too (this modal stays mounted between opens), so
+  // either is only shown read-only until a load made for this opening
+  // succeeds.
+  const { data, refetch } = useCourseMetadata(projectName, {
+    enabled: opened,
+    placeholderData: initialMetadata,
+  })
+  const metadata = data ?? initialMetadata
+  const { save } = useUpdateCourseMetadata(projectName)
 
-  // Only update from props when modal is opened
+  const [loadState, setLoadState] = useState<'loading' | 'fresh' | 'failed'>(
+    'loading',
+  )
   useEffect(() => {
-    if (opened) {
-      setMetadata(initialMetadata)
+    if (!opened) {
+      setLoadState('loading')
+      return
     }
-  }, [opened, initialMetadata])
+    let cancelled = false
+    setLoadState('loading')
+    // Edits are blocked until this resolves, so no save can cancel it.
+    void refetch().then((result) => {
+      if (cancelled) return
+      setLoadState(result.isSuccess ? 'fresh' : 'failed')
+    })
+    return () => {
+      cancelled = true
+    }
+    // Reload once per opening; `refetch` is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, projectName])
+  const canEdit = loadState === 'fresh'
 
   // Rest of the modal state
   const isPrivate = metadata?.is_private || false
@@ -144,19 +171,20 @@ export default function ShareSettingsModal({
   )
 
   const handleAccessSelect = async (level: AccessLevel) => {
+    if (!canEdit) return
     const accessFields =
       level === 'public'
         ? { is_private: false, allow_logged_in_users: false }
         : level === 'logged_in'
           ? { is_private: true, allow_logged_in_users: true }
           : { is_private: true, allow_logged_in_users: false }
-    const updatedMetadata: CourseMetadata = { ...metadata, ...accessFields }
-
-    setMetadata(updatedMetadata)
-    queryClient.setQueryData(['courseMetadata', projectName], updatedMetadata)
-    // Send only the access fields so a stale copy of the rest of the metadata
-    // (admins, prompt, ...) can't overwrite newer values on the server.
-    await callSetCourseMetadata(projectName, accessFields)
+    // Send only the access fields. The shared cache shows the change right
+    // away and is rolled back if the save fails.
+    const ok = await save(accessFields)
+    if (!ok) {
+      showErrorToast('Access level could not be changed. Please try again.')
+      return
+    }
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['allCourseMetadata'] }),
       // Access level decides the hub section and badge.
@@ -170,18 +198,7 @@ export default function ShareSettingsModal({
 
   // Removed old toggle handlers in favor of unified dropdown access control
 
-  const handleEmailAddressesChange = (
-    new_course_metadata: CourseMetadata,
-    course_name: string,
-  ) => {
-    // Update local state immediately
-    setMetadata(new_course_metadata)
-
-    // Update cache immediately
-    queryClient.setQueryData(
-      ['courseMetadata', course_name],
-      new_course_metadata,
-    )
+  const handleEmailListSaved = () => {
     void queryClient.invalidateQueries({ queryKey: ['allCourseMetadata'] })
   }
 
@@ -385,7 +402,10 @@ export default function ShareSettingsModal({
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger
                     render={
-                      <button className="flex items-center gap-2 rounded-lg border border-(--background-dark) bg-(--modal) px-3 py-2 text-sm transition-colors hover:bg-(--background-dark)">
+                      <button
+                        disabled={!canEdit}
+                        className="flex items-center gap-2 rounded-lg border border-(--background-dark) bg-(--modal) px-3 py-2 text-sm transition-colors hover:bg-(--background-dark) disabled:pointer-events-none disabled:opacity-50"
+                      >
                         <span className="hidden sm:inline">Change access</span>
                         <span className="sm:hidden">Access</span>
                         <IconChevronDown className="h-4 w-4" />
@@ -464,8 +484,9 @@ export default function ShareSettingsModal({
                         course_name={projectName}
                         metadata={metadata}
                         is_private={isPrivate}
-                        onEmailAddressesChange={handleEmailAddressesChange}
+                        onSaved={handleEmailListSaved}
                         is_for_admins={false}
+                        disabled={!canEdit}
                       />
                     </Accordion>
                   </motion.div>
@@ -498,13 +519,25 @@ export default function ShareSettingsModal({
                 )}
               </motion.div>
 
+              {loadState === 'failed' && (
+                <p
+                  role="alert"
+                  className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-(--error)`}
+                >
+                  Couldn&apos;t load the current sharing settings, so they
+                  can&apos;t be changed right now. Close and reopen to try
+                  again.
+                </p>
+              )}
+
               <Accordion defaultValue={['admins']} className="w-full">
                 <EmailListAccordion
                   course_name={projectName}
                   metadata={metadata}
                   is_private={isPrivate}
-                  onEmailAddressesChange={handleEmailAddressesChange}
+                  onSaved={handleEmailListSaved}
                   is_for_admins={true}
+                  disabled={!canEdit}
                 />
               </Accordion>
             </div>

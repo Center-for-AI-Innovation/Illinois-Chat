@@ -8,14 +8,27 @@ import {
   renderWithProviders,
 } from '~/test-utils/renderWithProviders'
 
-vi.mock('framer-motion', () => ({
-  motion: new Proxy(
-    {},
-    {
-      get: () => (props: any) => React.createElement('div', props),
-    },
-  ),
-}))
+// Return the same stand-in component for each tag. A new function per access
+// makes React remount the modal on every re-render (e.g. when its metadata
+// query resolves), detaching elements a test is about to click.
+vi.mock('framer-motion', () => {
+  const components = new Map<PropertyKey, (props: any) => any>()
+  return {
+    motion: new Proxy(
+      {},
+      {
+        get: (_target, tag) => {
+          if (!components.has(tag)) {
+            components.set(tag, (props: any) =>
+              React.createElement('div', props),
+            )
+          }
+          return components.get(tag)
+        },
+      },
+    ),
+  }
+})
 
 // Base UI's DropdownMenu drives its open/close state off real CSS animations
 // (animationend events), which jsdom never fires. That leaves the popup's
@@ -48,11 +61,13 @@ vi.mock('@/components/shadcn/ui/dropdown-menu', () => ({
 }))
 
 vi.mock('../EmailListAccordion', () => ({
-  default: ({ is_for_admins }: any) =>
+  default: ({ is_for_admins, metadata, disabled }: any) =>
     React.createElement(
       'div',
-      null,
-      is_for_admins ? 'Admins accordion' : 'Members accordion',
+      { 'data-disabled': String(Boolean(disabled)) },
+      is_for_admins
+        ? `Admins accordion: ${(metadata?.course_admins ?? []).join(', ')}`
+        : 'Members accordion',
     ),
 }))
 
@@ -61,6 +76,12 @@ vi.mock('~/utils/apiUtils', async (importOriginal) => {
   return {
     ...actual,
     callSetCourseMetadata: vi.fn(async () => true),
+    // The modal reads current settings from the shared query; serve a
+    // private project unless a test overrides it.
+    fetchCourseMetadata: vi.fn(async () => ({
+      is_private: true,
+      allow_logged_in_users: false,
+    })),
   }
 })
 
@@ -156,5 +177,133 @@ describe('ShareSettingsModal', () => {
       expect(screen.getByText(/Members accordion/i)).toBeInTheDocument(),
     )
     expect(screen.getByText(/Admins accordion/i)).toBeInTheDocument()
+  })
+
+  it('edits admins from fresh server data, not the stale prop', async () => {
+    const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+    vi.mocked(fetchCourseMetadata).mockResolvedValueOnce({
+      is_private: true,
+      allow_logged_in_users: false,
+      course_admins: [],
+    } as any)
+
+    const ShareSettingsModal = (await import('../ShareSettingsModal')).default
+    renderWithProviders(
+      <ShareSettingsModal
+        opened={true}
+        onClose={vi.fn()}
+        projectName="CS101"
+        // e.g. an old copy from the chatbot hub's list
+        metadata={
+          {
+            is_private: true,
+            allow_logged_in_users: false,
+            course_admins: ['removed@example.com'],
+          } as any
+        }
+      />,
+      { homeContext: { dispatch: vi.fn() } },
+    )
+
+    // The stale copy is shown at first, with editing blocked.
+    const admins = screen.getByText(/Admins accordion/i)
+    expect(admins).toHaveTextContent('removed@example.com')
+    expect(admins).toHaveAttribute('data-disabled', 'true')
+
+    // Once fresh data arrives, the removed admin is gone and edits are allowed.
+    await waitFor(() =>
+      expect(screen.getByText(/Admins accordion/i)).not.toHaveTextContent(
+        'removed@example.com',
+      ),
+    )
+    expect(screen.getByText(/Admins accordion/i)).toHaveAttribute(
+      'data-disabled',
+      'false',
+    )
+  })
+
+  it('stays read-only with an error when the fresh load fails', async () => {
+    const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+    const original = vi.mocked(fetchCourseMetadata).getMockImplementation()
+    vi.mocked(fetchCourseMetadata).mockRejectedValue(new Error('down'))
+    try {
+      const ShareSettingsModal = (await import('../ShareSettingsModal')).default
+      renderWithProviders(
+        <ShareSettingsModal
+          opened={true}
+          onClose={vi.fn()}
+          projectName="CS101"
+          metadata={
+            {
+              is_private: true,
+              allow_logged_in_users: false,
+              course_admins: ['removed@example.com'],
+            } as any
+          }
+        />,
+        { homeContext: { dispatch: vi.fn() } },
+      )
+
+      // The query retries once before failing.
+      expect(
+        await screen.findByRole('alert', {}, { timeout: 3000 }),
+      ).toHaveTextContent(/Couldn't load the current sharing settings/)
+      expect(screen.getByText(/Admins accordion/i)).toHaveAttribute(
+        'data-disabled',
+        'true',
+      )
+      expect(
+        screen.getByRole('button', { name: /Change access|Access/i }),
+      ).toBeDisabled()
+    } finally {
+      vi.mocked(fetchCourseMetadata).mockImplementation(original!)
+    }
+  })
+
+  it('on reopen, a cached copy stays read-only until the reload finishes', async () => {
+    const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+    let resolveFetch: (m: any) => void = () => {}
+    vi.mocked(fetchCourseMetadata).mockImplementationOnce(
+      () => new Promise((resolve) => (resolveFetch = resolve)),
+    )
+
+    // A copy cached by an earlier opening, now out of date.
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(['courseMetadata', 'CS101'], {
+      is_private: true,
+      allow_logged_in_users: false,
+      course_admins: ['removed@example.com'],
+    })
+
+    const ShareSettingsModal = (await import('../ShareSettingsModal')).default
+    renderWithProviders(
+      <ShareSettingsModal
+        opened={true}
+        onClose={vi.fn()}
+        projectName="CS101"
+        metadata={{ is_private: true, allow_logged_in_users: false } as any}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    const admins = screen.getByText(/Admins accordion/i)
+    expect(admins).toHaveTextContent('removed@example.com')
+    expect(admins).toHaveAttribute('data-disabled', 'true')
+
+    resolveFetch({
+      is_private: true,
+      allow_logged_in_users: false,
+      course_admins: [],
+    })
+
+    await waitFor(() =>
+      expect(screen.getByText(/Admins accordion/i)).toHaveAttribute(
+        'data-disabled',
+        'false',
+      ),
+    )
+    expect(screen.getByText(/Admins accordion/i)).not.toHaveTextContent(
+      'removed@example.com',
+    )
   })
 })

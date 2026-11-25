@@ -10,9 +10,11 @@ import {
 } from '@/components/shadcn/ui/tooltip'
 import { Spinner } from '@/components/shadcn/ui/spinner'
 
-import { useQueryClient } from '@tanstack/react-query'
 import { type CourseMetadataOptionalForUpsert } from '~/types/courseMetadata'
-import { callSetCourseMetadata } from '~/utils/apiUtils'
+import {
+  CourseMetadataSaveError,
+  useUpdateCourseMetadata,
+} from '~/hooks/queries/useUpdateCourseMetadata'
 
 interface QuestionState {
   value: string
@@ -29,18 +31,23 @@ export default function SetExampleQuestions({
   course_metadata: CourseMetadataOptionalForUpsert
   onStepLeave?: (callback: () => Promise<void>) => void
 }) {
-  const queryClient = useQueryClient()
   const example_questions = course_metadata?.example_questions || []
 
-  const updateCache = useCallback(
-    (newQuestions: string[]) => {
-      queryClient.setQueryData(
-        ['courseMetadata', course_name],
-        (prev: CourseMetadataOptionalForUpsert | undefined) =>
-          prev ? { ...prev, example_questions: newQuestions } : prev,
-      )
+  // Saves only example_questions; the mutation keeps the shared cache in sync.
+  // Resolves false when the server refuses the save; other errors are thrown
+  // so their message can be shown on the question.
+  const { mutateAsync } = useUpdateCourseMetadata(course_name)
+  const save = useCallback(
+    async (changes: { example_questions: string[] }): Promise<boolean> => {
+      try {
+        await mutateAsync(changes)
+        return true
+      } catch (error) {
+        if (error instanceof CourseMetadataSaveError) return false
+        throw error
+      }
     },
-    [queryClient, course_name],
+    [mutateAsync],
   )
   const [questions, setQuestions] = useState<QuestionState[]>(() => {
     if (example_questions.length > 0) {
@@ -76,13 +83,12 @@ export default function SetExampleQuestions({
         .filter((q) => q !== '')
 
       try {
-        const success = await callSetCourseMetadata(course_name, {
+        const success = await save({
           example_questions: validQuestions,
         })
 
         if (success) {
           originalValuesRef.current = validQuestions
-          updateCache(validQuestions)
           setQuestions((prev) =>
             prev.map((q) => ({
               ...q,
@@ -118,7 +124,7 @@ export default function SetExampleQuestions({
         await saveAllPendingQuestions()
       })
     }
-  }, [onStepLeave, course_name, course_metadata, updateCache])
+  }, [onStepLeave, save])
 
   const saveQuestion = useCallback(
     async (index: number, currentValue?: string) => {
@@ -155,14 +161,13 @@ export default function SetExampleQuestions({
         .filter((q) => q !== '')
 
       try {
-        const success = await callSetCourseMetadata(course_name, {
+        const success = await save({
           example_questions: allQuestions,
         })
 
         if (success) {
           // Update original values ref
           originalValuesRef.current = allQuestions
-          updateCache(allQuestions)
           setQuestions((prev) =>
             prev.map((q, i) =>
               i === index
@@ -190,7 +195,7 @@ export default function SetExampleQuestions({
         )
       }
     },
-    [course_name, course_metadata, updateCache],
+    [save],
   )
 
   const deleteQuestion = async (index: number) => {
@@ -205,13 +210,12 @@ export default function SetExampleQuestions({
     )
 
     try {
-      const success = await callSetCourseMetadata(course_name, {
+      const success = await save({
         example_questions: validQuestions,
       })
 
       if (success) {
         originalValuesRef.current = validQuestions
-        updateCache(validQuestions)
         // Keep at least one empty input field
         setQuestions(
           newQuestions.length > 0
