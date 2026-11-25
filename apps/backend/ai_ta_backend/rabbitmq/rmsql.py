@@ -22,6 +22,8 @@ try:
 except ModuleNotFoundError:
     import models
 
+logger = logging.getLogger(__name__)
+
 
 # Define your base if you haven’t already
 Base = declarative_base()
@@ -110,7 +112,8 @@ class SQLAlchemyIngestDB:
             self.engine = engine
             limit_statement_time(self.engine, statement_timeout)
             self.Session = sessionmaker(bind=self.engine)
-            logging.info("IngestSQL using injected per-project SQL engine")
+            url = self.engine.url
+            logger.debug("engine configured for %s:%s/%s (per-project)", url.host, url.port, url.database)
             return
 
         # Define supported database configurations and their required env vars
@@ -127,7 +130,9 @@ class SQLAlchemyIngestDB:
                 break
 
         if not db_type:
-            raise ValueError("No valid database configuration found in environment variables")
+            missing = '; '.join('%s needs %s' % (db, ', '.join(v for v in required_vars if not os.getenv(v)))
+                                for db, required_vars in DB_CONFIGS.items())
+            raise ValueError(f"No valid database configuration found in environment variables (unset: {missing})")
 
         # Build the appropriate connection string
         if db_type == 'sqlite':
@@ -136,12 +141,13 @@ class SQLAlchemyIngestDB:
             # postgres
             db_uri = f"postgresql://{os.getenv('POSTGRES_USERNAME')}:{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_ENDPOINT')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DATABASE')}"
 
-        # Create engine and session
-        logging.info("About to connect to DB from IngestSQL.py.")
-        self.engine = create_engine(db_uri, poolclass=NullPool, connect_args=postgres_connect_args(db_uri))
+        # Create engine and session. The engine is lazy: nothing connects yet.
+        self.engine = create_engine(db_uri, poolclass=NullPool, hide_parameters=True,
+                                    connect_args=postgres_connect_args(db_uri))
         limit_statement_time(self.engine, statement_timeout)
         self.Session = sessionmaker(bind=self.engine)
-        logging.info("Successfully connected to DB from IngestSQL.py")
+        url = self.engine.url
+        logger.debug("engine configured for %s:%s/%s", url.host, url.port, url.database)
 
 
     @contextmanager
@@ -190,21 +196,21 @@ class SQLAlchemyIngestDB:
                 insert_stmt = insert(models.DocumentsFailed).values(failed_doc_payload)
                 session.execute(insert_stmt)
                 return True
-            except SQLAlchemyError as e:
-                logging.error(f"Insertion failed: {e}")
+            except SQLAlchemyError:
+                logger.exception("insert into documents_failed failed")
                 return False
 
     def delete_document_in_progress(self, beam_task_id: str):
         with self.get_session() as session:
             try:
-                logging.info("Deleting task id "+beam_task_id)
+                logger.debug("deleting documents_in_progress row job=%s", beam_task_id)
                 delete_stmt = (
                     delete(models.DocumentsInProgress)
                     .where(models.DocumentsInProgress.beam_task_id == beam_task_id))
                 session.execute(delete_stmt)
                 return True
-            except SQLAlchemyError as e:
-                logging.error(f"Deletion failed: {e}")
+            except SQLAlchemyError:
+                logger.exception("delete from documents_in_progress failed")
                 return False
 
     def insert_document(self, doc_payload: dict) -> bool:
@@ -213,8 +219,8 @@ class SQLAlchemyIngestDB:
                 insert_stmt = insert(models.Document).values(doc_payload)
                 session.execute(insert_stmt)
                 return True  # Insertion successful
-            except SQLAlchemyError as e:
-                logging.error(f"Insertion failed: {e}")
+            except SQLAlchemyError:
+                logger.exception("insert into documents failed")
                 return False  # Insertion failed
 
     def add_document_to_group_url(self, contexts, groups):
@@ -233,8 +239,8 @@ class SQLAlchemyIngestDB:
                                               params)
                 count = result.rowcount if result.returns_rows else 0  # Number of affected rows or results
                 return count
-            except Exception as e:
-                logging.error(f"Stored procedure execution failed: {e}")
+            except Exception:
+                logger.exception("stored procedure add_document_to_group_url failed")
                 return None, 0
 
     def add_document_to_group(self, contexts, groups):
@@ -253,8 +259,8 @@ class SQLAlchemyIngestDB:
 
                 count = result.rowcount if result.returns_rows else 0  # Number of affected rows or results
                 return count
-            except Exception as e:
-                logging.error(f"Stored procedure execution failed: {e}")
+            except Exception:
+                logger.exception("stored procedure add_document_to_group failed")
                 return None, 0
 
     def get_like_docs_by_s3_path(self, course_name, original_filename):

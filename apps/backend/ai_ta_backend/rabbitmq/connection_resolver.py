@@ -19,6 +19,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -27,6 +28,7 @@ from botocore.config import Config
 from qdrant_client import QdrantClient
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine as SAEngine
+from sqlalchemy.exc import ArgumentError, NoSuchModuleError
 from sqlalchemy.pool import NullPool
 
 try:
@@ -95,7 +97,8 @@ def _decrypt_config(stored: dict) -> Optional[dict]:
         return None
     key = os.environ.get('ENCRYPTION_MASTER_KEY', '')
     if not key:
-        logger.warning("ENCRYPTION_MASTER_KEY not set; cannot decrypt external config")
+        # ERROR: the job then runs on the host defaults, not on the project's own connection.
+        logger.error("ENCRYPTION_MASTER_KEY is not set: cannot decrypt the project's external connection")
         return None
     plaintext = _decrypt(encrypted_str, key)
     return json.loads(plaintext)
@@ -170,7 +173,9 @@ class WorkerConnectionResolver:
         try:
             return _decrypt_config(encrypted_blob)
         except Exception as e:
-            logger.error("Failed to decrypt %s for project %s: %s", field, project_name, e)
+            # Only the type: the text of a decrypt or JSON error can hold the decrypted config.
+            logger.error("cannot decrypt %s course=%s (%s); using the host default for it", field, project_name,
+                         type(e).__name__)
             return None
 
     # ── Public API ──
@@ -219,12 +224,24 @@ class WorkerConnectionResolver:
             self._resolve_embedding(result, project_name, emb_cfg)
 
         if result.has_overrides:
-            logger.info(
+            logger.debug(
                 "Resolved external connections for project: %s (engine=%s)",
                 project_name, result.engine_kind,
             )
 
         return result
+
+    def resolve_documents_engine(self, project_name: str) -> Optional[SAEngine]:
+        """Only the project's documents database, or None when it uses the host one.
+
+        For the worker's failure path. resolve() can fail on a part that is not the
+        documents database (Qdrant, S3, the embedding config), and the status rows of the
+        job must still be updated in the database where the producer wrote them.
+        """
+        if not project_name:
+            return None
+        db_config = self._decrypt_field(self._get_raw_config(project_name), project_name, "database_config")
+        return self._create_engine(project_name, db_config) if db_config else None
 
     # ── Embedding ──
 
@@ -265,7 +282,7 @@ class WorkerConnectionResolver:
 
     @staticmethod
     def _create_qdrant(project_name: str, qdrant_config: dict) -> QdrantClient:
-        logger.info("Creating external Qdrant client for project: %s", project_name)
+        logger.debug("Creating external Qdrant client for project: %s", project_name)
         return QdrantClient(
             url=qdrant_config["url"],
             api_key=qdrant_config["api_key"],
@@ -285,15 +302,36 @@ class WorkerConnectionResolver:
         database pooler's job (the documented setup is a Supabase transaction
         pooler), and this matches the worker's host engine in rmsql.py.
         """
-        logger.info("Creating external SQL engine for project: %s", project_name)
+        logger.debug("Creating external SQL engine for project: %s", project_name)
         uri = db_config["connection_uri"]
-        return create_engine(uri, poolclass=NullPool, connect_args=postgres_connect_args(uri))
+        try:
+            return create_engine(uri, poolclass=NullPool, hide_parameters=True,
+                                 connect_args=postgres_connect_args(uri))
+        except NoSuchModuleError:
+            # The scheme names a driver that SQLAlchemy cannot load, for example postgres://.
+            # The scheme holds no secret, so the message names it. `from None` for the same
+            # reason as below.
+            scheme = uri.split("://", 1)[0] if isinstance(uri, str) and "://" in uri else ""
+            if not re.fullmatch(r"[A-Za-z0-9+.\-]{1,40}", scheme):
+                scheme = "?"
+            if scheme in ("postgresql", "postgresql+psycopg2"):
+                # The scheme is good. What cannot be loaded is something else in the string,
+                # a `plugin=` in the query for example.
+                raise ValueError("the connection_uri of project %s is not a valid database URL" %
+                                 project_name) from None
+            raise ValueError("the connection_uri of project %s has the scheme %s://, which the backend cannot "
+                             "use; use postgresql://" % (project_name, scheme)) from None
+        except (ArgumentError, ValueError):
+            # SQLAlchemy writes the string, or the part of it after the user name, into these
+            # errors, and that text holds the password. `from None` keeps it out of the
+            # traceback too.
+            raise ValueError("the connection_uri of project %s is not a valid database URL" % project_name) from None
 
     # ── S3 ──
 
     @staticmethod
     def _create_s3(project_name: str, s3_config: dict):
-        logger.info("Creating external S3 client for project: %s", project_name)
+        logger.debug("Creating external S3 client for project: %s", project_name)
         endpoint_url = s3_config.get("endpoint_url")
         region = s3_config.get("region")
         client_kwargs = dict(

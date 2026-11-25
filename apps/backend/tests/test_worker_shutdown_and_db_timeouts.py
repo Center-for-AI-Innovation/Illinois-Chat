@@ -35,7 +35,7 @@ finally:
 # ── run_ingest_isolated: stop for a shutdown ──
 
 
-def _child_sleep(job_id, inputs):
+def _child_sleep(job_id, rid, inputs):
     time.sleep(inputs["seconds"])
     sys.exit(0)
 
@@ -43,7 +43,7 @@ def _child_sleep(job_id, inputs):
 def test_shutdown_kills_a_running_child_and_reports_interrupted():
     started = time.monotonic()
     failure = worker.run_ingest_isolated(
-        "job", {"seconds": 60}, should_stop=lambda: time.monotonic() - started > 1.5, _target=_child_sleep)
+        "job", None, {"seconds": 60}, should_stop=lambda: time.monotonic() - started > 1.5, _target=_child_sleep)
     elapsed = time.monotonic() - started
     assert failure is worker.INTERRUPTED
     assert elapsed < 15, f"the child was not stopped promptly: {elapsed:.1f}s"
@@ -51,13 +51,13 @@ def test_shutdown_kills_a_running_child_and_reports_interrupted():
 
 def test_shutdown_before_the_child_starts_does_not_start_it():
     started = time.monotonic()
-    failure = worker.run_ingest_isolated("job", {"seconds": 60}, should_stop=lambda: True, _target=_child_sleep)
+    failure = worker.run_ingest_isolated("job", None, {"seconds": 60}, should_stop=lambda: True, _target=_child_sleep)
     assert failure is worker.INTERRUPTED
     assert time.monotonic() - started < 1, "a child was started (spawn alone takes longer than this)"
 
 
 def test_a_child_that_finishes_is_not_reported_interrupted():
-    failure = worker.run_ingest_isolated("job", {"seconds": 0.2}, should_stop=lambda: False, _target=_child_sleep)
+    failure = worker.run_ingest_isolated("job", None, {"seconds": 0.2}, should_stop=lambda: False, _target=_child_sleep)
     assert failure is None
 
 
@@ -126,7 +126,7 @@ def _deliver(w, channel):
 def test_interrupted_job_is_left_unacked_with_its_row_reset(monkeypatch):
     seen = {}
 
-    def fake_run(job_id, inputs, keepalive=None, should_stop=None):
+    def fake_run(job_id, rid, inputs, keepalive=None, should_stop=None):
         seen["should_stop"] = should_stop
         return worker.INTERRUPTED
 

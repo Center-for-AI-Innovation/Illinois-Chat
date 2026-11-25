@@ -1,10 +1,13 @@
 import { type NextApiResponse } from 'next'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { type AuthenticatedRequest } from '~/utils/authMiddleware'
-import { getCourseMetadata } from './getCourseMetadata'
+import { readCourseMetadata } from './getCourseMetadata'
 import { getKeycloakBaseUrl } from '~/utils/authHelpers'
 import { initializeKeycloakAdmin } from '~/utils/keycloakClient'
 import type { MaintainerProfile } from '~/components/UIUC-Components/chatbots-hub/chatbots.types'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.getMaintainerProfiles')
 
 export default withCourseAccessFromRequest('any')(handler)
 
@@ -23,7 +26,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .json({ success: false, error: 'course_name is required' })
   }
 
-  const course_metadata = await getCourseMetadata(course_name)
+  // Throws on a failed read: the route wrapper answers 503, not 404.
+  const course_metadata = await readCourseMetadata(course_name)
   if (course_metadata == null) {
     return res.status(404).json({ success: false, error: 'Project not found' })
   }
@@ -54,7 +58,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               }`.trim(),
               avatar_url: '',
             }
-          } catch {
+          } catch (err) {
+            // Without this line a Keycloak outage reads as "this person has no name".
+            log.warn(
+              'could not load a maintainer profile from Keycloak',
+              { email },
+              err,
+            )
             return {
               email,
             }
@@ -63,7 +73,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     )
     res.status(200).json({ success: true, profiles: maintainerProfiles })
   } catch (error) {
-    console.log('Error occurred while fetching maintainer profiles', error)
-    res.status(500).json({ success: false, error: error })
+    log.error('error fetching maintainer profiles', undefined, error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
   }
 }

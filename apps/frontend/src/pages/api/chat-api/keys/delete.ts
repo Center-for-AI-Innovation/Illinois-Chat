@@ -5,6 +5,9 @@ import type { ApiKeys } from '~/db/dbClient'
 import { apiKeys, db } from '~/db/dbClient'
 import { withCourseOwnerOrAdminAccess } from '~/server/authorization'
 import type { AuthenticatedRequest } from '~/utils/authMiddleware'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('api.keys.delete')
 
 type ApiResponse = {
   message?: string
@@ -33,7 +36,7 @@ async function handler(
       return res.status(400).json({ error: 'User email missing' })
     }
 
-    console.log('Deleting api key for:', userEmail)
+    log.info('deleting API key', { user: req.user?.sub })
 
     const data = await db
       .update(apiKeys)
@@ -42,7 +45,6 @@ async function handler(
       .returning()
 
     if (data.length === 0) {
-      console.error('No API key found for user email:', userEmail)
       throw new Error('No API key found for user email')
     }
 
@@ -55,7 +57,7 @@ async function handler(
       data,
     })
   } catch (error) {
-    console.error('Failed to delete API key:', error)
+    log.error('could not delete the API key', { user: req.user?.sub }, error)
 
     posthog.capture('api_key_deletion_failed', {
       error: (error as Error).message,
