@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { Button } from '@/components/shadcn/ui/button'
 import { montserrat_heading } from 'fonts'
 import { buildProjectChatPath } from '~/utils/projectName'
+import { withRequestRef } from '~/utils/requestRef'
 
 const buttonClassName =
   'login-btn h-auto min-h-12 bg-(--button) text-white hover:bg-(--button-hover)'
@@ -13,11 +14,13 @@ export const RoleCheckFailed = ({
   onRetry,
   title = "We couldn't check your access to this chatbot",
   message = 'Something went wrong while loading your permissions. Try again in a moment.',
+  requestId,
 }: {
   course_name: string
   onRetry: () => void
   title?: string
   message?: string
+  requestId?: string | null
 }) => {
   return (
     <>
@@ -49,7 +52,7 @@ export const RoleCheckFailed = ({
             <p
               className={`${montserrat_heading.variable} font-montserratHeading max-w-2xl p-4 text-center text-lg text-(--foreground)`}
             >
-              {message}
+              {withRequestRef(message, requestId)}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
               <Button

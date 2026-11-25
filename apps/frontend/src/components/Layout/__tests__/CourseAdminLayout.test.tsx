@@ -29,8 +29,8 @@ vi.mock('~/components/UIUC-Components/CourseIsFrozen', () => ({
   CourseIsFrozen: () => <div>course-is-frozen</div>,
 }))
 vi.mock('~/components/UIUC-Components/RoleCheckFailed', () => ({
-  RoleCheckFailed: (p: { onRetry: () => void }) => (
-    <button onClick={p.onRetry}>role-check-failed</button>
+  RoleCheckFailed: (p: { onRetry: () => void; requestId?: string }) => (
+    <button onClick={p.onRetry}>role-check-failed {p.requestId}</button>
   ),
 }))
 vi.mock('~/components/UIUC-Components/CannotEditGPT4', () => ({
@@ -138,11 +138,11 @@ describe('CourseAdminLayout', () => {
       isError: true,
       isLoadingError: true,
       data: undefined,
-      error: { status: 500 },
+      error: { status: 500, requestId: 'req-123' },
       refetch,
     }
     renderLayout()
-    fireEvent.click(screen.getByText('role-check-failed'))
+    fireEvent.click(screen.getByText('role-check-failed req-123'))
     expect(refetch).toHaveBeenCalled()
     expect(Child).not.toHaveBeenCalled()
   })

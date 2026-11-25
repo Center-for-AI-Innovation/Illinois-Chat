@@ -82,6 +82,7 @@ export default function CourseAdminLayout({
       <RoleCheckFailed
         course_name={courseName}
         onRetry={() => void role.refetch()}
+        requestId={role.error.requestId}
       />
     )
   }

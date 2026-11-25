@@ -9,11 +9,13 @@ export type CourseAccessRole = CourseRole | 'super_admin'
 
 export class CourseRoleError extends Error {
   status: number
+  requestId?: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, requestId?: string) {
     super(message)
     this.name = 'CourseRoleError'
     this.status = status
+    this.requestId = requestId
   }
 }
 
@@ -27,6 +29,7 @@ export async function fetchCourseRole(
     throw new CourseRoleError(
       response.status,
       `Error fetching course role: ${response.statusText || response.status}`,
+      response.headers.get('x-request-id') ?? undefined,
     )
   }
   const data = (await response.json()) as { role: CourseAccessRole }

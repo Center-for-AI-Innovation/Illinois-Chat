@@ -5,10 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { useFetchCourseRole } from '~/hooks/queries/useFetchCourseRole'
 
-const res = (status: number, body: unknown = {}) => ({
+const res = (status: number, body: unknown = {}, requestId?: string) => ({
   ok: status < 400,
   status,
   statusText: String(status),
+  headers: new Headers(requestId ? { 'x-request-id': requestId } : {}),
   json: async () => body,
 })
 
@@ -78,11 +79,12 @@ describe('useFetchCourseRole retries', () => {
 
   it('does not retry other 4xx', async () => {
     const { result, fetchMock } = renderRoleHook([
-      res(403),
+      res(403, {}, 'req-123'),
       res(200, { role: 'owner' }),
     ])
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(result.current.error?.status).toBe(403)
+    expect(result.current.error?.requestId).toBe('req-123')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
