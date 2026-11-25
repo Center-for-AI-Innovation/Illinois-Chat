@@ -177,6 +177,7 @@ export function withCourseAccessFromRequest(
       if (!courseMetadata.is_private && requiredAccess === 'any') {
         // Add course context to request
         req.courseName = courseName
+        req.courseMetadata = courseMetadata
         return await handler(req)
       }
 
@@ -245,6 +246,7 @@ export function withCourseAccessFromRequest(
 
         // Add course context to request
         req.courseName = courseName
+        req.courseMetadata = courseMetadata
 
         return await handler(req)
       })(req)

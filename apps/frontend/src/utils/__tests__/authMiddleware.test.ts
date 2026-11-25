@@ -293,4 +293,64 @@ describe('authMiddleware', () => {
     expect(isPublicEndpoint('/api/auth/logout')).toBe(true)
     expect(isPublicEndpoint('/api/private')).toBe(false)
   })
+
+  describe('getOptionalUser', () => {
+    async function load(verify: any) {
+      vi.doMock('../keycloakClient', () => ({ verifyTokenAsync: verify }))
+      vi.doMock('~/utils/authHelpers', () => ({
+        getKeycloakBaseFromHost: vi.fn(() => 'https://kc/'),
+        getKeycloakIssuerUrl: vi.fn(() => 'https://kc/realms/test'),
+      }))
+      vi.resetModules()
+      return (await import('../authMiddleware')).getOptionalUser
+    }
+
+    it('returns undefined without a token and does not verify', async () => {
+      const verify = vi.fn()
+      const getOptionalUser = await load(verify)
+      await expect(
+        getOptionalUser({ cookies: {}, headers: {} } as any),
+      ).resolves.toBeUndefined()
+      expect(verify).not.toHaveBeenCalled()
+    })
+
+    it('returns the user for a valid token', async () => {
+      const getOptionalUser = await load(
+        vi.fn().mockResolvedValue({ email: 'a@b.c' }),
+      )
+      await expect(
+        getOptionalUser({
+          cookies: { access_token: 't' },
+          headers: {},
+        } as any),
+      ).resolves.toEqual({ email: 'a@b.c' })
+    })
+
+    it('returns undefined for an invalid or expired token', async () => {
+      for (const err of [
+        new jwt.JsonWebTokenError('bad'),
+        new jwt.TokenExpiredError('old', new Date()),
+      ]) {
+        const getOptionalUser = await load(vi.fn().mockRejectedValue(err))
+        await expect(
+          getOptionalUser({
+            cookies: { access_token: 't' },
+            headers: {},
+          } as any),
+        ).resolves.toBeUndefined()
+      }
+    })
+
+    it('rethrows unexpected errors', async () => {
+      const getOptionalUser = await load(
+        vi.fn().mockRejectedValue(new Error('boom')),
+      )
+      await expect(
+        getOptionalUser({
+          cookies: { access_token: 't' },
+          headers: {},
+        } as any),
+      ).rejects.toThrow('boom')
+    })
+  })
 })

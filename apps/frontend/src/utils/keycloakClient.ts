@@ -39,6 +39,25 @@ export async function initializeKeycloakAdmin(
   return kcAdminClient
 }
 
+// One JWKS client per Keycloak base URL so its key cache and rate limiter
+// persist across requests (a new client per verification would never cache).
+const jwksClients = new Map<string, ReturnType<typeof jwksClient>>()
+
+function getJwksClient(keycloakBaseUrl: string) {
+  let client = jwksClients.get(keycloakBaseUrl)
+  if (!client) {
+    client = jwksClient({
+      jwksUri: `${keycloakBaseUrl}realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs`,
+      cache: true,
+      cacheMaxAge: 600000, // 10 minutes
+      rateLimit: true,
+      jwksRequestsPerMinute: 5,
+    })
+    jwksClients.set(keycloakBaseUrl, client)
+  }
+  return client
+}
+
 /**
  * Get signing key from Keycloak's JWKS endpoint
  */
@@ -47,14 +66,7 @@ export function getSigningKey(
   header: any,
   callback: any,
 ) {
-  // JWKS client for fetching public keys
-  const jwksClientInstance = jwksClient({
-    jwksUri: `${keycloakBaseUrl}realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs`,
-    cache: true,
-    cacheMaxAge: 600000, // 10 minutes
-    rateLimit: true,
-    jwksRequestsPerMinute: 5,
-  })
+  const jwksClientInstance = getJwksClient(keycloakBaseUrl)
   if (!header.kid) return callback(new Error('Missing kid in JWT header'))
   jwksClientInstance.getSigningKey(header.kid, (err, key) => {
     if (err) {

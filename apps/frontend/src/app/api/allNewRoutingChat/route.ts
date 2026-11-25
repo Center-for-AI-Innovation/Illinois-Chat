@@ -17,7 +17,10 @@ export const revalidate = 0
 async function handler(req: AuthenticatedRequest) {
   try {
     const body = await req.json()
-    const { conversation, course_name, courseMetadata, mode } = body as ChatBody
+    const { conversation, course_name, mode } = body as ChatBody
+    // Use stored metadata so callers cannot forge the prompt or settings.
+    const courseMetadata = req.courseMetadata
+    body.courseMetadata = courseMetadata
     const hydratedConversation: Conversation | undefined =
       reconstructConversation(conversation)
 

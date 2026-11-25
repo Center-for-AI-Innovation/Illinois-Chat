@@ -2,7 +2,11 @@
 import { type NextApiResponse } from 'next'
 import { withCourseAccessFromRequest } from '~/server/authorization'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { type AuthenticatedRequest } from '~/utils/authMiddleware'
+import {
+  type AuthenticatedRequest,
+  getOptionalUser,
+} from '~/utils/authMiddleware'
+import { redactCourseMetadataFor } from '~/server/redactCourseMetadata'
 import { ensureRedisConnected } from '~/utils/redisClient'
 import { getProjectTimestamps } from '~/utils/projectTimestamps'
 import { db } from '~/db/dbClient'
@@ -69,12 +73,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .json({ success: false, error: 'Project not found' })
     }
 
-    const userEmail = req.user?.email
+    // Public projects skip withAuth, so resolve the caller from the cookie.
+    const user = req.user ?? (await getOptionalUser(req))
+    const userEmail = user?.email
     const last_accessed_at = userEmail
       ? await getUserLastAccessForCourse(userEmail, course_name)
       : null
 
-    res.status(200).json({ course_metadata: course_metadata, last_accessed_at })
+    res.status(200).json({
+      course_metadata: redactCourseMetadataFor(user, course_metadata),
+      last_accessed_at,
+    })
   } catch (error) {
     console.log('Error occurred while fetching courseMetadata', error)
     res.status(500).json({ success: false, error: error })
