@@ -32,6 +32,9 @@ const BrandingForm = ({
   )
   const [isIntroMessageUpdated, setIsIntroMessageUpdated] = useState(false)
   const [isSavingGreeting, setIsSavingGreeting] = useState(false)
+  // Latest typed text, readable after an await (state would be stale there).
+  const introMessageRef = useRef(introMessage)
+  introMessageRef.current = introMessage
   const [greetingSaved, setGreetingSaved] = useState(
     !!metadata?.course_intro_message,
   )
@@ -119,16 +122,19 @@ const BrandingForm = ({
                 disabled={!isIntroMessageUpdated || isSavingGreeting}
                 onClick={async () => {
                   if (metadata) {
+                    const savedText = introMessage
                     setIsSavingGreeting(true)
                     const resp = await save({
-                      course_intro_message: introMessage,
+                      course_intro_message: savedText,
                     })
                     setIsSavingGreeting(false)
 
-                    if (resp) {
+                    // Text typed while the save was in flight isn't saved:
+                    // leave it marked unsaved so Update stays available.
+                    if (resp && introMessageRef.current === savedText) {
                       setIsIntroMessageUpdated(false)
                       setGreetingSaved(true)
-                    } else {
+                    } else if (!resp) {
                       console.log(
                         'Error upserting course metadata for course: ',
                         project_name,

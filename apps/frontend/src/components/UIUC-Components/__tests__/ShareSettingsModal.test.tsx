@@ -221,4 +221,89 @@ describe('ShareSettingsModal', () => {
       'false',
     )
   })
+
+  it('stays read-only with an error when the fresh load fails', async () => {
+    const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+    const original = vi.mocked(fetchCourseMetadata).getMockImplementation()
+    vi.mocked(fetchCourseMetadata).mockRejectedValue(new Error('down'))
+    try {
+      const ShareSettingsModal = (await import('../ShareSettingsModal')).default
+      renderWithProviders(
+        <ShareSettingsModal
+          opened={true}
+          onClose={vi.fn()}
+          projectName="CS101"
+          metadata={
+            {
+              is_private: true,
+              allow_logged_in_users: false,
+              course_admins: ['removed@example.com'],
+            } as any
+          }
+        />,
+        { homeContext: { dispatch: vi.fn() } },
+      )
+
+      // The query retries once before failing.
+      expect(
+        await screen.findByRole('alert', {}, { timeout: 3000 }),
+      ).toHaveTextContent(/Couldn't load the current sharing settings/)
+      expect(screen.getByText(/Admins accordion/i)).toHaveAttribute(
+        'data-disabled',
+        'true',
+      )
+      expect(
+        screen.getByRole('button', { name: /Change access|Access/i }),
+      ).toBeDisabled()
+    } finally {
+      vi.mocked(fetchCourseMetadata).mockImplementation(original!)
+    }
+  })
+
+  it('on reopen, a cached copy stays read-only until the reload finishes', async () => {
+    const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+    let resolveFetch: (m: any) => void = () => {}
+    vi.mocked(fetchCourseMetadata).mockImplementationOnce(
+      () => new Promise((resolve) => (resolveFetch = resolve)),
+    )
+
+    // A copy cached by an earlier opening, now out of date.
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(['courseMetadata', 'CS101'], {
+      is_private: true,
+      allow_logged_in_users: false,
+      course_admins: ['removed@example.com'],
+    })
+
+    const ShareSettingsModal = (await import('../ShareSettingsModal')).default
+    renderWithProviders(
+      <ShareSettingsModal
+        opened={true}
+        onClose={vi.fn()}
+        projectName="CS101"
+        metadata={{ is_private: true, allow_logged_in_users: false } as any}
+      />,
+      { homeContext: { dispatch: vi.fn() }, queryClient },
+    )
+
+    const admins = screen.getByText(/Admins accordion/i)
+    expect(admins).toHaveTextContent('removed@example.com')
+    expect(admins).toHaveAttribute('data-disabled', 'true')
+
+    resolveFetch({
+      is_private: true,
+      allow_logged_in_users: false,
+      course_admins: [],
+    })
+
+    await waitFor(() =>
+      expect(screen.getByText(/Admins accordion/i)).toHaveAttribute(
+        'data-disabled',
+        'false',
+      ),
+    )
+    expect(screen.getByText(/Admins accordion/i)).not.toHaveTextContent(
+      'removed@example.com',
+    )
+  })
 })

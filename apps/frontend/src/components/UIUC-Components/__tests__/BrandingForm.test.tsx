@@ -579,6 +579,37 @@ describe('BrandingForm', () => {
     })
   })
 
+  describe('typing during a save', () => {
+    it('keeps text typed while the save was in flight marked unsaved', async () => {
+      const user = userEvent.setup()
+      const { callSetCourseMetadata } = await import('~/utils/apiUtils')
+      let finishSave: (ok: boolean) => void = () => {}
+      vi.mocked(callSetCourseMetadata).mockImplementationOnce(
+        () => new Promise((resolve) => (finishSave = resolve)),
+      )
+
+      renderBrandingForm({ metadata: makeCourseMetadata() })
+      const textarea = screen.getByPlaceholderText(/enter a greeting/i)
+      const update = screen.getByRole('button', { name: /Update/i })
+
+      await user.type(textarea, 'Hello')
+      await user.click(update)
+      await waitFor(() =>
+        expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
+          'TestProject',
+          { course_intro_message: 'Hello' },
+        ),
+      )
+
+      await user.type(textarea, ' there')
+      finishSave(true)
+
+      // " there" never reached the server, so Update is still available.
+      await waitFor(() => expect(update).not.toBeDisabled())
+      expect(textarea).toHaveValue('Hello there')
+    })
+  })
+
   describe('query cache subscription', () => {
     it('updates greeting when query cache data changes after mount', async () => {
       const queryClient = createTestQueryClient()

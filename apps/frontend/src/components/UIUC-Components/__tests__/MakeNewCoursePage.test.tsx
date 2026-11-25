@@ -667,11 +667,14 @@ describe('MakeNewCoursePage', () => {
           }),
         ),
       )
-      // The save's rollback restores the previous (empty) tags.
-      expect(
-        queryClient.getQueryData<CourseMetadata>(['courseMetadata', 'NewBot'])
-          ?.tags ?? [],
-      ).toEqual([])
+      // The save's rollback restores the previous value: the new project's
+      // entry is still cached and has no tags.
+      const cached = queryClient.getQueryData<CourseMetadata>([
+        'courseMetadata',
+        'NewBot',
+      ])
+      expect(cached).toBeDefined()
+      expect(cached?.tags).toBeUndefined()
     })
 
     it('warns and caches nothing when fetchCourseMetadata fails', async () => {

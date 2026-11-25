@@ -388,7 +388,10 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   // Load LLM providers separately, so a metadata failure doesn't break
   // Optimize (and the other way round).
   useEffect(() => {
-    if (!project_name) return
+    if (!project_name) {
+      setProvidersLoaded(true)
+      return
+    }
     let cancelled = false
     const loadProviders = async () => {
       try {

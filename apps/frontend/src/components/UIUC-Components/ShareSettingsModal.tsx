@@ -65,14 +65,39 @@ export default function ShareSettingsModal({
 }: ShareSettingsModalProps) {
   const queryClient = useQueryClient()
   // Read the project's current settings from the shared query. The prop can
-  // be an old copy (the hub card passes one from the chatbot list), so it is
-  // only shown until the fetch finishes, and edits wait for fresh data.
-  const { data, isPlaceholderData } = useCourseMetadata(projectName, {
+  // be an old copy (the hub card passes one from the chatbot list), and a
+  // cached entry can be old too (this modal stays mounted between opens), so
+  // either is only shown read-only until a load made for this opening
+  // succeeds.
+  const { data, refetch } = useCourseMetadata(projectName, {
     enabled: opened,
     placeholderData: initialMetadata,
   })
   const metadata = data ?? initialMetadata
   const { save } = useUpdateCourseMetadata(projectName)
+
+  const [loadState, setLoadState] = useState<'loading' | 'fresh' | 'failed'>(
+    'loading',
+  )
+  useEffect(() => {
+    if (!opened) {
+      setLoadState('loading')
+      return
+    }
+    let cancelled = false
+    setLoadState('loading')
+    // Edits are blocked until this resolves, so no save can cancel it.
+    void refetch().then((result) => {
+      if (cancelled) return
+      setLoadState(result.isSuccess ? 'fresh' : 'failed')
+    })
+    return () => {
+      cancelled = true
+    }
+    // Reload once per opening; `refetch` is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, projectName])
+  const canEdit = loadState === 'fresh'
 
   // Rest of the modal state
   const isPrivate = metadata?.is_private || false
@@ -146,6 +171,7 @@ export default function ShareSettingsModal({
   )
 
   const handleAccessSelect = async (level: AccessLevel) => {
+    if (!canEdit) return
     const accessFields =
       level === 'public'
         ? { is_private: false, allow_logged_in_users: false }
@@ -376,7 +402,10 @@ export default function ShareSettingsModal({
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger
                     render={
-                      <button className="flex items-center gap-2 rounded-lg border border-(--background-dark) bg-(--modal) px-3 py-2 text-sm transition-colors hover:bg-(--background-dark)">
+                      <button
+                        disabled={!canEdit}
+                        className="flex items-center gap-2 rounded-lg border border-(--background-dark) bg-(--modal) px-3 py-2 text-sm transition-colors hover:bg-(--background-dark) disabled:pointer-events-none disabled:opacity-50"
+                      >
                         <span className="hidden sm:inline">Change access</span>
                         <span className="sm:hidden">Access</span>
                         <IconChevronDown className="h-4 w-4" />
@@ -457,7 +486,7 @@ export default function ShareSettingsModal({
                         is_private={isPrivate}
                         onSaved={handleEmailListSaved}
                         is_for_admins={false}
-                        disabled={isPlaceholderData}
+                        disabled={!canEdit}
                       />
                     </Accordion>
                   </motion.div>
@@ -490,6 +519,17 @@ export default function ShareSettingsModal({
                 )}
               </motion.div>
 
+              {loadState === 'failed' && (
+                <p
+                  role="alert"
+                  className={`${montserrat_paragraph.variable} font-montserratParagraph text-sm text-(--error)`}
+                >
+                  Couldn&apos;t load the current sharing settings, so they
+                  can&apos;t be changed right now. Close and reopen to try
+                  again.
+                </p>
+              )}
+
               <Accordion defaultValue={['admins']} className="w-full">
                 <EmailListAccordion
                   course_name={projectName}
@@ -497,7 +537,7 @@ export default function ShareSettingsModal({
                   is_private={isPrivate}
                   onSaved={handleEmailListSaved}
                   is_for_admins={true}
-                  disabled={isPlaceholderData}
+                  disabled={!canEdit}
                 />
               </Accordion>
             </div>
