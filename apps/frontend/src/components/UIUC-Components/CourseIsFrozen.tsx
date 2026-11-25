@@ -1,11 +1,14 @@
 import React from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
-import { Button } from '@/components/shadcn/ui/button'
+import { buttonVariants } from '@/components/shadcn/ui/button'
+import { cn } from '@/components/shadcn/lib/utils'
 import { montserrat_heading } from 'fonts'
 
 const buttonClassName =
   'login-btn h-auto min-h-12 bg-(--button) text-white hover:bg-(--button-hover)'
+// Styled as a button so each action is a single link, not a button nested in a link
+const linkClassName = cn(buttonVariants(), buttonClassName)
 
 export const CourseIsFrozen = ({ course_name }: { course_name: string }) => {
   return (
@@ -43,13 +46,12 @@ export const CourseIsFrozen = ({ course_name }: { course_name: string }) => {
               team if you think this is a mistake.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-              <Link href="/chatbots">
-                <Button
-                  className={buttonClassName}
-                  style={{ fontSize: '24px' }}
-                >
-                  My Chatbots →
-                </Button>
+              <Link
+                href="/chatbots"
+                className={linkClassName}
+                style={{ fontSize: '24px' }}
+              >
+                My Chatbots →
               </Link>
             </div>
           </div>

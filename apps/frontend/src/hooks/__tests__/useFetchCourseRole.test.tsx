@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
+const hoisted = vi.hoisted(() => ({ sub: 'user-1' }))
+vi.mock('react-oidc-context', () => ({
+  useAuth: () => ({ user: { profile: { sub: hoisted.sub } } }),
+}))
+
 import { useFetchCourseRole } from '~/hooks/queries/useFetchCourseRole'
 
 const res = (status: number, body: unknown = {}, requestId?: string) => ({
@@ -27,7 +32,7 @@ function renderRoleHook(responses: Array<ReturnType<typeof res> | Error>) {
   const hook = renderHook(() => useFetchCourseRole({ courseName: 'my-bot' }), {
     wrapper,
   })
-  return { ...hook, fetchMock }
+  return { ...hook, fetchMock, queryClient }
 }
 
 describe('useFetchCourseRole retries', () => {
@@ -86,5 +91,15 @@ describe('useFetchCourseRole retries', () => {
     expect(result.current.error?.status).toBe(403)
     expect(result.current.error?.requestId).toBe('req-123')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keys the cached role by user', async () => {
+    const { result, queryClient } = renderRoleHook([
+      res(200, { role: 'owner' }),
+    ])
+    await waitFor(() => expect(result.current.data).toBe('owner'))
+    expect(queryClient.getQueryData(['courseRole', 'my-bot', 'user-1'])).toBe(
+      'owner',
+    )
   })
 })

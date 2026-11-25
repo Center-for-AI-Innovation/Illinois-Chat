@@ -1,12 +1,15 @@
 import React from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
-import { Button } from '@/components/shadcn/ui/button'
+import { buttonVariants } from '@/components/shadcn/ui/button'
+import { cn } from '@/components/shadcn/lib/utils'
 import { montserrat_heading } from 'fonts'
 import { buildProjectChatPath } from '~/utils/projectName'
 
 const buttonClassName =
   'login-btn h-auto min-h-12 bg-(--button) text-white hover:bg-(--button-hover)'
+// Styled as a button so each action is a single link, not a button nested in a link
+const linkClassName = cn(buttonVariants(), buttonClassName)
 
 export const CannotEditCourse = ({ course_name }: { course_name: string }) => {
   return (
@@ -44,21 +47,19 @@ export const CannotEditCourse = ({ course_name }: { course_name: string }) => {
               account.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-              <Link href={buildProjectChatPath(course_name)}>
-                <Button
-                  className={buttonClassName}
-                  style={{ fontSize: '24px' }}
-                >
-                  Go to chatbot
-                </Button>
+              <Link
+                href={buildProjectChatPath(course_name)}
+                className={linkClassName}
+                style={{ fontSize: '24px' }}
+              >
+                Go to chatbot
               </Link>
-              <Link href="/new">
-                <Button
-                  className={buttonClassName}
-                  style={{ fontSize: '24px' }}
-                >
-                  Create your own chatbot
-                </Button>
+              <Link
+                href="/new"
+                className={linkClassName}
+                style={{ fontSize: '24px' }}
+              >
+                Create your own chatbot
               </Link>
             </div>
           </div>

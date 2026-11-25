@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from 'react-oidc-context'
 import { type CourseRole } from '~/server/authorization'
 import { getBaseUrl } from '~/utils/apiUtils'
 
@@ -43,8 +44,10 @@ export function useFetchCourseRole({
   courseName: string
   enabled?: boolean
 }) {
+  const auth = useAuth()
   return useQuery<CourseAccessRole, CourseRoleError>({
-    queryKey: ['courseRole', courseName],
+    // Role is per user, so a different account in the same tab never sees a cached role
+    queryKey: ['courseRole', courseName, auth.user?.profile.sub],
     queryFn: () => fetchCourseRole(courseName),
     // Retry network errors and 5xx; retry a 401 once in case the token is mid-renewal
     retry: (count, error) => {

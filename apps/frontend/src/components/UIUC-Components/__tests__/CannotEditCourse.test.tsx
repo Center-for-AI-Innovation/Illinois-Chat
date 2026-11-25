@@ -22,6 +22,8 @@ describe('CannotEditCourse', () => {
         .getByRole('link', { name: 'Create your own chatbot' })
         .getAttribute('href'),
     ).toBe('/new')
+    // Each action is one link, not a button nested inside a link
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(document.getElementById('main-content')).toBeTruthy()
   })
 })

@@ -15,6 +15,7 @@ describe('CourseIsFrozen', () => {
     expect(
       screen.getByRole('link', { name: /My Chatbots/ }).getAttribute('href'),
     ).toBe('/chatbots')
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(document.getElementById('main-content')).toBeTruthy()
   })
 })
