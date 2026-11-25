@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useState } from 'react'
+import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { cva } from 'class-variance-authority'
@@ -36,8 +36,16 @@ import { useTheme } from '~/contexts/ThemeContext'
 import { ADMIN_HOME_PAGE, ADMIN_SETTINGS_PAGES } from './admin-pages'
 import { type AdminPage } from './admin-pages.types'
 import { readLocationHash, scrollContentToTop } from './adminScroll'
+import {
+  type ActiveSectionTracker,
+  trackActiveSection,
+} from './trackActiveSection'
 
-/** Current URL hash, read after mount (SSR has none) and kept in sync. */
+/**
+ * Current URL hash, read after mount (SSR has none) and kept in sync.
+ * Only tracks the hash for highlighting; following a hash to its heading on
+ * arrival is owned by AdminLayout (its layout effect is mount-only).
+ */
 function useLocationHash() {
   const router = useRouter()
   const [hash, setHash] = useState('')
@@ -55,23 +63,31 @@ function useLocationHash() {
     }
   }, [router.events])
 
-  return hash
+  return [hash, setHash] as const
 }
 
 // Leave cmd/ctrl/shift/middle clicks to the browser (open in new tab, etc.).
 const isPlainClick = (e: MouseEvent) =>
   e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
 
+// The shared sidebar uses leading-none, which together with the label's
+// truncate (overflow hidden) clips descenders ("g" in "Prompting"). A real line
+// height on the label span fixes it without changing the item height.
+const LABEL_LINE_HEIGHT = '[&>span:last-child]:leading-5'
+
 function PageItem({
   page,
   courseName,
   activePath,
   hash,
+  onScrollStart,
 }: {
   page: AdminPage
   courseName: string
   activePath: string
   hash: string
+  /** Called before a click-triggered scroll, so scroll tracking pauses. */
+  onScrollStart: () => void
 }) {
   const router = useRouter()
   const { isMobile, setOpenMobile } = useSidebar()
@@ -87,6 +103,7 @@ function PageItem({
     if (isMobile) setOpenMobile(false)
     if (!isCurrent || !isPlainClick(e)) return
     e.preventDefault()
+    onScrollStart()
     scrollContentToTop()
     void router.replace(href, undefined, { shallow: true, scroll: false })
   }
@@ -96,6 +113,7 @@ function PageItem({
       <SidebarMenuItem>
         <SidebarMenuButton
           isActive={isCurrent}
+          className={LABEL_LINE_HEIGHT}
           onClick={onClick}
           render={
             <Link href={href} aria-current={isCurrent ? 'page' : undefined} />
@@ -115,6 +133,7 @@ function PageItem({
     <Collapsible defaultOpen={isCurrent} render={<SidebarMenuItem />}>
       <SidebarMenuButton
         isActive={isCurrent}
+        className={LABEL_LINE_HEIGHT}
         onClick={onClick}
         render={
           <Link href={href} aria-current={isCurrent ? 'page' : undefined} />
@@ -138,8 +157,12 @@ function PageItem({
           {page.sections.map((section) => (
             <SidebarMenuSubItem key={section.id}>
               <SidebarMenuSubButton
+                className={LABEL_LINE_HEIGHT}
                 isActive={activeSection === section.id}
-                onClick={() => isMobile && setOpenMobile(false)}
+                onClick={(e) => {
+                  if (isMobile) setOpenMobile(false)
+                  if (isCurrent && isPlainClick(e)) onScrollStart()
+                }}
                 render={
                   <Link
                     href={`${href}#${section.id}`}
@@ -159,6 +182,8 @@ function PageItem({
   )
 }
 
+// Deliberately not ThemeToggle.tsx: the admin sidebar footer needs a labelled
+// three-way radiogroup (Light / Dark / Default), not the icon-only toggle.
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
@@ -194,9 +219,30 @@ function ThemeSwitcher() {
 
 function SidebarBody({ courseName }: { courseName: string }) {
   const router = useRouter()
-  const hash = useLocationHash()
+  const [hash, setHash] = useLocationHash()
   // "/[course_name]/ai-models" -> "ai-models"
   const activePath = router.pathname.split('/').pop() ?? ''
+
+  // Scroll following, for every admin page that lists sections: the highlight
+  // moves with the section the reader has reached. State only; the URL is left
+  // alone. Clicks pause it while their smooth scroll runs (see holdTracking).
+  const sections = ADMIN_SETTINGS_PAGES.find(
+    (page) => page.path === activePath,
+  )?.sections
+  const tracker = useRef<ActiveSectionTracker | null>(null)
+  useEffect(() => {
+    if (!sections?.length) return undefined
+    const t = trackActiveSection(
+      sections.map((section) => section.id),
+      setHash,
+    )
+    tracker.current = t
+    return () => {
+      t.stop()
+      tracker.current = null
+    }
+  }, [sections, setHash])
+  const holdTracking = () => tracker.current?.hold()
 
   return (
     <>
@@ -230,6 +276,7 @@ function SidebarBody({ courseName }: { courseName: string }) {
               courseName={courseName}
               activePath={activePath}
               hash={hash}
+              onScrollStart={holdTracking}
             />
           </SidebarMenu>
           <SidebarGroupLabel>Project Settings</SidebarGroupLabel>
@@ -241,6 +288,7 @@ function SidebarBody({ courseName }: { courseName: string }) {
                 courseName={courseName}
                 activePath={activePath}
                 hash={hash}
+                onScrollStart={holdTracking}
               />
             ))}
           </SidebarMenu>
@@ -256,7 +304,7 @@ function SidebarBody({ courseName }: { courseName: string }) {
 const desktopSidebarVariants = cva(
   'overflow-hidden transition-[width] duration-200 ease-linear',
   {
-    variants: { open: { true: '', false: 'w-0 border-r-0' } },
+    variants: { open: { true: '', false: 'w-0 min-w-0' } },
   },
 )
 
@@ -274,7 +322,8 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
   }
   // Stay mounted when closed and collapse the width, so the header trigger
   // animates the panel instead of snapping it between one and two columns.
-  // `inert` takes the hidden links out of the tab order.
+  // `inert` takes the hidden links out of the tab order. `min-w-0` lets the
+  // shadcn Sidebar's width collapse past its content's min-content width.
   return (
     <Sidebar
       collapsible="none"
@@ -282,7 +331,11 @@ export function AdminSidebar({ courseName }: { courseName: string }) {
       inert={!open}
       className={desktopSidebarVariants({ open })}
     >
-      <SidebarBody courseName={courseName} />
+      {/* Fixed-width inner column: while the outer width animates to 0 the
+          content is clipped instead of reflowing (and truncating) mid-way. */}
+      <div className="flex h-full min-h-0 w-(--sidebar-width) shrink-0 flex-col">
+        <SidebarBody courseName={courseName} />
+      </div>
     </Sidebar>
   )
 }

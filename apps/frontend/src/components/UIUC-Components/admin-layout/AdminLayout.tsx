@@ -1,8 +1,9 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from 'react-oidc-context'
 
 import { SidebarProvider } from '@/components/shadcn/ui/sidebar'
+import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
 import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
 import Navbar from '~/components/UIUC-Components/navbars/Navbar'
 import { useFetchCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
@@ -20,8 +21,27 @@ function AdminShell({
   courseName: string
   children: ReactNode
 }) {
+  // Hides the app-level skip link (its #main-content target is not on admin
+  // pages); this layout renders its own.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-admin-layout', '')
+    return () => document.documentElement.removeAttribute('data-admin-layout')
+  }, [])
+
   return (
     <div className="bg-background flex h-(--viewport-height) flex-col pt-(--navbar-height)">
+      {/* The app-level skip link in _app.tsx targets #main-content, which
+          does not exist here; this one targets the scrolling panel. */}
+      <a
+        href={`#${ADMIN_CONTENT_ID}`}
+        className="skip-nav-link"
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById(ADMIN_CONTENT_ID)?.focus()
+        }}
+      >
+        Skip to admin content
+      </a>
       <Navbar />
       <div className="flex min-h-0 flex-1 p-4 md:p-8">
         <SidebarProvider className="bg-background border-border min-h-0 overflow-hidden rounded-xl border shadow-sm">
@@ -82,11 +102,7 @@ export function AdminLayout({
     auth.isLoading ||
     (auth.isAuthenticated && (isLoading || isSuperAdminLoading))
   ) {
-    return (
-      <div role="status" aria-busy="true" className="bg-background h-svh">
-        <span className="sr-only">Loading</span>
-      </div>
-    )
+    return <LoadingPlaceholderForAdminPages />
   }
 
   if (!auth.isAuthenticated) {

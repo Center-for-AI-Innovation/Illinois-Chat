@@ -16,7 +16,7 @@ function renderSidebar(pathname: string, replace = vi.fn()) {
         {/* Stand-in for AdminLayout's scrolling content. */}
         <main id="admin-panel-content">
           <h2 id="default-model">Set the Default Model</h2>
-          <h2 id="closed-source">Closed Source LLMs</h2>
+          <h2 id="commercial">Commercial LLMs</h2>
         </main>
       </SidebarProvider>
     </ThemeProvider>,
@@ -67,7 +67,7 @@ describe('AdminSidebar', () => {
     expect(first).toHaveAttribute('href', '/CS101/ai-models#default-model')
     expect(first).toHaveAttribute('data-active')
     expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+      screen.getByRole('link', { name: 'Commercial LLMs' }),
     ).not.toHaveAttribute('data-active')
     expect(
       screen.getByRole('link', { name: 'AI Models (LLMs)' }),
@@ -78,12 +78,12 @@ describe('AdminSidebar', () => {
     renderSidebar('/[course_name]/ai-models')
 
     act(() => {
-      window.location.hash = '#closed-source'
+      window.location.hash = '#commercial'
       window.dispatchEvent(new HashChangeEvent('hashchange'))
     })
 
     expect(
-      screen.getByRole('link', { name: 'Closed Source LLMs' }),
+      screen.getByRole('link', { name: 'Commercial LLMs' }),
     ).toHaveAttribute('data-active')
     expect(
       screen.getByRole('link', { name: 'Set the Default Model' }),
@@ -100,7 +100,7 @@ describe('AdminSidebar', () => {
 
   it('leaves a section link to the router, without scrolling itself', () => {
     renderSidebar('/[course_name]/ai-models')
-    const link = screen.getByRole('link', { name: 'Closed Source LLMs' })
+    const link = screen.getByRole('link', { name: 'Commercial LLMs' })
     let handlerPrevented: boolean | undefined
     document.addEventListener(
       'click',
@@ -118,6 +118,36 @@ describe('AdminSidebar', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
+  it('moves the highlight as the reader scrolls, without touching the URL', async () => {
+    renderSidebar('/[course_name]/ai-models')
+    const main = document.getElementById('admin-panel-content') as HTMLElement
+    const rect = (top: number) => ({ top }) as DOMRect
+    vi.spyOn(main, 'getBoundingClientRect').mockReturnValue(rect(0))
+    vi.spyOn(
+      document.getElementById('default-model') as HTMLElement,
+      'getBoundingClientRect',
+    ).mockReturnValue(rect(-300))
+    vi.spyOn(
+      document.getElementById('commercial') as HTMLElement,
+      'getBoundingClientRect',
+    ).mockReturnValue(rect(40))
+    const before = window.location.href
+
+    act(() => {
+      main.dispatchEvent(new Event('scroll'))
+    })
+
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole('link', { name: 'Commercial LLMs' }),
+      ).toHaveAttribute('data-active'),
+    )
+    expect(
+      screen.getByRole('link', { name: 'Set the Default Model' }),
+    ).not.toHaveAttribute('data-active')
+    expect(window.location.href).toBe(before)
+  })
+
   it('highlights a page that has sections when it is current', () => {
     renderSidebar('/[course_name]/ai-models')
 
@@ -129,7 +159,7 @@ describe('AdminSidebar', () => {
   it('scrolls back to the top and clears the hash through the router when the current page item is clicked', async () => {
     const user = userEvent.setup()
     const replace = vi.fn()
-    window.location.hash = '#closed-source'
+    window.location.hash = '#commercial'
     renderSidebar('/[course_name]/ai-models', replace)
 
     await user.click(screen.getByRole('link', { name: 'AI Models (LLMs)' }))
@@ -144,17 +174,7 @@ describe('AdminSidebar', () => {
     })
   })
 
-  it('lets links to other pages navigate normally', async () => {
-    const user = userEvent.setup()
-    renderSidebar('/[course_name]/tools')
-
-    await user.click(screen.getByRole('link', { name: 'AI Models (LLMs)' }))
-
-    expect(scrollTo).not.toHaveBeenCalled()
-    expect(scrollIntoView).not.toHaveBeenCalled()
-  })
-
-  it('does not prevent default on links to other pages', () => {
+  it('lets links to other pages navigate normally, without preventDefault', () => {
     renderSidebar('/[course_name]/tools')
     const link = screen.getByRole('link', { name: 'AI Models (LLMs)' })
     // Runs after React's handlers (document is above the root). Record what
@@ -172,6 +192,8 @@ describe('AdminSidebar', () => {
       new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),
     )
     expect(handlerPrevented).toBe(false)
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it('changes the theme with the toggle group', async () => {
@@ -186,7 +208,7 @@ describe('AdminSidebar', () => {
     )
   })
 
-  it('hides the desktop sidebar from the tab order when closed, without unmounting', () => {
+  it('marks the closed sidebar inert', () => {
     globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
     render(
       <ThemeProvider>

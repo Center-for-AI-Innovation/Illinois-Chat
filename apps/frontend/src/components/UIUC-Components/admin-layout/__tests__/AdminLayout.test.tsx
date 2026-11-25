@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { ThemeProvider } from '~/contexts/ThemeContext'
 import { AdminLayout } from '../AdminLayout'
@@ -22,6 +23,15 @@ const superAdminState = vi.hoisted(() => ({
 vi.mock('~/hooks/queries/useFetchIsSuperAdmin', () => ({
   useFetchIsSuperAdmin: () => superAdminState.value,
 }))
+
+vi.mock('~/components/UIUC-Components/MainPageBackground', () => ({
+  LoadingPlaceholderForAdminPages: () => (
+    <div data-testid="admin-loading">Loading</div>
+  ),
+}))
+
+const signIn = vi.hoisted(() => vi.fn())
+vi.mock('~/utils/authHelpers', () => ({ initiateSignIn: signIn }))
 
 const OWNER = 'owner@example.com'
 const ADMIN = 'admin@example.com'
@@ -50,6 +60,35 @@ describe('AdminLayout', () => {
     vi.unstubAllGlobals()
     window.location.hash = ''
     globalThis.__TEST_ROUTER__ = undefined
+  })
+
+  it('skip link moves focus to the admin content panel', async () => {
+    globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    render(
+      <ThemeProvider>
+        <AdminLayout courseName="CS101">
+          <p>content</p>
+        </AdminLayout>
+      </ThemeProvider>,
+    )
+    const link = screen.getByRole('link', { name: 'Skip to admin content' })
+    expect(link).toHaveAttribute('href', '#admin-panel-content')
+    await userEvent.setup().click(link)
+    expect(document.getElementById('admin-panel-content')).toHaveFocus()
+  })
+
+  it('flags the document while mounted so the app skip link is hidden', () => {
+    globalThis.__TEST_ROUTER__ = { pathname: '/[course_name]/ai-models' }
+    const { unmount } = render(
+      <ThemeProvider>
+        <AdminLayout courseName="CS101">
+          <p>content</p>
+        </AdminLayout>
+      </ThemeProvider>,
+    )
+    expect(document.documentElement).toHaveAttribute('data-admin-layout')
+    unmount()
+    expect(document.documentElement).not.toHaveAttribute('data-admin-layout')
   })
 
   describe('access check', () => {
@@ -109,7 +148,7 @@ describe('AdminLayout', () => {
       superAdminState.value = { data: undefined, isLoading: true }
       renderLayout()
 
-      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.getByTestId('admin-loading')).toBeInTheDocument()
       expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
     })
 
@@ -186,7 +225,7 @@ describe('AdminLayout', () => {
       }
       renderLayout()
 
-      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.getByTestId('admin-loading')).toBeInTheDocument()
       expect(
         screen.queryByRole('heading', { name: /sufficient permissions/ }),
       ).not.toBeInTheDocument()
@@ -203,11 +242,49 @@ describe('AdminLayout', () => {
       expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
     })
 
+    it('sends signed-out users to the chatbot dashboard after signing in', async () => {
+      globalThis.__TEST_AUTH__ = { isAuthenticated: false, user: null }
+      globalThis.__TEST_ROUTER__ = {
+        pathname: '/[course_name]/ai-models',
+        asPath: '/CS101/ai-models#commercial',
+      }
+      renderLayout()
+
+      await userEvent
+        .setup()
+        .click(screen.getByRole('button', { name: /sign in/i }))
+
+      expect(signIn).toHaveBeenCalledWith(expect.anything(), '/CS101/dashboard')
+    })
+
     it('shows nothing of the page while the access check is loading', () => {
       metadataState.value = { data: undefined, isLoading: true, isError: false }
       renderLayout()
 
-      expect(screen.getByRole('status')).toBeInTheDocument()
+      expect(screen.getByTestId('admin-loading')).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
+
+    it('shows the same loading look while the sign-in state is loading', () => {
+      globalThis.__TEST_AUTH__ = { isLoading: true, isAuthenticated: false }
+      renderLayout()
+
+      expect(screen.getByTestId('admin-loading')).toBeInTheDocument()
+      expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
+    })
+
+    it('shows the 404 screen when the chatbot does not exist', () => {
+      metadataState.value = {
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: Object.assign(new Error('Not Found'), { status: 404 }),
+      }
+      renderLayout()
+
+      expect(
+        screen.getByRole('heading', { name: 'Chatbot not found' }),
+      ).toBeInTheDocument()
       expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
     })
 
