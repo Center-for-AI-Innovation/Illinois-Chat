@@ -95,6 +95,27 @@ export const UploadCard = memo(function UploadCard({
     }
   }, [projectName, queryClient])
 
+  // Save only the changed fields (the server merges them over what it has),
+  // then merge them into local state and the shared cache without mutating
+  // the existing object.
+  const saveMetadataFields = async (
+    changes: Partial<CourseMetadata>,
+  ): Promise<boolean> => {
+    const resp = await callSetCourseMetadata(projectName, changes)
+    if (!resp) {
+      console.log('Error upserting course metadata for course: ', projectName)
+      return false
+    }
+    const latest =
+      (queryClient.getQueryData(['courseMetadata', projectName]) as
+        | CourseMetadata
+        | undefined) ?? metadata
+    const updated = { ...latest, ...changes } as CourseMetadata
+    setMetadata(updated)
+    queryClient.setQueryData(['courseMetadata', projectName], updated)
+    return true
+  }
+
   const handleCloseNotification = () => {
     setShowNotification(false)
     setUploadFiles([])
@@ -246,17 +267,9 @@ export const UploadCard = memo(function UploadCard({
                 className="mt-3 w-24 self-end"
                 onClick={async () => {
                   if (metadata) {
-                    metadata.project_description = projectDescription
-                    const resp = await callSetCourseMetadata(
-                      projectName,
-                      metadata,
-                    )
-                    if (!resp) {
-                      console.log(
-                        'Error upserting course metadata for course: ',
-                        projectName,
-                      )
-                    }
+                    await saveMetadataFields({
+                      project_description: projectDescription,
+                    })
                   }
                 }}
               >
@@ -306,19 +319,9 @@ export const UploadCard = memo(function UploadCard({
                       onClick={async () => {
                         setIsIntroMessageUpdated(false)
                         if (metadata) {
-                          metadata.course_intro_message = introMessage
-                          // Update the courseMetadata object
-
-                          const resp = await callSetCourseMetadata(
-                            projectName,
-                            metadata,
-                          )
-                          if (!resp) {
-                            console.log(
-                              'Error upserting course metadata for course: ',
-                              projectName,
-                            )
-                          }
+                          await saveMetadataFields({
+                            course_intro_message: introMessage,
+                          })
                         }
                       }}
                     >
@@ -373,8 +376,9 @@ export const UploadCard = memo(function UploadCard({
                         'document-group', // Course logos belong with course materials
                       )
                       if (banner_s3_image && metadata) {
-                        metadata.banner_image_s3 = banner_s3_image
-                        await callSetCourseMetadata(projectName, metadata)
+                        await saveMetadataFields({
+                          banner_image_s3: banner_s3_image,
+                        })
                       }
                     }
                   }}

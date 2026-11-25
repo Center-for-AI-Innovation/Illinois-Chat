@@ -144,18 +144,19 @@ export default function ShareSettingsModal({
   )
 
   const handleAccessSelect = async (level: AccessLevel) => {
-    const updatedMetadata: CourseMetadata = {
-      ...metadata,
-      ...(level === 'public'
+    const accessFields =
+      level === 'public'
         ? { is_private: false, allow_logged_in_users: false }
         : level === 'logged_in'
           ? { is_private: true, allow_logged_in_users: true }
-          : { is_private: true, allow_logged_in_users: false }),
-    }
+          : { is_private: true, allow_logged_in_users: false }
+    const updatedMetadata: CourseMetadata = { ...metadata, ...accessFields }
 
     setMetadata(updatedMetadata)
     queryClient.setQueryData(['courseMetadata', projectName], updatedMetadata)
-    await callSetCourseMetadata(projectName, updatedMetadata)
+    // Send only the access fields so a stale copy of the rest of the metadata
+    // (admins, prompt, ...) can't overwrite newer values on the server.
+    await callSetCourseMetadata(projectName, accessFields)
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['allCourseMetadata'] }),
       // Access level decides the hub section and badge.

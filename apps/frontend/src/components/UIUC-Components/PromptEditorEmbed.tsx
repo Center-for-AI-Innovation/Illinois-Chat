@@ -357,19 +357,12 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       if (!project_name) return
 
       try {
-        const cachedMetadata = queryClient.getQueryData([
-          'courseMetadata',
-          project_name,
-        ]) as CourseMetadata | undefined
-
-        let metadata: CourseMetadata | null = null
-        if (cachedMetadata) {
-          metadata = cachedMetadata
-        } else {
-          metadata = await fetchCourseMetadata(project_name)
-          if (metadata) {
-            queryClient.setQueryData(['courseMetadata', project_name], metadata)
-          }
+        // Always fetch on mount. The query cache lasts the whole session, so a
+        // cached copy can be minutes old and miss other admins' changes.
+        const metadata: CourseMetadata | null =
+          await fetchCourseMetadata(project_name)
+        if (metadata) {
+          queryClient.setQueryData(['courseMetadata', project_name], metadata)
         }
 
         if (metadata) {
@@ -438,16 +431,17 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
   ) => {
     let success = false
     if (courseMetadata && project_name) {
-      const updatedCourseMetadata = {
-        ...courseMetadata,
+      // Send only the fields this editor owns; the server merges them over
+      // what it has stored.
+      const changes = {
         system_prompt: newSystemPrompt,
         guidedLearning,
         documentsOnly,
         systemPromptOnly,
       }
-      success = await callSetCourseMetadata(project_name, updatedCourseMetadata)
+      success = await callSetCourseMetadata(project_name, changes)
       if (success) {
-        setCourseMetadata(updatedCourseMetadata)
+        setCourseMetadata({ ...courseMetadata, ...changes })
       }
     }
     if (!success) {
@@ -460,17 +454,14 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
 
   const resetSystemPrompt = async () => {
     if (courseMetadata && project_name) {
-      const updatedCourseMetadata = {
-        ...courseMetadata,
+      const resetFields = {
         system_prompt: null,
         guidedLearning: false,
         documentsOnly: false,
         systemPromptOnly: false,
       }
-      const success = await callSetCourseMetadata(
-        project_name,
-        updatedCourseMetadata,
-      )
+      const updatedCourseMetadata = { ...courseMetadata, ...resetFields }
+      const success = await callSetCourseMetadata(project_name, resetFields)
       if (!success) {
         alert('Error resetting system prompt')
         showToastOnPromptUpdate(true, true)
@@ -534,17 +525,26 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
       return
     }
 
-    const updatedMetadata = {
-      ...courseMetadataRef.current,
+    // Prompt toggles (Guided Learning, etc.) also rewrite the prompt text.
+    // Include system_prompt only when a toggle changed it, so a settings-only
+    // save never overwrites a prompt another admin saved meanwhile.
+    const togglePrompt = courseMetadataRef.current.system_prompt
+    const promptChanged = togglePrompt !== courseMetadata?.system_prompt
+    const settingChanges = {
       guidedLearning,
       documentsOnly,
       systemPromptOnly,
       vector_search_rewrite_disabled: !vectorSearchRewrite,
       agent_mode_enabled: agentModeFeatureEnabled,
+      ...(promptChanged ? { system_prompt: togglePrompt } : {}),
+    }
+    const updatedMetadata = {
+      ...courseMetadataRef.current,
+      ...settingChanges,
     } as CourseMetadata
 
     try {
-      const success = await callSetCourseMetadata(project_name, updatedMetadata)
+      const success = await callSetCourseMetadata(project_name, settingChanges)
       if (!success) {
         showPromptToast('Error', 'Failed to update settings', true)
         return

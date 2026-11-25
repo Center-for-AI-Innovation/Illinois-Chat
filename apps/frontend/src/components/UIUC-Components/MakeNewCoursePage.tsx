@@ -260,7 +260,7 @@ const MakeNewCoursePage = ({
       // already updated above so the user sees them immediately.
       const tagsSaved =
         initialTags.length > 0
-          ? callSetCourseMetadata(project_name, { tags: initialTags } as never)
+          ? callSetCourseMetadata(project_name, { tags: initialTags })
           : Promise.resolve(true)
 
       // Refetch Your Bots after the tag save so the new card isn't cached without tags.

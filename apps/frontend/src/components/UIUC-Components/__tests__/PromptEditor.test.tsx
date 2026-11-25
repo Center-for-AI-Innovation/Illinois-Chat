@@ -188,8 +188,10 @@ async function renderPromptEditor(
 
   setupFetchHandlers(metadata, providers)
 
+  // The editor always fetches on mount; serve the test metadata from there.
+  mockFetchCourseMetadata.mockResolvedValue(metadata)
+
   const queryClient = createTestQueryClient()
-  // Pre-populate cache so fetchCourseMetadata is bypassed in some cases
   queryClient.setQueryData(['courseMetadata', projectName], metadata)
 
   const PromptEditor = (await import('../PromptEditor')).default
@@ -316,6 +318,82 @@ describe('PromptEditor', () => {
         // Should use the default (from env or hardcoded)
         expect(textarea).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('stale cache (issue 435)', () => {
+    it('loads from the server and never sends a stale course_admins list', async () => {
+      // Cache holds an old copy: a removed admin and an old prompt.
+      const staleMetadata = makeCourseMetadata({
+        system_prompt: 'Old prompt',
+        course_admins: ['removed-admin@example.com'],
+        is_private: false,
+      })
+      // Server has the newer values another admin saved.
+      const serverMetadata = makeCourseMetadata({
+        system_prompt: 'Newer prompt from another admin',
+        course_admins: [],
+        is_private: true,
+      })
+
+      setupFetchHandlers(serverMetadata, mockLLMProviders)
+      mockFetchCourseMetadata.mockResolvedValue(serverMetadata)
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(['courseMetadata', 'TestProject'], staleMetadata)
+
+      const PromptEditor = (await import('../PromptEditor')).default
+      renderWithProviders(<PromptEditor project_name="TestProject" />, {
+        queryClient,
+      })
+
+      // The editor shows the server's prompt, not the cached one.
+      await waitFor(() =>
+        expect(screen.getByLabelText('System Prompt')).toHaveValue(
+          'Newer prompt from another admin',
+        ),
+      )
+      expect(mockFetchCourseMetadata).toHaveBeenCalledWith('TestProject')
+
+      fireEvent.click(
+        screen.getAllByRole('button', { name: /Update System Prompt/i })[0]!,
+      )
+
+      await waitFor(() => expect(mockCallSetCourseMetadata).toHaveBeenCalled())
+      const payload = mockCallSetCourseMetadata.mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >
+      expect(payload.system_prompt).toBe('Newer prompt from another admin')
+      expect(payload).not.toHaveProperty('course_admins')
+      expect(payload).not.toHaveProperty('is_private')
+      expect(payload).not.toHaveProperty('allow_logged_in_users')
+      expect(payload).not.toHaveProperty('approved_emails_list')
+    })
+
+    it('settings-only toggles do not send the prompt', async () => {
+      const user = userEvent.setup()
+      await renderPromptEditor({
+        isEmbedded: true,
+        metadata: makeCourseMetadata({
+          system_prompt: 'Keep me',
+          vector_search_rewrite_disabled: false,
+        }),
+      })
+
+      const label = await screen.findByLabelText(/Smart Document Search/i)
+      await user.click(label)
+
+      await waitFor(
+        () => expect(mockCallSetCourseMetadata).toHaveBeenCalled(),
+        { timeout: 2000 },
+      )
+      const payload = mockCallSetCourseMetadata.mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >
+      expect(payload.vector_search_rewrite_disabled).toBe(true)
+      expect(payload).not.toHaveProperty('system_prompt')
+      expect(payload).not.toHaveProperty('course_admins')
     })
   })
 

@@ -15,7 +15,11 @@ import {
   type CourseMetadata,
   type CourseMetadataOptionalForUpsert,
 } from '~/types/courseMetadata'
-import { callSetCourseMetadata, uploadToS3 } from '~/utils/apiUtils'
+import {
+  callSetCourseMetadata,
+  fetchCourseMetadata,
+  uploadToS3,
+} from '~/utils/apiUtils'
 
 const BrandingForm = ({
   project_name,
@@ -79,6 +83,26 @@ const BrandingForm = ({
     }
   }, [project_name, queryClient])
 
+  // Refresh from the server on mount. The cached copy above lets the form
+  // render immediately, but it can be stale (the query cache lasts the whole
+  // session). Writing the fresh copy to the cache updates this form through
+  // the subscription above and keeps sibling editors in sync.
+  useEffect(() => {
+    let cancelled = false
+    fetchCourseMetadata(project_name)
+      .then((fresh: CourseMetadata | null) => {
+        if (!cancelled && fresh) {
+          queryClient.setQueryData(['courseMetadata', project_name], fresh)
+        }
+      })
+      .catch(() => {
+        // Keep showing the cached copy; saves only send changed fields.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [project_name, queryClient])
+
   const onUploadLogo = async (logo: File | null) => {
     if (!logo) return
 
@@ -88,13 +112,19 @@ const BrandingForm = ({
     const banner_s3_image = await uploadToS3(logo, user_id, project_name)
 
     if (banner_s3_image && metadata) {
+      // Save the logo on its own. Other saves only send their own fields, so
+      // they no longer carry an unsaved banner along with them.
+      const saved = await callSetCourseMetadata(project_name, {
+        banner_image_s3: banner_s3_image,
+      })
+      if (!saved) {
+        setLogoStatus('error')
+        return
+      }
       const updatedMetadata = {
         ...metadata,
         banner_image_s3: banner_s3_image,
       }
-      // Only update local state and cache — the S3 key will be
-      // persisted to the server on the next metadata save
-      // (greeting update, question save, etc.)
       setMetadata(updatedMetadata)
       queryClient.setQueryData(
         ['courseMetadata', project_name],
@@ -148,10 +178,9 @@ const BrandingForm = ({
                       course_intro_message: introMessage,
                     }
 
-                    const resp = await callSetCourseMetadata(
-                      project_name,
-                      updatedMetadata,
-                    )
+                    const resp = await callSetCourseMetadata(project_name, {
+                      course_intro_message: introMessage,
+                    })
 
                     if (resp) {
                       setMetadata(updatedMetadata)

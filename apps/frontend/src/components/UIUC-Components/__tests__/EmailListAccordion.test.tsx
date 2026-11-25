@@ -137,8 +137,9 @@ describe('EmailListAccordion', () => {
       await screen.findByRole('button', { name: /Remove admin1@example.com/i }),
     )
 
+    // Only the edited list is sent, never the rest of the (possibly stale)
+    // metadata.
     expect(callSetCourseMetadata).toHaveBeenCalledWith('CS101', {
-      course_owner: 'owner@example.com',
       course_admins: ['admin2@example.com'],
     })
   })

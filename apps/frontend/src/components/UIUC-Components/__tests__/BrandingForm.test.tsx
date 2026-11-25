@@ -14,6 +14,9 @@ import type { CourseMetadata } from '~/types/courseMetadata'
 
 vi.mock('~/utils/apiUtils', () => ({
   callSetCourseMetadata: vi.fn(async () => true),
+  // Mount refresh returns nothing by default so tests drive the form through
+  // the query cache.
+  fetchCourseMetadata: vi.fn(async () => null),
   uploadToS3: vi.fn(async () => 'https://s3.example.com/logo.png'),
 }))
 
@@ -209,9 +212,9 @@ describe('BrandingForm', () => {
       await waitFor(() => {
         expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
           'TestProject',
-          expect.objectContaining({
+          {
             course_intro_message: 'New greeting',
-          }),
+          },
         )
       })
     })
@@ -316,9 +319,9 @@ describe('BrandingForm', () => {
       await waitFor(() => {
         expect(vi.mocked(callSetCourseMetadata)).toHaveBeenCalledWith(
           'TestProject',
-          expect.objectContaining({
+          {
             course_intro_message: 'Test input',
-          }),
+          },
         )
       })
     })

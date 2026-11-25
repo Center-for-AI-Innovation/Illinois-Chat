@@ -115,10 +115,8 @@ describe('ShareSettingsModal', () => {
     await waitFor(() =>
       expect(callSetCourseMetadata as any).toHaveBeenCalledWith(
         'CS101',
-        expect.objectContaining({
-          is_private: false,
-          allow_logged_in_users: false,
-        }),
+        // Only the access fields; never the rest of the metadata.
+        { is_private: false, allow_logged_in_users: false },
       ),
     )
     // Hub sections refetch so the bot moves section and badge.

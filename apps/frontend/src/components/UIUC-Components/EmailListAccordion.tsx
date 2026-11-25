@@ -126,6 +126,13 @@ function EmailListAccordion({
   const [error, setError] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
 
+  // The one field this accordion edits. Saves send only this field; the
+  // server merges it over the stored metadata.
+  const listChange = (updated: CourseMetadata) =>
+    is_for_admins
+      ? { course_admins: updated.course_admins }
+      : { approved_emails_list: updated.approved_emails_list }
+
   const handleDelete = async (email_address: string) => {
     if (isUpdating) return
     setIsUpdating(true)
@@ -169,8 +176,9 @@ function EmailListAccordion({
         onEmailAddressesChange(updatedMetadata, course_name)
       }
 
-      // Make API call
-      await callSetCourseMetadata(course_name, updatedMetadata)
+      // Send only the edited list so a stale copy of the rest of the metadata
+      // can't overwrite newer values on the server.
+      await callSetCourseMetadata(course_name, listChange(updatedMetadata))
     } finally {
       setIsUpdating(false)
     }
@@ -209,8 +217,8 @@ function EmailListAccordion({
           onEmailAddressesChange(updatedMetadata, course_name)
         }
 
-        // Make API call
-        await callSetCourseMetadata(course_name, updatedMetadata)
+        // Send only the edited list.
+        await callSetCourseMetadata(course_name, listChange(updatedMetadata))
         setValue('')
       }
     }
@@ -237,7 +245,7 @@ function EmailListAccordion({
 
         const response = await callSetCourseMetadata(
           course_name,
-          updatedMetadata,
+          listChange(updatedMetadata),
         )
         if (response && onEmailAddressesChange) {
           onEmailAddressesChange(updatedMetadata, course_name)
@@ -252,7 +260,7 @@ function EmailListAccordion({
 
         const response = await callSetCourseMetadata(
           course_name,
-          updatedMetadata,
+          listChange(updatedMetadata),
         )
         if (response && onEmailAddressesChange) {
           onEmailAddressesChange(updatedMetadata, course_name)
