@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { runPagesRoute } from '~/utils/server/routeContext'
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
@@ -19,4 +20,11 @@ export default async function handler(
 
   // Load any data your application needs for the API route
   return res.status(200).json({ userId: token })
+}
+
+export default async function isSignedInRoute(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  return runPagesRoute(req, res, () => handler(req, res))
 }

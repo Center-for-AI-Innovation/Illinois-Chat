@@ -1,7 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 
-import { useScrollToHashWhenReady } from '../adminScroll'
+import { readLocationHash, useScrollToHashWhenReady } from '../adminScroll'
+
+describe('readLocationHash', () => {
+  afterEach(() => {
+    window.location.hash = ''
+  })
+
+  it('returns the decoded hash so it matches section ids', () => {
+    window.location.hash = '#mod%C3%A8les'
+    expect(readLocationHash()).toBe('modèles')
+  })
+
+  it('falls back to the raw hash on a malformed escape', () => {
+    window.location.hash = '#%E0'
+    expect(readLocationHash()).toBe('%E0')
+  })
+})
 
 describe('useScrollToHashWhenReady', () => {
   afterEach(() => {
@@ -37,6 +53,15 @@ describe('useScrollToHashWhenReady', () => {
     rerender({ ready: true })
     await new Promise((r) => requestAnimationFrame(() => r(null)))
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not throw on a malformed hash escape', async () => {
+    const scrollIntoView = spy()
+    window.location.hash = '#%E0'
+
+    expect(() => renderHook(() => useScrollToHashWhenReady(true))).not.toThrow()
+    await new Promise((r) => requestAnimationFrame(() => r(null)))
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it('does nothing without a hash', async () => {

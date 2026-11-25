@@ -4,9 +4,12 @@ Same schema as ai_ta_backend.database.vector_store so the worker can run
 without importing from the main backend service.
 """
 import json
+import logging
 import os
 import uuid
 from typing import Any, Dict, List, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 def _get_pg_connection_params() -> Dict[str, str]:
@@ -77,16 +80,26 @@ class PgVectorStore:
         if connection_uri:
             from sqlalchemy import create_engine
 
-            self._engine = create_engine(connection_uri, pool_pre_ping=True)
+            self._engine = create_engine(connection_uri, pool_pre_ping=True, hide_parameters=True)
         elif engine is not None:
             self._engine = engine
         else:
             self._conn_params = _get_pg_connection_params()
 
     def _conn(self):
-        if self._engine is not None:
-            return self._engine.raw_connection()
-        return self._psycopg2.connect(**self._conn_params)  # type: ignore[arg-type]
+        try:
+            if self._engine is not None:
+                return self._engine.raw_connection()
+            return self._psycopg2.connect(**self._conn_params)  # type: ignore[arg-type]
+        except Exception as e:
+            # The caller handles the error; this line only says which database it was.
+            if self._engine is not None:
+                where = '%s:%s/%s' % (self._engine.url.host, self._engine.url.port, self._engine.url.database)
+            else:
+                params = self._conn_params or {}
+                where = '%s:%s/%s' % (params.get('host'), params.get('port'), params.get('dbname'))
+            logger.error("pgvector connect failed for %s: %s: %s", where, type(e).__name__, e)
+            raise
 
     def upsert_batch(
         self,

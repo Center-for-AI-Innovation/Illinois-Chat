@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm'
 import { db, chatbotTags } from '~/db/dbClient'
 import type { ChatbotTag } from '~/types/chatbotTags'
+import { getLogger } from '~/utils/server/log'
+
+const log = getLogger('chatbotTagsRegistry')
 
 /**
  * Upserts a set of chatbot tags into the registry. Inserts new (category,
@@ -33,9 +36,6 @@ export async function upsertChatbotTags(tags: ChatbotTag[]): Promise<void> {
         },
       })
   } catch (error) {
-    console.error(
-      'Failed to upsert chatbot tags registry:',
-      error instanceof Error ? error.message : String(error),
-    )
+    log.warn('could not upsert the chatbot tags registry', error as Error)
   }
 }

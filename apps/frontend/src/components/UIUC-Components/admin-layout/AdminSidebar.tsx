@@ -35,7 +35,7 @@ import { cn } from '@/components/shadcn/lib/utils'
 import { useTheme } from '~/contexts/ThemeContext'
 import { ADMIN_HOME_PAGE, ADMIN_SETTINGS_PAGES } from './admin-pages'
 import { type AdminPage } from './admin-pages.types'
-import { scrollContentToTop } from './adminScroll'
+import { readLocationHash, scrollContentToTop } from './adminScroll'
 import {
   type ActiveSectionTracker,
   trackActiveSection,
@@ -51,7 +51,7 @@ function useLocationHash() {
   const [hash, setHash] = useState('')
 
   useEffect(() => {
-    const update = () => setHash(window.location.hash.slice(1))
+    const update = () => setHash(readLocationHash())
     update()
     router.events.on('hashChangeComplete', update)
     router.events.on('routeChangeComplete', update)

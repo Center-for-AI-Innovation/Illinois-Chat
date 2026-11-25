@@ -291,6 +291,18 @@ describe('AdminLayout', () => {
       expect(screen.queryByText('admin page content')).not.toBeInTheDocument()
     })
 
+    it('keeps the owner on the page when a background refetch fails', () => {
+      metadataState.value = {
+        data: { course_owner: OWNER, course_admins: [] },
+        isLoading: false,
+        isError: true,
+        error: Object.assign(new Error('Bad Gateway'), { status: 502 }),
+      }
+      renderLayout()
+
+      expect(screen.getByText('admin page content')).toBeInTheDocument()
+    })
+
     it('denies access when the chatbot metadata cannot be read', () => {
       metadataState.value = { data: undefined, isLoading: false, isError: true }
       renderLayout()
