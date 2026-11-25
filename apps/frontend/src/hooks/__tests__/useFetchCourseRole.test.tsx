@@ -1,0 +1,105 @@
+import React from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { renderHook, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const hoisted = vi.hoisted(() => ({ sub: 'user-1' }))
+vi.mock('react-oidc-context', () => ({
+  useAuth: () => ({ user: { profile: { sub: hoisted.sub } } }),
+}))
+
+import { useFetchCourseRole } from '~/hooks/queries/useFetchCourseRole'
+
+const res = (status: number, body: unknown = {}, requestId?: string) => ({
+  ok: status < 400,
+  status,
+  statusText: String(status),
+  headers: new Headers(requestId ? { 'x-request-id': requestId } : {}),
+  json: async () => body,
+})
+
+function renderRoleHook(responses: Array<ReturnType<typeof res> | Error>) {
+  const fetchMock = vi.fn(async () => {
+    const next = responses.shift()!
+    if (next instanceof Error) throw next
+    return next
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const queryClient = new QueryClient()
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  const hook = renderHook(() => useFetchCourseRole({ courseName: 'my-bot' }), {
+    wrapper,
+  })
+  return { ...hook, fetchMock, queryClient }
+}
+
+describe('useFetchCourseRole retries', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('retries a 5xx and then returns the role', async () => {
+    const { result, fetchMock } = renderRoleHook([
+      res(500),
+      res(200, { role: 'owner' }),
+    ])
+    await waitFor(() => expect(result.current.data).toBe('owner'), {
+      timeout: 3000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a network error', async () => {
+    const { result, fetchMock } = renderRoleHook([
+      new TypeError('Failed to fetch'),
+      res(200, { role: 'admin' }),
+    ])
+    await waitFor(() => expect(result.current.data).toBe('admin'), {
+      timeout: 3000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a 401 once and then returns the role', async () => {
+    const { result, fetchMock } = renderRoleHook([
+      res(401),
+      res(200, { role: 'owner' }),
+    ])
+    await waitFor(() => expect(result.current.data).toBe('owner'), {
+      timeout: 3000,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up after a second 401', async () => {
+    const { result, fetchMock } = renderRoleHook([res(401), res(401)])
+    await waitFor(() => expect(result.current.isError).toBe(true), {
+      timeout: 3000,
+    })
+    expect(result.current.error?.status).toBe(401)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry other 4xx', async () => {
+    const { result, fetchMock } = renderRoleHook([
+      res(403, {}, 'req-123'),
+      res(200, { role: 'owner' }),
+    ])
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error?.status).toBe(403)
+    expect(result.current.error?.requestId).toBe('req-123')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keys the cached role by user', async () => {
+    const { result, queryClient } = renderRoleHook([
+      res(200, { role: 'owner' }),
+    ])
+    await waitFor(() => expect(result.current.data).toBe('owner'))
+    expect(queryClient.getQueryData(['courseRole', 'my-bot', 'user-1'])).toBe(
+      'owner',
+    )
+  })
+})

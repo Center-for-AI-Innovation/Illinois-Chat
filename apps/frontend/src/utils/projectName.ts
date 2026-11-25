@@ -53,3 +53,11 @@ export function buildProjectChatPath(name: string): string {
   }
   return `/${encodeURIComponent(segment)}/chat`
 }
+
+// Special projects that are plain model access with no knowledge base, so
+// they have no settings to manage.
+const NO_CONTEXT_PROJECTS = ['gpt4', 'global', 'extreme']
+
+export function isNoContextProject(name: string): boolean {
+  return NO_CONTEXT_PROJECTS.includes(name.toLowerCase())
+}

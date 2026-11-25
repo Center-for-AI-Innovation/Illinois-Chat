@@ -1,126 +1,69 @@
-import { type NextPage } from 'next'
-import MakeOldCoursePage from '~/components/UIUC-Components/MakeOldCoursePage'
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useRouter } from 'next/router'
-
 import { useAuth } from 'react-oidc-context'
-import { CannotEditGPT4Page } from '~/components/UIUC-Components/CannotEditGPT4'
+import CourseAdminLayout from '~/components/Layout/CourseAdminLayout'
+import { type NextPageWithLayout } from '~/pages/_app'
 import { LoadingPlaceholderForAdminPages } from '~/components/UIUC-Components/MainPageBackground'
-import {
-  PermissionGate,
-  getPermissionGateError,
-  type PermissionGateErrorType,
-} from '~/components/UIUC-Components/PermissionGate'
-import { useFetchIsSuperAdmin } from '~/hooks/queries/useFetchIsSuperAdmin'
-
+import ProjectDashboard from '~/components/UIUC-Components/ProjectDashboard'
+import { PermissionGate } from '~/components/UIUC-Components/PermissionGate'
+import { RoleCheckFailed } from '~/components/UIUC-Components/RoleCheckFailed'
+import { useQuery } from '@tanstack/react-query'
 import { type CourseMetadata } from '~/types/courseMetadata'
 import { fetchCourseMetadata } from '~/utils/apiUtils'
 
-const CourseMain: NextPage = () => {
+type MetadataError = Error & { status?: number; requestId?: string }
+
+const DashboardPage: NextPageWithLayout = () => {
   const router = useRouter()
-
-  const getCurrentPageName = () => {
-    const raw = router.query.course_name
-    return typeof raw === 'string'
-      ? raw
-      : Array.isArray(raw)
-        ? raw[0]
-        : undefined
-  }
-  const courseName = getCurrentPageName() as string
-
   const auth = useAuth()
-  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } =
-    useFetchIsSuperAdmin({ enabled: auth.isAuthenticated })
-  const [metadata, setMetadata] = useState<CourseMetadata | null>()
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorType, setErrorType] = useState<PermissionGateErrorType | null>(
-    null,
-  )
-  const [errorRequestId, setErrorRequestId] = useState<string>()
+  const courseName = router.query.course_name as string
 
-  useEffect(() => {
-    if (!router.isReady || auth.isLoading) return
-    const fetchCourseData = async () => {
-      setIsLoading(true)
-      try {
-        const local_metadata: CourseMetadata = (await fetchCourseMetadata(
-          courseName,
-        )) as CourseMetadata
+  const {
+    data: metadata,
+    isPending,
+    isLoadingError,
+    error,
+    refetch,
+  } = useQuery<CourseMetadata, MetadataError>({
+    // Own key: UploadCard and others write raw metadata to ['courseMetadata', name]
+    queryKey: ['dashboardCourseMetadata', courseName],
+    queryFn: () => fetchCourseMetadata(courseName),
+    retry: 1,
+    gcTime: 0,
+    enabled: Boolean(courseName),
+  })
 
-        if (local_metadata == null) {
-          setErrorType(404)
-          return
-        }
-
-        if (local_metadata && local_metadata.is_private) {
-          local_metadata.is_private = JSON.parse(
-            local_metadata.is_private as unknown as string,
-          )
-        }
-        setMetadata(local_metadata)
-      } catch (error) {
-        console.error(error)
-        // alert('An error occurred while fetching course metadata. Please try again later.')
-
-        const gateError = getPermissionGateError(error)
-        if (gateError) {
-          setErrorType(gateError.errorType)
-          setErrorRequestId(gateError.requestId)
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchCourseData()
-  }, [router.isReady, auth.isLoading, courseName])
-
-  useEffect(() => {
-    if (!router.isReady) return
-    if (auth.isLoading) return
-    if (!metadata) return
-    if (metadata == null) return
-
-    // Everything is loaded
-    setIsLoading(false)
-  }, [router.isReady, auth.isLoading, metadata])
-
-  if (isLoading || isSuperAdminLoading) {
+  if (isPending) {
     return <LoadingPlaceholderForAdminPages />
   }
 
-  if (!auth.isAuthenticated && courseName) {
-    return <PermissionGate course_name={courseName as string} />
-  }
-
-  if (
-    courseName.toLowerCase() == 'gpt4' ||
-    courseName.toLowerCase() == 'global' ||
-    courseName.toLowerCase() == 'extreme'
-  ) {
-    // Don't edit certain special pages (no context allowed)
-    return <CannotEditGPT4Page course_name={courseName as string} />
-  }
-
-  if (errorType !== null) {
+  // A failed refetch keeps the loaded data, so only a failed first load blocks
+  if (isLoadingError || !metadata) {
+    if (error?.status === 404) {
+      return <PermissionGate course_name={courseName} errorType={404} />
+    }
     return (
-      <PermissionGate
-        course_name={courseName ? (courseName as string) : 'new'}
-        errorType={errorType}
-        requestId={errorRequestId}
+      <RoleCheckFailed
+        course_name={courseName}
+        onRetry={() => void refetch()}
+        title="We couldn't load this dashboard"
+        message="Something went wrong while loading the project. Try again in a moment."
+        requestId={error?.requestId}
       />
     )
   }
 
   return (
-    <>
-      <MakeOldCoursePage
-        course_name={courseName as string}
-        metadata={metadata as CourseMetadata}
-        current_email={auth.user?.profile.email as string}
-        isSuperAdmin={isSuperAdmin === true}
-      />
-    </>
+    <ProjectDashboard
+      course_name={courseName}
+      metadata={metadata}
+      current_email={auth.user?.profile.email as string}
+    />
   )
 }
-export default CourseMain
+
+DashboardPage.getLayout = (page) => (
+  <CourseAdminLayout>{page}</CourseAdminLayout>
+)
+
+export default DashboardPage
