@@ -6,7 +6,7 @@ Illinois Chat is fully open source (Apache 2.0) and ships with a Docker Compose 
 
 - Docker v24+ and Docker Compose v2
 - Git
-- Python 3.10/3.11 and Node.js 20.19+/22.12+ only if you plan to [develop locally](../contributing/dev-setup.md)
+- [uv](https://docs.astral.sh/uv/) and Node.js 20.19+/22.12+ only if you plan to [develop locally](../contributing/dev-setup.md)
 
 ## First run
 

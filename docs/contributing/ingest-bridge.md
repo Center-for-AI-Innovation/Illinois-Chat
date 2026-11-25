@@ -50,7 +50,7 @@ Environment (identical to the worker):
 | `POSTGRES_ENDPOINT` / `POSTGRES_PORT` / `POSTGRES_DATABASE` / `POSTGRES_USERNAME` / `POSTGRES_PASSWORD` | Documents DB for the `documents_in_progress` status rows |
 | `INGEST_API_KEY` | Optional bearer token. If set, callers must send `Authorization: Bearer <key>`. Strongly recommended for anything internet-facing; if unset the endpoint is open. |
 
-For local experiments, `apps/backend/ai_ta_backend/rabbitmq/docker-compose.yml` brings up RabbitMQ, Postgres, and the worker container in one network.
+For local experiments, `bash infra/scripts/start-dev.sh` brings up RabbitMQ and Postgres (from `infra/docker/docker-compose.dev.yaml`) and writes `apps/backend/.env`; then run the worker with `uv run python ai_ta_backend/rabbitmq/worker.py` from `apps/backend`, as on [Development setup](dev-setup.md).
 
 Health check: `GET /api/healthcheck` returns `{"status": "OK"}`.
 

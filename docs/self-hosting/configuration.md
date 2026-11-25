@@ -14,7 +14,7 @@ Four template files exist. The **In template** column below says which one carri
 | Value | File | Who reads it |
 | --- | --- | --- |
 | root | `.env.template` | copied to `.env` by `start-all.sh`; also sourced by `start-dev.sh` |
-| worker | `apps/backend/ai_ta_backend/rabbitmq/.env.template` | the ingest worker when run on its own (`python worker.py`) |
+| worker | `apps/backend/ai_ta_backend/rabbitmq/.env.template` | the ingest worker when run on its own (`uv run python ai_ta_backend/rabbitmq/worker.py` from `apps/backend`) |
 | none | — | read from the process environment only |
 
 `apps/backend/.env.template` and `apps/frontend/.env.template` are dev reference files: no script reads them (`start-dev.sh` writes the app `.env` files itself), so a variable that appears only there has no effect on either stack.

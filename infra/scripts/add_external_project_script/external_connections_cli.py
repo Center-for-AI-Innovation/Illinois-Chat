@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["python-dotenv>=1.0.0"]
+# ///
 """
 external_connections_cli.py — CLI for the frontend's project-external-
 connections CRUD endpoints (populates the HOST database).
@@ -24,11 +28,11 @@ your browser (DevTools → Application → Cookies → `access_token`) and set
 ACCESS_TOKEN in `.external.env`, or pass --token.
 
 Usage:
-  python3 external_connections_cli.py get [project_name]
-  python3 external_connections_cli.py upsert <kind> [env|<json>|@file.json] [--project <name>]
-  python3 external_connections_cli.py delete [project_name] [--kind s3|database|qdrant|embedding]
-  python3 external_connections_cli.py set-active [project_name] --active true|false
-  python3 external_connections_cli.py test <kind> [env|<json>|@file.json]
+  uv run external_connections_cli.py get [project_name]
+  uv run external_connections_cli.py upsert <kind> [env|<json>|@file.json] [--project <name>]
+  uv run external_connections_cli.py delete [project_name] [--kind s3|database|qdrant|embedding]
+  uv run external_connections_cli.py set-active [project_name] --active true|false
+  uv run external_connections_cli.py test <kind> [env|<json>|@file.json]
 
 Positional project names fall back to EXT_PROJECT_NAME from `.external.env`.
 
@@ -55,8 +59,8 @@ try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover
     raise SystemExit(
-        "[error] python-dotenv is required. Install with:\n"
-        "  pip install -r requirements.txt"
+        "[error] python-dotenv is required. Run this script with uv so it is\n"
+        "fetched automatically:  uv run external_connections_cli.py ..."
     )
 
 SCRIPT_DIR = Path(__file__).resolve().parent

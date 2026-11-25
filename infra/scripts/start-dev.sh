@@ -380,13 +380,13 @@ ensure_dev_apps_prereqs() {
 
 	if [[ -z ${BACKEND_PYTHON} ]]; then
 		print_error "Python 3 is required to start the backend and worker."
-		print_error "Install Python 3.10 or 3.11, then: cd apps/backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install -r ai_ta_backend/rabbitmq/requirements.txt"
+		print_error "Install uv, then: cd apps/backend && uv sync --all-extras"
 		exit 1
 	fi
 
 	if ! "${BACKEND_PYTHON}" -c "import flask" >/dev/null 2>&1; then
 		print_error "Flask is not installed for ${BACKEND_PYTHON}."
-		print_error "From apps/backend: pip install -r requirements.txt && pip install -r ai_ta_backend/rabbitmq/requirements.txt"
+		print_error "From apps/backend: uv sync --all-extras"
 		exit 1
 	fi
 
@@ -954,7 +954,8 @@ echo "1. Update hosted model/API keys in apps/backend/.env, apps/frontend/.env, 
 echo "2. Start the backend, worker, and frontend together:"
 echo "   bash infra/scripts/start-dev.sh --apps"
 echo "   or in separate terminals:"
-echo "   cd apps/backend && flask --app ai_ta_backend.main:app --debug run --port 8000"
-echo "   cd apps/backend && python ai_ta_backend/rabbitmq/worker.py"
+echo "   cd apps/backend && uv sync --all-extras   # once, and after pulling a changed uv.lock"
+echo "   cd apps/backend && uv run flask --app ai_ta_backend.main:app --debug run --port 8000"
+echo "   cd apps/backend && uv run python ai_ta_backend/rabbitmq/worker.py"
 echo "   cd apps/frontend && npm run local"
 echo ""

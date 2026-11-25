@@ -1,34 +1,40 @@
-FROM python:3.10-slim AS build
+# Build context is apps/backend (not this directory) so the image can see pyproject.toml and uv.lock.
+# uv is only needed to install: it is mounted into the sync step below, not copied into the image.
+FROM ghcr.io/astral-sh/uv:0.12.8 AS uv
 
-# Install dependencies
-RUN apt update && \
-    apt-get install -y \
-        ffmpeg \
-        tesseract-ocr && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# trixie is the Debian release the python:3.10-slim images were already built on, so ffmpeg,
+# tesseract and git stay at the versions that have been running.
+FROM python:3.12-slim-trixie
 
-RUN apt update && \
-    apt-get install -y \
-        libpq-dev \
-        gcc \
-        git-all && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# ffmpeg: pydub and subprocess calls in ingest.py. tesseract: pytesseract OCR. git: GitPython.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg tesseract-ocr git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY . .
-RUN pip install --no-cache-dir -r requirements.txt
+# Fail loudly if the base image's interpreter does not satisfy .python-version instead of downloading one.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 
-# Pre-download NLTK data so unstructured (Excel, PPTX, etc.) does not fetch at runtime (avoids 403)
+# Dependency layer: only invalidated when the manifest or lock changes.
+COPY pyproject.toml uv.lock .python-version ./
+# --locked fails the build if uv.lock no longer matches pyproject.toml (--frozen would install
+# the stale lock without a word).
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=from=uv,source=/uv,target=/bin/uv \
+    uv sync --locked --no-dev --extra worker
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Pre-download NLTK data so unstructured (Excel, PPTX, etc.) does not fetch at runtime (403 in many environments).
 ENV NLTK_DATA=/usr/share/nltk_data
-RUN mkdir -p $NLTK_DATA && chmod -R 755 $NLTK_DATA \
-    && python -m nltk.downloader -d $NLTK_DATA punkt_tab averaged_perceptron_tagger_eng
+RUN mkdir -p "$NLTK_DATA" && chmod -R 755 "$NLTK_DATA" \
+    && python -m nltk.downloader -d "$NLTK_DATA" punkt_tab averaged_perceptron_tagger_eng
+
+COPY ai_ta_backend ./ai_ta_backend
 
 # Send print() and log output straight to the container log (no buffering).
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8001
 
-CMD ["python", "worker.py"]
+# Running worker.py by path puts ai_ta_backend/rabbitmq on sys.path, which its bare imports need.
+CMD ["python", "ai_ta_backend/rabbitmq/worker.py"]
