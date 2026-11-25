@@ -561,6 +561,22 @@ describe('BrandingForm', () => {
         ])?.tags,
       ).toEqual([{ category: 'general', value: 'fresh' }])
     })
+
+    it('shows the server greeting when the user has not edited it', async () => {
+      const { fetchCourseMetadata } = await import('~/utils/apiUtils')
+      vi.mocked(fetchCourseMetadata).mockResolvedValueOnce(
+        makeCourseMetadata({ course_intro_message: 'server greeting' }),
+      )
+      renderBrandingForm({
+        metadata: makeCourseMetadata({ course_intro_message: 'cached' }),
+      })
+
+      await waitFor(() =>
+        expect(screen.getByPlaceholderText(/enter a greeting/i)).toHaveValue(
+          'server greeting',
+        ),
+      )
+    })
   })
 
   describe('query cache subscription', () => {

@@ -10,16 +10,10 @@ import { FormInput } from '@/components/shadcn/ui/form-input'
 import SetExampleQuestions from './SetExampleQuestions'
 import ChatbotTagsEditor from './ChatbotTagsEditor'
 
-import { useQueryClient } from '@tanstack/react-query'
-import {
-  type CourseMetadata,
-  type CourseMetadataOptionalForUpsert,
-} from '~/types/courseMetadata'
-import {
-  callSetCourseMetadata,
-  fetchCourseMetadata,
-  uploadToS3,
-} from '~/utils/apiUtils'
+import { type CourseMetadataOptionalForUpsert } from '~/types/courseMetadata'
+import { uploadToS3 } from '~/utils/apiUtils'
+import { useCourseMetadata } from '~/hooks/queries/useFetchCourseMetadata'
+import { useUpdateCourseMetadata } from '~/hooks/queries/useUpdateCourseMetadata'
 
 const BrandingForm = ({
   project_name,
@@ -28,98 +22,49 @@ const BrandingForm = ({
   project_name: string
   user_id: string
 }) => {
-  const queryClient = useQueryClient()
-
-  // Read initial cached data synchronously so child components mount with it
-  const cachedMetadata = queryClient.getQueryData([
-    'courseMetadata',
-    project_name,
-  ]) as CourseMetadata | undefined
+  // Shared metadata query: shows any cached copy at once, refetches on mount,
+  // and re-renders when a sibling editor saves.
+  const { data: metadata = null } = useCourseMetadata(project_name)
+  const { save } = useUpdateCourseMetadata(project_name)
 
   const [introMessage, setIntroMessage] = useState(
-    cachedMetadata?.course_intro_message || '',
+    metadata?.course_intro_message || '',
   )
   const [isIntroMessageUpdated, setIsIntroMessageUpdated] = useState(false)
+  const [isSavingGreeting, setIsSavingGreeting] = useState(false)
   const [greetingSaved, setGreetingSaved] = useState(
-    !!cachedMetadata?.course_intro_message,
-  )
-  const [metadata, setMetadata] = useState<CourseMetadata | null>(
-    cachedMetadata ?? null,
+    !!metadata?.course_intro_message,
   )
   const [logoFileName, setLogoFileName] = useState<string | null>(
-    cachedMetadata?.banner_image_s3 ? 'Logo uploaded' : null,
+    metadata?.banner_image_s3 ? 'Logo uploaded' : null,
   )
   const [logoStatus, setLogoStatus] = useState<
     'idle' | 'uploading' | 'success' | 'error'
-  >(cachedMetadata?.banner_image_s3 ? 'success' : 'idle')
+  >(metadata?.banner_image_s3 ? 'success' : 'idle')
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // True while the greeting has edits that aren't saved yet (including while
-  // a save is in flight). Cache updates must not replace that text.
-  const greetingDirtyRef = useRef(false)
 
-  // Merge saved fields into the latest cached copy, not the copy this form
-  // captured earlier, so data fetched in the meantime isn't overwritten. The
-  // cache subscription below then updates this form's state.
-  const mergeIntoCache = (changes: Partial<CourseMetadata>) => {
-    queryClient.setQueryData<CourseMetadata>(
-      ['courseMetadata', project_name],
-      (latest) => {
-        const base = latest ?? metadata
-        return base ? { ...base, ...changes } : latest
-      },
-    )
-  }
-
-  // Subscribe to future query cache changes — but only react to events for
-  // this course's metadata key. Without this guard, *any* query observer
-  // mounting elsewhere in the tree (e.g. the tag autocomplete) would fire
-  // the callback and clobber any in-progress edits on this form.
+  // Follow the server's greeting, but never replace text the user is still
+  // editing or saving (a failed save rolls the cache back, and the typed
+  // text must survive that).
+  const serverGreeting = metadata?.course_intro_message || ''
   useEffect(() => {
-    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      const key = event?.query?.queryKey
-      if (
-        !Array.isArray(key) ||
-        key[0] !== 'courseMetadata' ||
-        key[1] !== project_name
-      ) {
-        return
-      }
-      const latestData = queryClient.getQueryData([
-        'courseMetadata',
-        project_name,
-      ]) as CourseMetadata | undefined
-      if (latestData) {
-        setMetadata(latestData)
-        if (!greetingDirtyRef.current) {
-          setIntroMessage(latestData.course_intro_message || '')
-        }
-      }
-    })
-
-    return () => {
-      unsubscribe()
+    if (!isIntroMessageUpdated && !isSavingGreeting) {
+      setIntroMessage(serverGreeting)
+      setGreetingSaved(!!serverGreeting)
     }
-  }, [project_name, queryClient])
+    // Only re-sync when the server value changes, not when editing stops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverGreeting])
 
-  // Refresh from the server on mount. The cached copy above lets the form
-  // render immediately, but it can be stale (the query cache lasts the whole
-  // session). Writing the fresh copy to the cache updates this form through
-  // the subscription above and keeps sibling editors in sync.
+  // Show an existing logo once the metadata arrives.
+  const serverLogo = metadata?.banner_image_s3
   useEffect(() => {
-    let cancelled = false
-    fetchCourseMetadata(project_name)
-      .then((fresh: CourseMetadata | null) => {
-        if (!cancelled && fresh) {
-          queryClient.setQueryData(['courseMetadata', project_name], fresh)
-        }
-      })
-      .catch(() => {
-        // Keep showing the cached copy; saves only send changed fields.
-      })
-    return () => {
-      cancelled = true
+    if (serverLogo && logoStatus === 'idle') {
+      setLogoFileName('Logo uploaded')
+      setLogoStatus('success')
     }
-  }, [project_name, queryClient])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverLogo])
 
   const onUploadLogo = async (logo: File | null) => {
     if (!logo) return
@@ -130,17 +75,10 @@ const BrandingForm = ({
     const banner_s3_image = await uploadToS3(logo, user_id, project_name)
 
     if (banner_s3_image && metadata) {
-      // Save the logo on its own. Other saves only send their own fields, so
-      // they no longer carry an unsaved banner along with them.
-      const saved = await callSetCourseMetadata(project_name, {
-        banner_image_s3: banner_s3_image,
-      })
-      if (!saved) {
-        setLogoStatus('error')
-        return
-      }
-      mergeIntoCache({ banner_image_s3: banner_s3_image })
-      setLogoStatus('success')
+      // Save the logo on its own. The mutation merges it into the latest
+      // cached copy, so data fetched during the upload is kept.
+      const saved = await save({ banner_image_s3: banner_s3_image })
+      setLogoStatus(saved ? 'success' : 'error')
     } else {
       setLogoStatus('error')
     }
@@ -167,7 +105,6 @@ const BrandingForm = ({
                 ) : null
               }
               onChange={(e) => {
-                greetingDirtyRef.current = true
                 setIntroMessage(e.target.value)
                 setIsIntroMessageUpdated(true)
                 setGreetingSaved(false)
@@ -179,22 +116,19 @@ const BrandingForm = ({
                 type="submit"
                 variant="dashboard"
                 size="sm"
-                disabled={!isIntroMessageUpdated}
+                disabled={!isIntroMessageUpdated || isSavingGreeting}
                 onClick={async () => {
-                  setIsIntroMessageUpdated(false)
-
                   if (metadata) {
-                    const resp = await callSetCourseMetadata(project_name, {
+                    setIsSavingGreeting(true)
+                    const resp = await save({
                       course_intro_message: introMessage,
                     })
+                    setIsSavingGreeting(false)
 
                     if (resp) {
-                      greetingDirtyRef.current = false
-                      mergeIntoCache({ course_intro_message: introMessage })
+                      setIsIntroMessageUpdated(false)
                       setGreetingSaved(true)
                     } else {
-                      // Keep the typed text and let the user retry.
-                      setIsIntroMessageUpdated(true)
                       console.log(
                         'Error upserting course metadata for course: ',
                         project_name,

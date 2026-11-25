@@ -449,9 +449,10 @@ describe('PromptEditor', () => {
       const PromptEditor = (await import('../PromptEditor')).default
       renderWithProviders(<PromptEditor project_name="TestProject" />)
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        /Couldn't load this project's prompt settings/,
-      )
+      // The metadata query retries once before reporting the failure.
+      expect(
+        await screen.findByRole('alert', {}, { timeout: 3000 }),
+      ).toHaveTextContent(/Couldn't load this project's prompt settings/)
       expect(screen.queryByLabelText('System Prompt')).not.toBeInTheDocument()
     })
   })

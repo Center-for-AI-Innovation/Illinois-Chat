@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { getBaseUrl } from '~/utils/apiUtils'
+import {
+  fetchCourseMetadata as fetchRawCourseMetadata,
+  getBaseUrl,
+} from '~/utils/apiUtils'
+
+/** Cache key for a project's raw CourseMetadata, shared by every editor. */
+export const courseMetadataQueryKey = (courseName: string) =>
+  ['courseMetadata', courseName] as const
 
 interface FetchCourseMetadataVariables {
   courseName: string
@@ -66,4 +73,40 @@ export function useFetchCourseMetadata({
     data: query.data?.courseMetadata,
     lastAccessedAt: query.data?.lastAccessedAt ?? null,
   }
+}
+
+interface UseCourseMetadataOptions {
+  enabled?: boolean
+  /**
+   * Shown until the first fetch finishes (for example metadata the parent
+   * already has). Never written to the cache, so it can't mask fresh data.
+   */
+  placeholderData?: CourseMetadata
+}
+
+/**
+ * The project's raw CourseMetadata. Every settings editor reads through this
+ * hook so they share one cache entry: it refetches on mount (staleTime 0),
+ * and a save through useUpdateCourseMetadata re-renders every reader.
+ */
+export function useCourseMetadata(
+  courseName: string,
+  { enabled = true, placeholderData }: UseCourseMetadataOptions = {},
+) {
+  return useQuery<CourseMetadata>({
+    queryKey: courseMetadataQueryKey(courseName),
+    queryFn: async () => {
+      const metadata = (await fetchRawCourseMetadata(courseName)) as
+        | CourseMetadata
+        | null
+        | undefined
+      // A missing project is an error, not empty data: readers keep any copy
+      // they have and editors show their "couldn't load" state.
+      if (!metadata) throw new Error(`No metadata for project ${courseName}`)
+      return metadata
+    },
+    enabled: enabled && Boolean(courseName),
+    placeholderData,
+    retry: 1,
+  })
 }

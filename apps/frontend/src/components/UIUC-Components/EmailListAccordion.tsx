@@ -6,7 +6,7 @@ import React, {
   type KeyboardEvent,
 } from 'react'
 import { type CourseMetadata } from '~/types/courseMetadata'
-import { callSetCourseMetadata } from '~/utils/apiUtils'
+import { useUpdateCourseMetadata } from '~/hooks/queries/useUpdateCourseMetadata'
 import {
   Accordion,
   AccordionContent,
@@ -14,7 +14,6 @@ import {
   AccordionTrigger,
 } from '~/components/shadcn/ui/accordion'
 import { montserrat_heading, montserrat_paragraph } from 'fonts'
-import { useQueryClient } from '@tanstack/react-query'
 import { superAdmins } from '~/utils/superAdmins'
 function EmailInput({
   value,
@@ -22,12 +21,14 @@ function EmailInput({
   onKeyDown,
   onChange,
   onPaste,
+  disabled = false,
 }: {
   value: string
   error: string | null
   onKeyDown: (evt: KeyboardEvent<HTMLInputElement>) => void
   onChange: (evt: ChangeEvent<HTMLInputElement>) => void
   onPaste: (evt: React.ClipboardEvent<HTMLInputElement>) => void
+  disabled?: boolean
 }) {
   return (
     <div className="relative">
@@ -43,6 +44,7 @@ function EmailInput({
         onKeyDown={onKeyDown}
         onChange={onChange}
         onPaste={onPaste}
+        disabled={disabled}
       />
       {error && (
         <p
@@ -107,19 +109,22 @@ function EmailListAccordion({
   course_name,
   metadata,
   is_private,
-  onEmailAddressesChange,
+  onSaved,
   is_for_admins,
+  disabled = false,
 }: {
   course_name: string
   metadata: CourseMetadata
   is_private: boolean
-  onEmailAddressesChange?: (
-    new_course_metadata: CourseMetadata,
-    course_name: string,
-  ) => void
+  /** Called after a list save succeeds. */
+  onSaved?: () => void
   is_for_admins: boolean
+  /** Blocks edits, e.g. while the parent still shows a possibly stale copy. */
+  disabled?: boolean
 }) {
-  const queryClient = useQueryClient()
+  // Saves update the shared metadata cache right away and roll back if the
+  // save fails; the parent re-renders from that cache.
+  const { save } = useUpdateCourseMetadata(course_name)
   const emailAddresses = metadata.approved_emails_list || []
   const courseAdmins = metadata.course_admins || []
   const [value, setValue] = useState<string>('')
@@ -133,8 +138,14 @@ function EmailListAccordion({
       ? { course_admins: updated.course_admins }
       : { approved_emails_list: updated.approved_emails_list }
 
+  const saveList = async (updated: CourseMetadata) => {
+    const ok = await save(listChange(updated))
+    if (ok) onSaved?.()
+    return ok
+  }
+
   const handleDelete = async (email_address: string) => {
-    if (isUpdating) return
+    if (isUpdating || disabled) return
     setIsUpdating(true)
 
     try {
@@ -168,23 +179,16 @@ function EmailListAccordion({
         }
       }
 
-      // Update cache immediately
-      queryClient.setQueryData(['courseMetadata', course_name], updatedMetadata)
-
-      // Update parent state
-      if (onEmailAddressesChange) {
-        onEmailAddressesChange(updatedMetadata, course_name)
-      }
-
       // Send only the edited list so a stale copy of the rest of the metadata
       // can't overwrite newer values on the server.
-      await callSetCourseMetadata(course_name, listChange(updatedMetadata))
+      await saveList(updatedMetadata)
     } finally {
       setIsUpdating(false)
     }
   }
 
   const handleKeyDown = async (evt: KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return
     if (['Enter', 'Tab', ','].includes(evt.key)) {
       evt.preventDefault()
       const trimmedValue = value.trim()
@@ -206,20 +210,8 @@ function EmailListAccordion({
           }
         }
 
-        // Update cache immediately
-        queryClient.setQueryData(
-          ['courseMetadata', course_name],
-          updatedMetadata,
-        )
-
-        // Update parent state
-        if (onEmailAddressesChange) {
-          onEmailAddressesChange(updatedMetadata, course_name)
-        }
-
-        // Send only the edited list.
-        await callSetCourseMetadata(course_name, listChange(updatedMetadata))
-        setValue('')
+        // Send only the edited list. Keep the typed address if it failed.
+        if (await saveList(updatedMetadata)) setValue('')
       }
     }
   }
@@ -231,7 +223,7 @@ function EmailListAccordion({
 
   const handlePaste = async (evt: React.ClipboardEvent<HTMLInputElement>) => {
     const paste = evt.clipboardData.getData('text')
-    if (!paste) return // Let browser handle paste if clipboard data is unavailable
+    if (!paste || disabled) return // Let browser handle paste if clipboard data is unavailable
     evt.preventDefault()
     const emails = paste.match(/[\w\d\.-]+@[\w\d\.-]+\.[\w\d\.-]+/g)
 
@@ -243,13 +235,7 @@ function EmailListAccordion({
           course_admins: [...new Set([...courseAdmins, ...toBeAdded])],
         }
 
-        const response = await callSetCourseMetadata(
-          course_name,
-          listChange(updatedMetadata),
-        )
-        if (response && onEmailAddressesChange) {
-          onEmailAddressesChange(updatedMetadata, course_name)
-        }
+        await saveList(updatedMetadata)
       } else {
         const updatedEmailAddresses = [...emailAddresses, ...toBeAdded]
 
@@ -258,13 +244,7 @@ function EmailListAccordion({
           approved_emails_list: updatedEmailAddresses,
         }
 
-        const response = await callSetCourseMetadata(
-          course_name,
-          listChange(updatedMetadata),
-        )
-        if (response && onEmailAddressesChange) {
-          onEmailAddressesChange(updatedMetadata, course_name)
-        }
+        await saveList(updatedMetadata)
       }
     }
   }
@@ -331,6 +311,7 @@ function EmailListAccordion({
                   onKeyDown={handleKeyDown}
                   onChange={handleChange}
                   onPaste={handlePaste}
+                  disabled={disabled}
                 />
                 {courseAdmins.filter((email) => !superAdmins.includes(email))
                   .length > 0 && (
@@ -392,6 +373,7 @@ function EmailListAccordion({
                 onKeyDown={handleKeyDown}
                 onChange={handleChange}
                 onPaste={handlePaste}
+                disabled={disabled}
               />
               {emailAddresses.length > 0 && (
                 <div className="space-y-2">
