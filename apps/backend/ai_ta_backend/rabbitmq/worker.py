@@ -1,4 +1,5 @@
 import os
+import signal
 import ssl
 import time
 from typing import List, Optional
@@ -6,6 +7,7 @@ from typing import List, Optional
 import pika
 import logging
 import json
+import math
 import sys
 import threading
 import multiprocessing as mp
@@ -21,7 +23,7 @@ configure_logging()
 # Explicit name: this module is '__main__' in the parent and '__mp_main__' in the child.
 logger = logging.getLogger('worker')
 
-from rmsql import SQLAlchemyIngestDB
+from rmsql import DB_CONNECT_TIMEOUT, SQLAlchemyIngestDB
 from connection_resolver import WorkerConnectionResolver
 from flask import Flask, jsonify
 
@@ -76,6 +78,33 @@ RECONNECT_MAX_DELAY = 60  # seconds; cap on the back-off between reconnect attem
 STABLE_SESSION = 30  # seconds; a consume session shorter than this keeps the back-off growing
 
 
+def _statement_timeout_from_env():
+    """Seconds a status-DB statement may run on the consumer thread, from
+    INGEST_DB_STATEMENT_TIMEOUT (default 30; 0 turns the limit off).
+
+    The consumer thread sends no heartbeat while it waits on the database, so one database
+    call (connect plus statement) has to end before the broker gives up on the connection.
+    """
+    raw = os.getenv('INGEST_DB_STATEMENT_TIMEOUT', '').strip()
+    try:
+        value = float(raw) if raw else 30.0
+    except ValueError:
+        value = -1.0
+    if not math.isfinite(value) or value < 0:
+        logger.warning("INGEST_DB_STATEMENT_TIMEOUT=%r is invalid; using 30", raw)
+        value = 30.0
+    if RABBITMQ_HEARTBEAT and (value == 0 or DB_CONNECT_TIMEOUT + value >= RABBITMQ_HEARTBEAT):
+        logger.warning("INGEST_DB_STATEMENT_TIMEOUT=%s lets one database call outlast the %ss AMQP heartbeat; "
+                       "a slow database will then cost the worker its broker connection",
+                       raw or '30', RABBITMQ_HEARTBEAT)
+    return value
+
+
+DB_STATEMENT_TIMEOUT = _statement_timeout_from_env()
+# run_ingest_isolated returns this, not an error text, when it stopped the child for a shutdown.
+INTERRUPTED = "interrupted: the worker is shutting down"
+
+
 def _ingest_child(job_id, rid, inputs):
     """Runs in a spawned subprocess: fresh Ingest() (no inherited fds/threads), do the work.
 
@@ -98,10 +127,14 @@ def _ingest_child(job_id, rid, inputs):
         sys.exit(3)
 
 
-def run_ingest_isolated(job_id, rid, inputs, keepalive=None, _target=_ingest_child):
+def run_ingest_isolated(job_id, rid, inputs, keepalive=None, should_stop=None, _target=_ingest_child):
     """Run main_ingest in a spawned child with a hard timeout so a hung/huge OCR can't block the
     consumer thread (RabbitMQ heartbeats) or the Flask ALB health check, and a native segfault in
     the OCR libs kills only the child. Returns None on clean completion, else an error string.
+
+    `should_stop`, when given, is checked about every KEEPALIVE_INTERVAL seconds. Once it
+    returns True the child is killed (or never started) and INTERRUPTED is returned: the
+    worker is shutting down and cannot wait out an ingest that may take INGEST_TIMEOUT.
 
     `keepalive`, when given, is called about every KEEPALIVE_INTERVAL seconds while the child
     runs. The worker passes a function that services the AMQP connection, so heartbeat frames
@@ -112,11 +145,17 @@ def run_ingest_isolated(job_id, rid, inputs, keepalive=None, _target=_ingest_chi
     """
     ctx = mp.get_context('spawn')  # spawn, NOT fork: worker is multithreaded (Flask) -> fork can deadlock
     p = ctx.Process(target=_target, args=(job_id, rid, inputs))  # _target is swapped only by tests
+    if should_stop is not None and should_stop():
+        return INTERRUPTED
     p.start()
     deadline = time.monotonic() + INGEST_TIMEOUT
+    interrupted = False
     while p.is_alive():
         remaining = deadline - time.monotonic()
         if remaining <= 0:
+            break
+        if should_stop is not None and should_stop():
+            interrupted = True
             break
         p.join(min(KEEPALIVE_INTERVAL, remaining))
         if keepalive is not None:
@@ -129,6 +168,8 @@ def run_ingest_isolated(job_id, rid, inputs, keepalive=None, _target=_ingest_chi
     if p.is_alive():
         p.kill()
         p.join(10)
+        if interrupted:
+            return INTERRUPTED
         return (f"OCR/ingest exceeded {INGEST_TIMEOUT}s limit and was killed "
                 f"(likely a very large/complex PDF OCR).")
     if p.exitcode is not None and p.exitcode < 0:
@@ -152,7 +193,7 @@ class Worker:
         # No connect() here: listen_for_jobs owns connecting, so a broker that is down at
         # start-up is retried with back-off instead of crashing the process before Flask is up.
 
-        self.sql_session = SQLAlchemyIngestDB()
+        self.sql_session = SQLAlchemyIngestDB(statement_timeout=DB_STATEMENT_TIMEOUT)
         self.resolver = WorkerConnectionResolver(self.sql_session)
 
     # Intended usage is "with Queue() as queue:"
@@ -202,7 +243,44 @@ class Worker:
                 and self.channel.is_open
         )
 
+    def _service_connection(self):
+        """Let pika send a heartbeat that came due while the consumer thread was blocked.
+        Raises AMQPError when the connection is already gone."""
+        self.connection.process_data_events(time_limit=0)
+
+    def _release_interrupted_job(self, status_db, prog_doc, previous_error, job_id):
+        """Hand a job whose ingest was stopped for a shutdown back to the queue.
+
+        The delivery is left unacked, so the broker requeues it when this worker closes its
+        connection. The in-progress row goes back to what it said before the ingest: left at
+        'Attempting ingest', the next delivery would be recorded as a worker crash.
+        """
+        try:
+            prog_doc["error"] = previous_error
+            status_db.update_document_in_progress(prog_doc)
+            logger.info("job stopped for shutdown; left unacked so the broker requeues it")
+        except Exception:  # pylint: disable=broad-except
+            logger.exception("job stopped for shutdown, but its in-progress row could not be reset; "
+                             "the next delivery will record it as a worker crash")
+
+    @staticmethod
+    def _remove_in_progress_if_recorded(status_db, job_id, recorded):
+        """Delete the job's in-progress row, but only once its documents_failed row is written.
+
+        insert_failed_document returns False when its statement fails, and with the statement
+        time limit a stalled database now makes it fail where it used to wait. Deleting the
+        in-progress row anyway would make the file vanish with no failure shown.
+        """
+        if recorded:
+            status_db.delete_document_in_progress(job_id)
+        else:
+            logger.error("job failed, but its documents_failed row could not be written; "
+                         "its documents_in_progress row stays, so the file shows as ingesting")
+
     def process_job(self, channel, method, header, body):
+        if self._stop.is_set():
+            # Shutting down: do not start a job. Unacked, it is requeued when the connection closes.
+            return
         started = time.monotonic()
         content = None
         try:
@@ -245,13 +323,17 @@ class Worker:
             course_name = inputs.get('course_name', '')
             resolved = self.resolver.resolve(course_name)
             status_db = (
-                SQLAlchemyIngestDB(engine=resolved.documents_sql_engine)
+                SQLAlchemyIngestDB(engine=resolved.documents_sql_engine, statement_timeout=DB_STATEMENT_TIMEOUT)
                 if resolved.documents_sql_engine else self.sql_session
             )
+            # Each database call below is bounded (connect and statement timeouts), but two slow
+            # ones in a row are not: send any due heartbeat between them.
+            self._service_connection()
 
             # flag this message as "processing started" so we can ack it later if memory runs out
 
             prog_doc = status_db.fetch_document_in_progress(job_id)
+            self._service_connection()
             if not prog_doc:
                 logger.error("job failed: job id %s not found in documents_in_progress", job_id)
                 channel.basic_ack(delivery_tag=method.delivery_tag)
@@ -259,7 +341,7 @@ class Worker:
                 if "error" in prog_doc and prog_doc["error"] == 'Attempting ingest':
                     crash_error = "Ingest could not resolve successfully, worker crashed (e.g. ran out of memory)"
                     logger.error("job failed: %s", crash_error)
-                    status_db.insert_failed_document({
+                    recorded = status_db.insert_failed_document({
                         "s3_path": str(prog_doc["s3_path"]),
                         "readable_filename": prog_doc["readable_filename"],
                         "course_name": prog_doc["course_name"],
@@ -268,9 +350,10 @@ class Worker:
                         "doc_groups": prog_doc["doc_groups"],
                         "error": crash_error,
                     })
-                    status_db.delete_document_in_progress(job_id)
+                    self._remove_in_progress_if_recorded(status_db, job_id, recorded)
                     channel.basic_ack(delivery_tag=method.delivery_tag)
                 else:
+                    previous_error = prog_doc.get("error")
                     prog_doc["error"] = 'Attempting ingest'
                     status_db.update_document_in_progress(prog_doc)
 
@@ -280,10 +363,14 @@ class Worker:
                     # ack (no requeue -> no redelivery-guard mislabel).
                     failure = run_ingest_isolated(
                         job_id, content.get('request_id'), inputs,
-                        keepalive=lambda: self.connection.process_data_events(time_limit=0))
+                        keepalive=lambda: self.connection.process_data_events(time_limit=0),
+                        should_stop=self._stop.is_set)
+                    if failure is INTERRUPTED:
+                        self._release_interrupted_job(status_db, prog_doc, previous_error, job_id)
+                        return
                     if failure is not None:
                         logger.error("job failed: %s", failure[:500])
-                        status_db.insert_failed_document({
+                        recorded = status_db.insert_failed_document({
                             "s3_path": str(prog_doc["s3_path"]),
                             "readable_filename": prog_doc["readable_filename"],
                             "course_name": prog_doc["course_name"],
@@ -292,7 +379,7 @@ class Worker:
                             "doc_groups": prog_doc["doc_groups"],
                             "error": failure,
                         })
-                        status_db.delete_document_in_progress(job_id)
+                        self._remove_in_progress_if_recorded(status_db, job_id, recorded)
                     channel.basic_ack(delivery_tag=method.delivery_tag)
                     if failure is None:
                         logger.info("job done ms=%d", int((time.monotonic() - started) * 1000))
@@ -354,7 +441,8 @@ class Worker:
                          "(%s); its documents_in_progress row stays, so the file shows as ingesting", course_name,
                          type(e).__name__)
             return None
-        return SQLAlchemyIngestDB(engine=engine) if engine else self.sql_session
+        return (SQLAlchemyIngestDB(engine=engine, statement_timeout=DB_STATEMENT_TIMEOUT)
+                if engine else self.sql_session)
 
     @staticmethod
     def _record_discarded_job(status_db, job_id, inputs, error, attempts):
@@ -407,7 +495,8 @@ class Worker:
             logger.info("Worker exiting")
 
     def stop(self):
-        """Ask listen_for_jobs to return after the current message (used on shutdown)."""
+        """Ask listen_for_jobs to return (used on shutdown). An ingest that is running is
+        stopped and its job requeued: see run_ingest_isolated and _release_interrupted_job."""
         self._stop.set()
 
     def _consume_until_disconnected(self):
@@ -448,18 +537,37 @@ def return_health():
     return jsonify(status), (200 if worker_running.is_set() else 500)
 
 
+def _install_sigterm_handler(worker):
+    """Make SIGTERM (ECS and Docker stop) shut the worker down instead of being dropped.
+
+    python is PID 1 in the worker image, and the kernel drops a signal PID 1 has no handler
+    for: the task then runs until ECS SIGKILLs it after stopTimeout (30s by default) and an
+    in-flight job is recorded as "worker crashed". An ingest can run far longer than
+    stopTimeout, so stop it now and requeue its job (worker.stop), then unwind app.run the
+    way Ctrl+C does. Call from the main thread.
+    """
+    def _on_sigterm(signum, frame):
+        logger.info("SIGTERM received; stopping the consumer and requeueing any job in progress")
+        worker.stop()
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _on_sigterm)
+
+
 if __name__ == '__main__':
     worker = Worker()
     worker_thread = threading.Thread(target=worker.listen_for_jobs)
     worker_thread.start()
     worker_thread.join(0)
 
+    _install_sigterm_handler(worker)
+
     logger.info("Running healthcheck endpoint")
     try:
         # threaded=True lets Flask serve multiple requests while worker runs
         app.run(host='0.0.0.0', port=8001, threaded=True)
     finally:
-        # Graceful shutdown: let the current message finish, then stop consuming.
+        # Stop consuming. The worker thread is not a daemon, so the process exits only once it
+        # has stopped the ingest child, reset the job's row and closed the broker connection.
         worker.stop()
         if worker_thread:
-            worker_thread.join(timeout=10)
+            worker_thread.join()

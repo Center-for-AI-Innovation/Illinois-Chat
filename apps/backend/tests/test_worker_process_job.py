@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -69,6 +70,7 @@ def worker():
     w.rabbitmq_queue = "test-queue"
     w.resolver = FailingResolver()
     w.sql_session = None
+    w._stop = threading.Event()
     return w
 
 
@@ -126,7 +128,9 @@ def test_discarded_job_is_recorded_in_the_host_database(worker):
 def test_discarded_job_is_recorded_in_the_project_documents_database(worker, monkeypatch):
     project_dbs = []
 
-    def project_db(engine=None):
+    def project_db(engine=None, statement_timeout=None):
+        # The consumer thread bounds its status queries (see test_worker_shutdown_and_db_timeouts.py).
+        assert statement_timeout == worker_module.DB_STATEMENT_TIMEOUT
         project_dbs.append(FakeStatusDB(engine))
         return project_dbs[-1]
 

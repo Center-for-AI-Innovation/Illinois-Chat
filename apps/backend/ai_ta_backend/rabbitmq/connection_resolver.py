@@ -37,9 +37,9 @@ except ModuleNotFoundError:
     from ai_ta_backend.rabbitmq.vector_store import PgVectorStore
 
 try:
-    from rmsql import SQLAlchemyIngestDB
+    from rmsql import SQLAlchemyIngestDB, postgres_connect_args
 except ModuleNotFoundError:
-    from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB
+    from ai_ta_backend.rabbitmq.rmsql import SQLAlchemyIngestDB, postgres_connect_args
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +305,8 @@ class WorkerConnectionResolver:
         logger.debug("Creating external SQL engine for project: %s", project_name)
         uri = db_config["connection_uri"]
         try:
-            return create_engine(uri, poolclass=NullPool, hide_parameters=True)
+            return create_engine(uri, poolclass=NullPool, hide_parameters=True,
+                                 connect_args=postgres_connect_args(uri))
         except NoSuchModuleError:
             # The scheme names a driver that SQLAlchemy cannot load, for example postgres://.
             # The scheme holds no secret, so the message names it. `from None` for the same
